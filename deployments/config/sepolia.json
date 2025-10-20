@@ -17,5 +17,126 @@
     "ERC7540s": {
         "USDC": "0x7Df1bB427ecD46D96808Bea02c9985Fe2C4e8B56",
         "WBTC": "0x19DD65d3A58427e70DdeB66945f98D7cf9F84D9f"
+    },
+    "custodialTargets": {
+        "walletUSDC": "0x0000000000000000000000000000000000000000",
+        "walletWBTC": "0x0000000000000000000000000000000000000000"
+    },
+    "kTokens": {
+        "kUSD": {
+            "name": "KAM USD",
+            "symbol": "kUSD",
+            "decimals": 6,
+            "maxMintPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            "maxRedeemPerBatch": "100000000000"
+        },
+        "kBTC": {
+            "name": "KAM BTC",
+            "symbol": "kBTC",
+            "decimals": 8,
+            "maxMintPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            "maxRedeemPerBatch": "200000000"
+        }
+    },
+    "vaults": {
+        "dnVaultUSDC": {
+            "name": "KAM DN Vault USD",
+            "symbol": "dnkUSD",
+            "decimals": 6,
+            "underlyingAsset": "USDC",
+            "useKToken": false,
+            "maxTotalAssets": 500000000000000,
+            "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            "maxWithdrawPerBatch": 50000000000000
+        },
+        "dnVaultWBTC": {
+            "name": "KAM DN Vault BTC",
+            "symbol": "dnkBTC",
+            "decimals": 8,
+            "underlyingAsset": "WBTC",
+            "useKToken": false,
+            "maxTotalAssets": 20000000000,
+            "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            "maxWithdrawPerBatch": 2000000000
+        },
+        "alphaVault": {
+            "name": "KAM Alpha Vault USD",
+            "symbol": "akUSD",
+            "decimals": 6,
+            "underlyingAsset": "USDC",
+            "useKToken": false,
+            "maxTotalAssets": "200000000000000",
+            "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            "maxWithdrawPerBatch": 20000000000000
+        },
+        "betaVault": {
+            "name": "KAM Beta Vault USD",
+            "symbol": "bkUSD",
+            "decimals": 6,
+            "underlyingAsset": "USDC",
+            "useKToken": false,
+            "maxTotalAssets": 200000000000000,
+            "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            "maxWithdrawPerBatch": 20000000000000
+        }
+    },
+    "assetRouter": {
+        "settlementCooldown": 0,
+        "maxAllowedDelta": 1000
+    },
+    "parameterChecker": {
+        "maxSingleTransfer": {
+            "USDC": "1000000000000",
+            "WBTC": "3000000000",
+            "ERC7540USDC": "1000000000000",
+            "ERC7540WBTC": "3000000000"
+        },
+        "allowedReceivers": {
+            "USDC": [
+                "walletUSDC"
+            ],
+            "WBTC": [
+                "walletUSDC"
+            ],
+            "ERC7540USDC": [
+                "kMinterAdapterUSDC",
+                "dnVaultAdapterUSDC"
+            ],
+            "ERC7540WBTC": [
+                "kMinterAdapterWBTC",
+                "dnVaultAdapterWBTC"
+            ]
+        },
+        "allowedSources": {
+            "ERC7540USDC": [
+                "kMinterAdapterUSDC",
+                "dnVaultAdapterUSDC",
+                "treasury"
+            ],
+            "ERC7540WBTC": [
+                "kMinterAdapterWBTC",
+                "dnVaultAdapterWBTC",
+                "treasury"
+            ]
+        },
+        "allowedSpenders": {
+            "USDC": [
+                "ERC7540USDC"
+            ],
+            "WBTC": [
+                "ERC7540WBTC"
+            ]
+        }
+    },
+    "mockAssets": {
+        "enabled": true,
+        "mintAmounts": {
+            "USDC": "10000000000000",
+            "WBTC": "100000000000"
+        },
+        "mockTargetAmounts": {
+            "USDC": "1000000000000",
+            "WBTC": "10000000000"
+        }
     }
 }

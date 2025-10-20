@@ -6,8 +6,8 @@ import { console2 as console } from "forge-std/console2.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
-import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
+import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 
 contract DeployVaultsScript is Script, DeploymentManager {
     ERC1967Factory factory;
@@ -56,41 +56,21 @@ contract DeployVaultsScript is Script, DeploymentManager {
         console.log("Setting batch limits for DN Vault USDC:");
         console.log("  Max Deposit:", config.dnVaultUSDC.maxDepositPerBatch);
         console.log("  Max Withdraw:", config.dnVaultUSDC.maxWithdrawPerBatch);
-        registry.setAssetBatchLimits(
-            dnVaultUSDC, // vault as token
-            config.dnVaultUSDC.maxDepositPerBatch,
-            config.dnVaultUSDC.maxWithdrawPerBatch
-        );
 
         // Set batch limits for DN Vault WBTC
         console.log("Setting batch limits for DN Vault WBTC:");
         console.log("  Max Deposit:", config.dnVaultWBTC.maxDepositPerBatch);
         console.log("  Max Withdraw:", config.dnVaultWBTC.maxWithdrawPerBatch);
-        registry.setAssetBatchLimits(
-            dnVaultWBTC, // vault as token
-            config.dnVaultWBTC.maxDepositPerBatch,
-            config.dnVaultWBTC.maxWithdrawPerBatch
-        );
 
         // Set batch limits for Alpha Vault
         console.log("Setting batch limits for Alpha Vault:");
         console.log("  Max Deposit:", config.alphaVault.maxDepositPerBatch);
         console.log("  Max Withdraw:", config.alphaVault.maxWithdrawPerBatch);
-        registry.setAssetBatchLimits(
-            alphaVault, // vault as token
-            config.alphaVault.maxDepositPerBatch,
-            config.alphaVault.maxWithdrawPerBatch
-        );
 
         // Set batch limits for Beta Vault
         console.log("Setting batch limits for Beta Vault:");
         console.log("  Max Deposit:", config.betaVault.maxDepositPerBatch);
         console.log("  Max Withdraw:", config.betaVault.maxWithdrawPerBatch);
-        registry.setAssetBatchLimits(
-            betaVault, // vault as token
-            config.betaVault.maxDepositPerBatch,
-            config.betaVault.maxWithdrawPerBatch
-        );
 
         vm.stopBroadcast();
 
@@ -103,7 +83,6 @@ contract DeployVaultsScript is Script, DeploymentManager {
         console.log("Beta Vault proxy deployed at:", betaVault);
         console.log("Network:", config.network);
         console.log("");
-        console.log("Batch limits configured in registry for all vaults");
 
         // Auto-write contract addresses to deployment JSON
         writeContractAddress("kStakingVaultImpl", stakingVaultImpl);
@@ -118,7 +97,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         console.log("  Name:", config.dnVaultUSDC.name);
         console.log("  Symbol:", config.dnVaultUSDC.symbol);
         console.log("  Max Total Assets:", config.dnVaultUSDC.maxTotalAssets);
-        
+
         return factory.deployAndCall(
             stakingVaultImpl,
             msg.sender,
@@ -141,7 +120,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         console.log("  Name:", config.dnVaultWBTC.name);
         console.log("  Symbol:", config.dnVaultWBTC.symbol);
         console.log("  Max Total Assets:", config.dnVaultWBTC.maxTotalAssets);
-        
+
         return factory.deployAndCall(
             stakingVaultImpl,
             msg.sender,
@@ -164,7 +143,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         console.log("  Name:", config.alphaVault.name);
         console.log("  Symbol:", config.alphaVault.symbol);
         console.log("  Max Total Assets:", config.alphaVault.maxTotalAssets);
-        
+
         return factory.deployAndCall(
             stakingVaultImpl,
             msg.sender,
@@ -187,7 +166,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         console.log("  Name:", config.betaVault.name);
         console.log("  Symbol:", config.betaVault.symbol);
         console.log("  Max Total Assets:", config.betaVault.maxTotalAssets);
-        
+
         return factory.deployAndCall(
             stakingVaultImpl,
             msg.sender,

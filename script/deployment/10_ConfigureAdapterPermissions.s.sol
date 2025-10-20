@@ -124,16 +124,16 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
 
         console.log("");
         console.log("3. Configuring parameter checker permissions from config...");
-        
+
         // Set allowed receivers from config
         _configureAllowedReceivers(erc20ParameterChecker, config, existing, usdc, usdcVault, usdcWallet);
-        
+
         // Set allowed sources from config
         _configureAllowedSources(erc20ParameterChecker, config, existing, usdcVault, wbtcVault);
-        
+
         // Set allowed spenders from config
         _configureAllowedSpenders(erc20ParameterChecker, config, existing, usdc, wbtc, usdcVault, wbtcVault);
-        
+
         // Set max transfer limits from config
         console.log("   - Set max transfer limits");
         erc20ParameterChecker.setMaxSingleTransfer(usdc, config.parameterChecker.maxSingleTransfer.USDC);
@@ -155,9 +155,11 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         address usdc,
         address usdcVault,
         address usdcWallet
-    ) internal {
+    )
+        internal
+    {
         console.log("   - Set allowed receivers from config");
-        
+
         // USDC receivers
         for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.USDC.length; i++) {
             address receiver = _resolveAddress(config.parameterChecker.allowedReceivers.USDC[i], config, existing);
@@ -165,7 +167,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
                 checker.setAllowedReceiver(usdc, receiver, true);
             }
         }
-        
+
         // WBTC receivers
         for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.WBTC.length; i++) {
             address receiver = _resolveAddress(config.parameterChecker.allowedReceivers.WBTC[i], config, existing);
@@ -173,18 +175,20 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
                 checker.setAllowedReceiver(config.assets.WBTC, receiver, true);
             }
         }
-        
+
         // ERC7540USDC receivers
         for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.ERC7540USDC.length; i++) {
-            address receiver = _resolveAddress(config.parameterChecker.allowedReceivers.ERC7540USDC[i], config, existing);
+            address receiver =
+                _resolveAddress(config.parameterChecker.allowedReceivers.ERC7540USDC[i], config, existing);
             if (receiver != address(0)) {
                 checker.setAllowedReceiver(usdcVault, receiver, true);
             }
         }
-        
+
         // ERC7540WBTC receivers
         for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.ERC7540WBTC.length; i++) {
-            address receiver = _resolveAddress(config.parameterChecker.allowedReceivers.ERC7540WBTC[i], config, existing);
+            address receiver =
+                _resolveAddress(config.parameterChecker.allowedReceivers.ERC7540WBTC[i], config, existing);
             if (receiver != address(0)) {
                 checker.setAllowedReceiver(existing.contracts.ERC7540WBTC, receiver, true);
             }
@@ -197,9 +201,11 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         DeploymentOutput memory existing,
         address usdcVault,
         address wbtcVault
-    ) internal {
+    )
+        internal
+    {
         console.log("   - Set allowed sources from config");
-        
+
         // ERC7540USDC sources
         for (uint256 i = 0; i < config.parameterChecker.allowedSources.ERC7540USDC.length; i++) {
             address source = _resolveAddress(config.parameterChecker.allowedSources.ERC7540USDC[i], config, existing);
@@ -207,7 +213,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
                 checker.setAllowedSource(usdcVault, source, true);
             }
         }
-        
+
         // ERC7540WBTC sources
         for (uint256 i = 0; i < config.parameterChecker.allowedSources.ERC7540WBTC.length; i++) {
             address source = _resolveAddress(config.parameterChecker.allowedSources.ERC7540WBTC[i], config, existing);
@@ -225,9 +231,11 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         address wbtc,
         address usdcVault,
         address wbtcVault
-    ) internal {
+    )
+        internal
+    {
         console.log("   - Set allowed spenders from config");
-        
+
         // USDC spenders
         for (uint256 i = 0; i < config.parameterChecker.allowedSpenders.USDC.length; i++) {
             address spender = _resolveAddress(config.parameterChecker.allowedSpenders.USDC[i], config, existing);
@@ -235,7 +243,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
                 checker.setAllowedSpender(usdc, spender, true);
             }
         }
-        
+
         // WBTC spenders
         for (uint256 i = 0; i < config.parameterChecker.allowedSpenders.WBTC.length; i++) {
             address spender = _resolveAddress(config.parameterChecker.allowedSpenders.WBTC[i], config, existing);
@@ -245,11 +253,11 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         }
     }
 
-    function _resolveAddress(
-        string memory key,
-        NetworkConfig memory config,
-        DeploymentOutput memory existing
-    ) internal pure returns (address) {
+    function _resolveAddress(string memory key, NetworkConfig memory config, DeploymentOutput memory existing)
+        internal
+        pure
+        returns (address)
+    {
         // Check if it's a contract key
         if (keccak256(bytes(key)) == keccak256(bytes("kMinterAdapterUSDC"))) {
             return existing.contracts.kMinterAdapterUSDC;
@@ -274,7 +282,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         } else if (keccak256(bytes(key)) == keccak256(bytes("ERC7540WBTC"))) {
             return existing.contracts.ERC7540WBTC;
         }
-        
+
         return address(0);
     }
 }

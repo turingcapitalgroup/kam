@@ -245,13 +245,13 @@ abstract contract DeploymentManager is Script {
         config.name = json.readString(string.concat(path, ".name"));
         config.symbol = json.readString(string.concat(path, ".symbol"));
         config.decimals = uint8(json.readUint(string.concat(path, ".decimals")));
-        
+
         string memory maxMintStr = json.readString(string.concat(path, ".maxMintPerBatch"));
         config.maxMintPerBatch = _parseUintString(maxMintStr);
-        
+
         string memory maxRedeemStr = json.readString(string.concat(path, ".maxRedeemPerBatch"));
         config.maxRedeemPerBatch = _parseUintString(maxRedeemStr);
-        
+
         return config;
     }
 
@@ -270,12 +270,14 @@ abstract contract DeploymentManager is Script {
 
     function _readParameterCheckerConfig(string memory json) private view returns (ParameterCheckerConfig memory) {
         ParameterCheckerConfig memory config;
-        
+
         // Read max single transfer amounts
         config.maxSingleTransfer.USDC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.USDC"));
         config.maxSingleTransfer.WBTC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.WBTC"));
-        config.maxSingleTransfer.ERC7540USDC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.ERC7540USDC"));
-        config.maxSingleTransfer.ERC7540WBTC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.ERC7540WBTC"));
+        config.maxSingleTransfer.ERC7540USDC =
+            _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.ERC7540USDC"));
+        config.maxSingleTransfer.ERC7540WBTC =
+            _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.ERC7540WBTC"));
 
         // Read allowed receivers arrays
         bytes memory usdcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.USDC");
@@ -310,7 +312,7 @@ abstract contract DeploymentManager is Script {
     function _parseUintString(string memory str) private pure returns (uint256) {
         bytes memory b = bytes(str);
         if (b.length == 1 && b[0] == 0x30) return 0; // "0"
-        
+
         uint256 result = 0;
         for (uint256 i = 0; i < b.length; i++) {
             uint8 digit = uint8(b[i]) - 48;
@@ -320,7 +322,11 @@ abstract contract DeploymentManager is Script {
         return result == 0 ? type(uint256).max : result;
     }
 
-    function getUnderlyingAssetAddress(NetworkConfig memory config, string memory assetKey) internal pure returns (address) {
+    function getUnderlyingAssetAddress(NetworkConfig memory config, string memory assetKey)
+        internal
+        pure
+        returns (address)
+    {
         if (keccak256(bytes(assetKey)) == keccak256(bytes("USDC"))) {
             return config.assets.USDC;
         } else if (keccak256(bytes(assetKey)) == keccak256(bytes("WBTC"))) {
@@ -329,7 +335,11 @@ abstract contract DeploymentManager is Script {
         revert("Unknown asset key");
     }
 
-    function resolveContractAddress(DeploymentOutput memory existing, string memory contractKey) internal pure returns (address) {
+    function resolveContractAddress(DeploymentOutput memory existing, string memory contractKey)
+        internal
+        pure
+        returns (address)
+    {
         if (keccak256(bytes(contractKey)) == keccak256(bytes("kMinterAdapterUSDC"))) {
             return existing.contracts.kMinterAdapterUSDC;
         } else if (keccak256(bytes(contractKey)) == keccak256(bytes("kMinterAdapterWBTC"))) {
@@ -541,7 +551,8 @@ abstract contract DeploymentManager is Script {
         json = string.concat(json, '"kBTC":"', vm.toString(output.contracts.kBTC), '",');
         json = string.concat(json, '"kStakingVaultImpl":"', vm.toString(output.contracts.kStakingVaultImpl), '",');
         json = string.concat(json, '"readerModule":"', vm.toString(output.contracts.readerModule), '",');
-        json = string.concat(json, '"adapterGuardianModule":"', vm.toString(output.contracts.adapterGuardianModule), '",');
+        json =
+            string.concat(json, '"adapterGuardianModule":"', vm.toString(output.contracts.adapterGuardianModule), '",');
         json = string.concat(json, '"dnVaultUSDC":"', vm.toString(output.contracts.dnVaultUSDC), '",');
         json = string.concat(json, '"dnVaultWBTC":"', vm.toString(output.contracts.dnVaultWBTC), '",');
         json = string.concat(json, '"alphaVault":"', vm.toString(output.contracts.alphaVault), '",');
@@ -556,7 +567,8 @@ abstract contract DeploymentManager is Script {
         json = string.concat(json, '"ERC7540USDC":"', vm.toString(output.contracts.ERC7540USDC), '",');
         json = string.concat(json, '"ERC7540WBTC":"', vm.toString(output.contracts.ERC7540WBTC), '",');
         json = string.concat(json, '"WalletUSDC":"', vm.toString(output.contracts.WalletUSDC), '",');
-        json = string.concat(json, '"erc20ParameterChecker":"', vm.toString(output.contracts.erc20ParameterChecker), '"');
+        json =
+            string.concat(json, '"erc20ParameterChecker":"', vm.toString(output.contracts.erc20ParameterChecker), '"');
         json = string.concat(json, "}}");
 
         return json;
