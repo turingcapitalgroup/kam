@@ -110,7 +110,9 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         address mockERC7540USDC,
         address mockERC7540WBTC,
         address mockWalletUSDC // Added MockWallet address
-    ) internal {
+    )
+        internal
+    {
         string memory configPath = string.concat("deployments/config/", network, ".json");
 
         // The vm.writeJson() cheatcode is the correct way to update specific keys

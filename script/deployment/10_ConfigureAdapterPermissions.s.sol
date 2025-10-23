@@ -44,7 +44,11 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         }
     }
 
-    function configureCustodialAdapterPermissions(IkRegistry registry, address adapter, address custodialAddress)
+    function configureCustodialAdapterPermissions(
+        IkRegistry registry,
+        address adapter,
+        address custodialAddress
+    )
         internal
     {
         bytes4 approveSelector = IERC7540.approve.selector;
@@ -253,7 +257,11 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         }
     }
 
-    function _resolveAddress(string memory key, NetworkConfig memory config, DeploymentOutput memory existing)
+    function _resolveAddress(
+        string memory key,
+        NetworkConfig memory config,
+        DeploymentOutput memory existing
+    )
         internal
         pure
         returns (address)
