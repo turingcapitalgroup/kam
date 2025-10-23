@@ -48,6 +48,30 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         registry.registerVault(existing.contracts.betaVault, IRegistry.VaultType.BETA, config.assets.USDC);
         console.log("   - Registered Beta Vault as BETA vault for USDC");
 
+        registry.setAssetBatchLimits(
+            existing.contracts.dnVaultWBTC, // vault as token
+            config.dnVaultWBTC.maxDepositPerBatch,
+            config.dnVaultWBTC.maxWithdrawPerBatch
+        );
+
+        registry.setAssetBatchLimits(
+            existing.contracts.dnVaultWBTC, // vault as token
+            config.dnVaultWBTC.maxDepositPerBatch,
+            config.dnVaultWBTC.maxWithdrawPerBatch
+        );
+
+        registry.setAssetBatchLimits(
+            existing.contracts.alphaVault, // vault as token
+            config.alphaVault.maxDepositPerBatch,
+            config.alphaVault.maxWithdrawPerBatch
+        );
+
+        registry.setAssetBatchLimits(
+            existing.contracts.betaVault, // vault as token
+            config.betaVault.maxDepositPerBatch,
+            config.betaVault.maxWithdrawPerBatch
+        );
+
         console.log("");
         console.log("2. Registering adapters with vaults...");
 
