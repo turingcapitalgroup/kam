@@ -44,6 +44,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         }
     }
 
+    // Helper function to configure custodial adapter permissions (targetType = 1)
     function configureCustodialAdapterPermissions(
         IkRegistry registry,
         address adapter,
