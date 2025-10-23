@@ -66,7 +66,12 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
 
         // Update network config with deployed addresses
         _updateNetworkConfig(
-            config.network, address(mockUSDC), address(mockWBTC), address(mockERC7540USDC), address(mockERC7540WBTC)
+            config.network,
+            address(mockUSDC),
+            address(mockWBTC),
+            address(mockERC7540USDC),
+            address(mockERC7540WBTC),
+            address(mockWalletUSDC) // Pass the new MockWallet address
         );
 
         // Write mock target addresses to deployment output
@@ -97,52 +102,42 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         return usdcDeployed && wbtcDeployed;
     }
 
+    // New function signature including the MockWallet address
     function _updateNetworkConfig(
         string memory network,
         address mockUSDC,
         address mockWBTC,
         address mockERC7540USDC,
-        address mockERC7540WBTC
-    )
-        internal
-    {
+        address mockERC7540WBTC,
+        address mockWalletUSDC // Added MockWallet address
+    ) internal {
         string memory configPath = string.concat("deployments/config/", network, ".json");
-        string memory json = vm.readFile(configPath);
 
-        // Build updated JSON string with new asset addresses
-        string memory updatedJson = string.concat(
-            '{"network":"',
-            network,
-            '","chainId":',
-            vm.toString(vm.parseJsonUint(json, ".chainId")),
-            ',"roles":{"owner":"',
-            vm.toString(vm.parseJsonAddress(json, ".roles.owner")),
-            '","admin":"',
-            vm.toString(vm.parseJsonAddress(json, ".roles.admin")),
-            '","emergencyAdmin":"',
-            vm.toString(vm.parseJsonAddress(json, ".roles.emergencyAdmin")),
-            '","guardian":"',
-            vm.toString(vm.parseJsonAddress(json, ".roles.guardian")),
-            '","relayer":"',
-            vm.toString(vm.parseJsonAddress(json, ".roles.relayer")),
-            '","institution":"',
-            vm.toString(vm.parseJsonAddress(json, ".roles.institution")),
-            '","treasury":"',
-            vm.toString(vm.parseJsonAddress(json, ".roles.treasury")),
-            '"},"assets":{"USDC":"',
-            vm.toString(mockUSDC),
-            '","WBTC":"',
-            vm.toString(mockWBTC),
-            '"},"ERC7540s":{"USDC":"',
-            vm.toString(mockERC7540USDC),
-            '","WBTC":"',
-            vm.toString(mockERC7540WBTC),
-            '"}}'
-        );
+        // The vm.writeJson() cheatcode is the correct way to update specific keys
+        // in a JSON file without deleting the rest of the file content.
 
-        vm.writeFile(configPath, updatedJson);
+        // 1. Update Asset Addresses
+        vm.writeJson(vm.toString(mockUSDC), configPath, ".assets.USDC");
+        vm.writeJson(vm.toString(mockWBTC), configPath, ".assets.WBTC");
+
+        // 2. Update ERC7540 Vault Addresses
+        vm.writeJson(vm.toString(mockERC7540USDC), configPath, ".ERC7540s.USDC");
+        vm.writeJson(vm.toString(mockERC7540WBTC), configPath, ".ERC7540s.WBTC");
+
+        // 3. Update the MockWallet Address
+        // This key may not exist in the original config, so we add a new top-level
+        // key or update an existing key where the MockWallet address should reside.
+        // Assuming there is a 'mockTargets' key or similar structure for non-standard assets.
+        // For simplicity, let's update an existing role or add a new key if needed.
+        // Based on the provided JSON structure, it's safer to add a new top-level key for mock-specific addresses.
+        // Since `MockWallet` isn't a main asset, we'll write it to a new mock-specific section.
+        // NOTE: If you need it in a specific existing key (like 'roles'), change the path here.
+        vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".mockAssets.WalletUSDC");
+
         console.log("Updated config file with mock asset addresses");
     }
+
+    // ... (rest of the helper functions remain the same)
 
     function _mintTokensForTesting(MockERC20 mockUSDC, MockERC20 mockWBTC, NetworkConfig memory config) internal {
         console.log("=== MINTING TOKENS FOR TESTING (from config) ===");
