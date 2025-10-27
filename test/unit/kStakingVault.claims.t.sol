@@ -6,6 +6,7 @@ import { _1_USDC } from "../utils/Constants.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
+import { IVault } from "kam/src/interfaces/IVault.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 
 import {
@@ -56,7 +57,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         // Claim staked shares
         vm.prank(users.alice);
         vm.expectEmit(true, false, true, true);
-        emit kStakingVault.StakingSharesClaimed(batchId, requestId, users.alice, 1000 * _1_USDC);
+        emit IVault.StakingSharesClaimed(batchId, requestId, users.alice, 1000 * _1_USDC);
         vault.claimStakedShares(requestId);
 
         // Verify user received stkTokens
@@ -260,7 +261,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         // Claim unstaked assets
         vm.prank(users.alice);
         vm.expectEmit(true, false, true, true);
-        emit kStakingVault.UnstakingAssetsClaimed(unstakeBatchId, unstakeRequestId, users.alice, aliceDeposit);
+        emit IVault.UnstakingAssetsClaimed(unstakeBatchId, unstakeRequestId, users.alice, aliceDeposit);
         vault.claimUnstakedAssets(unstakeRequestId);
 
         // Verify user received kTokens back
@@ -335,7 +336,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         // Claim unstaked assets
         vm.prank(users.alice);
         vm.expectEmit(true, false, true, true);
-        emit kStakingVault.UnstakingAssetsClaimed(unstakeBatchId, unstakeRequestId, users.alice, 999_178_000);
+        emit IVault.UnstakingAssetsClaimed(unstakeBatchId, unstakeRequestId, users.alice, 999_178_000);
         vault.claimUnstakedAssets(unstakeRequestId);
 
         assertApproxEqRel(vault.sharePrice(), sharePrice, 0.001 ether);

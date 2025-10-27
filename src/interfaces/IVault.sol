@@ -19,6 +19,70 @@ import { IVaultFees } from "./IVaultFees.sol";
 /// transparent yield accrual for retail participants.
 interface IVault is IVaultBatch, IVaultClaim, IVaultFees {
     /* //////////////////////////////////////////////////////////////
+                              EVENTS
+    //////////////////////////////////////////////////////////////*/
+
+    // VaultBatches Events
+    // / @notice Emitted when a new batch is created
+    // / @param batchId The batch ID of the new batch
+    event BatchCreated(bytes32 indexed batchId);
+
+    /// @notice Emitted when a batch is settled
+    /// @param batchId The batch ID of the settled batch
+    event BatchSettled(bytes32 indexed batchId);
+
+    /// @notice Emitted when a batch is closed
+    /// @param batchId The batch ID of the closed batch
+    event BatchClosed(bytes32 indexed batchId);
+
+    /// @notice Emitted when a BatchReceiver is created
+    /// @param receiver The address of the created BatchReceiver
+    /// @param batchId The batch ID of the BatchReceiver
+    event BatchReceiverCreated(address indexed receiver, bytes32 indexed batchId);
+
+    // VaultClaims Events
+    // / @notice Emitted when a user claims staking shares
+    event StakingSharesClaimed(bytes32 indexed batchId, bytes32 requestId, address indexed user, uint256 shares);
+
+    /// @notice Emitted when a user claims unstaking assets
+    event UnstakingAssetsClaimed(bytes32 indexed batchId, bytes32 requestId, address indexed user, uint256 assets);
+
+    /// @notice Emitted when kTokens are unstaked
+    event KTokenUnstaked(address indexed user, uint256 shares, uint256 kTokenAmount);
+
+    // VaultFees Events
+    // / @notice Emitted when the management fee is updated
+    // / @param oldFee Previous management fee in basis points
+    // / @param newFee New management fee in basis points
+    event ManagementFeeUpdated(uint16 oldFee, uint16 newFee);
+
+    /// @notice Emitted when the performance fee is updated
+    /// @param oldFee Previous performance fee in basis points
+    /// @param newFee New performance fee in basis points
+    event PerformanceFeeUpdated(uint16 oldFee, uint16 newFee);
+
+    /// @notice Emitted when fees are charged to the vault
+    /// @param managementFees Amount of management fees collected
+    /// @param performanceFees Amount of performance fees collected
+    event FeesAssesed(uint256 managementFees, uint256 performanceFees);
+
+    /// @notice Emitted when the hurdle rate is updated
+    /// @param newRate New hurdle rate in basis points
+    event HurdleRateUpdated(uint16 newRate);
+
+    /// @notice Emitted when the hard hurdle rate is updated
+    /// @param newRate New hard hurdle rate in basis points
+    event HardHurdleRateUpdated(bool newRate);
+
+    /// @notice Emitted when management fees are charged
+    /// @param timestamp Timestamp of the fee charge
+    event ManagementFeesCharged(uint256 timestamp);
+
+    /// @notice Emitted when performance fees are charged
+    /// @param timestamp Timestamp of the fee charge
+    event PerformanceFeesCharged(uint256 timestamp);
+
+    /* //////////////////////////////////////////////////////////////
                         USER STAKING OPERATIONS
     //////////////////////////////////////////////////////////////*/
 

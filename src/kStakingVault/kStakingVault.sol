@@ -68,70 +68,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     using OptimizedFixedPointMathLib for uint256;
 
     /* //////////////////////////////////////////////////////////////
-                              EVENTS
-    //////////////////////////////////////////////////////////////*/
-
-    // VaultBatches Events
-    // / @notice Emitted when a new batch is created
-    // / @param batchId The batch ID of the new batch
-    event BatchCreated(bytes32 indexed batchId);
-
-    /// @notice Emitted when a batch is settled
-    /// @param batchId The batch ID of the settled batch
-    event BatchSettled(bytes32 indexed batchId);
-
-    /// @notice Emitted when a batch is closed
-    /// @param batchId The batch ID of the closed batch
-    event BatchClosed(bytes32 indexed batchId);
-
-    /// @notice Emitted when a BatchReceiver is created
-    /// @param receiver The address of the created BatchReceiver
-    /// @param batchId The batch ID of the BatchReceiver
-    event BatchReceiverCreated(address indexed receiver, bytes32 indexed batchId);
-
-    // VaultClaims Events
-    // / @notice Emitted when a user claims staking shares
-    event StakingSharesClaimed(bytes32 indexed batchId, bytes32 requestId, address indexed user, uint256 shares);
-
-    /// @notice Emitted when a user claims unstaking assets
-    event UnstakingAssetsClaimed(bytes32 indexed batchId, bytes32 requestId, address indexed user, uint256 assets);
-
-    /// @notice Emitted when kTokens are unstaked
-    event KTokenUnstaked(address indexed user, uint256 shares, uint256 kTokenAmount);
-
-    // VaultFees Events
-    // / @notice Emitted when the management fee is updated
-    // / @param oldFee Previous management fee in basis points
-    // / @param newFee New management fee in basis points
-    event ManagementFeeUpdated(uint16 oldFee, uint16 newFee);
-
-    /// @notice Emitted when the performance fee is updated
-    /// @param oldFee Previous performance fee in basis points
-    /// @param newFee New performance fee in basis points
-    event PerformanceFeeUpdated(uint16 oldFee, uint16 newFee);
-
-    /// @notice Emitted when fees are charged to the vault
-    /// @param managementFees Amount of management fees collected
-    /// @param performanceFees Amount of performance fees collected
-    event FeesAssesed(uint256 managementFees, uint256 performanceFees);
-
-    /// @notice Emitted when the hurdle rate is updated
-    /// @param newRate New hurdle rate in basis points
-    event HurdleRateUpdated(uint16 newRate);
-
-    /// @notice Emitted when the hard hurdle rate is updated
-    /// @param newRate New hard hurdle rate in basis points
-    event HardHurdleRateUpdated(bool newRate);
-
-    /// @notice Emitted when management fees are charged
-    /// @param timestamp Timestamp of the fee charge
-    event ManagementFeesCharged(uint256 timestamp);
-
-    /// @notice Emitted when performance fees are charged
-    /// @param timestamp Timestamp of the fee charge
-    event PerformanceFeesCharged(uint256 timestamp);
-
-    /* //////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
@@ -223,9 +159,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Notify the router to move underlying assets from DN strategy
         // To the strategy of this vault
         // That movement will happen from the wallet managing the portfolio
-        IkAssetRouter(_getKAssetRouter()).kAssetTransfer(
-            _getKMinter(), address(this), $.underlyingAsset, amount, batchId
-        );
+        IkAssetRouter(_getKAssetRouter())
+            .kAssetTransfer(_getKMinter(), address(this), $.underlyingAsset, amount, batchId);
 
         // Deposit ktokens
         $.kToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -321,9 +256,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         request.status = BaseVaultTypes.RequestStatus.CANCELLED;
         $.totalPendingStake -= request.kTokenAmount;
 
-        IkAssetRouter(_getKAssetRouter()).kAssetTransfer(
-            address(this), _getKMinter(), $.underlyingAsset, request.kTokenAmount, request.batchId
-        );
+        IkAssetRouter(_getKAssetRouter())
+            .kAssetTransfer(address(this), _getKMinter(), $.underlyingAsset, request.kTokenAmount, request.batchId);
 
         $.kToken.safeTransfer(request.user, request.kTokenAmount);
 
@@ -531,7 +465,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _checkAmountNotZero(netSharePrice);
 
         // Divide the deposited assets by the share price of the batch to obtain stkTokens to mint
-        uint256 stkTokensToMint = (uint256(request.kTokenAmount)) * 10 ** _getDecimals($) / netSharePrice;
+        uint256 stkTokensToMint = ((uint256(request.kTokenAmount)) * 10 ** _getDecimals($)) / netSharePrice;
 
         emit StakingSharesClaimed(batchId, requestId, request.user, stkTokensToMint);
 
@@ -571,8 +505,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Calculate total kTokens to return based on settlement-time share price
         // Multiply redeemed shares for net and gross share price to obtain gross and net amount of assets
         uint8 decimals = _getDecimals($);
-        uint256 totalKTokensNet = (uint256(request.stkTokenAmount)) * netSharePrice / (10 ** decimals);
-        uint256 netSharesToBurn = (uint256(request.stkTokenAmount)) * netSharePrice / sharePrice;
+        uint256 totalKTokensNet = ((uint256(request.stkTokenAmount)) * netSharePrice) / (10 ** decimals);
+        uint256 netSharesToBurn = ((uint256(request.stkTokenAmount)) * netSharePrice) / sharePrice;
 
         // Burn stkTokens from vault (already transferred to vault during request)
         _burn(address(this), netSharesToBurn);

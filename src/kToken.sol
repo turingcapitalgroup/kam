@@ -13,6 +13,7 @@ import {
     KTOKEN_ZERO_ADDRESS,
     KTOKEN_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
+import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 /// @title kToken
 /// @notice ERC20 representation of underlying assets with guaranteed 1:1 backing in the KAM protocol
@@ -27,57 +28,8 @@ import {
 /// protocol emergencies, (6) Supports emergency asset recovery for accidentally sent tokens. The contract ensures
 /// protocol integrity by maintaining that kToken supply accurately reflects the underlying asset backing plus any
 /// distributed yield, while enabling efficient yield distribution without physical asset transfers.
-contract kToken is ERC20, OptimizedOwnableRoles, OptimizedReentrancyGuardTransient, Multicallable {
+contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGuardTransient, Multicallable {
     using SafeTransferLib for address;
-
-    /* //////////////////////////////////////////////////////////////
-                                EVENTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Emitted when tokens are minted
-    /// @param to The address to which the tokens are minted
-    /// @param amount The quantity of tokens minted
-    event Minted(address indexed to, uint256 amount);
-
-    /// @notice Emitted when tokens are burned
-    /// @param from The address from which tokens are burned
-    /// @param amount The quantity of tokens burned
-    event Burned(address indexed from, uint256 amount);
-
-    /// @notice Emitted when a new token is created
-    /// @param token The address of the new token
-    /// @param owner The owner of the new token
-    /// @param name The name of the new token
-    /// @param symbol The symbol of the new token
-    /// @param decimals The decimals of the new token
-    event TokenCreated(address indexed token, address owner, string name, string symbol, uint8 decimals);
-
-    /// @notice Emitted when the pause state is changed
-    /// @param isPaused The new pause state
-    event PauseState(bool isPaused);
-
-    /// @notice Emitted when an authorized caller is updated
-    /// @param caller The address of the caller
-    /// @param authorized Whether the caller is authorized
-    event AuthorizedCallerUpdated(address indexed caller, bool authorized);
-
-    /// @notice Emitted when an emergency withdrawal is requested
-    /// @param token The address of the token
-    /// @param to The address to which the tokens will be sent
-    /// @param amount The amount of tokens to withdraw
-    /// @param admin The address of the admin
-    event EmergencyWithdrawal(address indexed token, address indexed to, uint256 amount, address indexed admin);
-
-    /// @notice Emitted when assets are rescued
-    /// @param asset The address of the asset
-    /// @param to The address to which the assets will be sent
-    /// @param amount The amount of assets rescued
-    event RescuedAssets(address indexed asset, address indexed to, uint256 amount);
-
-    /// @notice Emitted when ETH is rescued
-    /// @param asset The address of the asset
-    /// @param amount The amount of ETH rescued
-    event RescuedETH(address indexed asset, uint256 amount);
 
     /* //////////////////////////////////////////////////////////////
                                 ROLES
@@ -202,21 +154,21 @@ contract kToken is ERC20, OptimizedOwnableRoles, OptimizedReentrancyGuardTransie
     /// @notice Retrieves the human-readable name of the token
     /// @dev Returns the name stored in contract storage during initialization
     /// @return The token name as a string
-    function name() public view virtual override returns (string memory) {
+    function name() public view virtual override(ERC20, IkToken) returns (string memory) {
         return _name;
     }
 
     /// @notice Retrieves the abbreviated symbol of the token
     /// @dev Returns the symbol stored in contract storage during initialization
     /// @return The token symbol as a string
-    function symbol() public view virtual override returns (string memory) {
+    function symbol() public view virtual override(ERC20, IkToken) returns (string memory) {
         return _symbol;
     }
 
     /// @notice Retrieves the number of decimal places for the token
     /// @dev Returns the decimals value stored in contract storage during initialization
     /// @return The number of decimal places as uint8
-    function decimals() public view virtual override returns (uint8) {
+    function decimals() public view virtual override(ERC20, IkToken) returns (uint8) {
         return _decimals;
     }
 
@@ -225,6 +177,57 @@ contract kToken is ERC20, OptimizedOwnableRoles, OptimizedReentrancyGuardTransie
     /// @return Boolean indicating if contract operations are paused
     function isPaused() external view returns (bool) {
         return _isPaused;
+    }
+
+    /// @notice Returns the total amount of tokens in existence
+    /// @return The total supply of tokens
+    function totalSupply() public view virtual override(ERC20, IkToken) returns (uint256) {
+        return ERC20.totalSupply();
+    }
+
+    /// @notice Returns the token balance of a specific account
+    /// @param account The address to query the balance for
+    /// @return The token balance of the specified account
+    function balanceOf(address account) public view virtual override(ERC20, IkToken) returns (uint256) {
+        return ERC20.balanceOf(account);
+    }
+
+    /// @notice Transfers tokens from the caller to another address
+    /// @param to The address to transfer tokens to
+    /// @param amount The amount of tokens to transfer
+    /// @return success True if the transfer succeeded
+    function transfer(address to, uint256 amount) public virtual override(ERC20, IkToken) returns (bool) {
+        return ERC20.transfer(to, amount);
+    }
+
+    /// @notice Returns the amount of tokens that spender is allowed to spend on behalf of owner
+    /// @param owner The address that owns the tokens
+    /// @param spender The address that is approved to spend the tokens
+    /// @return The amount of tokens the spender is allowed to spend
+    function allowance(address owner, address spender) public view virtual override(ERC20, IkToken) returns (uint256) {
+        return ERC20.allowance(owner, spender);
+    }
+
+    /// @notice Sets approval for another address to spend tokens on behalf of the caller
+    /// @param spender The address that is approved to spend the tokens
+    /// @param amount The amount of tokens the spender is approved to spend
+    /// @return success True if the approval succeeded
+    function approve(address spender, uint256 amount) public virtual override(ERC20, IkToken) returns (bool) {
+        return ERC20.approve(spender, amount);
+    }
+
+    /// @notice Transfers tokens from one address to another using allowance mechanism
+    /// @param from The address to transfer tokens from
+    /// @param to The address to transfer tokens to
+    /// @param amount The amount of tokens to transfer
+    /// @return success True if the transfer succeeded
+    function transferFrom(address from, address to, uint256 amount)
+        public
+        virtual
+        override(ERC20, IkToken)
+        returns (bool)
+    {
+        return ERC20.transferFrom(from, to, amount);
     }
 
     /* //////////////////////////////////////////////////////////////

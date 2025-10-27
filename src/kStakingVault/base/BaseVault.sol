@@ -68,7 +68,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// @notice Emitted when an unstake request is created
     /// @param requestId The unique identifier of the unstake request
     /// @param user The address of the user who created the request
-    /// @param amount The amount of kTokens requested
+    /// @param amount The amount of stkTokens requested
     /// @param recipient The address to which the kTokens will be sent
     /// @param batchId The batch ID associated with the request
     event UnstakeRequestCreated(

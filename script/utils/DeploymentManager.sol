@@ -322,10 +322,7 @@ abstract contract DeploymentManager is Script {
         return result == 0 ? type(uint256).max : result;
     }
 
-    function getUnderlyingAssetAddress(
-        NetworkConfig memory config,
-        string memory assetKey
-    )
+    function getUnderlyingAssetAddress(NetworkConfig memory config, string memory assetKey)
         internal
         pure
         returns (address)
@@ -338,10 +335,7 @@ abstract contract DeploymentManager is Script {
         revert("Unknown asset key");
     }
 
-    function resolveContractAddress(
-        DeploymentOutput memory existing,
-        string memory contractKey
-    )
+    function resolveContractAddress(DeploymentOutput memory existing, string memory contractKey)
         internal
         pure
         returns (address)

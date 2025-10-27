@@ -6,6 +6,7 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 import { KTOKEN_IS_PAUSED, KTOKEN_ZERO_ADDRESS, KTOKEN_ZERO_AMOUNT } from "kam/src/errors/Errors.sol";
+import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { kToken } from "kam/src/kToken.sol";
 
 contract kTokenTest is DeploymentBaseTest {
@@ -41,7 +42,7 @@ contract kTokenTest is DeploymentBaseTest {
 
         vm.prank(address(minter));
         vm.expectEmit(true, false, false, true);
-        emit kToken.Minted(recipient, amount);
+        emit IkToken.Minted(recipient, amount);
 
         kUSD.mint(recipient, amount);
 
@@ -70,7 +71,7 @@ contract kTokenTest is DeploymentBaseTest {
 
         vm.prank(address(minter));
         vm.expectEmit(true, false, false, true);
-        emit kToken.Minted(TEST_ZERO_ADDRESS, amount);
+        emit IkToken.Minted(TEST_ZERO_ADDRESS, amount);
 
         kUSD.mint(TEST_ZERO_ADDRESS, amount);
 
@@ -93,7 +94,7 @@ contract kTokenTest is DeploymentBaseTest {
         // Then burn them
         vm.prank(address(minter));
         vm.expectEmit(true, false, false, true);
-        emit kToken.Burned(account, amount);
+        emit IkToken.Burned(account, amount);
 
         kUSD.burn(account, amount);
 
@@ -139,7 +140,7 @@ contract kTokenTest is DeploymentBaseTest {
 
         vm.prank(address(minter));
         vm.expectEmit(true, false, false, true);
-        emit kToken.Burned(account, amount);
+        emit IkToken.Burned(account, amount);
 
         kUSD.burnFrom(account, amount);
 
@@ -245,14 +246,14 @@ contract kTokenTest is DeploymentBaseTest {
 
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(false, false, false, true);
-        emit kToken.PauseState(true);
+        emit IkToken.PauseState(true);
 
         kUSD.setPaused(true);
         assertTrue(kUSD.isPaused(), "Should be paused");
 
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(false, false, false, true);
-        emit kToken.PauseState(false);
+        emit IkToken.PauseState(false);
 
         kUSD.setPaused(false);
         assertFalse(kUSD.isPaused(), "Should be unpaused");
@@ -292,7 +293,7 @@ contract kTokenTest is DeploymentBaseTest {
 
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(true, true, true, true);
-        emit kToken.EmergencyWithdrawal(TEST_ZERO_ADDRESS, users.treasury, amount, users.emergencyAdmin);
+        emit IkToken.EmergencyWithdrawal(TEST_ZERO_ADDRESS, users.treasury, amount, users.emergencyAdmin);
 
         kUSD.emergencyWithdraw(TEST_ZERO_ADDRESS, users.treasury, amount);
 
@@ -312,7 +313,7 @@ contract kTokenTest is DeploymentBaseTest {
 
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(true, true, true, true);
-        emit kToken.EmergencyWithdrawal(tokens.usdc, users.treasury, amount, users.emergencyAdmin);
+        emit IkToken.EmergencyWithdrawal(tokens.usdc, users.treasury, amount, users.emergencyAdmin);
 
         kUSD.emergencyWithdraw(tokens.usdc, users.treasury, amount);
 
