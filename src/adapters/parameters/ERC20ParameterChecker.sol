@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
+import { ERC20 } from "solady/tokens/ERC20.sol";
+
 import {
     PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER,
     PARAMETERCHECKER_NOT_ALLOWED,
@@ -9,9 +11,9 @@ import {
     PARAMETERCHECKER_SOURCE_NOT_ALLOWED,
     PARAMETERCHECKER_SPENDER_NOT_ALLOWED
 } from "kam/src/errors/Errors.sol";
+
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 import { IParametersChecker } from "kam/src/interfaces/modules/IAdapterGuardian.sol";
-import { ERC20 } from "solady/tokens/ERC20.sol";
 
 /// @title ERC20ParameterChecker
 /// @notice A contract that checks parameters for ERC20 token operations
@@ -65,104 +67,104 @@ contract ERC20ParameterChecker is IParametersChecker {
     }
 
     /// @notice Sets whether a receiver is allowed for a specific token
-    /// @param token The token address
-    /// @param receiver The receiver address
-    /// @param allowed Whether the receiver is allowed
-    function setAllowedReceiver(address token, address receiver, bool allowed) external {
+    /// @param _token The token address
+    /// @param _receiver The receiver address
+    /// @param _allowed Whether the receiver is allowed
+    function setAllowedReceiver(address _token, address _receiver, bool _allowed) external {
         _checkAdmin(msg.sender);
-        _allowedReceivers[token][receiver] = allowed;
-        emit ReceiverStatusUpdated(token, receiver, allowed);
+        _allowedReceivers[_token][_receiver] = _allowed;
+        emit ReceiverStatusUpdated(_token, _receiver, _allowed);
     }
 
     /// @notice Sets whether a source is allowed for a specific token
-    /// @param token The token address
-    /// @param source The source address
-    /// @param allowed Whether the source is allowed
-    function setAllowedSource(address token, address source, bool allowed) external {
+    /// @param _token The token address
+    /// @param _source The source address
+    /// @param _allowed Whether the source is allowed
+    function setAllowedSource(address _token, address _source, bool _allowed) external {
         _checkAdmin(msg.sender);
-        _allowedSources[token][source] = allowed;
-        emit SourceStatusUpdated(token, source, allowed);
+        _allowedSources[_token][_source] = _allowed;
+        emit SourceStatusUpdated(_token, _source, _allowed);
     }
 
     /// @notice Sets whether a spender is allowed for a specific token
-    /// @param token The token address
-    /// @param spender The spender address
-    /// @param allowed Whether the spender is allowed
-    function setAllowedSpender(address token, address spender, bool allowed) external {
+    /// @param _token The token address
+    /// @param _spender The spender address
+    /// @param _allowed Whether the spender is allowed
+    function setAllowedSpender(address _token, address _spender, bool _allowed) external {
         _checkAdmin(msg.sender);
-        _allowedSpenders[token][spender] = allowed;
-        emit SpenderStatusUpdated(token, spender, allowed);
+        _allowedSpenders[_token][_spender] = _allowed;
+        emit SpenderStatusUpdated(_token, _spender, _allowed);
     }
 
     /// @notice Sets the maximum amount allowed for a single transfer
-    /// @param token The token address
-    /// @param max The maximum amount
-    function setMaxSingleTransfer(address token, uint256 max) external {
+    /// @param _token The token address
+    /// @param _max The maximum amount
+    function setMaxSingleTransfer(address _token, uint256 _max) external {
         _checkAdmin(msg.sender);
-        _maxSingleTransfer[token] = max;
-        emit MaxSingleTransferUpdated(token, max);
+        _maxSingleTransfer[_token] = _max;
+        emit MaxSingleTransferUpdated(_token, _max);
     }
 
     /// @notice Authorizes an adapter call based on parameters
-    /// @param adapter The adapter address
-    /// @param token The token address
-    /// @param selector The function selector
-    /// @param params The encoded function parameters
-    function authorizeAdapterCall(address adapter, address token, bytes4 selector, bytes calldata params) external {
-        if (selector == ERC20.transfer.selector) {
-            (address to, uint256 amount) = abi.decode(params, (address, uint256));
-            uint256 blockAmount = _amountTransferedPerBlock[token][block.number] += amount;
-            require(blockAmount <= maxSingleTransfer(token), PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
-            require(isAllowedReceiver(token, to), PARAMETERCHECKER_RECEIVER_NOT_ALLOWED);
-        } else if (selector == ERC20.transferFrom.selector) {
-            (address from, address to, uint256 amount) = abi.decode(params, (address, address, uint256));
-            uint256 blockAmount = _amountTransferedPerBlock[token][block.number] += amount;
-            require(blockAmount <= maxSingleTransfer(token), PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
-            require(isAllowedReceiver(token, to), PARAMETERCHECKER_RECEIVER_NOT_ALLOWED);
-            require(isAllowedSource(token, from), PARAMETERCHECKER_SOURCE_NOT_ALLOWED);
-        } else if (selector == ERC20.approve.selector) {
-            (address spender,) = abi.decode(params, (address, uint256));
-            require(isAllowedSpender(token, spender), PARAMETERCHECKER_SPENDER_NOT_ALLOWED);
+    /// @param _adapter The adapter address
+    /// @param _token The token address
+    /// @param _selector The function selector
+    /// @param _params The encoded function parameters
+    function authorizeAdapterCall(address _adapter, address _token, bytes4 _selector, bytes calldata _params) external {
+        if (_selector == ERC20.transfer.selector) {
+            (address _to, uint256 _amount) = abi.decode(_params, (address, uint256));
+            uint256 _blockAmount = _amountTransferedPerBlock[_token][block.number] += _amount;
+            require(_blockAmount <= maxSingleTransfer(_token), PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
+            require(isAllowedReceiver(_token, _to), PARAMETERCHECKER_RECEIVER_NOT_ALLOWED);
+        } else if (_selector == ERC20.transferFrom.selector) {
+            (address _from, address _to, uint256 _amount) = abi.decode(_params, (address, address, uint256));
+            uint256 _blockAmount = _amountTransferedPerBlock[_token][block.number] += _amount;
+            require(_blockAmount <= maxSingleTransfer(_token), PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
+            require(isAllowedReceiver(_token, _to), PARAMETERCHECKER_RECEIVER_NOT_ALLOWED);
+            require(isAllowedSource(_token, _from), PARAMETERCHECKER_SOURCE_NOT_ALLOWED);
+        } else if (_selector == ERC20.approve.selector) {
+            (address _spender,) = abi.decode(_params, (address, uint256));
+            require(isAllowedSpender(_token, _spender), PARAMETERCHECKER_SPENDER_NOT_ALLOWED);
         } else {
             revert(PARAMETERCHECKER_SELECTOR_NOT_ALLOWED);
         }
     }
 
     /// @notice Checks if a receiver is allowed for a specific token
-    /// @param token The token address
-    /// @param receiver The receiver address
+    /// @param _token The token address
+    /// @param _receiver The receiver address
     /// @return Whether the receiver is allowed
-    function isAllowedReceiver(address token, address receiver) public view returns (bool) {
-        return _allowedReceivers[token][receiver];
+    function isAllowedReceiver(address _token, address _receiver) public view returns (bool) {
+        return _allowedReceivers[_token][_receiver];
     }
 
     /// @notice Checks if a source is allowed for a specific token
-    /// @param token The token address
-    /// @param source The source address
+    /// @param _token The token address
+    /// @param _source The source address
     /// @return Whether the source is allowed
-    function isAllowedSource(address token, address source) public view returns (bool) {
-        return _allowedSources[token][source];
+    function isAllowedSource(address _token, address _source) public view returns (bool) {
+        return _allowedSources[_token][_source];
     }
 
     /// @notice Checks if a spender is allowed for a specific token
-    /// @param token The token address
-    /// @param spender The spender address
+    /// @param _token The token address
+    /// @param _spender The spender address
     /// @return Whether the spender is allowed
-    function isAllowedSpender(address token, address spender) public view returns (bool) {
-        return _allowedSpenders[token][spender];
+    function isAllowedSpender(address _token, address _spender) public view returns (bool) {
+        return _allowedSpenders[_token][_spender];
     }
 
     /// @notice Gets the maximum amount allowed for a single transfer
-    /// @param token The token address
+    /// @param _token The token address
     /// @return The maximum amount
-    function maxSingleTransfer(address token) public view returns (uint256) {
-        return _maxSingleTransfer[token];
+    function maxSingleTransfer(address _token) public view returns (uint256) {
+        return _maxSingleTransfer[_token];
     }
 
     /// @notice Checks if the caller is an admin
-    /// @param admin The address to check
+    /// @param _admin The address to check
     /// @dev Reverts if the address is not an admin
-    function _checkAdmin(address admin) private view {
-        require(registry.isAdmin(admin), PARAMETERCHECKER_NOT_ALLOWED);
+    function _checkAdmin(address _admin) private view {
+        require(registry.isAdmin(_admin), PARAMETERCHECKER_NOT_ALLOWED);
     }
 }

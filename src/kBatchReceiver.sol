@@ -12,6 +12,7 @@ import {
     KBATCHRECEIVER_ZERO_ADDRESS,
     KBATCHRECEIVER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
+
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
 
 /// @title kBatchReceiver
@@ -42,7 +43,7 @@ contract kBatchReceiver is IkBatchReceiver {
     /// has exclusive permission to call pullAssets() and rescueAssets(), ensuring only the originating
     /// kMinter can manage asset distribution for this specific batch. The immutable nature prevents
     /// modification and reduces gas costs for access control checks.
-    address public immutable kMinter;
+    address public immutable K_MINTER;
 
     /// @notice Address of the underlying asset contract this receiver will distribute
     /// @dev Set during initialization to specify which token type (USDC, WBTC, etc.) this receiver
@@ -75,7 +76,7 @@ contract kBatchReceiver is IkBatchReceiver {
     /// @param _kMinter Address of the kMinter contract that will have exclusive interaction rights
     constructor(address _kMinter) {
         _checkAddressNotZero(_kMinter);
-        kMinter = _kMinter;
+        K_MINTER = _kMinter;
     }
 
     /// @notice Configures the receiver with batch-specific parameters after deployment
@@ -95,7 +96,7 @@ contract kBatchReceiver is IkBatchReceiver {
         batchId = _batchId;
         asset = _asset;
 
-        emit BatchReceiverInitialized(kMinter, batchId, asset);
+        emit BatchReceiverInitialized(K_MINTER, batchId, asset);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -103,39 +104,39 @@ contract kBatchReceiver is IkBatchReceiver {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IkBatchReceiver
-    function pullAssets(address receiver, uint256 amount, bytes32 _batchId) external {
+    function pullAssets(address _receiver, uint256 _amount, bytes32 _batchId) external {
         _checkMinter(msg.sender);
         require(_batchId == batchId, KBATCHRECEIVER_INVALID_BATCH_ID);
-        _checkAmountNotZero(amount);
-        _checkAddressNotZero(receiver);
+        _checkAmountNotZero(_amount);
+        _checkAddressNotZero(_receiver);
 
-        asset.safeTransfer(receiver, amount);
-        emit PulledAssets(receiver, asset, amount);
+        asset.safeTransfer(_receiver, _amount);
+        emit PulledAssets(_receiver, asset, _amount);
     }
 
     /// @inheritdoc IkBatchReceiver
-    function rescueAssets(address asset_) external payable {
-        address sender = msg.sender;
-        _checkMinter(sender);
+    function rescueAssets(address _asset) external payable {
+        address _sender = msg.sender;
+        _checkMinter(_sender);
 
-        if (asset_ == address(0)) {
+        if (_asset == address(0)) {
             // Rescue ETH
-            uint256 balance = address(this).balance;
-            _checkAmountNotZero(balance);
+            uint256 _balance = address(this).balance;
+            _checkAmountNotZero(_balance);
 
-            (bool success,) = sender.call{ value: balance }("");
-            require(success, KBATCHRECEIVER_TRANSFER_FAILED);
+            (bool _success,) = _sender.call{ value: _balance }("");
+            require(_success, KBATCHRECEIVER_TRANSFER_FAILED);
 
-            emit RescuedETH(sender, balance);
+            emit RescuedETH(_sender, _balance);
         } else {
             // Rescue ERC20 tokens
-            require(asset_ != asset, KBATCHRECEIVER_WRONG_ASSET);
+            require(_asset != asset, KBATCHRECEIVER_WRONG_ASSET);
 
-            uint256 balance = asset_.balanceOf(address(this));
-            _checkAmountNotZero(balance);
+            uint256 _balance = _asset.balanceOf(address(this));
+            _checkAmountNotZero(_balance);
 
-            asset_.safeTransfer(sender, balance);
-            emit RescuedAssets(asset_, sender, balance);
+            _asset.safeTransfer(_sender, _balance);
+            emit RescuedAssets(_asset, _sender, _balance);
         }
     }
 
@@ -144,17 +145,17 @@ contract kBatchReceiver is IkBatchReceiver {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Only callable by kMinter
-    function _checkMinter(address minter) private view {
-        require(minter == kMinter, KBATCHRECEIVER_ONLY_KMINTER);
+    function _checkMinter(address _minter) private view {
+        require(_minter == K_MINTER, KBATCHRECEIVER_ONLY_KMINTER);
     }
 
     /// @dev Checks address is not zero
-    function _checkAddressNotZero(address address_) private pure {
-        require(address_ != address(0), KBATCHRECEIVER_ZERO_ADDRESS);
+    function _checkAddressNotZero(address _address) private pure {
+        require(_address != address(0), KBATCHRECEIVER_ZERO_ADDRESS);
     }
 
     /// @dev Checks amount is not zero
-    function _checkAmountNotZero(uint256 amount) private pure {
-        require(amount != 0, KBATCHRECEIVER_ZERO_AMOUNT);
+    function _checkAmountNotZero(uint256 _amount) private pure {
+        require(_amount != 0, KBATCHRECEIVER_ZERO_AMOUNT);
     }
 }

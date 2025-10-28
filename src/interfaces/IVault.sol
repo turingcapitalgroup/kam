@@ -82,6 +82,15 @@ interface IVault is IVaultBatch, IVaultClaim, IVaultFees {
     /// @param timestamp Timestamp of the fee charge
     event PerformanceFeesCharged(uint256 timestamp);
 
+    /// @notice Emitted when share price watermark is updated
+    /// @param newWatermark The new share price watermark value
+    event SharePriceWatermarkUpdated(uint256 newWatermark);
+
+    /// @notice Emitted when max total assets is updated
+    /// @param oldMaxTotalAssets The previous max total assets value
+    /// @param newMaxTotalAssets The new max total assets value
+    event MaxTotalAssetsUpdated(uint128 oldMaxTotalAssets, uint128 newMaxTotalAssets);
+
     /// @notice Emitted when a stake request is created
     /// @param requestId The unique identifier of the stake request
     /// @param user The address of the user who created the request

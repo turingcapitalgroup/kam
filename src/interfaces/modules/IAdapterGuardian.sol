@@ -1,6 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.4;
 
+// ParametersChecker Errors
+error ParametersCheckerZeroAddress();
+error ParametersCheckerZeroAmount();
+error ParametersCheckerInvalidToken();
+error ParametersCheckerInvalidReceiver();
+error ParametersCheckerInvalidSpender();
+error ParametersCheckerInvalidMax();
+error ParametersCheckerInvalidAdapter();
+error ParametersCheckerInvalidSelector();
+error ParametersCheckerInvalidParams();
+error ParametersCheckerUnauthorizedCaller();
+error ParametersCheckerTransferFailed();
+error ParametersCheckerInvalidAmount();
+error ParametersCheckerInvalidBlockAmount();
+error ParametersCheckerInvalidFrom();
+
 interface IParametersChecker {
     function authorizeAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params) external;
 }

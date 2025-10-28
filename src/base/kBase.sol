@@ -135,14 +135,14 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// normal operations, (4) Marks initialization complete to prevent future calls. This function MUST be called
     /// by all inheriting contracts during their initialization phase to establish proper protocol integration.
     /// The internal visibility ensures only inheriting contracts can initialize, preventing external manipulation.
-    /// @param registry_ The kRegistry contract address that serves as the protocol's configuration and discovery hub
-    function __kBase_init(address registry_) internal {
+    /// @param _registry The kRegistry contract address that serves as the protocol's configuration and discovery hub
+    function __kBase_init(address _registry) internal {
         kBaseStorage storage $ = _getBaseStorage();
 
         require(!$.initialized, KBASE_ALREADY_INITIALIZED);
-        require(registry_ != address(0), KBASE_INVALID_REGISTRY);
+        require(_registry != address(0), KBASE_INVALID_REGISTRY);
 
-        $.registry = registry_;
+        $.registry = _registry;
         $.paused = false;
         $.initialized = true;
     }
@@ -159,46 +159,46 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// halting operations protocol-wide, (4) Requires emergency admin role ensuring only authorized governance
     /// can trigger pauses. Inheriting contracts should check _isPaused() modifier in critical functions to
     /// respect the pause state. The external visibility with role check prevents unauthorized pause manipulation.
-    /// @param paused_ The desired pause state (true = halt operations, false = resume normal operation)
-    function setPaused(bool paused_) external {
+    /// @param _paused The desired pause state (true = halt operations, false = resume normal operation)
+    function setPaused(bool _paused) external {
         require(_isEmergencyAdmin(msg.sender), KBASE_WRONG_ROLE);
         kBaseStorage storage $ = _getBaseStorage();
         require($.initialized, KBASE_NOT_INITIALIZED);
-        $.paused = paused_;
-        emit Paused(paused_);
+        $.paused = _paused;
+        emit Paused(_paused);
     }
 
     /// @notice Rescues accidentally sent assets (ETH or ERC20 tokens) preventing permanent loss of funds
     /// @dev This function implements a critical safety mechanism for recovering tokens or ETH that become stuck
     /// in the contract through user error or airdrops. The rescue process: (1) Validates admin authorization to
     /// prevent unauthorized fund extraction, (2) Ensures recipient address is valid to prevent burning funds,
-    /// (3) For ETH rescue (asset_=address(0)): validates balance sufficiency and uses low-level call for transfer,
+    /// (3) For ETH rescue (_asset=address(0)): validates balance sufficiency and uses low-level call for transfer,
     /// (4) For ERC20 rescue: critically checks the token is NOT a registered protocol asset (USDC, WBTC, etc.) to
     /// protect user deposits and protocol integrity, then validates balance and uses SafeTransferLib for secure
     /// transfer. The distinction between ETH and ERC20 handling accounts for their different transfer mechanisms.
     /// Protocol assets are explicitly blocked from rescue to prevent admin abuse and maintain user trust.
-    /// @param asset_ The asset to rescue (use address(0) for native ETH, otherwise ERC20 token address)
-    /// @param to_ The recipient address that will receive the rescued assets (cannot be zero address)
-    /// @param amount_ The quantity to rescue (must not exceed available balance)
-    function rescueAssets(address asset_, address to_, uint256 amount_) external payable {
+    /// @param _asset The asset to rescue (use address(0) for native ETH, otherwise ERC20 token address)
+    /// @param _to The recipient address that will receive the rescued assets (cannot be zero address)
+    /// @param _amount The quantity to rescue (must not exceed available balance)
+    function rescueAssets(address _asset, address _to, uint256 _amount) external payable {
         require(_isAdmin(msg.sender), KBASE_WRONG_ROLE);
-        require(to_ != address(0), KBASE_ZERO_ADDRESS);
+        require(_to != address(0), KBASE_ZERO_ADDRESS);
 
-        if (asset_ == address(0)) {
+        if (_asset == address(0)) {
             // Rescue ETH
-            require(amount_ > 0 && amount_ <= address(this).balance, KBASE_ZERO_AMOUNT);
+            require(_amount > 0 && _amount <= address(this).balance, KBASE_ZERO_AMOUNT);
 
-            (bool success,) = to_.call{ value: amount_ }("");
-            require(success, KBASE_TRANSFER_FAILED);
+            (bool _success,) = _to.call{ value: _amount }("");
+            require(_success, KBASE_TRANSFER_FAILED);
 
-            emit RescuedETH(to_, amount_);
+            emit RescuedETH(_to, _amount);
         } else {
             // Rescue ERC20 tokens
-            require(!_isAsset(asset_), KBASE_WRONG_ASSET);
-            require(amount_ > 0 && amount_ <= asset_.balanceOf(address(this)), KBASE_ZERO_AMOUNT);
+            require(!_isAsset(_asset), KBASE_WRONG_ASSET);
+            require(_amount > 0 && _amount <= _asset.balanceOf(address(this)), KBASE_ZERO_AMOUNT);
 
-            asset_.safeTransfer(to_, amount_);
-            emit RescuedAssets(asset_, to_, amount_);
+            _asset.safeTransfer(_to, _amount);
+            emit RescuedAssets(_asset, _to, _amount);
         }
     }
 
@@ -227,64 +227,64 @@ contract kBase is OptimizedReentrancyGuardTransient {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Gets the current batch ID for a given vault
-    /// @param vault The vault address
-    /// @return batchId The current batch ID
+    /// @param _vault The vault address
+    /// @return _batchId The current batch ID
     /// @dev Reverts if vault not registered
-    function _getBatchId(address vault) internal view returns (bytes32 batchId) {
-        return IkStakingVault(vault).getBatchId();
+    function _getBatchId(address _vault) internal view returns (bytes32 _batchId) {
+        return IkStakingVault(_vault).getBatchId();
     }
 
     /// @notice Gets the current batch receiver for a given batchId
-    /// @param vault_ The vault address
-    /// @param batchId_ The batch ID
-    /// @return batchReceiver The address of the batchReceiver where tokens will be sent
+    /// @param _vault The vault address
+    /// @param _batchId The batch ID
+    /// @return _batchReceiver The address of the batchReceiver where tokens will be sent
     /// @dev Reverts if vault not registered
-    function _getBatchReceiver(address vault_, bytes32 batchId_) internal view returns (address batchReceiver) {
-        batchReceiver = IkStakingVault(vault_).getBatchReceiver(batchId_);
-        require(batchReceiver != address(0), KBASE_ZERO_ADDRESS);
+    function _getBatchReceiver(address _vault, bytes32 _batchId) internal view returns (address _batchReceiver) {
+        _batchReceiver = IkStakingVault(_vault).getBatchReceiver(_batchId);
+        require(_batchReceiver != address(0), KBASE_ZERO_ADDRESS);
     }
 
     /// @notice Gets the kMinter singleton contract address
-    /// @return minter The kMinter contract address
+    /// @return _minter The kMinter contract address
     /// @dev Reverts if kMinter not set in registry
-    function _getKMinter() internal view returns (address minter) {
-        minter = _registry().getContractById(K_MINTER);
-        require(minter != address(0), KBASE_CONTRACT_NOT_FOUND);
+    function _getKMinter() internal view returns (address _minter) {
+        _minter = _registry().getContractById(K_MINTER);
+        require(_minter != address(0), KBASE_CONTRACT_NOT_FOUND);
     }
 
     /// @notice Gets the kAssetRouter singleton contract address
-    /// @return router The kAssetRouter contract address
+    /// @return _router The kAssetRouter contract address
     /// @dev Reverts if kAssetRouter not set in registry
-    function _getKAssetRouter() internal view returns (address router) {
-        router = _registry().getContractById(K_ASSET_ROUTER);
-        require(router != address(0), KBASE_CONTRACT_NOT_FOUND);
+    function _getKAssetRouter() internal view returns (address _router) {
+        _router = _registry().getContractById(K_ASSET_ROUTER);
+        require(_router != address(0), KBASE_CONTRACT_NOT_FOUND);
     }
 
     /// @notice Gets the kToken address for a given asset
-    /// @param asset The underlying asset address
-    /// @return kToken The corresponding kToken address
+    /// @param _asset The underlying asset address
+    /// @return _kToken The corresponding kToken address
     /// @dev Reverts if asset not supported
-    function _getKTokenForAsset(address asset) internal view returns (address kToken) {
-        kToken = _registry().assetToKToken(asset);
-        require(kToken != address(0), KBASE_ASSET_NOT_SUPPORTED);
+    function _getKTokenForAsset(address _asset) internal view returns (address _kToken) {
+        _kToken = _registry().assetToKToken(_asset);
+        require(_kToken != address(0), KBASE_ASSET_NOT_SUPPORTED);
     }
 
     /// @notice Gets the asset managed by a vault
-    /// @param vault The vault address
-    /// @return assets The asset address managed by the vault
+    /// @param _vault The vault address
+    /// @return _assets The asset address managed by the vault
     /// @dev Reverts if vault not registered
-    function _getVaultAssets(address vault) internal view returns (address[] memory assets) {
-        assets = _registry().getVaultAssets(vault);
-        require(assets.length > 0, KBASE_INVALID_VAULT);
+    function _getVaultAssets(address _vault) internal view returns (address[] memory _assets) {
+        _assets = _registry().getVaultAssets(_vault);
+        require(_assets.length > 0, KBASE_INVALID_VAULT);
     }
 
     /// @notice Gets the DN vault address for a given asset
-    /// @param asset The asset address
-    /// @return vault The corresponding DN vault address
+    /// @param _asset The asset address
+    /// @return _vault The corresponding DN vault address
     /// @dev Reverts if asset not supported
-    function _getDNVaultByAsset(address asset) internal view returns (address vault) {
-        vault = _registry().getVaultByAssetAndType(asset, uint8(IRegistry.VaultType.DN));
-        require(vault != address(0), KBASE_INVALID_VAULT);
+    function _getDNVaultByAsset(address _asset) internal view returns (address _vault) {
+        _vault = _registry().getVaultByAssetAndType(_asset, uint8(IRegistry.VaultType.DN));
+        require(_vault != address(0), KBASE_INVALID_VAULT);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -294,46 +294,46 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// @notice Checks if an address has admin role in the protocol governance
     /// @dev Admins can execute critical functions like asset rescue and protocol configuration changes.
     /// This validation is used throughout inheriting contracts to enforce permission boundaries.
-    /// @param user The address to check for admin privileges
+    /// @param _user The address to check for admin privileges
     /// @return Whether the address is registered as an admin in the registry
-    function _isAdmin(address user) internal view returns (bool) {
-        return _registry().isAdmin(user);
+    function _isAdmin(address _user) internal view returns (bool) {
+        return _registry().isAdmin(_user);
     }
 
     /// @notice Checks if an address has emergency admin role for critical protocol interventions
     /// @dev Emergency admins can pause/unpause contracts during security incidents or market anomalies.
     /// This elevated role enables rapid response to threats while limiting scope to emergency functions only.
-    /// @param user The address to check for emergency admin privileges
+    /// @param _user The address to check for emergency admin privileges
     /// @return Whether the address is registered as an emergency admin in the registry
-    function _isEmergencyAdmin(address user) internal view returns (bool) {
-        return _registry().isEmergencyAdmin(user);
+    function _isEmergencyAdmin(address _user) internal view returns (bool) {
+        return _registry().isEmergencyAdmin(_user);
     }
 
     /// @notice Checks if an address has guardian role for protocol monitoring and verification
     /// @dev Guardians verify settlement proposals and can cancel incorrect settlements during cooldown periods.
     /// This role provides an additional security layer for yield distribution accuracy.
-    /// @param user The address to check for guardian privileges
+    /// @param _user The address to check for guardian privileges
     /// @return Whether the address is registered as a guardian in the registry
-    function _isGuardian(address user) internal view returns (bool) {
-        return _registry().isGuardian(user);
+    function _isGuardian(address _user) internal view returns (bool) {
+        return _registry().isGuardian(_user);
     }
 
     /// @notice Checks if an address has relayer role for automated protocol operations
     /// @dev Relayers execute batched operations and trigger settlements on behalf of users to optimize gas costs.
     /// This role enables automation while maintaining security through limited permissions.
-    /// @param user The address to check for relayer privileges
+    /// @param _user The address to check for relayer privileges
     /// @return Whether the address is registered as a relayer in the registry
-    function _isRelayer(address user) internal view returns (bool) {
-        return _registry().isRelayer(user);
+    function _isRelayer(address _user) internal view returns (bool) {
+        return _registry().isRelayer(_user);
     }
 
     /// @notice Checks if an address is registered as an institutional user
     /// @dev Institutions have special privileges in kMinter for large-scale minting and redemption operations.
     /// This distinction enables optimized flows for high-volume users while maintaining retail accessibility.
-    /// @param user The address to check for institutional status
+    /// @param _user The address to check for institutional status
     /// @return Whether the address is registered as an institution in the registry
-    function _isInstitution(address user) internal view returns (bool) {
-        return _registry().isInstitution(user);
+    function _isInstitution(address _user) internal view returns (bool) {
+        return _registry().isInstitution(_user);
     }
 
     /// @notice Checks if the contract is currently in emergency pause state
@@ -349,26 +349,26 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// @notice Checks if an address is the kMinter contract
     /// @dev Validates if the caller is the protocol's kMinter singleton for access control in vault operations.
     /// Used to ensure only kMinter can trigger institutional deposit and redemption flows.
-    /// @param vault The address to check against kMinter
+    /// @param _vault The address to check against kMinter
     /// @return Whether the address is the registered kMinter contract
-    function _isKMinter(address vault) internal view returns (bool) {
-        bool isTrue;
+    function _isKMinter(address _vault) internal view returns (bool) {
+        bool _isTrue;
         address _kminter = _registry().getContractById(K_MINTER);
-        if (_kminter == vault) isTrue = true;
-        return isTrue;
+        if (_kminter == _vault) _isTrue = true;
+        return _isTrue;
     }
 
     /// @notice Checks if an address is a registered vault
-    /// @param vault The address to check
+    /// @param _vault The address to check
     /// @return Whether the address is a registered vault
-    function _isVault(address vault) internal view returns (bool) {
-        return _registry().isVault(vault);
+    function _isVault(address _vault) internal view returns (bool) {
+        return _registry().isVault(_vault);
     }
 
     /// @notice Checks if an asset is registered
-    /// @param asset The asset address to check
+    /// @param _asset The asset address to check
     /// @return Whether the asset is registered
-    function _isAsset(address asset) internal view returns (bool) {
-        return _registry().isAsset(asset);
+    function _isAsset(address _asset) internal view returns (bool) {
+        return _registry().isAsset(_asset);
     }
 }

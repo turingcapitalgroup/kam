@@ -66,37 +66,37 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// The process establishes: (1) ownership hierarchy with owner at the top, (2) role assignments for protocol
     /// operations, (3) token metadata matching the underlying asset. The decimals parameter is particularly
     /// important as it must match the underlying asset to maintain accurate 1:1 exchange rates.
-    /// @param owner_ The contract owner (typically kRegistry or protocol governance)
-    /// @param admin_ Address to receive ADMIN_ROLE for managing minters and emergency admins
-    /// @param emergencyAdmin_ Address to receive EMERGENCY_ADMIN_ROLE for pause/emergency operations
-    /// @param minter_ Address to receive initial MINTER_ROLE (typically kMinter contract)
-    /// @param name_ Human-readable token name (e.g., \"KAM USDC\")
-    /// @param symbol_ Token symbol for trading (e.g., \"kUSDC\")
-    /// @param decimals_ Decimal places matching the underlying asset for accurate conversions
+    /// @param _owner The contract owner (typically kRegistry or protocol governance)
+    /// @param _admin Address to receive ADMIN_ROLE for managing minters and emergency admins
+    /// @param _emergencyAdmin Address to receive EMERGENCY_ADMIN_ROLE for pause/emergency operations
+    /// @param _minter Address to receive initial MINTER_ROLE (typically kMinter contract)
+    /// @param _nameValue Human-readable token name (e.g., \"KAM USDC\")
+    /// @param _symbolValue Token symbol for trading (e.g., \"kUSDC\")
+    /// @param _decimalsValue Decimal places matching the underlying asset for accurate conversions
     constructor(
-        address owner_,
-        address admin_,
-        address emergencyAdmin_,
-        address minter_,
-        string memory name_,
-        string memory symbol_,
-        uint8 decimals_
+        address _owner,
+        address _admin,
+        address _emergencyAdmin,
+        address _minter,
+        string memory _nameValue,
+        string memory _symbolValue,
+        uint8 _decimalsValue
     ) {
-        require(owner_ != address(0), KTOKEN_ZERO_ADDRESS);
-        require(admin_ != address(0), KTOKEN_ZERO_ADDRESS);
-        require(emergencyAdmin_ != address(0), KTOKEN_ZERO_ADDRESS);
-        require(minter_ != address(0), KTOKEN_ZERO_ADDRESS);
+        require(_owner != address(0), KTOKEN_ZERO_ADDRESS);
+        require(_admin != address(0), KTOKEN_ZERO_ADDRESS);
+        require(_emergencyAdmin != address(0), KTOKEN_ZERO_ADDRESS);
+        require(_minter != address(0), KTOKEN_ZERO_ADDRESS);
 
         // Initialize ownership and roles
-        _initializeOwner(owner_);
-        _grantRoles(admin_, ADMIN_ROLE);
-        _grantRoles(emergencyAdmin_, EMERGENCY_ADMIN_ROLE);
-        _grantRoles(minter_, MINTER_ROLE);
+        _initializeOwner(_owner);
+        _grantRoles(_admin, ADMIN_ROLE);
+        _grantRoles(_emergencyAdmin, EMERGENCY_ADMIN_ROLE);
+        _grantRoles(_minter, MINTER_ROLE);
 
-        _name = name_;
-        _symbol = symbol_;
-        _decimals = decimals_;
-        emit TokenCreated(address(this), owner_, name_, symbol_, _decimals);
+        _name = _nameValue;
+        _symbol = _symbolValue;
+        _decimals = _decimalsValue;
+        emit TokenCreated(address(this), _owner, _name, _symbol, _decimals);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -108,14 +108,13 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// users deposit underlying assets, minting kTokens 1:1 to maintain backing ratio, (2) kAssetRouter calls this
     /// to distribute positive yield to vaults, increasing the kToken supply to reflect earned returns. The function
     /// is restricted to MINTER_ROLE holders (kMinter, kAssetRouter) and requires the contract to not be paused.
-    /// All minting operations emit a Minted event for transparency and tracking.
+    /// High-level business events are emitted by the calling contracts (kMinter, kAssetRouter) for better context.
     /// @param _to The address that will receive the newly minted kTokens
     /// @param _amount The quantity of kTokens to create (matches asset amount for deposits, yield amount for
     /// distributions)
     function mint(address _to, uint256 _amount) external onlyRoles(MINTER_ROLE) {
         _checkPaused();
         _mint(_to, _amount);
-        emit Minted(_to, _amount);
     }
 
     /// @notice Destroys kTokens from the specified address
@@ -124,12 +123,12 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// burns kTokens from vaults when negative yield/losses occur, ensuring the kToken supply accurately reflects the
     /// reduced underlying asset value. The burn operation is permanent and irreversible, requiring careful validation.
     /// Only MINTER_ROLE holders can execute burns, and the contract must not be paused.
+    /// High-level business events are emitted by the calling contracts (kMinter, kAssetRouter) for better context.
     /// @param _from The address from which kTokens will be permanently destroyed
     /// @param _amount The quantity of kTokens to burn (matches redeemed assets or loss amounts)
     function burn(address _from, uint256 _amount) external onlyRoles(MINTER_ROLE) {
         _checkPaused();
         _burn(_from, _amount);
-        emit Burned(_from, _amount);
     }
 
     /// @notice Destroys kTokens from a specified address using the ERC20 allowance mechanism
@@ -138,13 +137,13 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// (2) burning the specified amount from the owner's balance. This is useful for automated systems or contracts
     /// that need to burn tokens on behalf of users, such as complex redemption flows or third-party integrations.
     /// The allowance model provides additional security by requiring explicit approval before token destruction.
+    /// High-level business events are emitted by the calling contracts for better context.
     /// @param _from The address from which kTokens will be burned (must have approved the burn amount)
     /// @param _amount The quantity of kTokens to burn using the allowance mechanism
     function burnFrom(address _from, uint256 _amount) external onlyRoles(MINTER_ROLE) {
         _checkPaused();
         _spendAllowance(_from, msg.sender, _amount);
         _burn(_from, _amount);
-        emit Burned(_from, _amount);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -186,48 +185,48 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     }
 
     /// @notice Returns the token balance of a specific account
-    /// @param account The address to query the balance for
+    /// @param _account The address to query the balance for
     /// @return The token balance of the specified account
-    function balanceOf(address account) public view virtual override(ERC20, IkToken) returns (uint256) {
-        return ERC20.balanceOf(account);
+    function balanceOf(address _account) public view virtual override(ERC20, IkToken) returns (uint256) {
+        return ERC20.balanceOf(_account);
     }
 
     /// @notice Transfers tokens from the caller to another address
-    /// @param to The address to transfer tokens to
-    /// @param amount The amount of tokens to transfer
+    /// @param _to The address to transfer tokens to
+    /// @param _amount The amount of tokens to transfer
     /// @return success True if the transfer succeeded
-    function transfer(address to, uint256 amount) public virtual override(ERC20, IkToken) returns (bool) {
-        return ERC20.transfer(to, amount);
+    function transfer(address _to, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool) {
+        return ERC20.transfer(_to, _amount);
     }
 
     /// @notice Returns the amount of tokens that spender is allowed to spend on behalf of owner
-    /// @param owner The address that owns the tokens
-    /// @param spender The address that is approved to spend the tokens
+    /// @param _owner The address that owns the tokens
+    /// @param _spender The address that is approved to spend the tokens
     /// @return The amount of tokens the spender is allowed to spend
-    function allowance(address owner, address spender) public view virtual override(ERC20, IkToken) returns (uint256) {
-        return ERC20.allowance(owner, spender);
+    function allowance(address _owner, address _spender) public view virtual override(ERC20, IkToken) returns (uint256) {
+        return ERC20.allowance(_owner, _spender);
     }
 
     /// @notice Sets approval for another address to spend tokens on behalf of the caller
-    /// @param spender The address that is approved to spend the tokens
-    /// @param amount The amount of tokens the spender is approved to spend
+    /// @param _spender The address that is approved to spend the tokens
+    /// @param _amount The amount of tokens the spender is approved to spend
     /// @return success True if the approval succeeded
-    function approve(address spender, uint256 amount) public virtual override(ERC20, IkToken) returns (bool) {
-        return ERC20.approve(spender, amount);
+    function approve(address _spender, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool) {
+        return ERC20.approve(_spender, _amount);
     }
 
     /// @notice Transfers tokens from one address to another using allowance mechanism
-    /// @param from The address to transfer tokens from
-    /// @param to The address to transfer tokens to
-    /// @param amount The amount of tokens to transfer
+    /// @param _from The address to transfer tokens from
+    /// @param _to The address to transfer tokens to
+    /// @param _amount The amount of tokens to transfer
     /// @return success True if the transfer succeeded
-    function transferFrom(address from, address to, uint256 amount)
+    function transferFrom(address _from, address _to, uint256 _amount)
         public
         virtual
         override(ERC20, IkToken)
         returns (bool)
     {
-        return ERC20.transferFrom(from, to, amount);
+        return ERC20.transferFrom(_from, _to, _amount);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -237,57 +236,57 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// @notice Grants administrative privileges to a new address
     /// @dev Only the contract owner can grant admin roles, establishing the highest level of access control.
     /// Admins can manage emergency admins and minter roles but cannot bypass owner-only functions.
-    /// @param admin The address to receive administrative privileges
-    function grantAdminRole(address admin) external onlyOwner {
-        _grantRoles(admin, ADMIN_ROLE);
+    /// @param _admin The address to receive administrative privileges
+    function grantAdminRole(address _admin) external onlyOwner {
+        _grantRoles(_admin, ADMIN_ROLE);
     }
 
     /// @notice Removes administrative privileges from an address
     /// @dev Only the contract owner can revoke admin roles, maintaining strict access control hierarchy.
     /// Revoking admin status prevents the address from managing emergency admins and minter roles.
-    /// @param admin The address to lose administrative privileges
-    function revokeAdminRole(address admin) external onlyOwner {
-        _removeRoles(admin, ADMIN_ROLE);
+    /// @param _admin The address to lose administrative privileges
+    function revokeAdminRole(address _admin) external onlyOwner {
+        _removeRoles(_admin, ADMIN_ROLE);
     }
 
     /// @notice Grants emergency administrative privileges for protocol safety operations
     /// @dev Emergency admins can pause/unpause the contract and execute emergency withdrawals during crises.
     /// This role is critical for protocol security and should only be granted to trusted addresses with
     /// operational procedures in place. Only existing admins can grant emergency roles.
-    /// @param emergency The address to receive emergency administrative privileges
-    function grantEmergencyRole(address emergency) external onlyRoles(ADMIN_ROLE) {
-        _grantRoles(emergency, EMERGENCY_ADMIN_ROLE);
+    /// @param _emergency The address to receive emergency administrative privileges
+    function grantEmergencyRole(address _emergency) external onlyRoles(ADMIN_ROLE) {
+        _grantRoles(_emergency, EMERGENCY_ADMIN_ROLE);
     }
 
     /// @notice Removes emergency administrative privileges from an address
     /// @dev Removes the ability to pause contracts and execute emergency operations. This should be done
     /// carefully as it reduces the protocol's ability to respond to emergencies.
-    /// @param emergency The address to lose emergency administrative privileges
-    function revokeEmergencyRole(address emergency) external onlyRoles(ADMIN_ROLE) {
-        _removeRoles(emergency, EMERGENCY_ADMIN_ROLE);
+    /// @param _emergency The address to lose emergency administrative privileges
+    function revokeEmergencyRole(address _emergency) external onlyRoles(ADMIN_ROLE) {
+        _removeRoles(_emergency, EMERGENCY_ADMIN_ROLE);
     }
 
     /// @notice Assigns minter role privileges to the specified address
     /// @dev Calls internal _grantRoles function to assign MINTER_ROLE
-    /// @param minter The address that will receive minter role privileges
-    function grantMinterRole(address minter) external onlyRoles(ADMIN_ROLE) {
-        _grantRoles(minter, MINTER_ROLE);
+    /// @param _minter The address that will receive minter role privileges
+    function grantMinterRole(address _minter) external onlyRoles(ADMIN_ROLE) {
+        _grantRoles(_minter, MINTER_ROLE);
     }
 
     /// @notice Removes minter role privileges from the specified address
     /// @dev Calls internal _removeRoles function to remove MINTER_ROLE
-    /// @param minter The address that will lose minter role privileges
-    function revokeMinterRole(address minter) external onlyRoles(ADMIN_ROLE) {
-        _removeRoles(minter, MINTER_ROLE);
+    /// @param _minter The address that will lose minter role privileges
+    function revokeMinterRole(address _minter) external onlyRoles(ADMIN_ROLE) {
+        _removeRoles(_minter, MINTER_ROLE);
     }
 
     /// @notice Activates or deactivates the emergency pause mechanism
     /// @dev When paused, all token transfers, minting, and burning operations are halted to protect the protocol
     /// during security incidents or system maintenance. Only emergency admins can trigger pause/unpause to ensure
     /// rapid response capability. The pause state affects all token operations through the _beforeTokenTransfer hook.
-    /// @param isPaused_ True to pause all operations, false to resume normal operations
-    function setPaused(bool isPaused_) external onlyRoles(EMERGENCY_ADMIN_ROLE) {
-        _isPaused = isPaused_;
+    /// @param _paused True to pause all operations, false to resume normal operations
+    function setPaused(bool _paused) external onlyRoles(EMERGENCY_ADMIN_ROLE) {
+        _isPaused = _paused;
         emit PauseState(_isPaused);
     }
 
@@ -297,25 +296,25 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// It's designed for emergency situations where users mistakenly transfer assets to the wrong address.
     /// The function can handle both ERC20 tokens and native ETH. Only emergency admins can execute withdrawals
     /// to prevent unauthorized asset extraction. This should not be used for regular operations.
-    /// @param token The token contract address to withdraw (use address(0) for native ETH)
-    /// @param to The destination address to receive the recovered assets
-    /// @param amount The quantity of tokens or ETH to recover
-    function emergencyWithdraw(address token, address to, uint256 amount) external onlyRoles(EMERGENCY_ADMIN_ROLE) {
-        require(to != address(0), KTOKEN_ZERO_ADDRESS);
-        require(amount != 0, KTOKEN_ZERO_AMOUNT);
+    /// @param _token The token contract address to withdraw (use address(0) for native ETH)
+    /// @param _to The destination address to receive the recovered assets
+    /// @param _amount The quantity of tokens or ETH to recover
+    function emergencyWithdraw(address _token, address _to, uint256 _amount) external onlyRoles(EMERGENCY_ADMIN_ROLE) {
+        require(_to != address(0), KTOKEN_ZERO_ADDRESS);
+        require(_amount != 0, KTOKEN_ZERO_AMOUNT);
 
-        if (token == address(0)) {
+        if (_token == address(0)) {
             // Withdraw ETH
-            (bool success,) = to.call{ value: amount }("");
-            require(success, KTOKEN_TRANSFER_FAILED);
-            emit RescuedETH(to, amount);
+            (bool _success,) = _to.call{ value: _amount }("");
+            require(_success, KTOKEN_TRANSFER_FAILED);
+            emit RescuedETH(_to, _amount);
         } else {
             // Withdraw ERC20 token
-            token.safeTransfer(to, amount);
-            emit RescuedAssets(token, to, amount);
+            _token.safeTransfer(_to, _amount);
+            emit RescuedAssets(_token, _to, _amount);
         }
 
-        emit EmergencyWithdrawal(token, to, amount, msg.sender);
+        emit EmergencyWithdrawal(_token, _to, _amount, msg.sender);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -334,11 +333,11 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// state before allowing any balance changes. It intercepts transfers, mints (from=0), and burns (to=0) to
     /// ensure protocol-wide emergency stops work correctly. The hook pattern allows centralized control over
     /// all token movements while maintaining ERC20 compatibility.
-    /// @param from The source address (address(0) for minting operations)
-    /// @param to The destination address (address(0) for burning operations)
-    /// @param amount The quantity of tokens being transferred/minted/burned
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
+    /// @param _from The source address (address(0) for minting operations)
+    /// @param _to The destination address (address(0) for burning operations)
+    /// @param _amount The quantity of tokens being transferred/minted/burned
+    function _beforeTokenTransfer(address _from, address _to, uint256 _amount) internal virtual override {
         _checkPaused();
-        super._beforeTokenTransfer(from, to, amount);
+        super._beforeTokenTransfer(_from, _to, _amount);
     }
 }

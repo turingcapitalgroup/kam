@@ -41,9 +41,7 @@ contract kTokenTest is DeploymentBaseTest {
         address recipient = users.alice;
 
         vm.prank(address(minter));
-        vm.expectEmit(true, false, false, true);
-        emit IkToken.Minted(recipient, amount);
-
+        // Note: kToken.mint() no longer emits Minted event - high-level events are emitted by calling contracts
         kUSD.mint(recipient, amount);
 
         assertEq(kUSD.balanceOf(recipient), amount, "Balance should equal minted amount");
@@ -70,9 +68,7 @@ contract kTokenTest is DeploymentBaseTest {
         uint256 amount = TEST_AMOUNT;
 
         vm.prank(address(minter));
-        vm.expectEmit(true, false, false, true);
-        emit IkToken.Minted(TEST_ZERO_ADDRESS, amount);
-
+        // Note: kToken.mint() no longer emits Minted event - high-level events are emitted by calling contracts
         kUSD.mint(TEST_ZERO_ADDRESS, amount);
 
         assertEq(kUSD.balanceOf(TEST_ZERO_ADDRESS), amount, "Zero address should have balance");
@@ -93,9 +89,7 @@ contract kTokenTest is DeploymentBaseTest {
 
         // Then burn them
         vm.prank(address(minter));
-        vm.expectEmit(true, false, false, true);
-        emit IkToken.Burned(account, amount);
-
+        // Note: kToken.burn() no longer emits Burned event - high-level events are emitted by calling contracts
         kUSD.burn(account, amount);
 
         assertEq(kUSD.balanceOf(account), 0, "Balance should be zero after burn");
@@ -139,9 +133,7 @@ contract kTokenTest is DeploymentBaseTest {
         kUSD.approve(address(minter), amount);
 
         vm.prank(address(minter));
-        vm.expectEmit(true, false, false, true);
-        emit IkToken.Burned(account, amount);
-
+        // Note: kToken.burnFrom() no longer emits Burned event - high-level events are emitted by calling contracts
         kUSD.burnFrom(account, amount);
 
         assertEq(kUSD.balanceOf(account), 0, "Balance should be zero after burn");

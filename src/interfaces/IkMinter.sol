@@ -93,11 +93,29 @@ interface IkMinter is IVersioned {
 
     /// @notice Emitted when a redemption request is successfully executed after batch settlement
     /// @param requestId The unique identifier of the executed redemption request
-    event Burned(bytes32 indexed requestId);
+    /// @param batchReceiver The address that holds the assets to witdrawn for that batchId
+    /// @param kToken The kToken address that burned the tokens
+    /// @param recipient The address that received the assets
+    /// @param amount The amount sent to the recipient
+    /// @param batchId The batchId related to the transaction
+    event Burned(
+        bytes32 indexed requestId,
+        address batchReceiver,
+        address kToken,
+        address recipient,
+        uint256 amount,
+        bytes32 batchId
+    );
 
     /// @notice Emitted when a pending redemption request is cancelled before batch closure
     /// @param requestId The unique identifier of the cancelled redemption request
-    event Cancelled(bytes32 indexed requestId);
+    /// @param user The address of the user requesting the cancellation
+    event Cancelled(
+        bytes32 indexed requestId,
+        address user,
+        uint256 amount,
+        bytes32 batchId
+    );
 
     // VaultBatches Events
     // / @notice Emitted when a new batch is created

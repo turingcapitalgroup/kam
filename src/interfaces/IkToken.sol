@@ -9,16 +9,6 @@ interface IkToken {
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Emitted when tokens are minted
-    /// @param to The address to which the tokens are minted
-    /// @param amount The quantity of tokens minted
-    event Minted(address indexed to, uint256 amount);
-
-    /// @notice Emitted when tokens are burned
-    /// @param from The address from which tokens are burned
-    /// @param amount The quantity of tokens burned
-    event Burned(address indexed from, uint256 amount);
-
     /// @notice Emitted when a new token is created
     /// @param token The address of the new token
     /// @param owner The owner of the new token
