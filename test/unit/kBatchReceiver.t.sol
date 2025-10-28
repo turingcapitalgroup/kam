@@ -229,6 +229,8 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         address[] memory receivers = new address[](5);
 
         for (uint256 i = 0; i < 5; i++) {
+            // casting to 'uint160' is safe because 0x2000 + i fits in uint160
+            // forge-lint: disable-next-line(unsafe-typecast)
             receivers[i] = address(uint160(0x2000 + i));
         }
 
@@ -341,6 +343,8 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         uint256 runningBalance = initialBalance;
 
         for (uint256 i = 0; i < pullAmounts.length; i++) {
+            // casting to 'uint160' is safe because 0x5000 + i fits in uint160
+            // forge-lint: disable-next-line(unsafe-typecast)
             address receiver = address(uint160(0x5000 + i));
 
             vm.prank(address(minter));

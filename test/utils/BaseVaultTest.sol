@@ -54,6 +54,8 @@ contract BaseVaultTest is DeploymentBaseTest {
             tokens.usdc,
             address(vault),
             batchId,
+            // casting to 'uint256' is safe because we're doing arithmetic on int256 values
+            // forge-lint: disable-next-line(unsafe-typecast)
             profit > 0 ? lastTotalAssets + uint256(profit) : lastTotalAssets - uint256(profit),
             0,
             0

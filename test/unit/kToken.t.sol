@@ -265,6 +265,7 @@ contract kTokenTest is DeploymentBaseTest {
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KTOKEN_IS_PAUSED));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         kUSD.transfer(users.bob, TEST_AMOUNT);
     }
 

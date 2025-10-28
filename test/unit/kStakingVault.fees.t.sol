@@ -17,7 +17,6 @@ import {
     VAULTFEES_INVALID_TIMESTAMP
 } from "kam/src/errors/Errors.sol";
 
-
 contract kStakingVaultFeesTest is BaseVaultTest {
     using OptimizedFixedPointMathLib for uint256;
     using SafeTransferLib for address;
@@ -60,6 +59,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
     function test_SetManagementFee_ExceedsMaximum() public {
         vm.expectRevert(bytes(VAULTFEES_FEE_EXCEEDS_MAXIMUM));
         vm.prank(users.admin);
+        // casting to 'uint16' is safe because we're testing overflow behavior
+        // forge-lint: disable-next-line(unsafe-typecast)
         vault.setManagementFee(uint16(MAX_BPS + 1));
     }
 
@@ -79,6 +80,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
     function test_SetPerformanceFee_ExceedsMaximum() public {
         vm.expectRevert(bytes(VAULTFEES_FEE_EXCEEDS_MAXIMUM));
         vm.prank(users.admin);
+        // casting to 'uint16' is safe because we're testing overflow behavior
+        // forge-lint: disable-next-line(unsafe-typecast)
         vault.setPerformanceFee(uint16(MAX_BPS + 1));
     }
 
@@ -249,6 +252,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         // Simulate loss by reducing vault's kToken balance
         uint256 lossAmount = 100_000 * _1_USDC;
         vm.prank(address(vault));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         kUSD.transfer(users.treasury, lossAmount);
 
         // Fast forward time
@@ -418,8 +422,12 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
         // Performance fee calculation (after management fees)
         uint256 assetsAfterManagementFee = totalAssets - managementFees;
+        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
+        // forge-lint: disable-next-line(unsafe-typecast)
         int256 assetsDelta = int256(assetsAfterManagementFee) - int256(INITIAL_DEPOSIT);
         // If the hurdle rate is soft apply fees to all return
+        // casting to 'uint256' is safe because assetsDelta is positive in this test
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 expectedPerformanceFee = (uint256(assetsDelta) * TEST_PERFORMANCE_FEE) / MAX_BPS;
         assertApproxEqRel(performanceFees, expectedPerformanceFee, 0.05e18); // 5% tolerance
     }
@@ -427,8 +435,12 @@ contract kStakingVaultFeesTest is BaseVaultTest {
     function test_NextFeeTimestamps() public {
         vm.warp(TEST_TIMESTAMP);
         vm.prank(users.admin);
+        // casting to 'uint64' is safe because TEST_TIMESTAMP fits in uint64
+        // forge-lint: disable-next-line(unsafe-typecast)
         vault.notifyManagementFeesCharged(uint64(TEST_TIMESTAMP));
         vm.prank(users.admin);
+        // casting to 'uint64' is safe because TEST_TIMESTAMP fits in uint64
+        // forge-lint: disable-next-line(unsafe-typecast)
         vault.notifyPerformanceFeesCharged(uint64(TEST_TIMESTAMP));
 
         uint256 nextManagement = vault.nextManagementFeeTimestamp();
@@ -469,8 +481,12 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
         vm.warp(newTimestamp); // Go to end of month
         vm.prank(users.admin);
+        // casting to 'uint64' is safe because newTimestamp fits in uint64
+        // forge-lint: disable-next-line(unsafe-typecast)
         vault.notifyManagementFeesCharged(uint64(newTimestamp));
         vm.prank(users.admin);
+        // casting to 'uint64' is safe because newTimestamp fits in uint64
+        // forge-lint: disable-next-line(unsafe-typecast)
         vault.notifyPerformanceFeesCharged(uint64(newTimestamp));
 
         nextManagement = vault.nextManagementFeeTimestamp();
@@ -616,38 +632,67 @@ contract kStakingVaultFeesTest is BaseVaultTest {
                         EVENT EMISSION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    event ManagementFeeUpdated(uint16 oldFee, uint16 newFee);
-    event PerformanceFeeUpdated(uint16 oldFee, uint16 newFee);
-    event HurdleRateUpdated(uint16 newRate);
-    event HardHurdleRateUpdated(bool newRate);
+    event ManagementFeeSet(uint16 oldFee, uint16 newFee);
+    event PerformanceFeeSet(uint16 oldFee, uint16 newFee);
+    event HardHurdleRateSet(bool isHard);
+    event SharePriceWatermarkUpdated(uint256 newWatermark);
     event ManagementFeesCharged(uint256 timestamp);
     event PerformanceFeesCharged(uint256 timestamp);
 
-    function test_ManagementFeeUpdated_Event() public {
+    function test_ManagementFeeSet_Event() public {
         uint16 oldFee = vault.managementFee();
 
         vm.expectEmit(true, true, false, true);
-        emit ManagementFeeUpdated(oldFee, TEST_MANAGEMENT_FEE);
+        emit ManagementFeeSet(oldFee, TEST_MANAGEMENT_FEE);
 
         vm.prank(users.admin);
         vault.setManagementFee(TEST_MANAGEMENT_FEE);
     }
 
-    function test_PerformanceFeeUpdated_Event() public {
+    function test_PerformanceFeeSet_Event() public {
         uint16 oldFee = vault.performanceFee();
 
         vm.expectEmit(true, true, false, true);
-        emit PerformanceFeeUpdated(oldFee, TEST_PERFORMANCE_FEE);
+        emit PerformanceFeeSet(oldFee, TEST_PERFORMANCE_FEE);
 
         vm.prank(users.admin);
         vault.setPerformanceFee(TEST_PERFORMANCE_FEE);
     }
 
-    function test_HardHurdleRateUpdated_Event() public {
+    function test_HardHurdleRateSet_Event() public {
         vm.expectEmit(false, false, false, true);
-        emit HardHurdleRateUpdated(true);
+        emit HardHurdleRateSet(true);
 
         vm.prank(users.admin);
         vault.setHardHurdleRate(true);
+    }
+
+    function test_SharePriceWatermarkUpdated_Event() public {
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        vm.warp(block.timestamp + 2);
+
+        // Add yield to increase share price
+        uint256 yieldAmount = 200_000 * _1_USDC;
+
+        vm.startPrank(users.relayer);
+        bytes32 batchId = vault.getBatchId();
+        vault.closeBatch(batchId, true);
+
+        bytes32 proposalId = assetRouter.proposeSettleBatch(
+            tokens.usdc,
+            address(vault),
+            batchId,
+            vault.totalAssets() + yieldAmount,
+            uint64(block.timestamp - 1),
+            uint64(block.timestamp - 1)
+        );
+
+        // The watermark update happens during settlement when notifyFeesCharged is called
+        // We need to calculate what the expected new watermark will be
+        assetRouter.executeSettleBatch(proposalId);
+
+        // Verify watermark was updated
+        assertGt(vault.sharePriceWatermark(), 1e6);
     }
 }

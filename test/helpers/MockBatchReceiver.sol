@@ -23,6 +23,7 @@ contract MockBatchReceiver {
         // Mock implementation - transfer assets to recipient
         // In a real implementation, this would handle the actual asset transfer
         // For testing, we'll transfer the assets to the recipient
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(asset).transfer(recipient, amount);
     }
 }

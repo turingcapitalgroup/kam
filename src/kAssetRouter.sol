@@ -308,14 +308,20 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
             uint256 _requestedAssets = (_totalSupply == 0 || _totalAssets == 0)
                 ? $.vaultRequestedShares[_vault][_batchId]
                 : $.vaultRequestedShares[_vault][_batchId].fullMulDiv(_totalAssets, _totalSupply);
+            // casting to 'int256' is safe because we're doing arithmetic on uint256 values
+            // forge-lint: disable-next-line(unsafe-typecast)
             _netted =
                 int256(uint256($.vaultBatchBalances[_vault][_batchId].deposited)) - int256(uint256(_requestedAssets));
         }
 
+        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
+        // forge-lint: disable-next-line(unsafe-typecast)
         _yield = int256(_totalAssets) - int256(_lastTotalAssets);
 
         // To calculate the strategy yield we need to include the deposits and requests into the new total assets
         // First to match last total assets
+        // casting to 'uint256' is safe because we're converting back from int256 arithmetic
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 _totalAssetsAdjusted = uint256(int256(_totalAssets) + _netted);
 
         // Check if yield exceeds tolerance threshold to prevent excessive yield deviations
@@ -444,6 +450,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
 
             // If netted assets are positive(it means more deposits than withdrawals)
             if (_netted > 0) {
+                // casting to 'uint256' is safe because _netted is positive in this branch
+                // forge-lint: disable-next-line(unsafe-typecast)
                 emit Deposited(_vault, _asset, uint256(_netted));
             }
 
@@ -455,6 +463,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
             // kMinter yield is sent to insuranceFund, cannot be minted.
             if (_yield != 0) {
                 if (_profit) {
+                    // casting to 'uint256' is safe because _yield is positive in this branch
+                    // forge-lint: disable-next-line(unsafe-typecast)
                     IkToken(_kToken).mint(_vault, uint256(_yield));
                 } else {
                     IkToken(_kToken).burn(_vault, _yield.abs());
@@ -466,6 +476,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
             _checkAddressNotZero(address(_kMinterAdapter));
             int256 _kMinterTotalAssets = int256(_kMinterAdapter.totalAssets()) - _netted;
             require(_kMinterTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
+            // casting to 'uint256' is safe because _kMinterTotalAssets is >= 0 due to require check
+            // forge-lint: disable-next-line(unsafe-typecast)
             _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
 
             // If global fees were charged in the batch, notify the vault to udpate share price

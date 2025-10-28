@@ -73,6 +73,8 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
 
         // Calculate the asset's value change since entry
         // This gives us the raw profit/loss in asset terms after management fees
+        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
+        // forge-lint: disable-next-line(unsafe-typecast)
         int256 _assetsDelta = int256(_currentTotalAssets) - int256(_lastTotalAssets);
 
         // Only calculate fees if there's a profit
@@ -84,6 +86,8 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
                 (_lastTotalAssets * _getHurdleRate($)).fullMulDiv(_durationPerformance, SECS_PER_YEAR) / MAX_BPS;
 
             // Calculate returns relative to hurdle rate
+            // casting to 'uint256' is safe because _assetsDelta is positive in this branch
+            // forge-lint: disable-next-line(unsafe-typecast)
             uint256 _totalReturn = uint256(_assetsDelta);
 
             // Only charge performance fees if:

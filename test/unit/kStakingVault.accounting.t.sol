@@ -226,6 +226,8 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
             }
 
             // Perform deposit
+            // casting to 'int256' is safe because yieldAmount fits in int256
+            // forge-lint: disable-next-line(unsafe-typecast)
             _performStakeAndSettle(_users[i], deposits[i], int256(yieldAmount));
 
             // Verify user's share balance
@@ -264,6 +266,8 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         uint256 yieldAmount = 500_000 * _1_USDC; // 50% yield
         uint256 aliceDeposit = INITIAL_DEPOSIT;
 
+        // casting to 'int256' is safe because yieldAmount fits in int256
+        // forge-lint: disable-next-line(unsafe-typecast)
         _performStakeAndSettle(users.alice, aliceDeposit, int256(yieldAmount));
 
         assertEq(vault.netSharePrice(), 1.5e6);

@@ -249,21 +249,27 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _checkPaused($);
         BaseVaultTypes.StakeRequest storage _request = $.stakeRequests[_requestId];
 
-        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
-        require(msg.sender == _request.user, KSTAKINGVAULT_UNAUTHORIZED);
+        // Cache frequently accessed values to save gas
+        address user = _request.user;
+        uint128 kTokenAmount = _request.kTokenAmount;
+        bytes32 batchId = _request.batchId;
+        BaseVaultTypes.BatchInfo storage batch = $.batches[batchId];
+
+        require(msg.sender == user, KSTAKINGVAULT_UNAUTHORIZED);
         require(_request.status == BaseVaultTypes.RequestStatus.PENDING, KSTAKINGVAULT_REQUEST_NOT_ELIGIBLE);
-        require(!$.batches[_request.batchId].isClosed, KSTAKINGVAULT_VAULT_CLOSED);
-        require(!$.batches[_request.batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        require(!batch.isClosed, KSTAKINGVAULT_VAULT_CLOSED);
+        require(!batch.isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
         _request.status = BaseVaultTypes.RequestStatus.CANCELLED;
-        $.totalPendingStake -= _request.kTokenAmount;
+        $.totalPendingStake -= kTokenAmount;
 
         IkAssetRouter(_getKAssetRouter())
-            .kAssetTransfer(address(this), _getKMinter(), $.underlyingAsset, _request.kTokenAmount, _request.batchId);
+            .kAssetTransfer(address(this), _getKMinter(), $.underlyingAsset, kTokenAmount, batchId);
 
-        $.kToken.safeTransfer(_request.user, _request.kTokenAmount);
+        $.kToken.safeTransfer(user, kTokenAmount);
 
-        emit StakeRequestCancelled(bytes32(_requestId));
+        emit StakeRequestCancelled(_requestId, batchId, kTokenAmount);
 
         // Close `nonReentrant`
         _unlockReentrant();
@@ -278,19 +284,25 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _checkPaused($);
         BaseVaultTypes.UnstakeRequest storage _request = $.unstakeRequests[_requestId];
 
-        require(msg.sender == _request.user, KSTAKINGVAULT_UNAUTHORIZED);
-        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
+        // Cache frequently accessed values to save gas
+        address user = _request.user;
+        uint128 stkTokenAmount = _request.stkTokenAmount;
+        bytes32 batchId = _request.batchId;
+        BaseVaultTypes.BatchInfo storage batch = $.batches[batchId];
+
+        require(msg.sender == user, KSTAKINGVAULT_UNAUTHORIZED);
         require(_request.status == BaseVaultTypes.RequestStatus.PENDING, KSTAKINGVAULT_REQUEST_NOT_ELIGIBLE);
-        require(!$.batches[_request.batchId].isClosed, KSTAKINGVAULT_VAULT_CLOSED);
-        require(!$.batches[_request.batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        require(!batch.isClosed, KSTAKINGVAULT_VAULT_CLOSED);
+        require(!batch.isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
         _request.status = BaseVaultTypes.RequestStatus.CANCELLED;
 
-        IkAssetRouter(_getKAssetRouter()).kSharesRequestPull(address(this), _request.stkTokenAmount, _request.batchId);
+        IkAssetRouter(_getKAssetRouter()).kSharesRequestPull(address(this), stkTokenAmount, batchId);
 
-        _transfer(address(this), _request.user, _request.stkTokenAmount);
+        _transfer(address(this), user, stkTokenAmount);
 
-        emit UnstakeRequestCancelled(_requestId);
+        emit UnstakeRequestCancelled(_requestId, batchId, stkTokenAmount);
 
         // Close `nonReentrant`
         _unlockReentrant();
@@ -489,34 +501,36 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _checkPaused($);
 
-        bytes32 _batchId = $.unstakeRequests[_requestId].batchId;
-
-        require($.batches[_batchId].isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
-
         BaseVaultTypes.UnstakeRequest storage _request = $.unstakeRequests[_requestId];
+
+        address user = _request.user;
+        uint128 stkTokenAmount = _request.stkTokenAmount;
+        bytes32 batchId = _request.batchId;
+        BaseVaultTypes.BatchInfo storage batch = $.batches[batchId];
+
+        require(batch.isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
         require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
-        require(msg.sender == _request.user, VAULTCLAIMS_NOT_BENEFICIARY);
-        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
+        require(msg.sender == user, VAULTCLAIMS_NOT_BENEFICIARY);
 
-        _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
-
-        uint256 _sharePrice = $.batches[_batchId].sharePrice;
-        uint256 _netSharePrice = $.batches[_batchId].netSharePrice;
-        _checkAmountNotZero(_sharePrice);
+        uint256 sharePrice = batch.sharePrice;
+        uint256 netSharePrice = batch.netSharePrice;
+        _checkAmountNotZero(sharePrice);
 
         // Calculate total kTokens to return based on settlement-time share price
         // Multiply redeemed shares for net and gross share price to obtain gross and net amount of assets
-        uint8 _decimals = _getDecimals($);
-        uint256 _totalKTokensNet = ((uint256(_request.stkTokenAmount)) * _netSharePrice) / (10 ** _decimals);
-        uint256 _netSharesToBurn = ((uint256(_request.stkTokenAmount)) * _netSharePrice) / _sharePrice;
+        uint8 decimals = _getDecimals($);
+        uint256 totalKTokensNet = ((uint256(stkTokenAmount)) * netSharePrice) / (10 ** decimals);
+        uint256 netSharesToBurn = ((uint256(stkTokenAmount)) * netSharePrice) / sharePrice;
 
-        // Burn stkTokens from vault (already transferred to vault during request)
-        _burn(address(this), _netSharesToBurn);
-        emit UnstakingAssetsClaimed(_batchId, _requestId, _request.user, _totalKTokensNet);
+        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
-        // Transfer kTokens to user
-        $.kToken.safeTransfer(_request.user, _totalKTokensNet);
-        emit KTokenUnstaked(_request.user, _request.stkTokenAmount, _totalKTokensNet);
+        _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
+        _burn(address(this), netSharesToBurn);
+
+        emit UnstakingAssetsClaimed(batchId, _requestId, user, totalKTokensNet);
+        emit KTokenUnstaked(user, stkTokenAmount, totalKTokensNet);
+
+        $.kToken.safeTransfer(user, totalKTokensNet);
 
         // Close `nonRentrant`
         _unlockReentrant();
@@ -531,7 +545,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _checkAdmin(msg.sender);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _setIsHardHurdleRate($, _isHard);
-        emit HardHurdleRateUpdated(_isHard);
+        emit HardHurdleRateSet(_isHard);
     }
 
     /// @inheritdoc IVaultFees
@@ -539,9 +553,9 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _checkAdmin(msg.sender);
         _checkValidBPS(_managementFee);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        uint16 _oldFee = _getManagementFee($);
+        uint16 oldFee = _getManagementFee($);
         _setManagementFee($, _managementFee);
-        emit ManagementFeeUpdated(_oldFee, _managementFee);
+        emit ManagementFeeSet(oldFee, _managementFee);
     }
 
     /// @inheritdoc IVaultFees
@@ -549,9 +563,9 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _checkAdmin(msg.sender);
         _checkValidBPS(_performanceFee);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        uint16 _oldFee = _getPerformanceFee($);
+        uint16 oldFee = _getPerformanceFee($);
         _setPerformanceFee($, _performanceFee);
-        emit PerformanceFeeUpdated(_oldFee, _performanceFee);
+        emit PerformanceFeeSet(oldFee, _performanceFee);
     }
 
     /// @inheritdoc IVaultFees

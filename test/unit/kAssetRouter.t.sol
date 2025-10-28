@@ -32,6 +32,8 @@ contract kAssetRouterTest is DeploymentBaseTest {
     uint256 internal constant TEST_PROFIT = 100 * _1_USDC;
     uint256 internal constant TEST_LOSS = 50 * _1_USDC;
     uint256 internal constant TEST_TOTAL_ASSETS = 10_000 * _1_USDC;
+    // casting to 'int256' is safe because 500 * _1_USDC fits in int256
+    // forge-lint: disable-next-line(unsafe-typecast)
     int256 internal constant TEST_NETTED = int256(500 * _1_USDC);
 
     address internal mockBatchReceiver = makeAddr("mockBatchReceiver");
@@ -102,6 +104,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         // Approve asset router to spend
         vm.prank(address(minter));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(tokens.usdc).transfer(address(assetRouter), amount);
 
         // Test asset push
@@ -477,6 +480,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Deposit via kMinter
         mockUSDC.mint(address(minter), depositAmount);
         vm.prank(address(minter));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(tokens.usdc).transfer(address(assetRouter), depositAmount);
         vm.prank(address(minter));
         assetRouter.kAssetPush(tokens.usdc, depositAmount, batchId);
@@ -634,6 +638,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Test with maximum amount in asset push
         mockUSDC.mint(address(minter), maxAmount);
         vm.prank(address(minter));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(tokens.usdc).transfer(address(assetRouter), maxAmount);
         vm.prank(address(minter));
         assetRouter.kAssetPush(tokens.usdc, maxAmount, batchId);
@@ -650,6 +655,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Test USDC
         mockUSDC.mint(address(minter), amount);
         vm.prank(address(minter));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(tokens.usdc).transfer(address(assetRouter), amount);
         vm.prank(address(minter));
         assetRouter.kAssetPush(tokens.usdc, amount, batchId1);
@@ -657,6 +663,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Test WBTC
         mockWBTC.mint(address(minter), amount);
         vm.prank(address(minter));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(tokens.wbtc).transfer(address(assetRouter), amount);
         vm.prank(address(minter));
         assetRouter.kAssetPush(tokens.wbtc, amount, batchId2);
@@ -752,6 +759,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Test all events are properly emitted
         mockUSDC.mint(address(minter), amount);
         vm.prank(address(minter));
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(tokens.usdc).transfer(address(assetRouter), amount);
 
         vm.prank(address(minter));
@@ -777,6 +785,8 @@ contract kAssetRouterTest is DeploymentBaseTest {
             batchId,
             TEST_TOTAL_ASSETS,
             TEST_NETTED,
+            // casting to 'int256' is safe because TEST_PROFIT fits in int256
+            // forge-lint: disable-next-line(unsafe-typecast)
             int256(TEST_PROFIT),
             block.timestamp + 1,
             0,

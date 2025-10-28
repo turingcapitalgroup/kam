@@ -51,28 +51,24 @@ interface IVault is IVaultBatch, IVaultClaim, IVaultFees {
     event KTokenUnstaked(address indexed user, uint256 shares, uint256 kTokenAmount);
 
     // VaultFees Events
-    // / @notice Emitted when the management fee is updated
-    // / @param oldFee Previous management fee in basis points
-    // / @param newFee New management fee in basis points
-    event ManagementFeeUpdated(uint16 oldFee, uint16 newFee);
+    /// @notice Emitted when the management fee is set
+    /// @param oldFee Previous management fee in basis points
+    /// @param newFee New management fee in basis points
+    event ManagementFeeSet(uint16 oldFee, uint16 newFee);
 
-    /// @notice Emitted when the performance fee is updated
+    /// @notice Emitted when the performance fee is set
     /// @param oldFee Previous performance fee in basis points
     /// @param newFee New performance fee in basis points
-    event PerformanceFeeUpdated(uint16 oldFee, uint16 newFee);
+    event PerformanceFeeSet(uint16 oldFee, uint16 newFee);
+
+    /// @notice Emitted when the hard hurdle rate is set
+    /// @param isHard True for hard hurdle, false for soft hurdle
+    event HardHurdleRateSet(bool isHard);
 
     /// @notice Emitted when fees are charged to the vault
     /// @param managementFees Amount of management fees collected
     /// @param performanceFees Amount of performance fees collected
     event FeesAssesed(uint256 managementFees, uint256 performanceFees);
-
-    /// @notice Emitted when the hurdle rate is updated
-    /// @param newRate New hurdle rate in basis points
-    event HurdleRateUpdated(uint16 newRate);
-
-    /// @notice Emitted when the hard hurdle rate is updated
-    /// @param newRate New hard hurdle rate in basis points
-    event HardHurdleRateUpdated(bool newRate);
 
     /// @notice Emitted when management fees are charged
     /// @param timestamp Timestamp of the fee charge
@@ -113,7 +109,9 @@ interface IVault is IVaultBatch, IVaultClaim, IVaultFees {
 
     /// @notice Emitted when a stake request is cancelled
     /// @param requestId The unique identifier of the stake request
-    event StakeRequestCancelled(bytes32 indexed requestId);
+    /// @param batchId The batch ID associated with the request
+    /// @param amount The amount of kTokens returned to the user
+    event StakeRequestCancelled(bytes32 indexed requestId, bytes32 indexed batchId, uint256 amount);
 
     /// @notice Emitted when an unstake request is created
     /// @param requestId The unique identifier of the unstake request
@@ -127,7 +125,9 @@ interface IVault is IVaultBatch, IVaultClaim, IVaultFees {
 
     /// @notice Emitted when an unstake request is cancelled
     /// @param requestId The unique identifier of the unstake request
-    event UnstakeRequestCancelled(bytes32 indexed requestId);
+    /// @param batchId The batch ID associated with the request
+    /// @param amount The amount of stkTokens returned to the user
+    event UnstakeRequestCancelled(bytes32 indexed requestId, bytes32 indexed batchId, uint256 amount);
 
     /// @notice Emitted when the vault is initialized
     /// @param registry The registry address

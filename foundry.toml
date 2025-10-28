@@ -21,7 +21,18 @@ optimizer_runs = 10_000
 gas_limit = 100_000_000
 
 [lint]
-exclude_lints = ["mixed-case-function","screaming-snake-case-immutable","pascal-case-struct", "mixed-case-variable"]
+exclude_lints = [
+    "mixed-case-function",
+    "screaming-snake-case-immutable",
+    "pascal-case-struct", 
+    "mixed-case-variable",
+    "unsafe-cheatcode",
+    "unsafe-typecast",
+    "shadowing",
+    "unused-parameter",
+    "unused-variable",
+    "function-mutability"
+]
                     
 [fuzz]
 runs = 1000

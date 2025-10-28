@@ -126,6 +126,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     //////////////////////////////////////////////////////////////*/
 
     function _getDecimals(BaseVaultStorage storage $) internal view returns (uint8) {
+        // casting to 'uint8' is safe because DECIMALS_MASK ensures value fits in uint8
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint8(($.config >> DECIMALS_SHIFT) & DECIMALS_MASK);
     }
 
@@ -138,6 +140,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     }
 
     function _getPerformanceFee(BaseVaultStorage storage $) internal view returns (uint16) {
+        // casting to 'uint16' is safe because PERFORMANCE_FEE_MASK ensures value fits in uint16
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint16(($.config >> PERFORMANCE_FEE_SHIFT) & PERFORMANCE_FEE_MASK);
     }
 
@@ -147,6 +151,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     }
 
     function _getManagementFee(BaseVaultStorage storage $) internal view returns (uint16) {
+        // casting to 'uint16' is safe because MANAGEMENT_FEE_MASK ensures value fits in uint16
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint16(($.config >> MANAGEMENT_FEE_SHIFT) & MANAGEMENT_FEE_MASK);
     }
 
@@ -182,6 +188,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     }
 
     function _getLastFeesChargedManagement(BaseVaultStorage storage $) internal view returns (uint64) {
+        // casting to 'uint64' is safe because LAST_FEES_CHARGED_MANAGEMENT_MASK ensures value fits in uint64
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint64(($.config >> LAST_FEES_CHARGED_MANAGEMENT_SHIFT) & LAST_FEES_CHARGED_MANAGEMENT_MASK);
     }
 
@@ -191,6 +199,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     }
 
     function _getLastFeesChargedPerformance(BaseVaultStorage storage $) internal view returns (uint64) {
+        // casting to 'uint64' is safe because LAST_FEES_CHARGED_PERFORMANCE_MASK ensures value fits in uint64
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint64(($.config >> LAST_FEES_CHARGED_PERFORMANCE_SHIFT) & LAST_FEES_CHARGED_PERFORMANCE_MASK);
     }
 
@@ -309,7 +319,11 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// @param _shares The quantity of stkTokens to convert to underlying asset terms
     /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
     /// @return _assets The equivalent value in underlying assets based on current vault performance
-    function _convertToAssetsWithTotals(uint256 _shares, uint256 _totalAssetsValue) internal view returns (uint256 _assets) {
+    function _convertToAssetsWithTotals(uint256 _shares, uint256 _totalAssetsValue)
+        internal
+        view
+        returns (uint256 _assets)
+    {
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) return _shares;
         return _shares.fullMulDiv(_totalAssetsValue, _totalSupply);
@@ -325,7 +339,11 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// @param _assets The underlying asset amount to convert to share terms
     /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
     /// @return _shares The equivalent stkToken amount based on current share price
-    function _convertToSharesWithTotals(uint256 _assets, uint256 _totalAssetsValue) internal view returns (uint256 _shares) {
+    function _convertToSharesWithTotals(uint256 _assets, uint256 _totalAssetsValue)
+        internal
+        view
+        returns (uint256 _shares)
+    {
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) return _assets;
         return _assets.fullMulDiv(_totalSupply, _totalAssetsValue);

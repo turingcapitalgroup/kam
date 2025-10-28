@@ -614,6 +614,169 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
     }
 
     /* //////////////////////////////////////////////////////////////
+                        CANCEL REQUESTS TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    event StakeRequestCancelled(bytes32 indexed requestId, bytes32 indexed batchId, uint256 amount);
+    event UnstakeRequestCancelled(bytes32 indexed requestId, bytes32 indexed batchId, uint256 amount);
+
+    function test_CancelStakeRequest_Success() public {
+        // Setup: Create a staking request
+        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+
+        uint256 kTokenBalanceBefore = kUSD.balanceOf(users.alice);
+
+        // Cancel the request
+        vm.expectEmit(true, true, false, true);
+        emit StakeRequestCancelled(requestId, batchId, 1000 * _1_USDC);
+
+        vm.prank(users.alice);
+        vault.cancelStakeRequest(requestId);
+
+        // Verify kTokens were returned
+        uint256 kTokenBalanceAfter = kUSD.balanceOf(users.alice);
+        assertEq(kTokenBalanceAfter - kTokenBalanceBefore, 1000 * _1_USDC);
+    }
+
+    function test_CancelStakeRequest_AfterBatchClosed() public {
+        // Setup: Create a staking request
+        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+
+        // Close the batch
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        // Try to cancel - should fail
+        vm.prank(users.alice);
+        vm.expectRevert();
+        vault.cancelStakeRequest(requestId);
+    }
+
+    function test_CancelStakeRequest_NotOwner() public {
+        // Setup: Alice creates a staking request
+        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+
+        // Bob tries to cancel Alice's request
+        vm.prank(users.bob);
+        vm.expectRevert();
+        vault.cancelStakeRequest(requestId);
+    }
+
+    function test_CancelUnstakeRequest_Success() public {
+        // Setup: Get stkTokens and create unstaking request
+        _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestUnstake(users.alice, 500 * _1_USDC);
+
+        uint256 stkTokenBalanceBefore = vault.balanceOf(users.alice);
+
+        // Cancel the request
+        vm.expectEmit(true, true, false, true);
+        emit UnstakeRequestCancelled(requestId, batchId, 500 * _1_USDC);
+
+        vm.prank(users.alice);
+        vault.cancelUnstakeRequest(requestId);
+
+        // Verify stkTokens were returned
+        uint256 stkTokenBalanceAfter = vault.balanceOf(users.alice);
+        assertEq(stkTokenBalanceAfter - stkTokenBalanceBefore, 500 * _1_USDC);
+    }
+
+    function test_CancelUnstakeRequest_AfterBatchClosed() public {
+        // Setup: Get stkTokens and create unstaking request
+        _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestUnstake(users.alice, 500 * _1_USDC);
+
+        // Close the batch
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        // Try to cancel - should fail
+        vm.prank(users.alice);
+        vm.expectRevert();
+        vault.cancelUnstakeRequest(requestId);
+    }
+
+    function test_CancelUnstakeRequest_NotOwner() public {
+        // Setup: Alice gets stkTokens and creates unstaking request
+        _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestUnstake(users.alice, 500 * _1_USDC);
+
+        // Bob tries to cancel Alice's request
+        vm.prank(users.bob);
+        vm.expectRevert();
+        vault.cancelUnstakeRequest(requestId);
+    }
+
+    function test_CancelStakeRequest_WhenPaused() public {
+        // Setup: Create a staking request
+        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+
+        // Pause the vault
+        vm.prank(users.emergencyAdmin);
+        vault.setPaused(true);
+
+        // Try to cancel - should fail
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KSTAKINGVAULT_IS_PAUSED));
+        vault.cancelStakeRequest(requestId);
+    }
+
+    function test_CancelUnstakeRequest_WhenPaused() public {
+        // Setup: Get stkTokens and create unstaking request
+        _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestUnstake(users.alice, 500 * _1_USDC);
+
+        // Pause the vault
+        vm.prank(users.emergencyAdmin);
+        vault.setPaused(true);
+
+        // Try to cancel - should fail
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KSTAKINGVAULT_IS_PAUSED));
+        vault.cancelUnstakeRequest(requestId);
+    }
+
+    /* //////////////////////////////////////////////////////////////
                         HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 

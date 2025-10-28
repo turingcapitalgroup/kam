@@ -1,5 +1,7 @@
 # KAM Protocol Architecture
 
+> 📘 **Note**: For detailed coding standards and conventions used throughout the codebase, see [Coding Standards](./coding-standards.md).
+
 ## Overview
 
 KAM is an institutional-grade tokenization protocol that creates kTokens (kUSDC, kWBTC, etc.) backed 1:1 by real-world assets (USDC, WBTC, etc.). The protocol bridges traditional finance and DeFi by serving two distinct user bases through separate but interconnected pathways.
