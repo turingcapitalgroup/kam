@@ -653,7 +653,13 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
     /// @notice Authorize function modification
     /// @dev This allows modifying functions while keeping modules separate
-    function _authorizeModifyFunctions(address /* _sender */) internal view override {
+    function _authorizeModifyFunctions(
+        address /* _sender */
+    )
+        internal
+        view
+        override
+    {
         _checkOwner();
     }
 
@@ -664,7 +670,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// @notice Fallback function to receive ETH transfers
     /// @dev Allows the contract to receive ETH for gas refunds, donations, or accidental transfers.
     /// Received ETH can be rescued using the rescueAssets function with address(0).
-    receive() external payable { }
+    receive() external payable override { }
 
     /* //////////////////////////////////////////////////////////////
                         CONTRACT INFO

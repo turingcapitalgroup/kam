@@ -35,7 +35,7 @@ contract BaseVaultTest is DeploymentBaseTest {
                           HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _performStakeAndSettle(address user, uint256 amount, int256 profit) internal returns (bytes32 /* requestId */) {
+    function _performStakeAndSettle(address user, uint256 amount, int256 profit) internal returns (bytes32 requestId) {
         // Approve kUSD for staking
         vm.prank(user);
         kUSD.approve(address(vault), amount);
@@ -66,6 +66,8 @@ contract BaseVaultTest is DeploymentBaseTest {
 
         vm.prank(user);
         vault.claimStakedShares(stakeRequestId);
+
+        return stakeRequestId;
     }
 
     function _setupTestFees() internal {

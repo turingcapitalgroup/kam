@@ -27,11 +27,7 @@ exclude_lints = [
     "pascal-case-struct", 
     "mixed-case-variable",
     "unsafe-cheatcode",
-    "unsafe-typecast",
-    "shadowing",
-    "unused-parameter",
-    "unused-variable",
-    "function-mutability"
+    "unsafe-typecast"
 ]
                     
 [fuzz]

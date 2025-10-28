@@ -106,4 +106,8 @@ abstract contract MultiFacetProxy is Proxy {
         if (_impl == address(0)) revert();
         return _impl;
     }
+
+    /// @notice Receive ether function
+    /// @dev Allows the contract to receive ether directly
+    receive() external payable virtual { }
 }

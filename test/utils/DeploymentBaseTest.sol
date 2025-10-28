@@ -417,7 +417,12 @@ contract DeploymentBaseTest is BaseTest {
         return kToken(token).balanceOf(user);
     }
 
-    function expectEvent(address emitter, bytes32 /* eventSig */) internal {
+    function expectEvent(
+        address emitter,
+        bytes32 /* eventSig */
+    )
+        internal
+    {
         vm.expectEmit(true, true, true, true, emitter);
     }
 

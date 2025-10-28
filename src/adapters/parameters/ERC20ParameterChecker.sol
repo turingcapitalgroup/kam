@@ -109,7 +109,15 @@ contract ERC20ParameterChecker is IParametersChecker {
     /// @param _token The token address
     /// @param _selector The function selector
     /// @param _params The encoded function parameters
-    function authorizeAdapterCall(address /* _adapter */, address _token, bytes4 _selector, bytes calldata _params) external {
+    function authorizeAdapterCall(
+        address,
+        /* _adapter */
+        address _token,
+        bytes4 _selector,
+        bytes calldata _params
+    )
+        external
+    {
         if (_selector == ERC20.transfer.selector) {
             (address _to, uint256 _amount) = abi.decode(_params, (address, uint256));
             uint256 _blockAmount = _amountTransferedPerBlock[_token][block.number] += _amount;
