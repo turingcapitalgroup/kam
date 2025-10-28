@@ -153,13 +153,13 @@ contract kStakingVaultHandler is BaseHandler {
         amount = bound(amount, 0, 30 days);
         vm.warp(block.timestamp + amount);
         bytes32 batchId = kStakingVault_vault.getBatchId();
-        (uint256 managementFee, uint256 performanceFee, uint256 totalFees) = kStakingVault_vault.computeLastBatchFees();
+        (, , uint256 totalFees) = kStakingVault_vault.computeLastBatchFees();
         kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - totalFees;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
     }
 
     function kStakingVault_chargeFees(bool management, bool performance) public {
-        (uint256 managementFee, uint256 performanceFee, uint256 totalFees) = kStakingVault_vault.computeLastBatchFees();
+        (uint256 managementFee, uint256 performanceFee, ) = kStakingVault_vault.computeLastBatchFees();
         if (management && managementFee > 0) {
             kStakingVault_chargedManagementInBatch[kStakingVault_vault.getBatchId()] += managementFee;
             kStakingVault_lastFeesChargedManagement = block.timestamp;
@@ -198,7 +198,7 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorStakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.StakeRequest memory stakeRequest = kStakingVault_vault.getStakeRequest(requestId);
         bytes32 batchId = stakeRequest.batchId;
-        (address batchReceiver, bool isClosed, bool isSettled, uint256 sharePrice, uint256 netSharePrice) =
+        (, , bool isSettled, , uint256 netSharePrice) =
             kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
@@ -247,7 +247,7 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorUnstakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.UnstakeRequest memory unstakeRequest = kStakingVault_vault.getUnstakeRequest(requestId);
         bytes32 batchId = unstakeRequest.batchId;
-        (address batchReceiver, bool isClosed, bool isSettled, uint256 sharePrice, uint256 netSharePrice) =
+        (, , bool isSettled, uint256 sharePrice, uint256 netSharePrice) =
             kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
@@ -374,10 +374,10 @@ contract kStakingVaultHandler is BaseHandler {
             console2.log("  New Value:", newBalance);
             kStakingVault_minterHandler.set_kMinter_actualAdapterBalance(newBalance);
 
-            uint256 newTotalAssets = kStakingVault_minterAdapter.totalAssets();
+            uint256 minterAdapterTotalAssets = kStakingVault_minterAdapter.totalAssets();
             console2.log("kStakingVault_proposeSettlement: Updating minterHandler.kMinter_actualAdapterTotalAssets");
-            console2.log("  New Value:", newTotalAssets);
-            kStakingVault_minterHandler.set_kMinter_actualAdapterTotalAssets(newTotalAssets);
+            console2.log("  New Value:", minterAdapterTotalAssets);
+            kStakingVault_minterHandler.set_kMinter_actualAdapterTotalAssets(minterAdapterTotalAssets);
         }
         kStakingVault_actualAdapterBalance = (kStakingVault_token).balanceOf(address(kStakingVault_vaultAdapter));
 
@@ -445,7 +445,7 @@ contract kStakingVaultHandler is BaseHandler {
                 - int256(kStakingVault_pendingStakeInBatch[proposal.batchId])
         );
 
-        (address batchReceiver, bool isClosed, bool isSettled, uint256 sharePrice, uint256 netSharePrice) =
+        (, , , uint256 sharePrice, uint256 netSharePrice) =
             kStakingVault_vault.getBatchIdInfo(proposal.batchId);
         uint256 expectedSharesToBurn;
         if (totalRequestedShares != 0) {

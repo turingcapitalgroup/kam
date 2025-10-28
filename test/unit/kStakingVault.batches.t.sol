@@ -271,7 +271,6 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         // Create another batch for testing
         vm.prank(users.relayer);
         vault.createNewBatch();
-        bytes32 anotherBatch = vault.getBatchId();
     }
 
     /* //////////////////////////////////////////////////////////////

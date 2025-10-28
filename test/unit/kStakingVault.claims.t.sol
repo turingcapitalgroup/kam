@@ -193,7 +193,6 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         uint256 lastTotalAssets = vault.totalAssets();
-        uint256 totalAmount = 1000 * _1_USDC + 500 * _1_USDC + 750 * _1_USDC;
         _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
 
         // All users claim their shares

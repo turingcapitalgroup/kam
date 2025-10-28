@@ -646,7 +646,11 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @notice Authorize function modification
     /// @dev This allows modifying functions while keeping modules separate
-    function _authorizeModifyFunctions(address _sender) internal override {
+    function _authorizeModifyFunctions(address /* _sender */) internal view override {
         _checkOwner();
     }
+
+    /// @notice Receive ether function
+    /// @dev Allows the contract to receive ether directly
+    receive() external payable {}
 }

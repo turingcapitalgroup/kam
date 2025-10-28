@@ -653,7 +653,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
     /// @notice Authorize function modification
     /// @dev This allows modifying functions while keeping modules separate
-    function _authorizeModifyFunctions(address _sender) internal view override {
+    function _authorizeModifyFunctions(address /* _sender */) internal view override {
         _checkOwner();
     }
 

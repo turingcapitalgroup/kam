@@ -173,7 +173,6 @@ contract DNVaultTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         uint256 lastTotalAssets = assetRouter.virtualBalance(address(vault), tokens.usdc);
-        uint256 totalAmount = 1000 * _1_USDC + 500 * _1_USDC + 750 * _1_USDC;
         _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
 
         vm.prank(users.alice);
@@ -225,8 +224,6 @@ contract DNVaultTest is BaseVaultTest {
 
     function test_ClaimUnstakedAssets_BatchNotSettled() public {
         _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
-
-        bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
         bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);

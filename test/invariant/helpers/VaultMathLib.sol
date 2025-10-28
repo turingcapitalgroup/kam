@@ -78,7 +78,7 @@ library VaultMathLib {
 
     function convertToAssetsWithAssetsAndSupply(uint256 _shares, uint256 _totalAssets, uint256 _totalSupply)
         internal
-        view
+        pure
         returns (uint256)
     {
         if (_totalSupply == 0) return _shares;
@@ -87,7 +87,7 @@ library VaultMathLib {
 
     function convertToSharesWithAssetsAndSupply(uint256 _assets, uint256 _totalAssets, uint256 _totalSupply)
         internal
-        view
+        pure
         returns (uint256)
     {
         if (_totalSupply == 0) return _assets;

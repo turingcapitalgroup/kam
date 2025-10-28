@@ -155,7 +155,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         DeploymentOutput memory existing,
         address usdc,
         address usdcVault,
-        address usdcWallet
+        address /* usdcWallet */
     )
         internal
     {
@@ -230,8 +230,8 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         DeploymentOutput memory existing,
         address usdc,
         address wbtc,
-        address usdcVault,
-        address wbtcVault
+        address /* usdcVault */,
+        address /* wbtcVault */
     )
         internal
     {

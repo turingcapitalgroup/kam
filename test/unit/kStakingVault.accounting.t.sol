@@ -211,24 +211,21 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         uint256[] memory expectedShares = new uint256[](3);
 
         for (uint256 i = 0; i < 3; i++) {
-            uint256 currentAssets;
-            uint256 yieldAmount;
-
-            // Record share price before deposit
-            uint256 sharePrice = vault.netSharePrice();
-
-            // Calculate expected shares
-            expectedShares[i] = deposits[i] * 1e6 / sharePrice;
-
+            uint256 yieldAmount = 0;
             if (i < 2) {
                 uint256 currentAssets = vault.totalAssets();
-                uint256 yieldAmount = currentAssets / 10; // 10% yield
+                yieldAmount = currentAssets / 10; // 10% yield
             }
 
             // Perform deposit
             // casting to 'int256' is safe because yieldAmount fits in int256
             // forge-lint: disable-next-line(unsafe-typecast)
             _performStakeAndSettle(_users[i], deposits[i], int256(yieldAmount));
+
+            // Calculate expected shares based on the actual share price used during settlement
+            // The share price is calculated during settlement and includes any yield added
+            uint256 actualSharePrice = vault.netSharePrice();
+            expectedShares[i] = deposits[i] * 1e6 / actualSharePrice;
 
             // Verify user's share balance
             assertApproxEqAbs(vault.balanceOf(_users[i]), expectedShares[i], 10); // 10 wei tolerance
