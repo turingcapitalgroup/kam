@@ -23,6 +23,8 @@ import {
 
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
+
+import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { kToken } from "kam/src/kToken.sol";
 
 /// @title kRegistry
@@ -338,27 +340,40 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     function registerVault(address vault, VaultType type_, address asset) external payable {
         _checkAdmin(msg.sender);
         _checkAddressNotZero(vault);
+        _checkAddressNotZero(asset);
 
         kRegistryStorage storage $ = _getkRegistryStorage();
         _checkAssetRegistered(asset);
+
+        uint8 vaultType_ = uint8(type_);
+        bool isKMinter = vault == $.singletonContracts[K_MINTER];
+        bool alreadyRegistered = $.allVaults.contains(vault);
+
+        // Check if vault is already registered (before making state changes)
+        // Allow kMinter to be registered multiple times for different assets
+        require(isKMinter || !alreadyRegistered, KREGISTRY_ALREADY_REGISTERED);
 
         // Associate vault with the asset it manages
         $.vaultAsset[vault].add(asset);
 
         // Set as primary vault for this asset-type combination
-        $.assetToVault[asset][uint8(type_)] = vault;
+        $.assetToVault[asset][vaultType_] = vault;
 
         // Enable reverse lookup: find all vaults for an asset
         $.vaultsByAsset[asset].add(vault);
 
-        address kMinter_ = $.singletonContracts[K_MINTER];
-        if (kMinter_ == vault && $.allVaults.contains(kMinter_)) return;
-
         // Classify vault by type for routing logic
-        $.vaultType[vault] = uint8(type_);
+        $.vaultType[vault] = vaultType_;
 
-        require(!$.allVaults.contains(vault), KREGISTRY_ALREADY_REGISTERED);
-        $.allVaults.add(vault);
+        // Handle kMinter special case: create batch for each new asset
+        if (isKMinter) {
+            if (!alreadyRegistered) {
+                $.allVaults.add(vault);
+            }
+            IkMinter(vault).createNewBatch(asset);
+        } else {
+            $.allVaults.add(vault);
+        }
 
         emit VaultRegistered(vault, asset, type_);
     }

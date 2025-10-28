@@ -297,7 +297,9 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
 
     /// @inheritdoc IkMinter
     function createNewBatch(address asset_) external returns (bytes32) {
-        _checkRelayer(msg.sender);
+        // Only relayers or registry can create new batches
+        // Registry can call this during vault registration
+        require(_isRelayer(msg.sender) || msg.sender == address(_registry()), KMINTER_WRONG_ROLE);
         return _createNewBatch(asset_);
     }
 

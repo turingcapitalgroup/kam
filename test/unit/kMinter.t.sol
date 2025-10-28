@@ -215,12 +215,6 @@ contract kMinterTest is DeploymentBaseTest {
         minter.requestBurn(invalidAsset, users.institution, TEST_AMOUNT);
     }
 
-    function test_RequestBurn_RevertBatchNotSet() public {
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_BATCH_NOT_SET));
-        minter.requestBurn(tokens.usdc, users.institution, TEST_AMOUNT);
-    }
-
     function test_RequestBurn_RevertWhenPaused() public {
         vm.prank(users.emergencyAdmin);
         minter.setPaused(true);

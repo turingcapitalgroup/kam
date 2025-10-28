@@ -41,55 +41,9 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Emitted when a stake request is created
-    /// @param requestId The unique identifier of the stake request
-    /// @param user The address of the user who created the request
-    /// @param kToken The address of the kToken associated with the request
-    /// @param amount The amount of kTokens requested
-    /// @param recipient The address to which the kTokens will be sent
-    /// @param batchId The batch ID associated with the request
-    event StakeRequestCreated(
-        bytes32 indexed requestId,
-        address indexed user,
-        address indexed kToken,
-        uint256 amount,
-        address recipient,
-        bytes32 batchId
-    );
-
-    /// @notice Emitted when a stake request is redeemed
-    /// @param requestId The unique identifier of the stake request
-    event StakeRequestRedeemed(bytes32 indexed requestId);
-
-    /// @notice Emitted when a stake request is cancelled
-    /// @param requestId The unique identifier of the stake request
-    event StakeRequestCancelled(bytes32 indexed requestId);
-
-    /// @notice Emitted when an unstake request is created
-    /// @param requestId The unique identifier of the unstake request
-    /// @param user The address of the user who created the request
-    /// @param amount The amount of stkTokens requested
-    /// @param recipient The address to which the kTokens will be sent
-    /// @param batchId The batch ID associated with the request
-    event UnstakeRequestCreated(
-        bytes32 indexed requestId, address indexed user, uint256 amount, address recipient, bytes32 batchId
-    );
-
-    /// @notice Emitted when an unstake request is cancelled
-    /// @param requestId The unique identifier of the unstake request
-    event UnstakeRequestCancelled(bytes32 indexed requestId);
-
     /// @notice Emitted when the vault is paused
     /// @param paused The new paused state
     event Paused(bool paused);
-
-    /// @notice Emitted when the vault is initialized
-    /// @param registry The registry address
-    /// @param name The name of the vault
-    /// @param symbol The symbol of the vault
-    /// @param decimals The decimals of the vault
-    /// @param asset The asset of the vault
-    event Initialized(address registry, string name, string symbol, uint8 decimals, address asset);
 
     /* //////////////////////////////////////////////////////////////
                               CONSTANTS

@@ -122,7 +122,9 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         $.receiverImplementation = address(new kBatchReceiver(_registry().getContractById(K_MINTER)));
         $.maxTotalAssets = maxTotalAssets_;
 
-        emit Initialized(registry_, name_, symbol_, decimals_, asset_);
+        bytes32 newBatchId = _createNewBatch();
+
+        emit Initialized(registry_, name_, symbol_, decimals_, asset_, newBatchId);
     }
 
     /* //////////////////////////////////////////////////////////////
