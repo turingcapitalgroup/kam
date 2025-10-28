@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
-import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
-import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
+import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
 import { Multicallable } from "solady/utils/Multicallable.sol";
+import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
+import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
-import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 
 import {
     KASSETROUTER_BATCH_ID_PROPOSED,
@@ -29,10 +29,10 @@ import {
     KASSETROUTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
-import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
-import { ISettleBatch, IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
+import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
+import { ISettleBatch, IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
@@ -195,7 +195,13 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IkAssetRouter
-    function kAssetTransfer(address _sourceVault, address _targetVault, address _asset, uint256 _amount, bytes32 _batchId)
+    function kAssetTransfer(
+        address _sourceVault,
+        address _targetVault,
+        address _asset,
+        uint256 _amount,
+        bytes32 _batchId
+    )
         external
         payable
     {
@@ -302,7 +308,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
             uint256 _requestedAssets = (_totalSupply == 0 || _totalAssets == 0)
                 ? $.vaultRequestedShares[_vault][_batchId]
                 : $.vaultRequestedShares[_vault][_batchId].fullMulDiv(_totalAssets, _totalSupply);
-            _netted = int256(uint256($.vaultBatchBalances[_vault][_batchId].deposited)) - int256(uint256(_requestedAssets));
+            _netted =
+                int256(uint256($.vaultBatchBalances[_vault][_batchId].deposited)) - int256(uint256(_requestedAssets));
         }
 
         _yield = int256(_totalAssets) - int256(_lastTotalAssets);
@@ -541,7 +548,11 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     }
 
     /// @inheritdoc IkAssetRouter
-    function getSettlementProposal(bytes32 _proposalId) external view returns (VaultSettlementProposal memory _proposal) {
+    function getSettlementProposal(bytes32 _proposalId)
+        external
+        view
+        returns (VaultSettlementProposal memory _proposal)
+    {
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         _proposal = $.settlementProposals[_proposalId];
     }

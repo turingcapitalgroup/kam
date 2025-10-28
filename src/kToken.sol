@@ -203,7 +203,13 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// @param _owner The address that owns the tokens
     /// @param _spender The address that is approved to spend the tokens
     /// @return The amount of tokens the spender is allowed to spend
-    function allowance(address _owner, address _spender) public view virtual override(ERC20, IkToken) returns (uint256) {
+    function allowance(address _owner, address _spender)
+        public
+        view
+        virtual
+        override(ERC20, IkToken)
+        returns (uint256)
+    {
         return ERC20.allowance(_owner, _spender);
     }
 

@@ -160,7 +160,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     }
 
     function _setInitialized(BaseVaultStorage storage $, bool _value) internal {
-        $.config = ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT)) | (uint256(_value ? 1 : 0) << INITIALIZED_SHIFT);
+        $.config =
+            ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT)) | (uint256(_value ? 1 : 0) << INITIALIZED_SHIFT);
     }
 
     function _getPaused(BaseVaultStorage storage $) internal view returns (bool) {

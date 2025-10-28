@@ -104,7 +104,12 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
     }
 
     /// @inheritdoc IAdapterGuardian
-    function setAdapterParametersChecker(address _adapter, address _target, bytes4 _selector, address _parametersChecker)
+    function setAdapterParametersChecker(
+        address _adapter,
+        address _target,
+        bytes4 _selector,
+        address _parametersChecker
+    )
         external
     {
         _checkAdmin(msg.sender);
@@ -138,7 +143,11 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
     }
 
     /// @inheritdoc IAdapterGuardian
-    function isAdapterSelectorAllowed(address _adapter, address _target, bytes4 _selector) external view returns (bool) {
+    function isAdapterSelectorAllowed(address _adapter, address _target, bytes4 _selector)
+        external
+        view
+        returns (bool)
+    {
         AdapterGuardianModuleStorage storage $ = _getAdapterGuardianModuleStorage();
         return $.adapterAllowedSelectors[_adapter][_target][_selector];
     }
