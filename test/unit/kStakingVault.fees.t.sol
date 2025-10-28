@@ -17,7 +17,6 @@ import {
     VAULTFEES_INVALID_TIMESTAMP
 } from "kam/src/errors/Errors.sol";
 
-import { console2 as console } from "forge-std/console2.sol";
 
 contract kStakingVaultFeesTest is BaseVaultTest {
     using OptimizedFixedPointMathLib for uint256;

@@ -8,8 +8,7 @@ import {
     GUARDIANMODULE_INVALID_ADAPTER,
     GUARDIANMODULE_NOT_ALLOWED,
     GUARDIANMODULE_SELECTOR_ALREADY_SET,
-    GUARDIANMODULE_SELECTOR_NOT_FOUND,
-    GUARDIANMODULE_UNAUTHORIZED
+    GUARDIANMODULE_SELECTOR_NOT_FOUND
 } from "kam/src/errors/Errors.sol";
 
 import { IAdapterGuardian, IParametersChecker } from "kam/src/interfaces/modules/IAdapterGuardian.sol";

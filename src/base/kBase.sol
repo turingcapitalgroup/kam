@@ -135,14 +135,14 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// normal operations, (4) Marks initialization complete to prevent future calls. This function MUST be called
     /// by all inheriting contracts during their initialization phase to establish proper protocol integration.
     /// The internal visibility ensures only inheriting contracts can initialize, preventing external manipulation.
-    /// @param _registry The kRegistry contract address that serves as the protocol's configuration and discovery hub
-    function __kBase_init(address _registry) internal {
+    /// @param _registryAddress The kRegistry contract address that serves as the protocol's configuration and discovery hub
+    function __kBase_init(address _registryAddress) internal {
         kBaseStorage storage $ = _getBaseStorage();
 
         require(!$.initialized, KBASE_ALREADY_INITIALIZED);
-        require(_registry != address(0), KBASE_INVALID_REGISTRY);
+        require(_registryAddress != address(0), KBASE_INVALID_REGISTRY);
 
-        $.registry = _registry;
+        $.registry = _registryAddress;
         $.paused = false;
         $.initialized = true;
     }

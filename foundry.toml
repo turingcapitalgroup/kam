@@ -18,7 +18,6 @@ fs_permissions = [{ access = "read-write", path = "." }]
 optimizer_runs = 10_000
 
 [profile.solx]
-optimization = 3
 gas_limit = 100_000_000
 
 [lint]

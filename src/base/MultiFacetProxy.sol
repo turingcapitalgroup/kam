@@ -49,28 +49,28 @@ abstract contract MultiFacetProxy is Proxy {
 
     /// @notice Adds a function selector mapping to an implementation address
     /// @param _selector The function selector to add
-    /// @param _implementation The implementation contract address
+    /// @param _impl The implementation contract address
     /// @param _forceOverride If true, allows overwriting existing mappings
     /// @dev Only callable by admin role
-    function addFunction(bytes4 _selector, address _implementation, bool _forceOverride) public {
+    function addFunction(bytes4 _selector, address _impl, bool _forceOverride) public {
         _authorizeModifyFunctions(msg.sender);
         MultiFacetProxyStorage storage $ = _getMultiFacetProxyStorage();
         if (!_forceOverride) {
             if ($.selectorToImplementation[_selector] != address(0)) revert();
         }
         address _oldImplementation = $.selectorToImplementation[_selector];
-        $.selectorToImplementation[_selector] = _implementation;
-        emit FunctionAdded(_selector, _oldImplementation, _implementation);
+        $.selectorToImplementation[_selector] = _impl;
+        emit FunctionAdded(_selector, _oldImplementation, _impl);
     }
 
     /// @notice Adds multiple function selector mappings to an implementation
     /// @param _selectors Array of function selectors to add
-    /// @param _implementation The implementation contract address
+    /// @param _impl The implementation contract address
     /// @param _forceOverride If true, allows overwriting existing mappings
     /// @dev Only callable by admin role
-    function addFunctions(bytes4[] calldata _selectors, address _implementation, bool _forceOverride) external {
+    function addFunctions(bytes4[] calldata _selectors, address _impl, bool _forceOverride) external {
         for (uint256 _i = 0; _i < _selectors.length; _i++) {
-            addFunction(_selectors[_i], _implementation, _forceOverride);
+            addFunction(_selectors[_i], _impl, _forceOverride);
         }
     }
 
@@ -102,8 +102,8 @@ abstract contract MultiFacetProxy is Proxy {
     function _implementation() internal view override returns (address) {
         bytes4 _selector = msg.sig;
         MultiFacetProxyStorage storage $ = _getMultiFacetProxyStorage();
-        address _implementation = $.selectorToImplementation[_selector];
-        if (_implementation == address(0)) revert();
-        return _implementation;
+        address _impl = $.selectorToImplementation[_selector];
+        if (_impl == address(0)) revert();
+        return _impl;
     }
 }

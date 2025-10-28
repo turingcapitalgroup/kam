@@ -221,7 +221,7 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
     function getCurrentBatchInfo()
         external
         view
-        returns (bytes32 batchId, address batchReceiver, bool isClosed, bool isSettled)
+        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled)
     {
         return (
             _getBaseVaultStorage().currentBatchId,

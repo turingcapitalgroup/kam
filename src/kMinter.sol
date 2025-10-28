@@ -434,13 +434,13 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
     /// @inheritdoc IkMinter
     function hasActiveBatch(address _asset) external view returns (bool) {
         kMinterStorage storage $ = _getkMinterStorage();
-        bytes32 _currentBatchId = $.currentBatchIds[_asset];
+        bytes32 _batchId = $.currentBatchIds[_asset];
 
-        if (_currentBatchId == bytes32(0)) {
+        if (_batchId == bytes32(0)) {
             return false;
         }
 
-        IkMinter.BatchInfo storage _batch = $.batches[_currentBatchId];
+        IkMinter.BatchInfo storage _batch = $.batches[_batchId];
         return !_batch.isClosed;
     }
 

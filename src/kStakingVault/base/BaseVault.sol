@@ -211,15 +211,15 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// to current block time for accurate fee accrual calculations, (5) Marks initialization complete to prevent
     /// future calls. The registry serves as the single source of truth for protocol configuration, role management,
     /// and contract discovery. Fee timestamps are initialized to prevent immediate fee charges on new vaults.
-    /// @param _registry The kRegistry contract address providing protocol configuration and role management
+    /// @param _registryAddress The kRegistry contract address providing protocol configuration and role management
     /// @param _paused Initial operational state (true = paused, false = active)
-    function __BaseVault_init(address _registry, bool _paused) internal {
+    function __BaseVault_init(address _registryAddress, bool _paused) internal {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
 
         require(!_getInitialized($), BASEVAULT_ALREADY_INITIALIZED);
-        require(_registry != address(0), BASEVAULT_INVALID_REGISTRY);
+        require(_registryAddress != address(0), BASEVAULT_INVALID_REGISTRY);
 
-        $.registry = _registry;
+        $.registry = _registryAddress;
         _setPaused($, _paused);
         _setInitialized($, true);
         _setLastFeesChargedManagement($, uint64(block.timestamp));
@@ -307,12 +307,12 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// maintains precision through fullMulDiv to prevent rounding errors that could accumulate over time. This
     /// function is critical for determining redemption values, share price calculations, and user balance queries.
     /// @param _shares The quantity of stkTokens to convert to underlying asset terms
-    /// @param _totalAssets The total asset value managed by the vault including yields but excluding pending operations
+    /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
     /// @return _assets The equivalent value in underlying assets based on current vault performance
-    function _convertToAssetsWithTotals(uint256 _shares, uint256 _totalAssets) internal view returns (uint256 _assets) {
+    function _convertToAssetsWithTotals(uint256 _shares, uint256 _totalAssetsValue) internal view returns (uint256 _assets) {
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) return _shares;
-        return _shares.fullMulDiv(_totalAssets, _totalSupply);
+        return _shares.fullMulDiv(_totalAssetsValue, _totalSupply);
     }
 
     /// @notice Converts underlying asset amount to equivalent stkToken shares at current vault valuation
@@ -323,12 +323,12 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// fixed-point mathematics prevent dilution attacks and ensure fair pricing for all participants. This function
     /// is essential for determining share issuance during staking operations and maintaining equitable vault ownership.
     /// @param _assets The underlying asset amount to convert to share terms
-    /// @param _totalAssets The total asset value managed by the vault including yields but excluding pending operations
+    /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
     /// @return _shares The equivalent stkToken amount based on current share price
-    function _convertToSharesWithTotals(uint256 _assets, uint256 _totalAssets) internal view returns (uint256 _shares) {
+    function _convertToSharesWithTotals(uint256 _assets, uint256 _totalAssetsValue) internal view returns (uint256 _shares) {
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) return _assets;
-        return _assets.fullMulDiv(_totalSupply, _totalAssets);
+        return _assets.fullMulDiv(_totalSupply, _totalAssetsValue);
     }
 
     /// @notice Calculates net share price per stkToken after deducting accumulated fees

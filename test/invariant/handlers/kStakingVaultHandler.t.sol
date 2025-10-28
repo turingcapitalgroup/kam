@@ -2,8 +2,9 @@
 pragma solidity 0.8.30;
 
 import { Bytes32Set, LibBytes32Set } from "../helpers/Bytes32Set.sol";
+import { AddressSet, LibAddressSet } from "../helpers/AddressSet.sol";
 import { VaultMathLib } from "../helpers/VaultMathLib.sol";
-import { AddressSet, BaseHandler, LibAddressSet } from "./BaseHandler.t.sol";
+import { BaseHandler } from "./BaseHandler.t.sol";
 import { console2 } from "forge-std/console2.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
