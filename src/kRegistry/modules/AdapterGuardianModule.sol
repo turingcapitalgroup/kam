@@ -142,7 +142,11 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
     }
 
     /// @inheritdoc IAdapterGuardian
-    function isAdapterSelectorAllowed(address _adapter, address _target, bytes4 _selector)
+    function isAdapterSelectorAllowed(
+        address _adapter,
+        address _target,
+        bytes4 _selector
+    )
         external
         view
         returns (bool)
@@ -152,7 +156,11 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
     }
 
     /// @inheritdoc IAdapterGuardian
-    function getAdapterParametersChecker(address _adapter, address _target, bytes4 _selector)
+    function getAdapterParametersChecker(
+        address _adapter,
+        address _target,
+        bytes4 _selector
+    )
         external
         view
         returns (address)

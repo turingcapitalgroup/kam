@@ -236,7 +236,11 @@ contract DeploymentBaseTest is BaseTest {
         vm.label(address(readerModule), "ReaderModule");
     }
 
-    function _deployVault(string memory name, string memory symbol, string memory label)
+    function _deployVault(
+        string memory name,
+        string memory symbol,
+        string memory label
+    )
         internal
         returns (IkStakingVault vault)
     {

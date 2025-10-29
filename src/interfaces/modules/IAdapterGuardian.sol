@@ -18,7 +18,13 @@ error ParametersCheckerInvalidBlockAmount();
 error ParametersCheckerInvalidFrom();
 
 interface IParametersChecker {
-    function authorizeAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params) external;
+    function authorizeAdapterCall(
+        address adapter,
+        address target,
+        bytes4 selector,
+        bytes calldata params
+    )
+        external;
 }
 
 /// @title IAdapterGuardian
@@ -63,7 +69,12 @@ interface IAdapterGuardian {
     /// @param selector The function selector
     /// @param parametersChecker The parameter checker contract address (0x0 to remove)
     /// @dev Only callable by ADMIN_ROLE
-    function setAdapterParametersChecker(address adapter, address target, bytes4 selector, address parametersChecker)
+    function setAdapterParametersChecker(
+        address adapter,
+        address target,
+        bytes4 selector,
+        address parametersChecker
+    )
         external;
 
     /* //////////////////////////////////////////////////////////////
@@ -81,14 +92,25 @@ interface IAdapterGuardian {
     /// @param target The target contract address
     /// @param selector The function selector
     /// @return Whether the selector is allowed
-    function isAdapterSelectorAllowed(address adapter, address target, bytes4 selector) external view returns (bool);
+    function isAdapterSelectorAllowed(
+        address adapter,
+        address target,
+        bytes4 selector
+    )
+        external
+        view
+        returns (bool);
 
     /// @notice Get the parameter checker for an adapter selector
     /// @param adapter The adapter address
     /// @param target The target contract address
     /// @param selector The function selector
     /// @return The parameter checker address (address(0) if none)
-    function getAdapterParametersChecker(address adapter, address target, bytes4 selector)
+    function getAdapterParametersChecker(
+        address adapter,
+        address target,
+        bytes4 selector
+    )
         external
         view
         returns (address);

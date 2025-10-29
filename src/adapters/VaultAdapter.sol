@@ -124,7 +124,11 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IVaultAdapter
-    function execute(address[] calldata _targets, bytes[] calldata _data, uint256[] calldata _values)
+    function execute(
+        address[] calldata _targets,
+        bytes[] calldata _data,
+        uint256[] calldata _values
+    )
         external
         payable
         returns (bytes[] memory _result)

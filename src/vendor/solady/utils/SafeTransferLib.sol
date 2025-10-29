@@ -218,7 +218,12 @@ library SafeTransferLib {
     /// @dev Sends `amount` of ERC20 `token` from `from` to `to`.
     ///
     /// The `from` account must have at least `amount` approved for the current contract to manage.
-    function trySafeTransferFrom(address token, address from, address to, uint256 amount)
+    function trySafeTransferFrom(
+        address token,
+        address from,
+        address to,
+        uint256 amount
+    )
         internal
         returns (bool success)
     {
@@ -398,7 +403,14 @@ library SafeTransferLib {
     /// @dev Performs a `token.balanceOf(account)` check.
     /// `implemented` denotes whether the `token` does not implement `balanceOf`.
     /// `amount` is zero if the `token` does not implement `balanceOf`.
-    function checkBalanceOf(address token, address account) internal view returns (bool implemented, uint256 amount) {
+    function checkBalanceOf(
+        address token,
+        address account
+    )
+        internal
+        view
+        returns (bool implemented, uint256 amount)
+    {
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x14, account) // Store the `account` argument.

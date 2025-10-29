@@ -52,7 +52,11 @@ contract MockERC7540 is IERC7540, ERC20 {
         return super.allowance(owner, spender);
     }
 
-    function transferFrom(address owner, address spender, uint256 amount)
+    function transferFrom(
+        address owner,
+        address spender,
+        uint256 amount
+    )
         public
         override(ERC20, IERC7540)
         returns (bool)
@@ -92,7 +96,11 @@ contract MockERC7540 is IERC7540, ERC20 {
         return _operators[controller][operator];
     }
 
-    function requestDeposit(uint256 assets, address controller, address owner)
+    function requestDeposit(
+        uint256 assets,
+        address controller,
+        address owner
+    )
         external
         override
         returns (uint256 requestId)
@@ -126,7 +134,11 @@ contract MockERC7540 is IERC7540, ERC20 {
         _mint(to, shares);
     }
 
-    function requestRedeem(uint256 shares, address controller, address owner)
+    function requestRedeem(
+        uint256 shares,
+        address controller,
+        address owner
+    )
         external
         override
         returns (uint256 requestId)
@@ -143,7 +155,15 @@ contract MockERC7540 is IERC7540, ERC20 {
         requestId = ++_requestCounter;
     }
 
-    function redeem(uint256 shares, address receiver, address controller) external override returns (uint256 assets) {
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address controller
+    )
+        external
+        override
+        returns (uint256 assets)
+    {
         require(_claimableRedeemRequests[controller] >= shares, "Insufficient claimable redeem");
 
         _claimableRedeemRequests[controller] -= shares;
@@ -153,7 +173,15 @@ contract MockERC7540 is IERC7540, ERC20 {
         _asset.safeTransfer(receiver, assets);
     }
 
-    function withdraw(uint256 assets, address receiver, address controller) external override returns (uint256 shares) {
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address controller
+    )
+        external
+        override
+        returns (uint256 shares)
+    {
         shares = assets; // 1:1 conversion
         require(_claimableRedeemRequests[controller] >= shares, "Insufficient claimable redeem");
 

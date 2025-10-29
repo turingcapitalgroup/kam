@@ -496,8 +496,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
             // If there were withdrawals we take fees on them
             if (_totalRequestedShares != 0) {
                 // Discount protocol fees
-                uint256 _netRequestedShares =
-                    _totalRequestedShares * IkStakingVault(_vault).netSharePrice() / IkStakingVault(_vault).sharePrice();
+                uint256 _netRequestedShares = _totalRequestedShares * IkStakingVault(_vault).netSharePrice()
+                    / IkStakingVault(_vault).sharePrice();
                 uint256 _feeShares = _totalRequestedShares - _netRequestedShares;
                 uint256 _feeAssets = IkStakingVault(_vault).convertToAssets(_feeShares);
 
@@ -647,7 +647,14 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     /// @notice Check if virtual balance is sufficient
     /// @param _vault Vault address
     /// @param _requiredAmount Required amount
-    function _checkSufficientVirtualBalance(address _vault, address _asset, uint256 _requiredAmount) private view {
+    function _checkSufficientVirtualBalance(
+        address _vault,
+        address _asset,
+        uint256 _requiredAmount
+    )
+        private
+        view
+    {
         require(_virtualBalance(_vault, _asset) >= _requiredAmount, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
     }
 
@@ -674,7 +681,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     }
 
     /// @inheritdoc IkAssetRouter
-    function getBatchIdBalances(address _vault, bytes32 _batchId)
+    function getBatchIdBalances(
+        address _vault,
+        bytes32 _batchId
+    )
         external
         view
         returns (uint256 _deposited, uint256 _requested)
