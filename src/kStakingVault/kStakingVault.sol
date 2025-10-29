@@ -24,11 +24,7 @@ import {
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
     KSTAKINGVAULT_IS_PAUSED,
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
-    KSTAKINGVAULT_REQUEST_NOT_ELIGIBLE,
     KSTAKINGVAULT_REQUEST_NOT_FOUND,
-    KSTAKINGVAULT_UNAUTHORIZED,
-    KSTAKINGVAULT_VAULT_CLOSED,
-    KSTAKINGVAULT_VAULT_SETTLED,
     KSTAKINGVAULT_WRONG_ROLE,
     KSTAKINGVAULT_ZERO_ADDRESS,
     KSTAKINGVAULT_ZERO_AMOUNT,
@@ -240,71 +236,85 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         return _requestId;
     }
 
-    /// @inheritdoc IVault
-    function cancelStakeRequest(bytes32 _requestId) external payable {
-        // Open `nonReentrant`
-        _lockReentrant();
+    /* //////////////////////////////////////////////////////////////
+                          VAULT CLAIMS FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
+    /// @inheritdoc IVaultClaim
+    function claimStakedShares(bytes32 _requestId) external payable {
+        // Open `nonRentrant`
+        _lockReentrant();
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _checkPaused($);
+        bytes32 _batchId = $.stakeRequests[_requestId].batchId;
+        require($.batches[_batchId].isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
+
         BaseVaultTypes.StakeRequest storage _request = $.stakeRequests[_requestId];
-
-        // Cache frequently accessed values to save gas
-        address user = _request.user;
-        uint128 kTokenAmount = _request.kTokenAmount;
-        bytes32 batchId = _request.batchId;
-        BaseVaultTypes.BatchInfo storage batch = $.batches[batchId];
-
-        require(msg.sender == user, KSTAKINGVAULT_UNAUTHORIZED);
-        require(_request.status == BaseVaultTypes.RequestStatus.PENDING, KSTAKINGVAULT_REQUEST_NOT_ELIGIBLE);
-        require(!batch.isClosed, KSTAKINGVAULT_VAULT_CLOSED);
-        require(!batch.isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
+        require(msg.sender == _request.user, VAULTCLAIMS_NOT_BENEFICIARY);
         require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
-        _request.status = BaseVaultTypes.RequestStatus.CANCELLED;
-        $.totalPendingStake -= kTokenAmount;
+        _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
 
-        IkAssetRouter(_getKAssetRouter())
-            .kAssetTransfer(address(this), _getKMinter(), $.underlyingAsset, kTokenAmount, batchId);
+        // Calculate stkToken amount based on settlement-time share price
+        uint256 _netSharePrice = $.batches[_batchId].netSharePrice;
+        _checkAmountNotZero(_netSharePrice);
 
-        $.kToken.safeTransfer(user, kTokenAmount);
+        // Divide the deposited assets by the share price of the batch to obtain stkTokens to mint
+        uint256 _stkTokensToMint = ((uint256(_request.kTokenAmount)) * 10 ** _getDecimals($)) / _netSharePrice;
 
-        emit StakeRequestCancelled(_requestId, batchId, kTokenAmount);
+        emit StakingSharesClaimed(_batchId, _requestId, _request.user, _stkTokensToMint);
 
-        // Close `nonReentrant`
+        // Reduce total pending stake and remove user stake request
+        $.totalPendingStake -= _request.kTokenAmount;
+
+        // Mint stkTokens to user
+        _mint(_request.user, _stkTokensToMint);
+
+        // Close `nonRentrant`
         _unlockReentrant();
     }
 
-    /// @inheritdoc IVault
-    function cancelUnstakeRequest(bytes32 _requestId) external payable {
-        // Open `nonReentrant`
+    /// @inheritdoc IVaultClaim
+    function claimUnstakedAssets(bytes32 _requestId) external payable {
+        // Open `nonRentrant`
         _lockReentrant();
 
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _checkPaused($);
+
         BaseVaultTypes.UnstakeRequest storage _request = $.unstakeRequests[_requestId];
 
-        // Cache frequently accessed values to save gas
         address user = _request.user;
         uint128 stkTokenAmount = _request.stkTokenAmount;
         bytes32 batchId = _request.batchId;
         BaseVaultTypes.BatchInfo storage batch = $.batches[batchId];
 
-        require(msg.sender == user, KSTAKINGVAULT_UNAUTHORIZED);
-        require(_request.status == BaseVaultTypes.RequestStatus.PENDING, KSTAKINGVAULT_REQUEST_NOT_ELIGIBLE);
-        require(!batch.isClosed, KSTAKINGVAULT_VAULT_CLOSED);
-        require(!batch.isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        require(batch.isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
+        require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
+        require(msg.sender == user, VAULTCLAIMS_NOT_BENEFICIARY);
+
+        uint256 sharePrice = batch.sharePrice;
+        uint256 netSharePrice = batch.netSharePrice;
+        _checkAmountNotZero(sharePrice);
+
+        // Calculate total kTokens to return based on settlement-time share price
+        // Multiply redeemed shares for net and gross share price to obtain gross and net amount of assets
+        uint8 decimals = _getDecimals($);
+        uint256 totalKTokensNet = ((uint256(stkTokenAmount)) * netSharePrice) / (10 ** decimals);
+        uint256 netSharesToBurn = ((uint256(stkTokenAmount)) * netSharePrice) / sharePrice;
+
         require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
-        _request.status = BaseVaultTypes.RequestStatus.CANCELLED;
+        _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
+        _burn(address(this), netSharesToBurn);
 
-        IkAssetRouter(_getKAssetRouter()).kSharesRequestPull(address(this), stkTokenAmount, batchId);
+        emit UnstakingAssetsClaimed(batchId, _requestId, user, totalKTokensNet);
+        emit KTokenUnstaked(user, stkTokenAmount, totalKTokensNet);
 
-        _transfer(address(this), user, stkTokenAmount);
+        $.kToken.safeTransfer(user, totalKTokensNet);
 
-        emit UnstakeRequestCancelled(_requestId, batchId, stkTokenAmount);
-
-        // Close `nonReentrant`
+        // Close `nonRentrant`
         _unlockReentrant();
     }
 
@@ -452,88 +462,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /// @param _lastTimestamp The previous timestamp for progression validation
     function _validateTimestamp(uint256 _timestamp, uint256 _lastTimestamp) private view {
         require(_timestamp >= _lastTimestamp && _timestamp <= block.timestamp, VAULTFEES_INVALID_TIMESTAMP);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                          VAULT CLAIMS FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IVaultClaim
-    function claimStakedShares(bytes32 _requestId) external payable {
-        // Open `nonRentrant`
-        _lockReentrant();
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        _checkPaused($);
-        bytes32 _batchId = $.stakeRequests[_requestId].batchId;
-        require($.batches[_batchId].isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
-
-        BaseVaultTypes.StakeRequest storage _request = $.stakeRequests[_requestId];
-        require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
-        require(msg.sender == _request.user, VAULTCLAIMS_NOT_BENEFICIARY);
-        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
-
-        _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
-
-        // Calculate stkToken amount based on settlement-time share price
-        uint256 _netSharePrice = $.batches[_batchId].netSharePrice;
-        _checkAmountNotZero(_netSharePrice);
-
-        // Divide the deposited assets by the share price of the batch to obtain stkTokens to mint
-        uint256 _stkTokensToMint = ((uint256(_request.kTokenAmount)) * 10 ** _getDecimals($)) / _netSharePrice;
-
-        emit StakingSharesClaimed(_batchId, _requestId, _request.user, _stkTokensToMint);
-
-        // Reduce total pending stake and remove user stake request
-        $.totalPendingStake -= _request.kTokenAmount;
-
-        // Mint stkTokens to user
-        _mint(_request.user, _stkTokensToMint);
-
-        // Close `nonRentrant`
-        _unlockReentrant();
-    }
-
-    /// @inheritdoc IVaultClaim
-    function claimUnstakedAssets(bytes32 _requestId) external payable {
-        // Open `nonRentrant`
-        _lockReentrant();
-
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        _checkPaused($);
-
-        BaseVaultTypes.UnstakeRequest storage _request = $.unstakeRequests[_requestId];
-
-        address user = _request.user;
-        uint128 stkTokenAmount = _request.stkTokenAmount;
-        bytes32 batchId = _request.batchId;
-        BaseVaultTypes.BatchInfo storage batch = $.batches[batchId];
-
-        require(batch.isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
-        require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
-        require(msg.sender == user, VAULTCLAIMS_NOT_BENEFICIARY);
-
-        uint256 sharePrice = batch.sharePrice;
-        uint256 netSharePrice = batch.netSharePrice;
-        _checkAmountNotZero(sharePrice);
-
-        // Calculate total kTokens to return based on settlement-time share price
-        // Multiply redeemed shares for net and gross share price to obtain gross and net amount of assets
-        uint8 decimals = _getDecimals($);
-        uint256 totalKTokensNet = ((uint256(stkTokenAmount)) * netSharePrice) / (10 ** decimals);
-        uint256 netSharesToBurn = ((uint256(stkTokenAmount)) * netSharePrice) / sharePrice;
-
-        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
-
-        _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
-        _burn(address(this), netSharesToBurn);
-
-        emit UnstakingAssetsClaimed(batchId, _requestId, user, totalKTokensNet);
-        emit KTokenUnstaked(user, stkTokenAmount, totalKTokensNet);
-
-        $.kToken.safeTransfer(user, totalKTokensNet);
-
-        // Close `nonRentrant`
-        _unlockReentrant();
     }
 
     /* //////////////////////////////////////////////////////////////

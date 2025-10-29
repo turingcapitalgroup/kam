@@ -254,37 +254,6 @@ contract kMinterTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                        CANCELLATION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_CancelRequest_RevertRequestNotFound() public {
-        bytes32 invalidRequestId = keccak256("invalid");
-
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_REQUEST_NOT_FOUND));
-        minter.cancelRequest(invalidRequestId);
-    }
-
-    function test_CancelRequest_WrongRole() public {
-        bytes32 requestId = keccak256("test");
-
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
-        minter.cancelRequest(requestId);
-    }
-
-    function test_CancelRequest_RevertWhenPaused() public {
-        vm.prank(users.emergencyAdmin);
-        minter.setPaused(true);
-
-        bytes32 requestId = keccak256("test");
-
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
-        minter.cancelRequest(requestId);
-    }
-
-    /* //////////////////////////////////////////////////////////////
                         PAUSE FUNCTIONALITY TESTS
     //////////////////////////////////////////////////////////////*/
 

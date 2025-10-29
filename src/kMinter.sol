@@ -237,7 +237,6 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
         require($.userRequests[_burnRequest.user].remove(_requestId), KMINTER_REQUEST_NOT_FOUND);
         require(_status == RequestStatus.PENDING, KMINTER_REQUEST_NOT_ELIGIBLE);
         require(_status != RequestStatus.REDEEMED, KMINTER_REQUEST_PROCESSED);
-        require(_status != RequestStatus.CANCELLED, KMINTER_REQUEST_NOT_ELIGIBLE);
 
         address _batchReceiver = $.batches[_batchId].batchReceiver;
         require(_batchReceiver != address(0), KMINTER_ZERO_ADDRESS);
@@ -257,44 +256,6 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
 
         _unlockReentrant();
         emit Burned(_requestId, _batchReceiver, _kToken, _recipient, _amount, _batchId);
-    }
-
-    /// @inheritdoc IkMinter
-    function cancelRequest(bytes32 _requestId) external payable {
-        _lockReentrant();
-        _checkNotPaused();
-        _checkInstitution(msg.sender);
-
-        kMinterStorage storage $ = _getkMinterStorage();
-        BurnRequest storage _burnRequest = $.burnRequests[_requestId];
-
-        address _user = _burnRequest.user;
-        bytes32 _batchId = _burnRequest.batchId;
-        uint256 _amount = _burnRequest.amount;
-
-        // Validate request exists and is eligible for cancellation
-        require($.userRequests[_user].remove(_requestId), KMINTER_REQUEST_NOT_FOUND);
-        require(_burnRequest.status == RequestStatus.PENDING, KMINTER_REQUEST_NOT_ELIGIBLE);
-
-        // Ensure batch is still open - cannot cancel after batch closure or settlement
-        IkMinter.BatchInfo storage _batch = $.batches[_batchId];
-        require(!_batch.isClosed, KMINTER_BATCH_CLOSED);
-        require(!_batch.isSettled, KMINTER_BATCH_SETTLED);
-
-        // Update status and remove from tracking
-        _burnRequest.status = RequestStatus.CANCELLED;
-
-        address _kToken = _getKTokenForAsset(_burnRequest.asset);
-
-        // Return escrowed kTokens to the original requester
-        _kToken.safeTransfer(_user, _amount);
-
-        // Remove request from batch
-        $.batches[_batchId].burnedInBatch -= _amount.toUint128();
-
-        emit Cancelled(_requestId, _user, _amount, _batchId);
-
-        _unlockReentrant();
     }
 
     /* //////////////////////////////////////////////////////////////
