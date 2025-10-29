@@ -1,12 +1,9 @@
 # IkToken
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/interfaces/IkToken.sol)
-
-**Inherits:**
-[IVersioned](/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/interfaces/IkToken.sol)
 
 Interface for kToken with role-based minting and burning capabilities
 
-*Defines the standard interface for kToken implementations with ERC20 compatibility*
+Defines the standard interface for kToken implementations with ERC20 compatibility
 
 
 ## Functions
@@ -14,7 +11,7 @@ Interface for kToken with role-based minting and burning capabilities
 
 Creates new tokens and assigns them to the specified address
 
-*Only callable by addresses with MINTER_ROLE, emits Minted event*
+Only callable by addresses with MINTER_ROLE, emits Minted event
 
 
 ```solidity
@@ -32,7 +29,7 @@ function mint(address to, uint256 amount) external;
 
 Destroys tokens from the specified address
 
-*Only callable by addresses with MINTER_ROLE, emits Burned event*
+Only callable by addresses with MINTER_ROLE, emits Burned event
 
 
 ```solidity
@@ -50,7 +47,7 @@ function burn(address from, uint256 amount) external;
 
 Destroys tokens from an address using allowance mechanism
 
-*Reduces allowance and burns tokens, only callable by addresses with MINTER_ROLE*
+Reduces allowance and burns tokens, only callable by addresses with MINTER_ROLE
 
 
 ```solidity
@@ -253,7 +250,7 @@ function isPaused() external view returns (bool);
 
 Sets the pause state of the contract
 
-*Only callable by addresses with EMERGENCY_ADMIN_ROLE*
+Only callable by addresses with EMERGENCY_ADMIN_ROLE
 
 
 ```solidity
@@ -270,7 +267,7 @@ function setPaused(bool _isPaused) external;
 
 Grants administrative privileges to an address
 
-*Only callable by the contract owner*
+Only callable by the contract owner
 
 
 ```solidity
@@ -287,7 +284,7 @@ function grantAdminRole(address admin) external;
 
 Revokes administrative privileges from an address
 
-*Only callable by the contract owner*
+Only callable by the contract owner
 
 
 ```solidity
@@ -304,7 +301,7 @@ function revokeAdminRole(address admin) external;
 
 Grants emergency administrative privileges to an address
 
-*Only callable by addresses with ADMIN_ROLE*
+Only callable by addresses with ADMIN_ROLE
 
 
 ```solidity
@@ -321,7 +318,7 @@ function grantEmergencyRole(address emergency) external;
 
 Revokes emergency administrative privileges from an address
 
-*Only callable by addresses with ADMIN_ROLE*
+Only callable by addresses with ADMIN_ROLE
 
 
 ```solidity
@@ -338,7 +335,7 @@ function revokeEmergencyRole(address emergency) external;
 
 Grants minting privileges to an address
 
-*Only callable by addresses with ADMIN_ROLE*
+Only callable by addresses with ADMIN_ROLE
 
 
 ```solidity
@@ -355,7 +352,7 @@ function grantMinterRole(address minter) external;
 
 Revokes minting privileges from an address
 
-*Only callable by addresses with ADMIN_ROLE*
+Only callable by addresses with ADMIN_ROLE
 
 
 ```solidity
@@ -367,4 +364,100 @@ function revokeMinterRole(address minter) external;
 |----|----|-----------|
 |`minter`|`address`|The address to revoke minter role from|
 
+
+## Events
+### TokenCreated
+Emitted when a new token is created
+
+
+```solidity
+event TokenCreated(address indexed token, address owner, string name, string symbol, uint8 decimals);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`token`|`address`|The address of the new token|
+|`owner`|`address`|The owner of the new token|
+|`name`|`string`|The name of the new token|
+|`symbol`|`string`|The symbol of the new token|
+|`decimals`|`uint8`|The decimals of the new token|
+
+### PauseState
+Emitted when the pause state is changed
+
+
+```solidity
+event PauseState(bool isPaused);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`isPaused`|`bool`|The new pause state|
+
+### AuthorizedCallerUpdated
+Emitted when an authorized caller is updated
+
+
+```solidity
+event AuthorizedCallerUpdated(address indexed caller, bool authorized);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`caller`|`address`|The address of the caller|
+|`authorized`|`bool`|Whether the caller is authorized|
+
+### EmergencyWithdrawal
+Emitted when an emergency withdrawal is requested
+
+
+```solidity
+event EmergencyWithdrawal(address indexed token, address indexed to, uint256 amount, address indexed admin);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`token`|`address`|The address of the token|
+|`to`|`address`|The address to which the tokens will be sent|
+|`amount`|`uint256`|The amount of tokens to withdraw|
+|`admin`|`address`|The address of the admin|
+
+### RescuedAssets
+Emitted when assets are rescued
+
+
+```solidity
+event RescuedAssets(address indexed asset, address indexed to, uint256 amount);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`asset`|`address`|The address of the asset|
+|`to`|`address`|The address to which the assets will be sent|
+|`amount`|`uint256`|The amount of assets rescued|
+
+### RescuedETH
+Emitted when ETH is rescued
+
+
+```solidity
+event RescuedETH(address indexed asset, uint256 amount);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`asset`|`address`|The address of the asset|
+|`amount`|`uint256`|The amount of ETH rescued|
 

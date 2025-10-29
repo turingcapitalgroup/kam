@@ -1,5 +1,5 @@
 # IAdapterGuardian
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/interfaces/modules/IAdapterGuardian.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/interfaces/modules/IAdapterGuardian.sol)
 
 
 ## Functions
@@ -7,7 +7,7 @@
 
 Set whether a selector is allowed for an adapter on a target contract
 
-*Only callable by ADMIN_ROLE*
+Only callable by ADMIN_ROLE
 
 
 ```solidity
@@ -35,7 +35,7 @@ function setAdapterAllowedSelector(
 
 Set a parameter checker for an adapter selector
 
-*Only callable by ADMIN_ROLE*
+Only callable by ADMIN_ROLE
 
 
 ```solidity
@@ -63,7 +63,7 @@ Check if an adapter is authorized to call a specific function on a target
 
 
 ```solidity
-function authorizeAdapterCall(address target, bytes4 selector, bytes calldata params) external view;
+function authorizeAdapterCall(address target, bytes4 selector, bytes calldata params) external;
 ```
 **Parameters**
 
@@ -80,7 +80,14 @@ Check if a selector is allowed for an adapter
 
 
 ```solidity
-function isAdapterSelectorAllowed(address adapter, address target, bytes4 selector) external view returns (bool);
+function isAdapterSelectorAllowed(
+    address adapter,
+    address target,
+    bytes4 selector
+)
+    external
+    view
+    returns (bool);
 ```
 **Parameters**
 

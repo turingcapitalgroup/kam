@@ -1,8 +1,8 @@
 # UUPSUpgradeable
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/vendor/solady/utils/UUPSUpgradeable.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/vendor/solady/utils/UUPSUpgradeable.sol)
 
 **Inherits:**
-[CallContextChecker](/src/vendor/solady/utils/UUPSUpgradeable.sol/contract.CallContextChecker.md)
+[CallContextChecker](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/contract.CallContextChecker.md)
 
 **Authors:**
 Solady (https://github.com/vectorized/solady/blob/main/src/utils/UUPSUpgradeable.sol), Modified from OpenZeppelin
@@ -10,42 +10,43 @@ Solady (https://github.com/vectorized/solady/blob/main/src/utils/UUPSUpgradeable
 
 UUPS proxy mixin.
 
-*Note:
+Note:
 - This implementation is intended to be used with ERC1967 proxies.
 See: `OptimizedLibClone.deployERC1967` and related functions.
 - This implementation is NOT compatible with legacy OpenZeppelin proxies
-which do not store the implementation at `_ERC1967_IMPLEMENTATION_SLOT`.*
+which do not store the implementation at `_ERC1967_IMPLEMENTATION_SLOT`.
 
 
 ## State Variables
 ### _UPGRADED_EVENT_SIGNATURE
-*`keccak256(bytes("Upgraded(address)"))`.*
+`keccak256(bytes("Upgraded(address)"))`.
 
 
 ```solidity
-uint256 private constant _UPGRADED_EVENT_SIGNATURE = 0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b;
+uint256 private constant _UPGRADED_EVENT_SIGNATURE =
+    0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b
 ```
 
 
 ### _ERC1967_IMPLEMENTATION_SLOT
-*The ERC-1967 storage slot for the implementation in the proxy.
-`uint256(keccak256("eip1967.proxy.implementation")) - 1`.*
+The ERC-1967 storage slot for the implementation in the proxy.
+`uint256(keccak256("eip1967.proxy.implementation")) - 1`.
 
 
 ```solidity
 bytes32 internal constant _ERC1967_IMPLEMENTATION_SLOT =
-    0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
 ```
 
 
 ## Functions
 ### _authorizeUpgrade
 
-*Please override this function to check if `msg.sender` is authorized
+Please override this function to check if `msg.sender` is authorized
 to upgrade the proxy to `newImplementation`, reverting if not.
 ```
 function _authorizeUpgrade(address) internal override onlyOwner {}
-```*
+```
 
 
 ```solidity
@@ -54,10 +55,10 @@ function _authorizeUpgrade(address newImplementation) internal virtual;
 
 ### proxiableUUID
 
-*Returns the storage slot used by the implementation,
+Returns the storage slot used by the implementation,
 as specified in [ERC1822](https://eips.ethereum.org/EIPS/eip-1822).
 Note: The `notDelegated` modifier prevents accidental upgrades to
-an implementation that is a proxy contract.*
+an implementation that is a proxy contract.
 
 
 ```solidity
@@ -66,9 +67,9 @@ function proxiableUUID() public view virtual notDelegated returns (bytes32);
 
 ### upgradeToAndCall
 
-*Upgrades the proxy's implementation to `newImplementation`.
-Emits a [Upgraded](/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md#upgraded) event.
-Note: Passing in empty `data` skips the delegatecall to `newImplementation`.*
+Upgrades the proxy's implementation to `newImplementation`.
+Emits a [Upgraded](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md#upgraded) event.
+Note: Passing in empty `data` skips the delegatecall to `newImplementation`.
 
 
 ```solidity
@@ -77,7 +78,7 @@ function upgradeToAndCall(address newImplementation, bytes calldata data) public
 
 ## Events
 ### Upgraded
-*Emitted when the proxy's implementation is upgraded.*
+Emitted when the proxy's implementation is upgraded.
 
 
 ```solidity
@@ -86,7 +87,7 @@ event Upgraded(address indexed implementation);
 
 ## Errors
 ### UpgradeFailed
-*The upgrade failed.*
+The upgrade failed.
 
 
 ```solidity

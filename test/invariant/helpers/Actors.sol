@@ -30,9 +30,9 @@ abstract contract Actors {
         return _actors.forEach(func);
     }
 
-    function addActors(address[] memory actors) public {
-        for (uint256 i = 0; i < actors.length; i++) {
-            _actors.add(actors[i]);
+    function addActors(address[] memory newActors) public {
+        for (uint256 i = 0; i < newActors.length; i++) {
+            _actors.add(newActors[i]);
         }
     }
 

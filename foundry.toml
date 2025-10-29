@@ -18,11 +18,17 @@ fs_permissions = [{ access = "read-write", path = "." }]
 optimizer_runs = 10_000
 
 [profile.solx]
-optimization = 3
 gas_limit = 100_000_000
 
 [lint]
-exclude_lints = ["mixed-case-function","screaming-snake-case-immutable","pascal-case-struct", "mixed-case-variable"]
+exclude_lints = [
+    "mixed-case-function",
+    "screaming-snake-case-immutable",
+    "pascal-case-struct", 
+    "mixed-case-variable",
+    "unsafe-cheatcode",
+    "unsafe-typecast"
+]
                     
 [fuzz]
 runs = 1000
@@ -49,7 +55,6 @@ multiline_func_header = "all"
 number_underscore = "thousands"
 quote_style = "double"
 tab_width = 4
-wrap_comments = true
 sort_imports = true
 
 [rpc_endpoints]

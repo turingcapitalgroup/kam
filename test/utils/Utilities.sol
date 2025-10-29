@@ -62,6 +62,7 @@ contract Utilities is StdCheats {
 
     function transferTokens(address user, address token, address to, uint256 amount) external {
         vm.prank(user);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(token).transfer(to, amount);
     }
 }

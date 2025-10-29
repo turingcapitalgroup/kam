@@ -1,8 +1,8 @@
 # IRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/interfaces/IRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/interfaces/IRegistry.sol)
 
 **Inherits:**
-[IVersioned](/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 
 ## Functions
@@ -10,11 +10,11 @@
 
 Emergency function to rescue accidentally sent assets (ETH or ERC20) from the contract
 
-*This function provides a recovery mechanism for assets mistakenly sent to the registry. It includes
+This function provides a recovery mechanism for assets mistakenly sent to the registry. It includes
 critical safety checks: (1) Only callable by ADMIN_ROLE to prevent unauthorized access, (2) Cannot rescue
 registered protocol assets to prevent draining legitimate funds, (3) Validates amounts and balances.
 For ETH rescue, use address(0) as the asset parameter. The function ensures protocol integrity by
-preventing rescue of assets that are part of normal protocol operations.*
+preventing rescue of assets that are part of normal protocol operations.
 
 
 ```solidity
@@ -33,7 +33,7 @@ function rescueAssets(address asset_, address to_, uint256 amount_) external pay
 
 Registers a core singleton contract in the protocol
 
-*Only callable by ADMIN_ROLE. Ensures single source of truth for protocol contracts.*
+Only callable by ADMIN_ROLE. Ensures single source of truth for protocol contracts.
 
 
 ```solidity
@@ -51,11 +51,11 @@ function setSingletonContract(bytes32 id, address contractAddress) external paya
 
 Registers a new underlying asset in the protocol and deploys its corresponding kToken
 
-*This function performs critical asset onboarding: (1) Validates the asset isn't already registered,
+This function performs critical asset onboarding: (1) Validates the asset isn't already registered,
 (2) Adds asset to the supported set and singleton registry, (3) Deploys a new kToken contract with
 matching decimals, (4) Establishes bidirectional asset-kToken mapping, (5) Grants minting privileges
 to kMinter. The function automatically inherits decimals from the underlying asset for consistency.
-Only callable by ADMIN_ROLE to maintain protocol security and prevent unauthorized token creation.*
+Only callable by ADMIN_ROLE to maintain protocol security and prevent unauthorized token creation.
 
 
 ```solidity
@@ -65,7 +65,7 @@ function registerAsset(
     address asset,
     bytes32 id,
     uint256 maxMintPerBatch,
-    uint256 maxRedeemPerBatch
+    uint256 maxBurnPerBatch
 )
     external
     payable
@@ -79,8 +79,8 @@ function registerAsset(
 |`symbol`|`string`|The symbol for the kToken (e.g., "kUSDC")|
 |`asset`|`address`|The underlying asset contract address to register|
 |`id`|`bytes32`|The unique identifier for singleton asset storage (e.g., USDC, WBTC)|
-|`maxMintPerBatch`|`uint256`||
-|`maxRedeemPerBatch`|`uint256`||
+|`maxMintPerBatch`|`uint256`|Maximum amount of the asset that can be minted in a single batch|
+|`maxBurnPerBatch`|`uint256`|Maximum amount of the asset that can be redeemed in a single batch|
 
 **Returns**
 
@@ -93,12 +93,12 @@ function registerAsset(
 
 Registers a new vault contract in the protocol's vault management system
 
-*This function integrates vaults into the protocol by: (1) Validating the vault isn't already registered,
+This function integrates vaults into the protocol by: (1) Validating the vault isn't already registered,
 (2) Verifying the asset is supported by the protocol, (3) Classifying the vault by type for routing,
 (4) Establishing vault-asset relationships for both forward and reverse lookups, (5) Setting as primary
 vault for the asset-type combination if it's the first registered. The vault type determines routing
 logic and strategy selection (DN for institutional, ALPHA/BETA for different risk profiles).
-Only callable by ADMIN_ROLE to ensure proper vault vetting and integration.*
+Only callable by ADMIN_ROLE to ensure proper vault vetting and integration.
 
 
 ```solidity
@@ -117,7 +117,7 @@ function registerVault(address vault, VaultType type_, address asset) external p
 
 Registers an external protocol adapter for a vault
 
-*Enables yield strategy integrations through external DeFi protocols. Only callable by ADMIN_ROLE.*
+Enables yield strategy integrations through external DeFi protocols. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -136,8 +136,8 @@ function registerAdapter(address vault, address asset, address adapter) external
 
 Removes an adapter from a vault's registered adapter set
 
-*This disables a specific external protocol integration for the vault. Only callable by ADMIN_ROLE
-to ensure proper risk assessment before removing yield strategies.*
+This disables a specific external protocol integration for the vault. Only callable by ADMIN_ROLE
+to ensure proper risk assessment before removing yield strategies.
 
 
 ```solidity
@@ -156,7 +156,7 @@ function removeAdapter(address vault, address asset, address adapter) external p
 
 Grants institution role to enable privileged protocol access
 
-*Only callable by VENDOR_ROLE. Institutions gain access to kMinter and other premium features.*
+Only callable by VENDOR_ROLE. Institutions gain access to kMinter and other premium features.
 
 
 ```solidity
@@ -173,7 +173,7 @@ function grantInstitutionRole(address institution_) external payable;
 
 Grants vendor role for vendor management capabilities
 
-*Only callable by ADMIN_ROLE. Vendors can grant institution roles and manage vendor vaults.*
+Only callable by ADMIN_ROLE. Vendors can grant institution roles and manage vendor vaults.
 
 
 ```solidity
@@ -190,7 +190,7 @@ function grantVendorRole(address vendor_) external payable;
 
 Grants relayer role for external vault operations
 
-*Only callable by ADMIN_ROLE. Relayers manage external vaults and set hurdle rates.*
+Only callable by ADMIN_ROLE. Relayers manage external vaults and set hurdle rates.
 
 
 ```solidity
@@ -207,7 +207,7 @@ function grantRelayerRole(address relayer_) external payable;
 
 Grants manager role for vault adapter operations
 
-*Only callable by ADMIN_ROLE. Relayers manage external vaults and set hurdle rates.*
+Only callable by ADMIN_ROLE. Managers can execute calls in the vault adapter.
 
 
 ```solidity
@@ -224,7 +224,7 @@ function grantManagerRole(address manager_) external payable;
 
 Retrieves a singleton contract address by identifier
 
-*Reverts if contract not registered. Used for protocol contract discovery.*
+Reverts if contract not registered. Used for protocol contract discovery.
 
 
 ```solidity
@@ -247,7 +247,7 @@ function getContractById(bytes32 id) external view returns (address);
 
 Gets all protocol-supported asset addresses
 
-*Returns the complete whitelist of supported underlying assets.*
+Returns the complete whitelist of supported underlying assets.
 
 
 ```solidity
@@ -264,7 +264,7 @@ function getAllAssets() external view returns (address[] memory);
 
 Retrieves core protocol contract addresses in one call
 
-*Optimized getter for frequently accessed contracts. Reverts if either not set.*
+Optimized getter for frequently accessed contracts. Reverts if either not set.
 
 
 ```solidity
@@ -282,7 +282,7 @@ function getCoreContracts() external view returns (address kMinter, address kAss
 
 Gets all vaults that support a specific asset
 
-*Enables discovery of all vaults capable of handling an asset across different types.*
+Enables discovery of all vaults capable of handling an asset across different types.
 
 
 ```solidity
@@ -305,7 +305,7 @@ function getVaultsByAsset(address asset) external view returns (address[] memory
 
 Retrieves the primary vault for an asset-type combination
 
-*Used for routing operations to the appropriate vault. Reverts if not found.*
+Used for routing operations to the appropriate vault. Reverts if not found.
 
 
 ```solidity
@@ -329,7 +329,7 @@ function getVaultByAssetAndType(address asset, uint8 vaultType) external view re
 
 Gets the classification type of a vault
 
-*Returns the VaultType enum value for routing and strategy selection.*
+Returns the VaultType enum value for routing and strategy selection.
 
 
 ```solidity
@@ -352,7 +352,7 @@ function getVaultType(address vault) external view returns (uint8);
 
 Checks if an address has admin privileges
 
-*Admin role has broad protocol management capabilities.*
+Admin role has broad protocol management capabilities.
 
 
 ```solidity
@@ -375,7 +375,7 @@ function isAdmin(address user) external view returns (bool);
 
 Checks if an address has emergency admin privileges
 
-*Emergency admin can perform critical safety operations.*
+Emergency admin can perform critical safety operations.
 
 
 ```solidity
@@ -398,7 +398,7 @@ function isEmergencyAdmin(address user) external view returns (bool);
 
 Checks if an address has guardian privileges
 
-*Guardian acts as circuit breaker for settlement proposals.*
+Guardian acts as circuit breaker for settlement proposals.
 
 
 ```solidity
@@ -421,7 +421,7 @@ function isGuardian(address user) external view returns (bool);
 
 Checks if an address has relayer privileges
 
-*Relayer manages external vault operations and hurdle rates.*
+Relayer manages external vault operations and hurdle rates.
 
 
 ```solidity
@@ -444,7 +444,7 @@ function isRelayer(address user) external view returns (bool);
 
 Checks if an address is a qualified institution
 
-*Institutions have access to privileged operations like kMinter.*
+Institutions have access to privileged operations like kMinter.
 
 
 ```solidity
@@ -467,7 +467,7 @@ function isInstitution(address user) external view returns (bool);
 
 Checks if an address has vendor privileges
 
-*Vendors can grant institution roles and manage vendor vaults.*
+Vendors can grant institution roles and manage vendor vaults.
 
 
 ```solidity
@@ -490,7 +490,7 @@ function isVendor(address user) external view returns (bool);
 
 Checks if an address has manager privileges
 
-*Managers can Execute calls in the vault adapter*
+Managers can execute calls in the vault adapter.
 
 
 ```solidity
@@ -506,14 +506,14 @@ function isManager(address user) external view returns (bool);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`bool`|True if address has VENDOR_ROLE|
+|`<none>`|`bool`|True if address has MANAGER_ROLE|
 
 
 ### isAsset
 
 Checks if an asset is supported by the protocol
 
-*Used for validation before operations. Checks supportedAssets set membership.*
+Used for validation before operations. Checks supportedAssets set membership.
 
 
 ```solidity
@@ -536,7 +536,7 @@ function isAsset(address asset) external view returns (bool);
 
 Checks if a vault is registered in the protocol
 
-*Used for validation before vault operations. Checks allVaults set membership.*
+Used for validation before vault operations. Checks allVaults set membership.
 
 
 ```solidity
@@ -557,9 +557,9 @@ function isVault(address vault) external view returns (bool);
 
 ### getAdapter
 
-Gets all adapters registered for a specific vault
+Gets the adapter registered for a specific vault and asset
 
-*Returns external protocol integrations enabling yield strategies.*
+Returns external protocol integration enabling yield strategies. Reverts if no adapter is set.
 
 
 ```solidity
@@ -576,14 +576,14 @@ function getAdapter(address vault, address asset) external view returns (address
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`address`|Array of adapter addresses for the vault|
+|`<none>`|`address`|The adapter address for the vault-asset pair|
 
 
 ### isAdapterRegistered
 
 Checks if a specific adapter is registered for a vault
 
-*Used to validate adapter-vault relationships before operations.*
+Used to validate adapter-vault relationships before operations.
 
 
 ```solidity
@@ -608,7 +608,7 @@ function isAdapterRegistered(address vault, address asset, address adapter) exte
 
 Gets all assets managed by a specific vault
 
-*Most vaults manage single asset, some (like kMinter) handle multiple.*
+Most vaults manage single asset, some (like kMinter) handle multiple.
 
 
 ```solidity
@@ -631,7 +631,7 @@ function getVaultAssets(address vault) external view returns (address[] memory);
 
 Gets the kToken address for a specific underlying asset
 
-*Critical for minting/redemption operations. Reverts if no kToken exists.*
+Critical for minting/redemption operations. Reverts if no kToken exists.
 
 
 ```solidity
@@ -654,8 +654,8 @@ function assetToKToken(address asset) external view returns (address);
 
 Gets all registered vaults in the protocol
 
-*Returns array of all vault addresses that have been registered through addVault().
-Includes both active and inactive vaults. Used for protocol monitoring and management operations.*
+Returns array of all vault addresses that have been registered through registerVault().
+Includes both active and inactive vaults. Used for protocol monitoring and management operations.
 
 
 ```solidity
@@ -672,7 +672,7 @@ function getAllVaults() external view returns (address[] memory);
 
 Gets the protocol treasury address
 
-*Treasury receives protocol fees and serves as emergency fund holder.*
+Treasury receives protocol fees and serves as emergency fund holder.
 
 
 ```solidity
@@ -689,8 +689,8 @@ function getTreasury() external view returns (address);
 
 Sets the hurdle rate for a specific asset
 
-*Only relayer can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
-Asset must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.*
+Only relayer can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
+Asset must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
 
 
 ```solidity
@@ -708,8 +708,8 @@ function setHurdleRate(address asset, uint16 hurdleRate) external payable;
 
 Gets the hurdle rate for a specific asset
 
-*Returns minimum performance threshold in basis points for yield distribution.
-Asset must be registered to query hurdle rate.*
+Returns minimum performance threshold in basis points for yield distribution.
+Asset must be registered to query hurdle rate.
 
 
 ```solidity
@@ -732,9 +732,9 @@ function getHurdleRate(address asset) external view returns (uint16);
 
 Removes a vault from the protocol registry
 
-*This function deregisters a vault, removing it from the active vault set. This operation should be
+This function deregisters a vault, removing it from the active vault set. This operation should be
 used carefully as it affects routing and asset management. Only callable by ADMIN_ROLE to ensure proper
-decommissioning procedures are followed. Note that this doesn't clear all vault mappings for gas efficiency.*
+decommissioning procedures are followed. Note that this doesn't clear all vault mappings for gas efficiency.
 
 
 ```solidity
@@ -751,7 +751,7 @@ function removeVault(address vault) external payable;
 
 Sets the treasury address
 
-*Treasury receives protocol fees and serves as emergency fund holder. Only callable by ADMIN_ROLE.*
+Treasury receives protocol fees and serves as emergency fund holder. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -768,11 +768,17 @@ function setTreasury(address treasury_) external payable;
 
 Sets maximum mint and redeem amounts per batch for an asset
 
-*Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume assets*
+Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume assets.
 
 
 ```solidity
-function setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 maxRedeemPerBatch_) external payable;
+function setAssetBatchLimits(
+    address asset,
+    uint256 maxMintPerBatch_,
+    uint256 maxBurnPerBatch_
+)
+    external
+    payable;
 ```
 **Parameters**
 
@@ -780,14 +786,14 @@ function setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 ma
 |----|----|-----------|
 |`asset`|`address`|The asset address to set limits for|
 |`maxMintPerBatch_`|`uint256`|Maximum amount of the asset that can be minted in a single batch|
-|`maxRedeemPerBatch_`|`uint256`|Maximum amount of the asset that can be redeemed in a single batch|
+|`maxBurnPerBatch_`|`uint256`|Maximum amount of the asset that can be redeemed in a single batch|
 
 
 ### getMaxMintPerBatch
 
 Gets the maximum mint amount per batch for an asset
 
-*Used to enforce minting limits for liquidity and risk management*
+Used to enforce minting limits for liquidity and risk management. Reverts if asset not registered.
 
 
 ```solidity
@@ -806,15 +812,15 @@ function getMaxMintPerBatch(address asset) external view returns (uint256);
 |`<none>`|`uint256`|The maximum mint amount per batch|
 
 
-### getMaxRedeemPerBatch
+### getMaxBurnPerBatch
 
 Gets the maximum redeem amount per batch for an asset
 
-*Used to enforce redemption limits for liquidity and risk management*
+Used to enforce redemption limits for liquidity and risk management. Reverts if asset not registered.
 
 
 ```solidity
-function getMaxRedeemPerBatch(address asset) external view returns (uint256);
+function getMaxBurnPerBatch(address asset) external view returns (uint256);
 ```
 **Parameters**
 

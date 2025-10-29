@@ -1,13 +1,13 @@
 # IVersioned
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/interfaces/IVersioned.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/interfaces/IVersioned.sol)
 
 Standard interface for contract versioning in upgradable contracts
 
-*This interface provides a standardized way to query contract identity and version information
+This interface provides a standardized way to query contract identity and version information
 for upgradable contracts. It enables consistent version tracking across the protocol, supports
 upgrade management, and allows for contract discovery and validation. All upgradable contracts
 in the KAM protocol should implement this interface to maintain consistency and enable proper
-version control during upgrades.*
+version control during upgrades.
 
 
 ## Functions
@@ -15,9 +15,9 @@ version control during upgrades.*
 
 Returns the human-readable name identifier for this contract type
 
-*Used for contract identification and logging purposes. The name should be consistent
+Used for contract identification and logging purposes. The name should be consistent
 across all versions of the same contract type. This enables external systems and other
-contracts to identify the contract's purpose and role within the protocol ecosystem.*
+contracts to identify the contract's purpose and role within the protocol ecosystem.
 
 
 ```solidity
@@ -34,10 +34,10 @@ function contractName() external pure returns (string memory);
 
 Returns the version identifier for this contract implementation
 
-*Used for upgrade management and compatibility checking within the protocol. The version
+Used for upgrade management and compatibility checking within the protocol. The version
 string should follow semantic versioning (e.g., "1.0.0") to clearly indicate major, minor,
 and patch updates. This enables the protocol governance and monitoring systems to track
-deployed versions and ensure compatibility between interacting components.*
+deployed versions and ensure compatibility between interacting components.
 
 
 ```solidity

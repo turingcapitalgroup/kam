@@ -1,8 +1,30 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.4;
 
+// ParametersChecker Errors
+error ParametersCheckerZeroAddress();
+error ParametersCheckerZeroAmount();
+error ParametersCheckerInvalidToken();
+error ParametersCheckerInvalidReceiver();
+error ParametersCheckerInvalidSpender();
+error ParametersCheckerInvalidMax();
+error ParametersCheckerInvalidAdapter();
+error ParametersCheckerInvalidSelector();
+error ParametersCheckerInvalidParams();
+error ParametersCheckerUnauthorizedCaller();
+error ParametersCheckerTransferFailed();
+error ParametersCheckerInvalidAmount();
+error ParametersCheckerInvalidBlockAmount();
+error ParametersCheckerInvalidFrom();
+
 interface IParametersChecker {
-    function authorizeAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params) external;
+    function authorizeAdapterCall(
+        address adapter,
+        address target,
+        bytes4 selector,
+        bytes calldata params
+    )
+        external;
 }
 
 /// @title IAdapterGuardian
@@ -70,7 +92,14 @@ interface IAdapterGuardian {
     /// @param target The target contract address
     /// @param selector The function selector
     /// @return Whether the selector is allowed
-    function isAdapterSelectorAllowed(address adapter, address target, bytes4 selector) external view returns (bool);
+    function isAdapterSelectorAllowed(
+        address adapter,
+        address target,
+        bytes4 selector
+    )
+        external
+        view
+        returns (bool);
 
     /// @notice Get the parameter checker for an adapter selector
     /// @param adapter The adapter address

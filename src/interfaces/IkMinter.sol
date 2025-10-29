@@ -19,9 +19,7 @@ interface IkMinter is IVersioned {
         /// @dev Request has been created and tokens are held in escrow, awaiting batch settlement
         PENDING,
         /// @dev Request has been successfully executed and underlying assets have been distributed
-        REDEEMED,
-        /// @dev Request was cancelled before batch closure and escrowed tokens were returned
-        CANCELLED
+        REDEEMED
     }
 
     /// @notice Contains all information related to a redemption request
@@ -93,11 +91,24 @@ interface IkMinter is IVersioned {
 
     /// @notice Emitted when a redemption request is successfully executed after batch settlement
     /// @param requestId The unique identifier of the executed redemption request
-    event Burned(bytes32 indexed requestId);
+    /// @param batchReceiver The address that holds the assets to witdrawn for that batchId
+    /// @param kToken The kToken address that burned the tokens
+    /// @param recipient The address that received the assets
+    /// @param amount The amount sent to the recipient
+    /// @param batchId The batchId related to the transaction
+    event Burned(
+        bytes32 indexed requestId,
+        address batchReceiver,
+        address kToken,
+        address recipient,
+        uint256 amount,
+        bytes32 batchId
+    );
 
     /// @notice Emitted when a pending redemption request is cancelled before batch closure
     /// @param requestId The unique identifier of the cancelled redemption request
-    event Cancelled(bytes32 indexed requestId);
+    /// @param user The address of the user requesting the cancellation
+    event Cancelled(bytes32 indexed requestId, address user, uint256 amount, bytes32 batchId);
 
     // VaultBatches Events
     // / @notice Emitted when a new batch is created
@@ -167,22 +178,6 @@ interface IkMinter is IVersioned {
     /// safety.
     /// @param requestId The unique identifier of the redemption request to execute (obtained from requestBurn)
     function burn(bytes32 requestId) external payable;
-
-    /// @notice Cancels a pending redemption request and returns the escrowed kTokens to the user
-    /// @dev This function allows institutions to cancel their redemption requests before the batch is closed or
-    /// settled.
-    /// The cancellation process involves: (1) validating the request exists and is in PENDING status, (2) checking that
-    /// the batch is neither closed nor settled (once closed, cancellation is not possible as the batch is being
-    /// processed),
-    /// (3) updating the request status to CANCELLED, (4) removing the request from tracking, (5) returning the escrowed
-    /// kTokens back to the original requester. This mechanism provides flexibility for institutions to manage their
-    /// liquidity needs, allowing them to reverse redemption decisions if market conditions change or if they need
-    /// immediate
-    /// access to their kTokens. The function enforces strict timing constraints - cancellation is only permitted while
-    /// the
-    /// batch remains open, ensuring batch integrity and preventing manipulation of settled redemptions.
-    /// @param requestId The unique identifier of the redemption request to cancel (obtained from requestBurn)
-    function cancelRequest(bytes32 requestId) external payable;
 
     /// @notice Creates a new batch for a specific asset
     /// @param asset_ The asset for which to create a new batch

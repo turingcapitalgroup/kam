@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
-import { kBaseRoles } from "kam/src/base/kBaseRoles.sol";
+import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedAddressEnumerableSetLib.sol";
+import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
+
 import {
     GUARDIANMODULE_INVALID_ADAPTER,
     GUARDIANMODULE_NOT_ALLOWED,
     GUARDIANMODULE_SELECTOR_ALREADY_SET,
-    GUARDIANMODULE_SELECTOR_NOT_FOUND,
-    GUARDIANMODULE_UNAUTHORIZED
+    GUARDIANMODULE_SELECTOR_NOT_FOUND
 } from "kam/src/errors/Errors.sol";
 
 import { IAdapterGuardian, IParametersChecker } from "kam/src/interfaces/modules/IAdapterGuardian.sol";
 import { IModule } from "kam/src/interfaces/modules/IModule.sol";
-import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedAddressEnumerableSetLib.sol";
-import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
+
+import { kBaseRoles } from "kam/src/base/kBaseRoles.sol";
 
 /// @title AdapterGuardianModule
 /// @notice Module for managing adapter permissions and parameter checking in kRegistry
@@ -63,64 +64,64 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
 
     /// @inheritdoc IAdapterGuardian
     function setAdapterAllowedSelector(
-        address adapter,
-        address target,
-        uint8 targetType_,
-        bytes4 selector,
-        bool isAllowed
+        address _adapter,
+        address _target,
+        uint8 _targetType,
+        bytes4 _selector,
+        bool _isAllowed
     )
         external
     {
         _checkAdmin(msg.sender);
-        _checkAddressNotZero(adapter);
-        _checkAddressNotZero(target);
+        _checkAddressNotZero(_adapter);
+        _checkAddressNotZero(_target);
 
-        require(selector != bytes4(0), GUARDIANMODULE_INVALID_ADAPTER);
+        require(_selector != bytes4(0), GUARDIANMODULE_INVALID_ADAPTER);
 
         AdapterGuardianModuleStorage storage $ = _getAdapterGuardianModuleStorage();
 
         // Check if trying to set to the same value
-        bool currentlyAllowed = $.adapterAllowedSelectors[adapter][target][selector];
-        if (currentlyAllowed && isAllowed) {
+        bool _currentlyAllowed = $.adapterAllowedSelectors[_adapter][_target][_selector];
+        if (_currentlyAllowed && _isAllowed) {
             revert(GUARDIANMODULE_SELECTOR_ALREADY_SET);
         }
 
-        $.adapterAllowedSelectors[adapter][target][selector] = isAllowed;
-        $.targetType[target] = targetType_;
+        $.adapterAllowedSelectors[_adapter][_target][_selector] = _isAllowed;
+        $.targetType[_target] = _targetType;
 
         // Update tracking sets
-        if (isAllowed) {
+        if (_isAllowed) {
             // Add target to adapter's target set
-            $.adapterTargets[adapter].add(target);
+            $.adapterTargets[_adapter].add(_target);
         } else {
-            $.adapterTargets[adapter].remove(target);
+            $.adapterTargets[_adapter].remove(_target);
             // Also remove any parameter checker
-            delete $.adapterParametersChecker[adapter][target][selector];
+            delete $.adapterParametersChecker[_adapter][_target][_selector];
         }
 
-        emit SelectorAllowed(adapter, target, selector, isAllowed);
+        emit SelectorAllowed(_adapter, _target, _selector, _isAllowed);
     }
 
     /// @inheritdoc IAdapterGuardian
     function setAdapterParametersChecker(
-        address adapter,
-        address target,
-        bytes4 selector,
-        address parametersChecker
+        address _adapter,
+        address _target,
+        bytes4 _selector,
+        address _parametersChecker
     )
         external
     {
         _checkAdmin(msg.sender);
-        _checkAddressNotZero(adapter);
-        _checkAddressNotZero(target);
+        _checkAddressNotZero(_adapter);
+        _checkAddressNotZero(_target);
 
         AdapterGuardianModuleStorage storage $ = _getAdapterGuardianModuleStorage();
 
         // Selector must be allowed before setting a parameter checker
-        require($.adapterAllowedSelectors[adapter][target][selector], GUARDIANMODULE_SELECTOR_NOT_FOUND);
+        require($.adapterAllowedSelectors[_adapter][_target][_selector], GUARDIANMODULE_SELECTOR_NOT_FOUND);
 
-        $.adapterParametersChecker[adapter][target][selector] = parametersChecker;
-        emit ParametersCheckerSet(adapter, target, selector, parametersChecker);
+        $.adapterParametersChecker[_adapter][_target][_selector] = _parametersChecker;
+        emit ParametersCheckerSet(_adapter, _target, _selector, _parametersChecker);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -128,50 +129,58 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdapterGuardian
-    function authorizeAdapterCall(address target, bytes4 selector, bytes calldata params) external {
+    function authorizeAdapterCall(address _target, bytes4 _selector, bytes calldata _params) external {
         AdapterGuardianModuleStorage storage $ = _getAdapterGuardianModuleStorage();
 
-        address adapter = msg.sender;
-        require($.adapterAllowedSelectors[adapter][target][selector], GUARDIANMODULE_NOT_ALLOWED);
+        address _adapter = msg.sender;
+        require($.adapterAllowedSelectors[_adapter][_target][_selector], GUARDIANMODULE_NOT_ALLOWED);
 
-        address checker = $.adapterParametersChecker[adapter][target][selector];
-        if (checker == address(0)) return;
+        address _checker = $.adapterParametersChecker[_adapter][_target][_selector];
+        if (_checker == address(0)) return;
 
-        IParametersChecker(checker).authorizeAdapterCall(adapter, target, selector, params);
+        IParametersChecker(_checker).authorizeAdapterCall(_adapter, _target, _selector, _params);
     }
 
     /// @inheritdoc IAdapterGuardian
-    function isAdapterSelectorAllowed(address adapter, address target, bytes4 selector) external view returns (bool) {
+    function isAdapterSelectorAllowed(
+        address _adapter,
+        address _target,
+        bytes4 _selector
+    )
+        external
+        view
+        returns (bool)
+    {
         AdapterGuardianModuleStorage storage $ = _getAdapterGuardianModuleStorage();
-        return $.adapterAllowedSelectors[adapter][target][selector];
+        return $.adapterAllowedSelectors[_adapter][_target][_selector];
     }
 
     /// @inheritdoc IAdapterGuardian
     function getAdapterParametersChecker(
-        address adapter,
-        address target,
-        bytes4 selector
+        address _adapter,
+        address _target,
+        bytes4 _selector
     )
         external
         view
         returns (address)
     {
         AdapterGuardianModuleStorage storage $ = _getAdapterGuardianModuleStorage();
-        return $.adapterParametersChecker[adapter][target][selector];
+        return $.adapterParametersChecker[_adapter][_target][_selector];
     }
 
     /// @notice Gets all allowed targets for a specific adapter
-    /// @param adapter The adapter address to query targets for
-    /// @return targets An array of allowed target addresses for the adapter
-    function getAdapterTargets(address adapter) external view returns (address[] memory targets) {
+    /// @param _adapter The adapter address to query targets for
+    /// @return _targets An array of allowed target addresses for the adapter
+    function getAdapterTargets(address _adapter) external view returns (address[] memory _targets) {
         AdapterGuardianModuleStorage storage $ = _getAdapterGuardianModuleStorage();
-        return $.adapterTargets[adapter].values();
+        return $.adapterTargets[_adapter].values();
     }
 
     /// @inheritdoc IAdapterGuardian
-    function getTargetType(address target) external view returns (uint8) {
+    function getTargetType(address _target) external view returns (uint8) {
         AdapterGuardianModuleStorage storage $ = _getAdapterGuardianModuleStorage();
-        return $.targetType[target];
+        return $.targetType[_target];
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -179,8 +188,8 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IModule
-    function selectors() external pure returns (bytes4[] memory moduleSelectors) {
-        moduleSelectors = new bytes4[](7);
+    function selectors() external pure returns (bytes4[] memory) {
+        bytes4[] memory moduleSelectors = new bytes4[](7);
         moduleSelectors[0] = this.setAdapterAllowedSelector.selector;
         moduleSelectors[1] = this.setAdapterParametersChecker.selector;
         moduleSelectors[2] = this.authorizeAdapterCall.selector;
@@ -188,5 +197,6 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
         moduleSelectors[4] = this.getAdapterParametersChecker.selector;
         moduleSelectors[5] = this.getAdapterTargets.selector;
         moduleSelectors[6] = this.getTargetType.selector;
+        return moduleSelectors;
     }
 }

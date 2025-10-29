@@ -8,8 +8,7 @@ library BaseVaultTypes {
     /// @notice Request status
     enum RequestStatus {
         PENDING,
-        CLAIMED,
-        CANCELLED
+        CLAIMED
     }
 
     /// @notice Stake request structure

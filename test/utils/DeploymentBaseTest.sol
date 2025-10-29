@@ -312,13 +312,15 @@ contract DeploymentBaseTest is BaseTest {
         registry.registerAdapter(address(alphaVault), tokens.usdc, address(ALPHAVaultAdapterUSDC));
         registry.registerAdapter(address(betaVault), tokens.usdc, address(BETHAVaultAdapterUSDC));
 
-        IkRegistry(address(registry)).setAdapterAllowedSelector(
-            address(minterAdapterUSDC), tokens.usdc, 1, bytes4(keccak256("transfer(address,uint256)")), true
-        );
+        IkRegistry(address(registry))
+            .setAdapterAllowedSelector(
+                address(minterAdapterUSDC), tokens.usdc, 1, bytes4(keccak256("transfer(address,uint256)")), true
+            );
 
-        IkRegistry(address(registry)).setAdapterAllowedSelector(
-            address(ALPHAVaultAdapterUSDC), tokens.usdc, 1, bytes4(keccak256("transfer(address,uint256)")), true
-        );
+        IkRegistry(address(registry))
+            .setAdapterAllowedSelector(
+                address(ALPHAVaultAdapterUSDC), tokens.usdc, 1, bytes4(keccak256("transfer(address,uint256)")), true
+            );
 
         registry.setAssetBatchLimits(address(dnVault), type(uint256).max, type(uint256).max);
         registry.setAssetBatchLimits(address(alphaVault), type(uint256).max, type(uint256).max);
@@ -419,7 +421,12 @@ contract DeploymentBaseTest is BaseTest {
         return kToken(token).balanceOf(user);
     }
 
-    function expectEvent(address emitter, bytes32 eventSig) internal {
+    function expectEvent(
+        address emitter,
+        bytes32 /* eventSig */
+    )
+        internal
+    {
         vm.expectEmit(true, true, true, true, emitter);
     }
 

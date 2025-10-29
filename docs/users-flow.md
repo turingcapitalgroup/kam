@@ -426,12 +426,6 @@ Request Status Flow:
 │PENDING      │ ── Initial state when requestStake() or requestUnstake() is called
 └──────┬──────┘
        │
-       ├────────────────────────────────────┐
-       │                                    ▼
-       │                            ┌─────────────┐
-       │                            │CANCELLED    │ ── Via user cancellation
-       │                            └─────────────┘
-       │
        ▼
 ┌─────────────┐
 │CLAIMED      │ ── After successful claim operation
@@ -458,13 +452,12 @@ Request Status Flow:
 │  │                           │      │  (Called by kAssetRouter) │   │
 │  │• claimUnstakedAssets()    │      └───────────────────────────┘   │
 │  │  Get kTokens + yield      │                                      │
-│  │                           │                                      │
-│  │• cancelStakeRequest()     │      kAssetRouter Functions:         │
-│  │  Cancel pending stake     │      ┌───────────────────────────┐   │
-│  │                           │      │• proposeSettleBatch()     │   │
-│  │• cancelUnstakeRequest()   │      │  Start settlement process │   │
-│  │  Cancel pending unstake   │      │                           │   │
-│  └───────────────────────────┘      │• executeSettleBatch()     │   │
+│  └───────────────────────────┘      kAssetRouter Functions:         │
+│                                     ┌───────────────────────────┐   │
+│                                     │• proposeSettleBatch()     │   │
+│                                     │  Start settlement process │   │
+│                                     │                           │   │
+│                                     │• executeSettleBatch()     │   │
 │                                     │  Execute after cooldown   │   │
 │  Price Functions:                   │                           │   │
 │  ┌───────────────────────────┐      │• cancelProposal()         │   │

@@ -1,12 +1,12 @@
 # ERC20ParameterChecker
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/adapters/parameters/ERC20ParameterChecker.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/adapters/parameters/ERC20ParameterChecker.sol)
 
 **Inherits:**
-[IParametersChecker](/src/interfaces/modules/IAdapterGuardian.sol/interface.IParametersChecker.md)
+[IParametersChecker](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IAdapterGuardian.sol/interface.IParametersChecker.md)
 
 A contract that checks parameters for ERC20 token operations
 
-*Implements IParametersChecker to authorize adapter calls for ERC20 tokens*
+Implements IParametersChecker to authorize adapter calls for ERC20 tokens
 
 
 ## State Variables
@@ -15,7 +15,7 @@ The registry contract reference
 
 
 ```solidity
-IRegistry public immutable registry;
+IkRegistry public immutable registry
 ```
 
 
@@ -24,7 +24,7 @@ Mapping of allowed receivers for each token
 
 
 ```solidity
-mapping(address token => mapping(address receiver => bool)) private _allowedReceivers;
+mapping(address token => mapping(address receiver => bool)) private _allowedReceivers
 ```
 
 
@@ -33,7 +33,7 @@ Mapping of allowed sources for each token
 
 
 ```solidity
-mapping(address token => mapping(address source => bool)) private _allowedSources;
+mapping(address token => mapping(address source => bool)) private _allowedSources
 ```
 
 
@@ -42,7 +42,7 @@ Mapping of allowed spenders for each token
 
 
 ```solidity
-mapping(address token => mapping(address spender => bool)) private _allowedSpenders;
+mapping(address token => mapping(address spender => bool)) private _allowedSpenders
 ```
 
 
@@ -51,7 +51,16 @@ Maximum amount allowed for a single transfer per token
 
 
 ```solidity
-mapping(address token => uint256 maxSingleTransfer) private _maxSingleTransfer;
+mapping(address token => uint256 maxSingleTransfer) private _maxSingleTransfer
+```
+
+
+### _amountTransferedPerBlock
+Mapping of amount transferred per block for each token
+
+
+```solidity
+mapping(address token => mapping(uint256 => uint256)) private _amountTransferedPerBlock
 ```
 
 
@@ -62,7 +71,7 @@ Constructs the ERC20ParameterChecker
 
 
 ```solidity
-constructor(address _registry);
+constructor(address _registry) ;
 ```
 **Parameters**
 
@@ -77,15 +86,15 @@ Sets whether a receiver is allowed for a specific token
 
 
 ```solidity
-function setAllowedReceiver(address token, address receiver, bool allowed) external;
+function setAllowedReceiver(address _token, address _receiver, bool _allowed) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`token`|`address`|The token address|
-|`receiver`|`address`|The receiver address|
-|`allowed`|`bool`|Whether the receiver is allowed|
+|`_token`|`address`|The token address|
+|`_receiver`|`address`|The receiver address|
+|`_allowed`|`bool`|Whether the receiver is allowed|
 
 
 ### setAllowedSource
@@ -94,15 +103,15 @@ Sets whether a source is allowed for a specific token
 
 
 ```solidity
-function setAllowedSource(address token, address source, bool allowed) external;
+function setAllowedSource(address _token, address _source, bool _allowed) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`token`|`address`|The token address|
-|`source`|`address`|The source address|
-|`allowed`|`bool`|Whether the source is allowed|
+|`_token`|`address`|The token address|
+|`_source`|`address`|The source address|
+|`_allowed`|`bool`|Whether the source is allowed|
 
 
 ### setAllowedSpender
@@ -111,15 +120,15 @@ Sets whether a spender is allowed for a specific token
 
 
 ```solidity
-function setAllowedSpender(address token, address spender, bool allowed) external;
+function setAllowedSpender(address _token, address _spender, bool _allowed) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`token`|`address`|The token address|
-|`spender`|`address`|The spender address|
-|`allowed`|`bool`|Whether the spender is allowed|
+|`_token`|`address`|The token address|
+|`_spender`|`address`|The spender address|
+|`_allowed`|`bool`|Whether the spender is allowed|
 
 
 ### setMaxSingleTransfer
@@ -128,14 +137,14 @@ Sets the maximum amount allowed for a single transfer
 
 
 ```solidity
-function setMaxSingleTransfer(address token, uint256 max) external;
+function setMaxSingleTransfer(address _token, uint256 _max) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`token`|`address`|The token address|
-|`max`|`uint256`|The maximum amount|
+|`_token`|`address`|The token address|
+|`_max`|`uint256`|The maximum amount|
 
 
 ### authorizeAdapterCall
@@ -145,29 +154,22 @@ Authorizes an adapter call based on parameters
 
 ```solidity
 function authorizeAdapterCall(
-    address adapter,
-    address token,
-    bytes4 selector,
-    bytes calldata params
+    address,
+    /* _adapter */
+    address _token,
+    bytes4 _selector,
+    bytes calldata _params
 )
-    external
-    view
-    returns (bool);
+    external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`adapter`|`address`|The adapter address|
-|`token`|`address`|The token address|
-|`selector`|`bytes4`|The function selector|
-|`params`|`bytes`|The encoded function parameters|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`bool`|Whether the call is authorized|
+|`<none>`|`address`||
+|`_token`|`address`|The token address|
+|`_selector`|`bytes4`|The function selector|
+|`_params`|`bytes`|The encoded function parameters|
 
 
 ### isAllowedReceiver
@@ -176,14 +178,14 @@ Checks if a receiver is allowed for a specific token
 
 
 ```solidity
-function isAllowedReceiver(address token, address receiver) public view returns (bool);
+function isAllowedReceiver(address _token, address _receiver) public view returns (bool);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`token`|`address`|The token address|
-|`receiver`|`address`|The receiver address|
+|`_token`|`address`|The token address|
+|`_receiver`|`address`|The receiver address|
 
 **Returns**
 
@@ -198,14 +200,14 @@ Checks if a source is allowed for a specific token
 
 
 ```solidity
-function isAllowedSource(address token, address source) public view returns (bool);
+function isAllowedSource(address _token, address _source) public view returns (bool);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`token`|`address`|The token address|
-|`source`|`address`|The source address|
+|`_token`|`address`|The token address|
+|`_source`|`address`|The source address|
 
 **Returns**
 
@@ -220,14 +222,14 @@ Checks if a spender is allowed for a specific token
 
 
 ```solidity
-function isAllowedSpender(address token, address spender) public view returns (bool);
+function isAllowedSpender(address _token, address _spender) public view returns (bool);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`token`|`address`|The token address|
-|`spender`|`address`|The spender address|
+|`_token`|`address`|The token address|
+|`_spender`|`address`|The spender address|
 
 **Returns**
 
@@ -242,13 +244,13 @@ Gets the maximum amount allowed for a single transfer
 
 
 ```solidity
-function maxSingleTransfer(address token) public view returns (uint256);
+function maxSingleTransfer(address _token) public view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`token`|`address`|The token address|
+|`_token`|`address`|The token address|
 
 **Returns**
 
@@ -261,17 +263,17 @@ function maxSingleTransfer(address token) public view returns (uint256);
 
 Checks if the caller is an admin
 
-*Reverts if the address is not an admin*
+Reverts if the address is not an admin
 
 
 ```solidity
-function _checkAdmin(address admin) private view;
+function _checkAdmin(address _admin) private view;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`admin`|`address`|The address to check|
+|`_admin`|`address`|The address to check|
 
 
 ## Events

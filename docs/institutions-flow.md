@@ -116,7 +116,7 @@
 ┌─────────────────┐
 │Batch Active     │
 │(Accepting mint/ │
-│burn requests) │
+│burn requests)   │
 └────────┬────────┘
          │
          ▼
@@ -223,12 +223,6 @@ Request Status Flow:
 │PENDING      │ ── Initial state when requestBurn() is called
 └──────┬──────┘
        │
-       ├─────────────┐
-       │             ▼
-       │    ┌─────────────┐
-       │    │CANCELLED    │ ── Via cancelRequest() before batch settlement
-       │    └─────────────┘
-       │
        ▼
 ┌─────────────┐
 │SETTLED      │ ── After batch settlement is executed
@@ -258,8 +252,8 @@ Request Status Flow:
 │  │• burn()                 │      │• proposeSettleBatch()   │    │
 │  │  Execute redemption     │      │  Start settlement       │    │
 │  │                         │      │                         │    │
-│  │• cancelRequest()        │      │• executeSettleBatch()   │    │
-│  │  Cancel pending         │      │  Finalize settlement    │    │
+│  │                         │      │• executeSettleBatch()   │    │
+│  │                         │      │  Finalize settlement    │    │
 │  └─────────────────────────┘      └─────────────────────────┘    │
 │                                                                  │
 │  kMinter Batch Functions:                                        │

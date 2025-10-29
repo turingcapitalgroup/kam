@@ -5,6 +5,7 @@
 - [ERC1967Factory](ERC1967Factory.sol/contract.ERC1967Factory.md)
 - [Initializable](Initializable.sol/abstract.Initializable.md)
 - [Multicallable](Multicallable.sol/abstract.Multicallable.md)
+- [OptimizedDateTimeLib](OptimizedDateTimeLib.sol/library.OptimizedDateTimeLib.md)
 - [OptimizedEfficientHashLib](OptimizedEfficientHashLib.sol/library.OptimizedEfficientHashLib.md)
 - [OptimizedFixedPointMathLib](OptimizedFixedPointMathLib.sol/library.OptimizedFixedPointMathLib.md)
 - [OptimizedLibCall](OptimizedLibCall.sol/library.OptimizedLibCall.md)

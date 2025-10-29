@@ -1,22 +1,22 @@
 # OptimizedFixedPointMathLib
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/vendor/solady/utils/OptimizedFixedPointMathLib.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/vendor/solady/utils/OptimizedFixedPointMathLib.sol)
 
 **Authors:**
 Originally by Solady (https://github.com/vectorized/solady/blob/main/src/utils/FixedPointMathLib.sol), Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/utils/FixedPointMathLib.sol)
 
 Arithmetic library with operations for fixed-point numbers.
 
-*NOTE: This is a reduced version of the original Solady library.
+NOTE: This is a reduced version of the original Solady library.
 We have extracted only the necessary fixed-point math functionality to optimize contract size.
-Original code by Solady, modified for size optimization.*
+Original code by Solady, modified for size optimization.
 
 
 ## Functions
 ### fullMulDiv
 
-*Calculates `floor(x * y / d)` with full precision.
+Calculates `floor(x * y / d)` with full precision.
 Throws if result overflows a uint256 or when `d` is zero.
-Credit to Remco Bloemen under MIT license: https://2π.com/21/muldiv*
+Credit to Remco Bloemen under MIT license: https://2π.com/21/muldiv
 
 
 ```solidity
@@ -25,7 +25,7 @@ function fullMulDiv(uint256 x, uint256 y, uint256 d) internal pure returns (uint
 
 ### abs
 
-*Returns the absolute value of `x`.*
+Returns the absolute value of `x`.
 
 
 ```solidity
@@ -34,8 +34,8 @@ function abs(int256 x) internal pure returns (uint256 z);
 
 ## Errors
 ### FullMulDivFailed
-*The full precision multiply-divide operation failed, either due
-to the result being larger than 256 bits, or a division by a zero.*
+The full precision multiply-divide operation failed, either due
+to the result being larger than 256 bits, or a division by a zero.
 
 
 ```solidity

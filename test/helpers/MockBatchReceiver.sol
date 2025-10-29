@@ -18,11 +18,19 @@ contract MockBatchReceiver {
     /// @param recipient The address to receive the assets
     /// @param asset The asset address
     /// @param amount The amount to transfer
-    /// @param batchId The batch ID
-    function receiveAssets(address recipient, address asset, uint256 amount, bytes32 batchId) external payable {
+    function receiveAssets(
+        address recipient,
+        address asset,
+        uint256 amount,
+        bytes32 /* batchId */
+    )
+        external
+        payable
+    {
         // Mock implementation - transfer assets to recipient
         // In a real implementation, this would handle the actual asset transfer
         // For testing, we'll transfer the assets to the recipient
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(asset).transfer(recipient, amount);
     }
 }

@@ -1,30 +1,30 @@
 # OptimizedBytes32EnumerableSetLib
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/vendor/solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/vendor/solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol)
 
 **Author:**
 Originally by Solady (https://github.com/Vectorized/solady/blob/main/src/utils/EnumerableSetLib.sol)
 
 Library for managing enumerable sets in storage.
 
-*NOTE: This is a reduced version of the original Solady library.
+NOTE: This is a reduced version of the original Solady library.
 We have extracted only the bytes32 set functionality to optimize contract size.
-Original code by Solady, modified for size optimization.*
+Original code by Solady, modified for size optimization.
 
 
 ## State Variables
 ### _ZERO_SENTINEL
-*A sentinel value to denote the zero value in storage.
+A sentinel value to denote the zero value in storage.
 No elements can be equal to this value.
-`uint72(bytes9(keccak256(bytes("_ZERO_SENTINEL"))))`.*
+`uint72(bytes9(keccak256(bytes("_ZERO_SENTINEL"))))`.
 
 
 ```solidity
-uint256 private constant _ZERO_SENTINEL = 0xfbb67fda52d4bfb8bf;
+uint256 private constant _ZERO_SENTINEL = 0xfbb67fda52d4bfb8bf
 ```
 
 
 ### _ENUMERABLE_WORD_SET_SLOT_SEED
-*The storage layout is given by:
+The storage layout is given by:
 ```
 mstore(0x04, _ENUMERABLE_WORD_SET_SLOT_SEED)
 mstore(0x00, set.slot)
@@ -35,18 +35,18 @@ let positionSlot := keccak256(0x00, 0x40)
 let valueSlot := add(rootSlot, sload(positionSlot))
 let valueInStorage := sload(valueSlot)
 let lazyLength := sload(not(rootSlot))
-```*
+```
 
 
 ```solidity
-uint256 private constant _ENUMERABLE_WORD_SET_SLOT_SEED = 0x18fb5864;
+uint256 private constant _ENUMERABLE_WORD_SET_SLOT_SEED = 0x18fb5864
 ```
 
 
 ## Functions
 ### length
 
-*Returns the number of elements in the set.*
+Returns the number of elements in the set.
 
 
 ```solidity
@@ -55,7 +55,7 @@ function length(Bytes32Set storage set) internal view returns (uint256 result);
 
 ### contains
 
-*Returns whether `value` is in the set.*
+Returns whether `value` is in the set.
 
 
 ```solidity
@@ -64,7 +64,7 @@ function contains(Bytes32Set storage set, bytes32 value) internal view returns (
 
 ### add
 
-*Adds `value` to the set. Returns whether `value` was not in the set.*
+Adds `value` to the set. Returns whether `value` was not in the set.
 
 
 ```solidity
@@ -73,8 +73,8 @@ function add(Bytes32Set storage set, bytes32 value) internal returns (bool resul
 
 ### add
 
-*Adds `value` to the set. Returns whether `value` was not in the set.
-Reverts if the set grows bigger than the custom on-the-fly capacity `cap`.*
+Adds `value` to the set. Returns whether `value` was not in the set.
+Reverts if the set grows bigger than the custom on-the-fly capacity `cap`.
 
 
 ```solidity
@@ -83,7 +83,7 @@ function add(Bytes32Set storage set, bytes32 value, uint256 cap) internal return
 
 ### remove
 
-*Removes `value` from the set. Returns whether `value` was in the set.*
+Removes `value` from the set. Returns whether `value` was in the set.
 
 
 ```solidity
@@ -92,7 +92,7 @@ function remove(Bytes32Set storage set, bytes32 value) internal returns (bool re
 
 ### update
 
-*Shorthand for `isAdd ? set.add(value, cap) : set.remove(value)`.*
+Shorthand for `isAdd ? set.add(value, cap) : set.remove(value)`.
 
 
 ```solidity
@@ -101,8 +101,8 @@ function update(Bytes32Set storage set, bytes32 value, bool isAdd, uint256 cap) 
 
 ### values
 
-*Returns all of the values in the set.
-Note: This can consume more gas than the block gas limit for large sets.*
+Returns all of the values in the set.
+Note: This can consume more gas than the block gas limit for large sets.
 
 
 ```solidity
@@ -111,7 +111,7 @@ function values(Bytes32Set storage set) internal view returns (bytes32[] memory 
 
 ### at
 
-*Returns the element at index `i` in the set. Reverts if `i` is out-of-bounds.*
+Returns the element at index `i` in the set. Reverts if `i` is out-of-bounds.
 
 
 ```solidity
@@ -120,7 +120,7 @@ function at(Bytes32Set storage set, uint256 i) internal view returns (bytes32 re
 
 ### _rootSlot
 
-*Returns the root slot.*
+Returns the root slot.
 
 
 ```solidity
@@ -129,7 +129,7 @@ function _rootSlot(Bytes32Set storage s) private pure returns (bytes32 r);
 
 ## Errors
 ### IndexOutOfBounds
-*The index must be less than the length.*
+The index must be less than the length.
 
 
 ```solidity
@@ -137,7 +137,7 @@ error IndexOutOfBounds();
 ```
 
 ### ValueIsZeroSentinel
-*The value cannot be the zero sentinel.*
+The value cannot be the zero sentinel.
 
 
 ```solidity
@@ -145,7 +145,7 @@ error ValueIsZeroSentinel();
 ```
 
 ### ExceedsCapacity
-*Cannot accommodate a new unique value with the capacity.*
+Cannot accommodate a new unique value with the capacity.
 
 
 ```solidity
@@ -154,7 +154,7 @@ error ExceedsCapacity();
 
 ## Structs
 ### Bytes32Set
-*An enumerable bytes32 set in storage.*
+An enumerable bytes32 set in storage.
 
 
 ```solidity

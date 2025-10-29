@@ -1,12 +1,12 @@
 # kMinter
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/kMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/kMinter.sol)
 
 **Inherits:**
-[IkMinter](/src/interfaces/IkMinter.sol/interface.IkMinter.md), [Initializable](/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/src/base/kBase.sol/contract.kBase.md), [Extsload](/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md)
+[IkMinter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md)
 
 Institutional gateway for kToken minting and redemption with batch settlement processing
 
-*This contract serves as the primary interface for qualified institutions to interact with the KAM protocol,
+This contract serves as the primary interface for qualified institutions to interact with the KAM protocol,
 enabling them to mint kTokens by depositing underlying assets and burn them through a sophisticated batch
 settlement system. Key features include: (1) Immediate 1:1 kToken minting upon asset deposit, bypassing the
 share-based accounting used for retail users, (2) Two-phase redemption process that handles requests through
@@ -14,14 +14,15 @@ batch settlements to optimize gas costs and maintain protocol efficiency, (3) In
 for yield generation on deposited assets, (4) Request tracking and management system with unique IDs for each
 redemption, (5) Cancellation mechanism for pending requests before batch closure. The contract enforces strict
 access control, ensuring only verified institutions can access these privileged operations while maintaining
-the security and integrity of the protocol's asset backing.*
+the security and integrity of the protocol's asset backing.
 
 
 ## State Variables
 ### KMINTER_STORAGE_LOCATION
 
 ```solidity
-bytes32 private constant KMINTER_STORAGE_LOCATION = 0xd0574379115d2b8497bfd9020aa9e0becaffc59e5509520aa5fe8c763e40d000;
+bytes32 private constant KMINTER_STORAGE_LOCATION =
+    0xd0574379115d2b8497bfd9020aa9e0becaffc59e5509520aa5fe8c763e40d000
 ```
 
 
@@ -30,9 +31,9 @@ bytes32 private constant KMINTER_STORAGE_LOCATION = 0xd0574379115d2b8497bfd9020a
 
 Retrieves the kMinter storage struct from its designated storage slot
 
-*Uses ERC-7201 namespaced storage pattern to access the storage struct at a deterministic location.
+Uses ERC-7201 namespaced storage pattern to access the storage struct at a deterministic location.
 This approach prevents storage collisions in upgradeable contracts and allows safe addition of new
-storage variables in future upgrades without affecting existing storage layout.*
+storage variables in future upgrades without affecting existing storage layout.
 
 
 ```solidity
@@ -51,7 +52,7 @@ Disables initializers to prevent implementation contract initialization
 
 
 ```solidity
-constructor();
+constructor() ;
 ```
 
 ### initialize
@@ -60,37 +61,37 @@ Initializes the kMinter contract
 
 
 ```solidity
-function initialize(address registry_) external initializer;
+function initialize(address _registry) external initializer;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`registry_`|`address`|Address of the registry contract|
+|`_registry`|`address`|Address of the registry contract|
 
 
 ### mint
 
 Executes institutional minting of kTokens through immediate 1:1 issuance against deposited assets
 
-*This function enables qualified institutions to mint kTokens by depositing underlying assets. The process
+This function enables qualified institutions to mint kTokens by depositing underlying assets. The process
 involves: (1) transferring assets from the caller to kAssetRouter, (2) pushing assets into the current batch
 of the designated DN vault for yield generation, and (3) immediately minting an equivalent amount of kTokens
 to the recipient. Unlike retail operations, institutional mints bypass share-based accounting and provide
 immediate token issuance without waiting for batch settlement. The deposited assets are tracked separately
-to maintain the 1:1 backing ratio and will participate in vault yield strategies through the batch system.*
+to maintain the 1:1 backing ratio and will participate in vault yield strategies through the batch system.
 
 
 ```solidity
-function mint(address asset_, address to_, uint256 amount_) external payable;
+function mint(address _asset, address _to, uint256 _amount) external payable;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset_`|`address`||
-|`to_`|`address`||
-|`amount_`|`uint256`||
+|`_asset`|`address`||
+|`_to`|`address`||
+|`_amount`|`uint256`||
 
 
 ### requestBurn
@@ -98,7 +99,7 @@ function mint(address asset_, address to_, uint256 amount_) external payable;
 Initiates a two-phase institutional redemption by creating a batch request for underlying asset
 withdrawal
 
-*This function implements the first phase of the redemption process for qualified institutions. The workflow
+This function implements the first phase of the redemption process for qualified institutions. The workflow
 consists of: (1) transferring kTokens from the caller to this contract for escrow (not burned yet), (2)
 generating
 a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4) registering the
@@ -106,32 +107,39 @@ request with kAssetRouter for batch processing. The kTokens remain in escrow unt
 user calls burn() to complete the process. This two-phase approach is necessary because redemptions are
 processed
 in batches through the DN vault system, which requires waiting for batch settlement to ensure proper asset
-availability and yield distribution. The request can be cancelled before batch closure/settlement.*
+availability and yield distribution. The request can be cancelled before batch closure/settlement.
 
 
 ```solidity
-function requestBurn(address asset_, address to_, uint256 amount_) external payable returns (bytes32 requestId);
+function requestBurn(
+    address _asset,
+    address _to,
+    uint256 _amount
+)
+    external
+    payable
+    returns (bytes32 _requestId);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset_`|`address`||
-|`to_`|`address`||
-|`amount_`|`uint256`||
+|`_asset`|`address`||
+|`_to`|`address`||
+|`_amount`|`uint256`||
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`requestId`|`bytes32`|A unique bytes32 identifier for tracking and executing this redemption request|
+|`_requestId`|`bytes32`|requestId A unique bytes32 identifier for tracking and executing this redemption request|
 
 
 ### burn
 
 Completes the second phase of institutional redemption by executing a settled batch request
 
-*This function finalizes the redemption process initiated by requestBurn(). It can only be called after
+This function finalizes the redemption process initiated by requestBurn(). It can only be called after
 the batch containing this request has been settled through the kAssetRouter settlement process. The execution
 involves: (1) validating the request exists and is in PENDING status, (2) updating the request status to
 REDEEMED,
@@ -142,45 +150,17 @@ deployed per batch that holds the settled assets and ensures isolated distributi
 the batch is not yet settled, ensuring assets are only distributed when available. The separation between
 request
 and redemption phases allows for efficient batch processing of multiple redemptions while maintaining asset
-safety.*
+safety.
 
 
 ```solidity
-function burn(bytes32 requestId) external payable;
+function burn(bytes32 _requestId) external payable;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`requestId`|`bytes32`|The unique identifier of the redemption request to execute (obtained from requestBurn)|
-
-
-### cancelRequest
-
-Cancels a pending redemption request and returns the escrowed kTokens to the user
-
-*This function allows institutions to cancel their redemption requests before the batch is closed or
-settled.
-The cancellation process involves: (1) validating the request exists and is in PENDING status, (2) checking that
-the batch is neither closed nor settled (once closed, cancellation is not possible as the batch is being
-processed),
-(3) updating the request status to CANCELLED, (4) removing the request from tracking, (5) returning the escrowed
-kTokens back to the original requester. This mechanism provides flexibility for institutions to manage their
-liquidity needs, allowing them to reverse redemption decisions if market conditions change or if they need
-immediate
-access to their kTokens. The function enforces strict timing constraints - cancellation is only permitted while
-the
-batch remains open, ensuring batch integrity and preventing manipulation of settled redemptions.*
-
-
-```solidity
-function cancelRequest(bytes32 requestId) external payable;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`requestId`|`bytes32`|The unique identifier of the redemption request to cancel (obtained from requestBurn)|
+|`_requestId`|`bytes32`||
 
 
 ### createNewBatch
@@ -189,13 +169,13 @@ Creates a new batch for a specific asset
 
 
 ```solidity
-function createNewBatch(address asset_) external returns (bytes32);
+function createNewBatch(address _asset) external returns (bytes32);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset_`|`address`|The asset for which to create a new batch|
+|`_asset`|`address`||
 
 **Returns**
 
@@ -222,7 +202,7 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 ### settleBatch
 
-Settles a closed batch (unchanged functionality)
+Marks a batch as settled after processing
 
 
 ```solidity
@@ -269,29 +249,29 @@ function _createBatchReceiver(bytes32 _batchId) internal returns (address);
 
 Internal function to create deterministic batch IDs with collision resistance per asset
 
-*This function generates unique batch identifiers per asset using multiple entropy sources for security.
+This function generates unique batch identifiers per asset using multiple entropy sources for security.
 The ID generation process: (1) Increments asset-specific batch counter to ensure uniqueness within the vault
 per asset, (2) Combines vault address, asset-specific batch number, chain ID, timestamp, and asset address
 for collision resistance, (3) Uses optimized hashing function for gas efficiency, (4) Initializes batch
 storage with default state for new requests. The deterministic approach enables consistent batch identification
 across different contexts while the multiple entropy sources prevent prediction or collision attacks. Each
-batch starts in open state ready to accept user requests until explicitly closed by relayers.*
+batch starts in open state ready to accept user requests until explicitly closed by relayers.
 
 
 ```solidity
-function _createNewBatch(address asset_) private returns (bytes32);
+function _createNewBatch(address _asset) private returns (bytes32);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset_`|`address`|The asset for which to create a new batch|
+|`_asset`|`address`|The asset for which to create a new batch|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`bytes32`|newBatchId Deterministic batch identifier for the newly created batch period for the specific asset|
+|`<none>`|`bytes32`|_newBatchId Deterministic batch identifier for the newly created batch period for the specific asset|
 
 
 ### getBatchId
@@ -300,13 +280,13 @@ Get the current active batch ID for a specific asset
 
 
 ```solidity
-function getBatchId(address asset_) external view returns (bytes32);
+function getBatchId(address _asset) external view returns (bytes32);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset_`|`address`|The asset to query|
+|`_asset`|`address`||
 
 **Returns**
 
@@ -321,13 +301,13 @@ Get the current active batch ID for a specific asset
 
 
 ```solidity
-function _currentBatchId(address asset_) internal view returns (bytes32);
+function _currentBatchId(address _asset) internal view returns (bytes32);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset_`|`address`|The asset to query|
+|`_asset`|`address`|The asset to query|
 
 **Returns**
 
@@ -342,13 +322,13 @@ Checks if a batch exists for a specific asset
 
 
 ```solidity
-function _checkBatchId(address asset_) internal view;
+function _checkBatchId(address _asset) internal view;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset_`|`address`|The asset to check|
+|`_asset`|`address`|The asset to check|
 
 
 ### getCurrentBatchNumber
@@ -357,13 +337,13 @@ Get the current batch number for a specific asset
 
 
 ```solidity
-function getCurrentBatchNumber(address asset_) external view returns (uint256);
+function getCurrentBatchNumber(address _asset) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset_`|`address`|The asset to query|
+|`_asset`|`address`||
 
 **Returns**
 
@@ -374,32 +354,38 @@ function getCurrentBatchNumber(address asset_) external view returns (uint256);
 
 ### hasActiveBatch
 
-Check if an asset has an active (open) batch
+Checks if an asset has an active (open) batch
 
 
 ```solidity
-function hasActiveBatch(address asset_) external view returns (bool);
+function hasActiveBatch(address _asset) external view returns (bool);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset_`|`address`|The asset to check|
+|`_asset`|`address`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if the asset has an active batch, false otherwise|
 
 
 ### getBatchInfo
 
-Get batch info for a specific batch ID
+Gets batch information for a specific batch ID
 
 
 ```solidity
-function getBatchInfo(bytes32 batchId_) external view returns (IkMinter.BatchInfo memory);
+function getBatchInfo(bytes32 _batchId) external view returns (IkMinter.BatchInfo memory);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`batchId_`|`bytes32`|The batch ID to query|
+|`_batchId`|`bytes32`||
 
 **Returns**
 
@@ -414,19 +400,40 @@ Gets the batch receiver address for a specific batch
 
 
 ```solidity
-function getBatchReceiver(bytes32 batchId_) external view returns (address);
+function getBatchReceiver(bytes32 _batchId) external view returns (address);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`batchId_`|`bytes32`|The batch ID to query|
+|`_batchId`|`bytes32`||
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`address`|The address of the batch receiver|
+
+
+### isClosed
+
+Returns the close state of a given batchId
+
+
+```solidity
+function isClosed(bytes32 _batchId) external view returns (bool _isClosed);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_batchId`|`bytes32`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_isClosed`|`bool`|isClosed_ the state of the given batchId|
 
 
 ### _checkNotPaused
@@ -444,13 +451,13 @@ Check if caller is an institution
 
 
 ```solidity
-function _checkInstitution(address user) private view;
+function _checkInstitution(address _user) private view;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`user`|`address`|Address to check|
+|`_user`|`address`|Address to check|
 
 
 ### _checkAdmin
@@ -459,13 +466,13 @@ Check if caller is an admin
 
 
 ```solidity
-function _checkAdmin(address user) private view;
+function _checkAdmin(address _user) private view;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`user`|`address`|Address to check|
+|`_user`|`address`|Address to check|
 
 
 ### _checkRelayer
@@ -474,13 +481,13 @@ Check if caller is a relayer
 
 
 ```solidity
-function _checkRelayer(address user) private view;
+function _checkRelayer(address _user) private view;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`user`|`address`|Address to check|
+|`_user`|`address`|Address to check|
 
 
 ### _checkRouter
@@ -489,13 +496,13 @@ Check if caller is the AssetRouter
 
 
 ```solidity
-function _checkRouter(address user) private view;
+function _checkRouter(address _user) private view;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`user`|`address`|Address to check|
+|`_user`|`address`|Address to check|
 
 
 ### _checkValidAsset
@@ -504,13 +511,13 @@ Check if asset is valid/supported
 
 
 ```solidity
-function _checkValidAsset(address asset) private view;
+function _checkValidAsset(address _asset) private view;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset`|`address`|Asset address to check|
+|`_asset`|`address`|Asset address to check|
 
 
 ### _checkAmountNotZero
@@ -519,13 +526,13 @@ Check if amount is not zero
 
 
 ```solidity
-function _checkAmountNotZero(uint256 amount) private pure;
+function _checkAmountNotZero(uint256 _amount) private pure;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`amount`|`uint256`|Amount to check|
+|`_amount`|`uint256`|Amount to check|
 
 
 ### _checkAddressNotZero
@@ -534,13 +541,13 @@ Check if address is not zero
 
 
 ```solidity
-function _checkAddressNotZero(address addr) private pure;
+function _checkAddressNotZero(address _addr) private pure;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`addr`|`address`|Address to check|
+|`_addr`|`address`|Address to check|
 
 
 ### _createBurnRequestId
@@ -549,15 +556,15 @@ Generates a request ID
 
 
 ```solidity
-function _createBurnRequestId(address user, uint256 amount, uint256 timestamp) private returns (bytes32);
+function _createBurnRequestId(address _user, uint256 _amount, uint256 _timestamp) private returns (bytes32);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`user`|`address`|User address|
-|`amount`|`uint256`|Amount|
-|`timestamp`|`uint256`|Timestamp|
+|`_user`|`address`|User address|
+|`_amount`|`uint256`|Amount|
+|`_timestamp`|`uint256`|Timestamp|
 
 **Returns**
 
@@ -570,32 +577,38 @@ function _createBurnRequestId(address user, uint256 amount, uint256 timestamp) p
 
 Emergency admin function to recover stuck assets from a batch receiver contract
 
-*This function provides a recovery mechanism for assets that may become stuck in kBatchReceiver contracts
+This function provides a recovery mechanism for assets that may become stuck in kBatchReceiver contracts
 due to failed redemptions or system errors. The process involves two steps: (1) calling rescueAssets on the
 kBatchReceiver to transfer assets back to this contract, and (2) using the inherited rescueAssets function
 from kBase to forward them to the specified destination. This two-step process ensures proper access control
 and maintains the security model where only authorized contracts can interact with batch receivers. This
-function should only be used in emergency situations and requires admin privileges to prevent abuse.*
+function should only be used in emergency situations and requires admin privileges to prevent abuse.
 
 
 ```solidity
-function rescueReceiverAssets(address batchReceiver, address asset_, address to_, uint256 amount_) external;
+function rescueReceiverAssets(
+    address _batchReceiver,
+    address _asset,
+    address _to,
+    uint256 _amount
+)
+    external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`batchReceiver`|`address`|The address of the kBatchReceiver contract holding the stuck assets|
-|`asset_`|`address`||
-|`to_`|`address`||
-|`amount_`|`uint256`||
+|`_batchReceiver`|`address`||
+|`_asset`|`address`||
+|`_to`|`address`||
+|`_amount`|`uint256`||
 
 
 ### isPaused
 
 Checks if the contract is currently paused
 
-*Returns the paused state from the base storage for operational control*
+Returns the paused state from the base storage for operational control
 
 
 ```solidity
@@ -612,17 +625,17 @@ function isPaused() external view returns (bool);
 
 Retrieves details of a specific redemption request
 
-*Returns the complete BurnRequest struct containing all request information*
+Returns the complete BurnRequest struct containing all request information
 
 
 ```solidity
-function getBurnRequest(bytes32 requestId) external view returns (BurnRequest memory);
+function getBurnRequest(bytes32 _requestId) external view returns (BurnRequest memory);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`requestId`|`bytes32`|The unique identifier of the request|
+|`_requestId`|`bytes32`||
 
 **Returns**
 
@@ -635,17 +648,17 @@ function getBurnRequest(bytes32 requestId) external view returns (BurnRequest me
 
 Gets all redemption request IDs for a specific user
 
-*Returns request IDs from the user's enumerable set for efficient tracking*
+Returns request IDs from the user's enumerable set for efficient tracking
 
 
 ```solidity
-function getUserRequests(address user) external view returns (bytes32[] memory);
+function getUserRequests(address _user) external view returns (bytes32[] memory);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`user`|`address`|The user address to query|
+|`_user`|`address`||
 
 **Returns**
 
@@ -658,7 +671,7 @@ function getUserRequests(address user) external view returns (bytes32[] memory);
 
 Gets the current request counter value
 
-*Returns the monotonically increasing counter used for generating unique request IDs*
+Returns the monotonically increasing counter used for generating unique request IDs
 
 
 ```solidity
@@ -675,17 +688,17 @@ function getRequestCounter() external view returns (uint256);
 
 Gets the total locked assets for a specific asset
 
-*Returns the cumulative amount of assets deposited through mint operations for accounting*
+Returns the cumulative amount of assets deposited through mint operations for accounting
 
 
 ```solidity
-function getTotalLockedAssets(address asset) external view returns (uint256);
+function getTotalLockedAssets(address _asset) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset`|`address`|The asset address to query|
+|`_asset`|`address`||
 
 **Returns**
 
@@ -698,26 +711,26 @@ function getTotalLockedAssets(address asset) external view returns (uint256);
 
 Authorizes contract upgrades
 
-*Only callable by ADMIN_ROLE*
+Only callable by ADMIN_ROLE
 
 
 ```solidity
-function _authorizeUpgrade(address newImplementation) internal view override;
+function _authorizeUpgrade(address _newImplementation) internal view override;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`newImplementation`|`address`|New implementation address|
+|`_newImplementation`|`address`|New implementation address|
 
 
 ### contractName
 
 Returns the human-readable name identifier for this contract type
 
-*Used for contract identification and logging purposes. The name should be consistent
+Used for contract identification and logging purposes. The name should be consistent
 across all versions of the same contract type. This enables external systems and other
-contracts to identify the contract's purpose and role within the protocol ecosystem.*
+contracts to identify the contract's purpose and role within the protocol ecosystem.
 
 
 ```solidity
@@ -734,10 +747,10 @@ function contractName() external pure returns (string memory);
 
 Returns the version identifier for this contract implementation
 
-*Used for upgrade management and compatibility checking within the protocol. The version
+Used for upgrade management and compatibility checking within the protocol. The version
 string should follow semantic versioning (e.g., "1.0.0") to clearly indicate major, minor,
 and patch updates. This enables the protocol governance and monitoring systems to track
-deployed versions and ensure compatibility between interacting components.*
+deployed versions and ensure compatibility between interacting components.
 
 
 ```solidity
@@ -754,8 +767,8 @@ function contractVersion() external pure returns (string memory);
 ### kMinterStorage
 Core storage structure for kMinter using ERC-7201 namespaced storage pattern
 
-*This structure manages all state for institutional minting and redemption operations.
-Uses the diamond storage pattern to avoid storage collisions in upgradeable contracts.*
+This structure manages all state for institutional minting and redemption operations.
+Uses the diamond storage pattern to avoid storage collisions in upgradeable contracts.
 
 **Note:**
 storage-location: erc7201:kam.storage.kMinter
@@ -763,13 +776,22 @@ storage-location: erc7201:kam.storage.kMinter
 
 ```solidity
 struct kMinterStorage {
+    /// @dev Counter for generating unique request IDs
     uint64 requestCounter;
+    /// @dev receiverImplementation address
     address receiverImplementation;
+    /// @dev Tracks total assets locked in pending redemption requests per asset
     mapping(address => uint256) totalLockedAssets;
+    /// @dev Tracks total assets locked in pending redemption requests per asset
     mapping(bytes32 => BurnRequest) burnRequests;
+    /// @dev Maps user addresses to their set of redemption request IDs for efficient lookup
+    /// Enables quick retrieval of all requests associated with a specific user
     mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set) userRequests;
+    /// @dev Per-asset batch counters
     mapping(address => uint256) assetBatchCounters;
+    /// @dev Per-asset current batch ID tracking
     mapping(address => bytes32) currentBatchIds;
+    /// @dev Global batch storage
     mapping(bytes32 => IkMinter.BatchInfo) batches;
 }
 ```

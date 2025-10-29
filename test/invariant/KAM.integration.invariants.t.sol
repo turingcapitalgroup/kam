@@ -17,49 +17,49 @@ contract IntegrationInvariants is SetUp {
         _setUpVaultFees(betaVault);
     }
 
-    function invariant_INTEGRATION_kMinterLockedAssets() public {
+    function invariant_INTEGRATION_kMinterLockedAssets() public view {
         minterHandler.INVARIANT_A_TOTAL_LOCKED_ASSETS();
     }
 
-    function invariant_INTEGRATION_kMinterAdapterBalance() public {
+    function invariant_INTEGRATION_kMinterAdapterBalance() public view {
         minterHandler.INVARIANT_B_ADAPTER_BALANCE();
     }
 
-    function invariant_INTEGRATION_kMinterAdapterTotalAssets() public {
+    function invariant_INTEGRATION_kMinterAdapterTotalAssets() public view {
         minterHandler.INVARIANT_C_ADAPTER_TOTAL_ASSETS();
     }
 
-    function invariant_INTEGRATION_kStakingVaultTotalAssets() public {
+    function invariant_INTEGRATION_kStakingVaultTotalAssets() public view {
         vaultHandlerDeltaNeutral.INVARIANT_A_TOTAL_ASSETS();
         vaultHandlerAlpha.INVARIANT_A_TOTAL_ASSETS();
         vaultHandlerBeta.INVARIANT_A_TOTAL_ASSETS();
     }
 
-    function invariant_INTEGRATION_kStakingVaultAdapterBalance() public {
+    function invariant_INTEGRATION_kStakingVaultAdapterBalance() public view {
         vaultHandlerDeltaNeutral.INVARIANT_B_ADAPTER_BALANCE();
         vaultHandlerAlpha.INVARIANT_B_ADAPTER_BALANCE();
         vaultHandlerBeta.INVARIANT_B_ADAPTER_BALANCE();
     }
 
-    function invariant_INTEGRATION_kStakingVaultAdapterTotalAssets() public {
+    function invariant_INTEGRATION_kStakingVaultAdapterTotalAssets() public view {
         vaultHandlerDeltaNeutral.INVARIANT_C_ADAPTER_TOTAL_ASSETS();
         vaultHandlerAlpha.INVARIANT_C_ADAPTER_TOTAL_ASSETS();
         vaultHandlerBeta.INVARIANT_C_ADAPTER_TOTAL_ASSETS();
     }
 
-    function invariant_INTEGRATION_kStakingVaultSharePrice() public {
+    function invariant_INTEGRATION_kStakingVaultSharePrice() public view {
         vaultHandlerDeltaNeutral.INVARIANT_D_SHARE_PRICE();
         vaultHandlerAlpha.INVARIANT_D_SHARE_PRICE();
         vaultHandlerBeta.INVARIANT_D_SHARE_PRICE();
     }
 
-    function invariant_INTEGRATION_kStakingVaultTotalNetAssets() public {
+    function invariant_INTEGRATION_kStakingVaultTotalNetAssets() public view {
         vaultHandlerDeltaNeutral.INVARIANT_E_TOTAL_NET_ASSETS();
         vaultHandlerAlpha.INVARIANT_E_TOTAL_NET_ASSETS();
         vaultHandlerBeta.INVARIANT_E_TOTAL_NET_ASSETS();
     }
 
-    function invariant_INTEGRATION_kStakingVaultSupply() public {
+    function invariant_INTEGRATION_kStakingVaultSupply() public view {
         vaultHandlerDeltaNeutral.INVARIANT_F_SUPPLY();
         vaultHandlerAlpha.INVARIANT_F_SUPPLY();
         vaultHandlerBeta.INVARIANT_F_SUPPLY();

@@ -10,7 +10,16 @@ contract MockAssetRouter {
         return _registeredAssets[asset];
     }
 
-    function registerAsset(string memory name, string memory symbol, address asset, bool isRegistered) external {
+    function registerAsset(
+        string memory,
+        /* name */
+        string memory,
+        /* symbol */
+        address asset,
+        bool isRegistered
+    )
+        external
+    {
         _registeredAssets[asset] = isRegistered;
     }
 

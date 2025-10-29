@@ -413,7 +413,7 @@ abstract contract ERC20 {
                 revert(0x1c, 0x04)
             }
             let m := mload(0x40) // Grab the free memory pointer.
-                // Clean the upper 96 bits.
+            // Clean the upper 96 bits.
             owner := shr(96, shl(96, owner))
             spender := shr(96, shl(96, spender))
             // Compute the nonce slot and load its value.
@@ -453,8 +453,8 @@ abstract contract ERC20 {
             }
             // Increment and store the updated nonce.
             sstore(nonceSlot, add(nonceValue, t)) // `t` is 1 if ecrecover succeeds.
-                // Compute the allowance slot and store the value.
-                // The `owner` is already at slot 0x20.
+            // Compute the allowance slot and store the value.
+            // The `owner` is already at slot 0x20.
             mstore(0x40, or(shl(160, _ALLOWANCE_SLOT_SEED), spender))
             sstore(keccak256(0x2c, 0x34), value)
             // Emit the {Approval} event.

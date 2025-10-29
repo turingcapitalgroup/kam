@@ -56,6 +56,11 @@ interface IVaultAdapter is IVersioned {
     /// @param amount The quantity of assets transferred
     event TransferExecuted(address indexed asset, address indexed to, uint256 amount);
 
+    /// @notice Emitted when total assets are updated
+    /// @param oldTotalAssets The previous total assets value
+    /// @param newTotalAssets The new total assets value
+    event TotalAssetsUpdated(uint256 oldTotalAssets, uint256 newTotalAssets);
+
     /* //////////////////////////////////////////////////////////////
                             CORE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
