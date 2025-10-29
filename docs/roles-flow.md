@@ -113,13 +113,11 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 - **Key Permissions**:
   - Mint kTokens 1:1 with underlying assets
   - Request redemptions
-  - Cancel redemption requests
   - Execute redemptions after settlement
 - **Key Functions**:
   - `kMinter.mint()` - Mint kTokens
   - `kMinter.requestBurn()` - Request redemption
   - `kMinter.burn()` - Execute redemption
-  - `kMinter.cancelRequest()` - Cancel redemption request
 
 ### VENDOR_ROLE
 
@@ -265,7 +263,6 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  │• mint() - Mint kTokens 1:1 with assets                      ││
 │  │• requestBurn() - Request redemption                         ││
 │  │• burn() - Execute redemption after settlement               ││
-│  │• cancelRequest() - Cancel pending redemption                ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 │  RELAYER_ROLE Functions:                                        │
