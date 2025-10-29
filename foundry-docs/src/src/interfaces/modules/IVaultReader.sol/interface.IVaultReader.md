@@ -1,12 +1,12 @@
 # IVaultReader
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/interfaces/modules/IVaultReader.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/interfaces/modules/IVaultReader.sol)
 
 **Inherits:**
-[IVersioned](/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Read-only interface for querying vault state, calculations, and metrics without modifying contract state
 
-*This interface provides comprehensive access to vault information for external integrations, front-ends, and
+This interface provides comprehensive access to vault information for external integrations, front-ends, and
 analytics without gas costs or state modifications. The interface covers several key areas: (1) Configuration:
 Registry references, underlying assets, and fee parameters, (2) Financial Metrics: Share prices, total assets,
 and fee calculations for accurate vault valuation, (3) Batch Information: Current and historical batch states
@@ -14,7 +14,7 @@ for settlement tracking, (4) Fee Calculations: Real-time fee accruals and next f
 Validated batch ID and receiver retrieval preventing errors. This read-only approach enables efficient monitoring
 and integration while maintaining clear separation from state-modifying operations. All calculations reflect current
 vault state including pending fees and accrued yields, providing accurate real-time vault metrics for users and
-integrations.*
+integrations.
 
 
 ## Functions
@@ -67,10 +67,10 @@ function underlyingAsset() external view returns (address);
 
 Calculates accumulated fees for the current period including management and performance components
 
-*Computes real-time fee accruals based on time elapsed and vault performance since last fee charge.
+Computes real-time fee accruals based on time elapsed and vault performance since last fee charge.
 Management fees accrue continuously based on assets under management and time passed. Performance fees
 are calculated on share price appreciation above watermarks and hurdle rates. This function provides
-accurate fee projections for settlement planning and user transparency without modifying state.*
+accurate fee projections for settlement planning and user transparency without modifying state.
 
 
 ```solidity
@@ -212,9 +212,9 @@ function managementFee() external view returns (uint16);
 
 Returns the high watermark used for performance fee calculations
 
-*The watermark tracks the highest share price achieved, ensuring performance fees are only
+The watermark tracks the highest share price achieved, ensuring performance fees are only
 charged on new highs and preventing double-charging on recovered losses. Reset occurs when new
-high watermarks are achieved, establishing a new baseline for future performance fee calculations.*
+high watermarks are achieved, establishing a new baseline for future performance fee calculations.
 
 
 ```solidity
@@ -352,8 +352,8 @@ function getSafeBatchReceiver(bytes32 batchId) external view returns (address);
 
 Calculates current share price including all accrued yields
 
-*Returns net share price after fee deductions, reflecting total vault performance.
-Used for settlement calculations and performance tracking.*
+Returns net share price after fee deductions, reflecting total vault performance.
+Used for settlement calculations and performance tracking.
 
 
 ```solidity
@@ -370,8 +370,8 @@ function netSharePrice() external view returns (uint256);
 
 Calculates current share price including all accrued yields
 
-*Returns gross share price before fee deductions, reflecting total vault performance.
-Used for settlement calculations and performance tracking.*
+Returns gross share price before fee deductions, reflecting total vault performance.
+Used for settlement calculations and performance tracking.
 
 
 ```solidity
@@ -403,8 +403,8 @@ function totalAssets() external view returns (uint256);
 
 Returns net assets after deducting accumulated fees
 
-*Provides user-facing asset value after management and performance fee deductions.
-Used for accurate user balance calculations and net yield reporting.*
+Provides user-facing asset value after management and performance fee deductions.
+Used for accurate user balance calculations and net yield reporting.
 
 
 ```solidity
@@ -612,5 +612,26 @@ function getTotalPendingStake() external view returns (uint256);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`uint256`|Total pending stake amount|
+
+
+### isClosed
+
+Returns the close state of a given batchId
+
+
+```solidity
+function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`batchId_`|`bytes32`|the batchId to verify|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`isClosed_`|`bool`|the state of the given batchId|
 
 

@@ -1,8 +1,8 @@
 # IVaultAdapter
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/interfaces/IVaultAdapter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/interfaces/IVaultAdapter.sol)
 
 **Inherits:**
-[IVersioned](/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 
 ## Functions
@@ -10,13 +10,13 @@
 
 Toggles the emergency pause state affecting all protocol operations in this contract
 
-*This function provides critical risk management capability by allowing emergency admins to halt
+This function provides critical risk management capability by allowing emergency admins to halt
 contract operations during security incidents or market anomalies. The pause mechanism: (1) Affects all
 state-changing operations in inheriting contracts that check _isPaused(), (2) Does not affect view/pure
 functions ensuring protocol state remains readable, (3) Enables rapid response to potential exploits by
 halting operations protocol-wide, (4) Requires emergency admin role ensuring only authorized governance
 can trigger pauses. Inheriting contracts should check _isPaused() modifier in critical functions to
-respect the pause state. The external visibility with role check prevents unauthorized pause manipulation.*
+respect the pause state. The external visibility with role check prevents unauthorized pause manipulation.
 
 
 ```solidity
@@ -33,14 +33,14 @@ function setPaused(bool paused_) external;
 
 Rescues accidentally sent assets (ETH or ERC20 tokens) preventing permanent loss of funds
 
-*This function implements a critical safety mechanism for recovering tokens or ETH that become stuck
+This function implements a critical safety mechanism for recovering tokens or ETH that become stuck
 in the contract through user error or airdrops. The rescue process: (1) Validates admin authorization to
 prevent unauthorized fund extraction, (2) Ensures recipient address is valid to prevent burning funds,
 (3) For ETH rescue (asset_=address(0)): validates balance sufficiency and uses low-level call for transfer,
 (4) For ERC20 rescue: critically checks the token is NOT a registered protocol asset (USDC, WBTC, etc.) to
 protect user deposits and protocol integrity, then validates balance and uses SafeTransferLib for secure
 transfer. The distinction between ETH and ERC20 handling accounts for their different transfer mechanisms.
-Protocol assets are explicitly blocked from rescue to prevent admin abuse and maintain user trust.*
+Protocol assets are explicitly blocked from rescue to prevent admin abuse and maintain user trust.
 
 
 ```solidity
@@ -59,11 +59,11 @@ function rescueAssets(address asset_, address to_, uint256 amount_) external pay
 
 Allows the relayer to execute arbitrary calls on behalf of the protocol
 
-*This function enables the relayer role to perform flexible interactions with external contracts
+This function enables the relayer role to perform flexible interactions with external contracts
 as part of protocol operations. Key aspects of this function include: (1) Authorization restricted to relayer
 role to prevent misuse, (2) Pause state check to ensure operations are halted during emergencies, (3) Validates
 target addresses are non-zero to prevent calls to the zero address, (4) Uses low-level calls to enable arbitrary
-function execution*
+function execution
 
 
 ```solidity
@@ -95,10 +95,10 @@ function execute(
 
 Sets the last recorded total assets for vault accounting and performance tracking
 
-*This function allows the admin to update the lastTotalAssets variable, which is
+This function allows the admin to update the lastTotalAssets variable, which is
 used for various accounting and performance metrics within the vault adapter. Key aspects
 of this function include: (1) Authorization restricted to admin role to prevent misuse,
-(2) Directly updates the lastTotalAssets variable in storage.*
+(2) Directly updates the lastTotalAssets variable in storage.
 
 
 ```solidity
@@ -115,9 +115,9 @@ function setTotalAssets(uint256 totalAssets_) external;
 
 Retrieves the last recorded total assets for vault accounting and performance tracking
 
-*This function returns the lastTotalAssets variable, which is used for various accounting
+This function returns the lastTotalAssets variable, which is used for various accounting
 and performance metrics within the vault adapter. This provides a snapshot of the total assets
-managed by the vault at the last recorded time.*
+managed by the vault at the last recorded time.
 
 
 ```solidity
@@ -128,6 +128,22 @@ function totalAssets() external view returns (uint256);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`uint256`|The last recorded total assets value.|
+
+
+### pull
+
+This function provides a way for the router to withdraw assets from the adapter
+
+
+```solidity
+function pull(address asset_, uint256 amount_) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`asset_`|`address`|The asset to pull (use address(0) for native ETH, otherwise ERC20 token address)|
+|`amount_`|`uint256`|The quantity to pull|
 
 
 ## Events
@@ -148,9 +164,9 @@ event ContractInitialized(address indexed registry);
 ### Paused
 Emitted when the emergency pause state is toggled for protocol-wide risk mitigation
 
-*This event signals a critical protocol state change that affects all inheriting contracts.
+This event signals a critical protocol state change that affects all inheriting contracts.
 When paused=true, protocol operations are halted to prevent potential exploits or manage emergencies.
-Only emergency admins can trigger this, providing rapid response capability during security incidents.*
+Only emergency admins can trigger this, providing rapid response capability during security incidents.
 
 
 ```solidity
@@ -166,9 +182,9 @@ event Paused(bool paused_);
 ### RescuedAssets
 Emitted when ERC20 tokens are rescued from the contract to prevent permanent loss
 
-*This rescue mechanism is restricted to non-protocol assets only - registered assets (USDC, WBTC, etc.)
+This rescue mechanism is restricted to non-protocol assets only - registered assets (USDC, WBTC, etc.)
 cannot be rescued to protect user funds and maintain protocol integrity. Typically used to recover
-accidentally sent tokens or airdrops. Only admin role can execute rescues as a security measure.*
+accidentally sent tokens or airdrops. Only admin role can execute rescues as a security measure.
 
 
 ```solidity
@@ -186,9 +202,9 @@ event RescuedAssets(address indexed asset_, address indexed to_, uint256 amount_
 ### RescuedETH
 Emitted when native ETH is rescued from the contract to recover stuck funds
 
-*ETH rescue is separate from ERC20 rescue due to different transfer mechanisms. This prevents
+ETH rescue is separate from ERC20 rescue due to different transfer mechanisms. This prevents
 ETH from being permanently locked if sent to the contract accidentally. Uses low-level call for
-ETH transfer with proper success checking. Only admin role authorized for security.*
+ETH transfer with proper success checking. Only admin role authorized for security.
 
 
 ```solidity
@@ -205,9 +221,9 @@ event RescuedETH(address indexed to_, uint256 amount_);
 ### Executed
 Emitted when the relayer executes an arbitrary call on behalf of the protocol
 
-*This event provides transparency into all external interactions initiated by the relayer.
+This event provides transparency into all external interactions initiated by the relayer.
 It logs the caller, target contract, function data, value sent, and the resulting returndata.
-This is critical for auditing and monitoring protocol actions executed via the relayer role.*
+This is critical for auditing and monitoring protocol actions executed via the relayer role.
 
 
 ```solidity
@@ -227,9 +243,9 @@ event Executed(address indexed caller, address indexed target, bytes data, uint2
 ### TransferExecuted
 Emmited when the relayer executes a transfer of assets on behalf of the protocol
 
-*This event provides transparency into all asset transfers initiated by the relayer.
+This event provides transparency into all asset transfers initiated by the relayer.
 It logs the caller, asset, recipient, and amount transferred. This is critical for auditing
-and monitoring protocol asset movements executed via the relayer role.*
+and monitoring protocol asset movements executed via the relayer role.
 
 
 ```solidity
@@ -243,4 +259,19 @@ event TransferExecuted(address indexed asset, address indexed to, uint256 amount
 |`asset`|`address`|The asset address that was transferred (address(0) for native ETH)|
 |`to`|`address`|The recipient address that received the assets|
 |`amount`|`uint256`|The quantity of assets transferred|
+
+### TotalAssetsUpdated
+Emitted when total assets are updated
+
+
+```solidity
+event TotalAssetsUpdated(uint256 oldTotalAssets, uint256 newTotalAssets);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`oldTotalAssets`|`uint256`|The previous total assets value|
+|`newTotalAssets`|`uint256`|The new total assets value|
 

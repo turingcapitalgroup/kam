@@ -1,37 +1,19 @@
 # ReaderModule
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/kStakingVault/modules/ReaderModule.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/kStakingVault/modules/ReaderModule.sol)
 
 **Inherits:**
-[BaseVault](/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Extsload](/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [IVaultReader](/src/interfaces/modules/IVaultReader.sol/interface.IVaultReader.md), [IModule](/src/interfaces/modules/IModule.sol/interface.IModule.md)
+[BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [IVaultReader](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IVaultReader.sol/interface.IVaultReader.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md)
 
 Contains all the public getters for the Staking Vault
 
 
 ## State Variables
-### MANAGEMENT_FEE_INTERVAL
-Interval for management fee (1 month)
-
-
-```solidity
-uint256 constant MANAGEMENT_FEE_INTERVAL = 657_436;
-```
-
-
-### PERFORMANCE_FEE_INTERVAL
-Interval for performance fee (3 months)
-
-
-```solidity
-uint256 constant PERFORMANCE_FEE_INTERVAL = 7_889_238;
-```
-
-
 ### MAX_BPS
 Maximum basis points
 
 
 ```solidity
-uint256 constant MAX_BPS = 10_000;
+uint256 constant MAX_BPS = 10_000
 ```
 
 
@@ -40,7 +22,7 @@ Number of seconds in a year
 
 
 ```solidity
-uint256 constant SECS_PER_YEAR = 31_556_952;
+uint256 constant SECS_PER_YEAR = 31_556_952
 ```
 
 
@@ -94,10 +76,10 @@ function underlyingAsset() external view returns (address);
 
 FEES
 
-*Computes real-time fee accruals based on time elapsed and vault performance since last fee charge.
+Computes real-time fee accruals based on time elapsed and vault performance since last fee charge.
 Management fees accrue continuously based on assets under management and time passed. Performance fees
 are calculated on share price appreciation above watermarks and hurdle rates. This function provides
-accurate fee projections for settlement planning and user transparency without modifying state.*
+accurate fee projections for settlement planning and user transparency without modifying state.
 
 
 ```solidity
@@ -239,9 +221,9 @@ function managementFee() external view returns (uint16);
 
 Returns the high watermark used for performance fee calculations
 
-*The watermark tracks the highest share price achieved, ensuring performance fees are only
+The watermark tracks the highest share price achieved, ensuring performance fees are only
 charged on new highs and preventing double-charging on recovered losses. Reset occurs when new
-high watermarks are achieved, establishing a new baseline for future performance fee calculations.*
+high watermarks are achieved, establishing a new baseline for future performance fee calculations.
 
 
 ```solidity
@@ -293,7 +275,7 @@ Returns comprehensive information about the current batch
 function getCurrentBatchInfo()
     external
     view
-    returns (bytes32 batchId, address batchReceiver, bool isClosed, bool isSettled);
+    returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
 ```
 **Returns**
 
@@ -301,7 +283,7 @@ function getCurrentBatchInfo()
 |----|----|-----------|
 |`batchId`|`bytes32`|Current batch identifier|
 |`batchReceiver`|`address`|Address of batch receiver contract (may be zero if not created)|
-|`isClosed`|`bool`|Whether the batch is closed to new requests|
+|`isClosed_`|`bool`|isClosed Whether the batch is closed to new requests|
 |`isSettled`|`bool`|Whether the batch has been settled|
 
 
@@ -311,26 +293,47 @@ Returns comprehensive information about a specific batch
 
 
 ```solidity
-function getBatchIdInfo(bytes32 batchId)
+function getBatchIdInfo(bytes32 _batchId)
     external
     view
-    returns (address batchReceiver, bool isClosed, bool isSettled, uint256 sharePrice, uint256 netSharePrice);
+    returns (address batchReceiver, bool isClosed_, bool isSettled, uint256 sharePrice_, uint256 netSharePrice_);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`batchId`|`bytes32`|The batch identifier to query|
+|`_batchId`|`bytes32`||
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`batchReceiver`|`address`|Address of batch receiver contract (may be zero if not deployed)|
-|`isClosed`|`bool`|Whether the batch is closed to new requests|
+|`isClosed_`|`bool`|isClosed Whether the batch is closed to new requests|
 |`isSettled`|`bool`|Whether the batch has been settled|
-|`sharePrice`|`uint256`|Share price of settlement|
-|`netSharePrice`|`uint256`|Net share price of settlement|
+|`sharePrice_`|`uint256`|sharePrice Share price of settlement|
+|`netSharePrice_`|`uint256`|netSharePrice Net share price of settlement|
+
+
+### isClosed
+
+Returns the close state of a given batchId
+
+
+```solidity
+function isClosed(bytes32 _batchId) external view returns (bool isClosed_);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_batchId`|`bytes32`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`isClosed_`|`bool`|the state of the given batchId|
 
 
 ### getBatchReceiver
@@ -339,13 +342,13 @@ Returns the batch receiver address for a specific batch ID
 
 
 ```solidity
-function getBatchReceiver(bytes32 batchId) external view returns (address);
+function getBatchReceiver(bytes32 _batchId) external view returns (address);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`batchId`|`bytes32`|The batch identifier to query|
+|`_batchId`|`bytes32`||
 
 **Returns**
 
@@ -360,13 +363,13 @@ Returns batch receiver address with validation, creating if necessary
 
 
 ```solidity
-function getSafeBatchReceiver(bytes32 batchId) external view returns (address);
+function getSafeBatchReceiver(bytes32 _batchId) external view returns (address);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`batchId`|`bytes32`|The batch identifier to query|
+|`_batchId`|`bytes32`||
 
 **Returns**
 
@@ -379,8 +382,8 @@ function getSafeBatchReceiver(bytes32 batchId) external view returns (address);
 
 Calculates current share price including all accrued yields
 
-*Returns gross share price before fee deductions, reflecting total vault performance.
-Used for settlement calculations and performance tracking.*
+Returns gross share price before fee deductions, reflecting total vault performance.
+Used for settlement calculations and performance tracking.
 
 
 ```solidity
@@ -397,8 +400,8 @@ function sharePrice() external view returns (uint256);
 
 Calculates current share price including all accrued yields
 
-*Returns net share price after fee deductions, reflecting total vault performance.
-Used for settlement calculations and performance tracking.*
+Returns net share price after fee deductions, reflecting total vault performance.
+Used for settlement calculations and performance tracking.
 
 
 ```solidity
@@ -430,8 +433,8 @@ function totalAssets() external view returns (uint256);
 
 Returns net assets after deducting accumulated fees
 
-*Provides user-facing asset value after management and performance fee deductions.
-Used for accurate user balance calculations and net yield reporting.*
+Provides user-facing asset value after management and performance fee deductions.
+Used for accurate user balance calculations and net yield reporting.
 
 
 ```solidity
@@ -480,13 +483,13 @@ Converts a given amount of shares to assets
 
 
 ```solidity
-function convertToShares(uint256 shares) external view returns (uint256);
+function convertToShares(uint256 _shares) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`shares`|`uint256`|The amount of shares to convert|
+|`_shares`|`uint256`||
 
 **Returns**
 
@@ -501,13 +504,13 @@ Converts a given amount of assets to shares
 
 
 ```solidity
-function convertToAssets(uint256 assets) external view returns (uint256);
+function convertToAssets(uint256 _assets) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`assets`|`uint256`|The amount of assets to convert|
+|`_assets`|`uint256`||
 
 **Returns**
 
@@ -522,14 +525,14 @@ Converts a given amount of assets to shares with a specified total assets
 
 
 ```solidity
-function convertToSharesWithTotals(uint256 shares, uint256 totalAssets_) external view returns (uint256);
+function convertToSharesWithTotals(uint256 _shares, uint256 _totalAssets) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`shares`|`uint256`||
-|`totalAssets_`|`uint256`||
+|`_shares`|`uint256`||
+|`_totalAssets`|`uint256`||
 
 **Returns**
 
@@ -544,14 +547,14 @@ Converts a given amount of shares to assets with a specified total assets
 
 
 ```solidity
-function convertToAssetsWithTotals(uint256 assets, uint256 totalAssets_) external view returns (uint256);
+function convertToAssetsWithTotals(uint256 _assets, uint256 _totalAssets) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`assets`|`uint256`||
-|`totalAssets_`|`uint256`||
+|`_assets`|`uint256`||
+|`_totalAssets`|`uint256`||
 
 **Returns**
 
@@ -579,17 +582,15 @@ function getTotalPendingStake() external view returns (uint256);
 
 REQUEST GETTERS
 
-Gets all request IDs associated with a user
-
 
 ```solidity
-function getUserRequests(address user) external view returns (bytes32[] memory requestIds);
+function getUserRequests(address _user) external view returns (bytes32[] memory requestIds);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`user`|`address`|The address to query requests for|
+|`_user`|`address`||
 
 **Returns**
 
@@ -604,13 +605,16 @@ Gets the details of a specific stake request
 
 
 ```solidity
-function getStakeRequest(bytes32 requestId) external view returns (BaseVaultTypes.StakeRequest memory stakeRequest);
+function getStakeRequest(bytes32 _requestId)
+    external
+    view
+    returns (BaseVaultTypes.StakeRequest memory stakeRequest);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`requestId`|`bytes32`|The unique identifier of the stake request|
+|`_requestId`|`bytes32`||
 
 **Returns**
 
@@ -625,7 +629,7 @@ Gets the details of a specific unstake request
 
 
 ```solidity
-function getUnstakeRequest(bytes32 requestId)
+function getUnstakeRequest(bytes32 _requestId)
     external
     view
     returns (BaseVaultTypes.UnstakeRequest memory unstakeRequest);
@@ -634,7 +638,7 @@ function getUnstakeRequest(bytes32 requestId)
 
 |Name|Type|Description|
 |----|----|-----------|
-|`requestId`|`bytes32`|The unique identifier of the unstake request|
+|`_requestId`|`bytes32`||
 
 **Returns**
 
@@ -647,9 +651,9 @@ function getUnstakeRequest(bytes32 requestId)
 
 Returns the human-readable name identifier for this contract type
 
-*Used for contract identification and logging purposes. The name should be consistent
+Used for contract identification and logging purposes. The name should be consistent
 across all versions of the same contract type. This enables external systems and other
-contracts to identify the contract's purpose and role within the protocol ecosystem.*
+contracts to identify the contract's purpose and role within the protocol ecosystem.
 
 
 ```solidity
@@ -666,10 +670,10 @@ function contractName() external pure returns (string memory);
 
 Returns the version identifier for this contract implementation
 
-*Used for upgrade management and compatibility checking within the protocol. The version
+Used for upgrade management and compatibility checking within the protocol. The version
 string should follow semantic versioning (e.g., "1.0.0") to clearly indicate major, minor,
 and patch updates. This enables the protocol governance and monitoring systems to track
-deployed versions and ensure compatibility between interacting components.*
+deployed versions and ensure compatibility between interacting components.
 
 
 ```solidity

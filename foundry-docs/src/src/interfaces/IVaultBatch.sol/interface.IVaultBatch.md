@@ -1,9 +1,9 @@
 # IVaultBatch
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/interfaces/IVaultBatch.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/interfaces/IVaultBatch.sol)
 
 Interface for batch lifecycle management enabling gas-efficient settlement of multiple user operations
 
-*This interface defines the batch processing system that aggregates individual staking/unstaking requests
+This interface defines the batch processing system that aggregates individual staking/unstaking requests
 for efficient settlement. The batch lifecycle consists of three distinct phases: (1) Open Phase: New requests
 can be added to the current batch, enabling users to join the settlement period, (2) Closed Phase: No new
 requests accepted, batch is prepared for settlement with final share price calculations, (3) Settled Phase:
@@ -11,7 +11,7 @@ Assets distributed and share prices fixed, users can claim their rewards/redempt
 several key benefits: gas cost optimization through bulk processing, fair pricing through synchronized settlement,
 coordination with kAssetRouter for cross-vault yield distribution, and minimal proxy deployment for isolated
 asset distribution. The batch system is critical for maintaining protocol scalability while ensuring equitable
-treatment of all participants within each settlement period.*
+treatment of all participants within each settlement period.
 
 
 ## Functions
@@ -19,14 +19,14 @@ treatment of all participants within each settlement period.*
 
 Creates a new batch to begin aggregating user requests for the next settlement period
 
-*This function initializes a fresh batch period for collecting staking and unstaking requests. Process:
+This function initializes a fresh batch period for collecting staking and unstaking requests. Process:
 (1) Increments internal batch counter for unique identification, (2) Generates deterministic batch ID using
 chain-specific parameters (vault address, batch number, chainid, timestamp, asset) for collision resistance,
 (3) Initializes batch storage with open state enabling new request acceptance, (4) Updates vault's current
 batch tracking for request routing. Only relayers can call this function as part of the automated settlement
 schedule. The timing is typically coordinated with institutional settlement cycles to optimize capital
 efficiency
-across the protocol. Each batch remains open until explicitly closed by relayers or governance.*
+across the protocol. Each batch remains open until explicitly closed by relayers or governance.
 
 
 ```solidity
@@ -43,13 +43,13 @@ function createNewBatch() external returns (bytes32 batchId);
 
 Closes a batch to prevent new requests and prepare for settlement processing
 
-*This function transitions a batch from open to closed state, finalizing the request set for settlement.
+This function transitions a batch from open to closed state, finalizing the request set for settlement.
 Process: (1) Validates batch exists and is currently open to prevent double-closing, (2) Marks batch as closed
 preventing new stake/unstake requests from joining, (3) Optionally creates new batch for continued operations
 if _create flag is true, enabling seamless transitions. Once closed, the batch awaits settlement by kAssetRouter
 which will calculate final share prices and distribute yields. Only relayers can execute batch closure as part
 of the coordinated settlement schedule across all protocol vaults. The timing typically aligns with DN vault
-yield calculations to ensure accurate price discovery.*
+yield calculations to ensure accurate price discovery.
 
 
 ```solidity
@@ -67,13 +67,13 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 Marks a batch as settled after yield distribution and enables user claiming
 
-*This function finalizes batch settlement by recording final asset values and enabling claims. Process:
+This function finalizes batch settlement by recording final asset values and enabling claims. Process:
 (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Snapshots both
 gross and net share prices at settlement time for accurate reward calculations, (3) Marks batch as settled
 enabling users to claim their staked shares or unstaked assets, (4) Completes the batch lifecycle allowing
 reward distribution through the claiming mechanism. Only kAssetRouter can settle batches as it coordinates
 yield calculations across DN vaults and manages cross-vault asset flows. Settlement triggers share price
-finalization based on vault performance during the batch period.*
+finalization based on vault performance during the batch period.
 
 
 ```solidity
@@ -84,22 +84,5 @@ function settleBatch(bytes32 _batchId) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`_batchId`|`bytes32`|The batch identifier to mark as settled (must be closed, not previously settled)|
-
-
-### burnFees
-
-Burns fees shares from the vault
-
-*This function burns fees from the vault*
-
-
-```solidity
-function burnFees(uint256 shares) external;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`shares`|`uint256`|The quantity of shares to burn|
 
 

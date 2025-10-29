@@ -1,5 +1,5 @@
 # Multicallable
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/vendor/solady/utils/Multicallable.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/vendor/solady/utils/Multicallable.sol)
 
 **Authors:**
 Solady (https://github.com/vectorized/solady/blob/main/src/utils/Multicallable.sol), Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/utils/Multicallable.sol)
@@ -20,12 +20,12 @@ Contract that enables a single call to call multiple methods on itself.
 ## Functions
 ### multicall
 
-*Apply `delegatecall` with the current contract to each calldata in `data`,
+Apply `delegatecall` with the current contract to each calldata in `data`,
 and store the `abi.encode` formatted results of each `delegatecall` into `results`.
 If any of the `delegatecall`s reverts, the entire context is reverted,
 and the error is bubbled up.
 By default, this function directly returns the results and terminates the call context.
-If you need to add before and after actions to the multicall, please override this function.*
+If you need to add before and after actions to the multicall, please override this function.
 
 
 ```solidity
@@ -34,9 +34,9 @@ function multicall(bytes[] calldata data) public payable virtual returns (bytes[
 
 ### _multicall
 
-*The inner logic of `multicall`.
+The inner logic of `multicall`.
 This function is included so that you can override `multicall`
-to add before and after actions, and use the `_multicallDirectReturn` function.*
+to add before and after actions, and use the `_multicallDirectReturn` function.
 
 
 ```solidity
@@ -45,8 +45,8 @@ function _multicall(bytes[] calldata data) internal virtual returns (bytes32 res
 
 ### _multicallResultsToBytesArray
 
-*Decodes the `results` into an array of bytes.
-This can be useful if you need to access the results or re-encode it.*
+Decodes the `results` into an array of bytes.
+This can be useful if you need to access the results or re-encode it.
 
 
 ```solidity
@@ -55,8 +55,8 @@ function _multicallResultsToBytesArray(bytes32 results) internal pure virtual re
 
 ### _multicallDirectReturn
 
-*Directly returns the `results` and terminates the current call context.
-`results` must be from `_multicall`, else behavior is undefined.*
+Directly returns the `results` and terminates the current call context.
+`results` must be from `_multicall`, else behavior is undefined.
 
 
 ```solidity

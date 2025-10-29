@@ -1,12 +1,12 @@
 # AdapterGuardianModule
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/kRegistry/modules/AdapterGuardianModule.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/kRegistry/modules/AdapterGuardianModule.sol)
 
 **Inherits:**
-[IAdapterGuardian](/src/interfaces/modules/IAdapterGuardian.sol/interface.IAdapterGuardian.md), [IModule](/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
+[IAdapterGuardian](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IAdapterGuardian.sol/interface.IAdapterGuardian.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
 
 Module for managing adapter permissions and parameter checking in kRegistry
 
-*Inherits from kBaseRoles for role-based access control*
+Inherits from kBaseRoles for role-based access control
 
 
 ## State Variables
@@ -14,7 +14,7 @@ Module for managing adapter permissions and parameter checking in kRegistry
 
 ```solidity
 bytes32 private constant ADAPTERGUARDIANMODULE_STORAGE_LOCATION =
-    0x82abb426e3b44c537e85e43273337421a20a3ea37d7e65190cbdd1a7dbb77100;
+    0x82abb426e3b44c537e85e43273337421a20a3ea37d7e65190cbdd1a7dbb77100
 ```
 
 
@@ -23,9 +23,9 @@ bytes32 private constant ADAPTERGUARDIANMODULE_STORAGE_LOCATION =
 
 Retrieves the AdapterGuardianModule storage struct from its designated storage slot
 
-*Uses ERC-7201 namespaced storage pattern to access the storage struct at a deterministic location.
+Uses ERC-7201 namespaced storage pattern to access the storage struct at a deterministic location.
 This approach prevents storage collisions in upgradeable contracts and allows safe addition of new
-storage variables in future upgrades without affecting existing storage layout.*
+storage variables in future upgrades without affecting existing storage layout.
 
 
 ```solidity
@@ -42,16 +42,16 @@ function _getAdapterGuardianModuleStorage() private pure returns (AdapterGuardia
 
 Set whether a selector is allowed for an adapter on a target contract
 
-*Only callable by ADMIN_ROLE*
+Only callable by ADMIN_ROLE
 
 
 ```solidity
 function setAdapterAllowedSelector(
-    address adapter,
-    address target,
-    uint8 targetType_,
-    bytes4 selector,
-    bool isAllowed
+    address _adapter,
+    address _target,
+    uint8 _targetType,
+    bytes4 _selector,
+    bool _isAllowed
 )
     external;
 ```
@@ -59,26 +59,26 @@ function setAdapterAllowedSelector(
 
 |Name|Type|Description|
 |----|----|-----------|
-|`adapter`|`address`|The adapter address|
-|`target`|`address`|The target contract address|
-|`targetType_`|`uint8`||
-|`selector`|`bytes4`|The function selector|
-|`isAllowed`|`bool`|Whether the selector is allowed|
+|`_adapter`|`address`||
+|`_target`|`address`||
+|`_targetType`|`uint8`||
+|`_selector`|`bytes4`||
+|`_isAllowed`|`bool`||
 
 
 ### setAdapterParametersChecker
 
 Set a parameter checker for an adapter selector
 
-*Only callable by ADMIN_ROLE*
+Only callable by ADMIN_ROLE
 
 
 ```solidity
 function setAdapterParametersChecker(
-    address adapter,
-    address target,
-    bytes4 selector,
-    address parametersChecker
+    address _adapter,
+    address _target,
+    bytes4 _selector,
+    address _parametersChecker
 )
     external;
 ```
@@ -86,10 +86,10 @@ function setAdapterParametersChecker(
 
 |Name|Type|Description|
 |----|----|-----------|
-|`adapter`|`address`|The adapter address|
-|`target`|`address`|The target contract address|
-|`selector`|`bytes4`|The function selector|
-|`parametersChecker`|`address`|The parameter checker contract address (0x0 to remove)|
+|`_adapter`|`address`||
+|`_target`|`address`||
+|`_selector`|`bytes4`||
+|`_parametersChecker`|`address`||
 
 
 ### authorizeAdapterCall
@@ -98,15 +98,15 @@ Check if an adapter is authorized to call a specific function on a target
 
 
 ```solidity
-function authorizeAdapterCall(address target, bytes4 selector, bytes calldata params) external view;
+function authorizeAdapterCall(address _target, bytes4 _selector, bytes calldata _params) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`target`|`address`|The target contract address|
-|`selector`|`bytes4`|The function selector|
-|`params`|`bytes`|The function parameters|
+|`_target`|`address`||
+|`_selector`|`bytes4`||
+|`_params`|`bytes`||
 
 
 ### isAdapterSelectorAllowed
@@ -115,15 +115,22 @@ Check if a selector is allowed for an adapter
 
 
 ```solidity
-function isAdapterSelectorAllowed(address adapter, address target, bytes4 selector) external view returns (bool);
+function isAdapterSelectorAllowed(
+    address _adapter,
+    address _target,
+    bytes4 _selector
+)
+    external
+    view
+    returns (bool);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`adapter`|`address`|The adapter address|
-|`target`|`address`|The target contract address|
-|`selector`|`bytes4`|The function selector|
+|`_adapter`|`address`||
+|`_target`|`address`||
+|`_selector`|`bytes4`||
 
 **Returns**
 
@@ -139,9 +146,9 @@ Get the parameter checker for an adapter selector
 
 ```solidity
 function getAdapterParametersChecker(
-    address adapter,
-    address target,
-    bytes4 selector
+    address _adapter,
+    address _target,
+    bytes4 _selector
 )
     external
     view
@@ -151,9 +158,9 @@ function getAdapterParametersChecker(
 
 |Name|Type|Description|
 |----|----|-----------|
-|`adapter`|`address`|The adapter address|
-|`target`|`address`|The target contract address|
-|`selector`|`bytes4`|The function selector|
+|`_adapter`|`address`||
+|`_target`|`address`||
+|`_selector`|`bytes4`||
 
 **Returns**
 
@@ -168,19 +175,19 @@ Gets all allowed targets for a specific adapter
 
 
 ```solidity
-function getAdapterTargets(address adapter) external view returns (address[] memory targets);
+function getAdapterTargets(address _adapter) external view returns (address[] memory _targets);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`adapter`|`address`|The adapter address to query targets for|
+|`_adapter`|`address`|The adapter address to query targets for|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`targets`|`address[]`|An array of allowed target addresses for the adapter|
+|`_targets`|`address[]`|An array of allowed target addresses for the adapter|
 
 
 ### getTargetType
@@ -189,13 +196,13 @@ Gets the type of an target
 
 
 ```solidity
-function getTargetType(address target) external view returns (uint8);
+function getTargetType(address _target) external view returns (uint8);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`target`|`address`|The target address to check the type of|
+|`_target`|`address`||
 
 **Returns**
 
@@ -210,20 +217,20 @@ Returns the selectors for functions in this module
 
 
 ```solidity
-function selectors() external pure returns (bytes4[] memory moduleSelectors);
+function selectors() external pure returns (bytes4[] memory);
 ```
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`moduleSelectors`|`bytes4[]`|Array of function selectors|
+|`<none>`|`bytes4[]`|moduleSelectors Array of function selectors|
 
 
 ## Structs
 ### AdapterGuardianModuleStorage
 Storage structure for AdapterGuardianModule using ERC-7201 namespaced storage pattern
 
-*This structure maintains adapter permissions and parameter checkers*
+This structure maintains adapter permissions and parameter checkers
 
 **Note:**
 storage-location: erc7201:kam.storage.AdapterGuardianModule
@@ -231,9 +238,15 @@ storage-location: erc7201:kam.storage.AdapterGuardianModule
 
 ```solidity
 struct AdapterGuardianModuleStorage {
+    /// @dev Maps adapter address to target contract to allowed selectors
+    /// Controls which functions an adapter can call on target contracts
     mapping(address => mapping(address => mapping(bytes4 => bool))) adapterAllowedSelectors;
+    /// @dev Maps adapter address to target contract to selector to parameter checker
+    /// Enables fine-grained parameter validation for adapter calls
     mapping(address => mapping(address => mapping(bytes4 => address))) adapterParametersChecker;
+    /// @dev Tracks all allowed targets for each adapter
     mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) adapterTargets;
+    /// @dev Maps the type of each target
     mapping(address => uint8 targetType) targetType;
 }
 ```

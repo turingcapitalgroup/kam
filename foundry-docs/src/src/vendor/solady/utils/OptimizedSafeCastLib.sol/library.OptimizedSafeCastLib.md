@@ -1,5 +1,5 @@
 # OptimizedSafeCastLib
-[Git Source](https://github.com/VerisLabs/KAM/blob/7810ef786f844ebd78831ee424b7ee896113d92b/src/vendor/solady/utils/OptimizedSafeCastLib.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/vendor/solady/utils/OptimizedSafeCastLib.sol)
 
 **Authors:**
 Originally by Solady (https://github.com/vectorized/solady/blob/main/src/utils/SafeCastLib.sol), Modified from OpenZeppelin
@@ -7,15 +7,15 @@ Originally by Solady (https://github.com/vectorized/solady/blob/main/src/utils/S
 
 Safe integer casting library that reverts on overflow.
 
-*NOTE: This is a reduced version of the original Solady library.
+NOTE: This is a reduced version of the original Solady library.
 We have extracted only the necessary safe casting functionality to optimize contract size.
-Original code by Solady, modified for size optimization.*
+Original code by Solady, modified for size optimization.
 
 
 ## Functions
 ### toUint64
 
-*Casts `x` to a uint64. Reverts on overflow.*
+Casts `x` to a uint64. Reverts on overflow.
 
 
 ```solidity
@@ -24,7 +24,7 @@ function toUint64(uint256 x) internal pure returns (uint64);
 
 ### toUint128
 
-*Casts `x` to a uint128. Reverts on overflow.*
+Casts `x` to a uint128. Reverts on overflow.
 
 
 ```solidity
@@ -33,7 +33,7 @@ function toUint128(uint256 x) internal pure returns (uint128);
 
 ### toUint256
 
-*Casts `x` to a uint256. Reverts on overflow.*
+Casts `x` to a uint256. Reverts on overflow.
 
 
 ```solidity
@@ -49,7 +49,7 @@ function _revertOverflow() private pure;
 
 ## Errors
 ### Overflow
-*Unable to cast to the target type due to overflow.*
+Unable to cast to the target type due to overflow.
 
 
 ```solidity
