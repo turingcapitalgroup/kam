@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
+import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedAddressEnumerableSetLib.sol";
+import { Initializable } from "solady/utils/Initializable.sol";
+import { OptimizedLibCall } from "solady/utils/OptimizedLibCall.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
+
 import {
     VAULTADAPTER_ARRAY_MISMATCH,
     VAULTADAPTER_IS_PAUSED,
@@ -11,16 +17,10 @@ import {
     VAULTADAPTER_ZERO_AMOUNT,
     VAULTADAPTER_ZERO_ARRAY
 } from "kam/src/errors/Errors.sol";
-import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
-import { Initializable } from "solady/utils/Initializable.sol";
-import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
-import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
+import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
-
-import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedAddressEnumerableSetLib.sol";
-import { OptimizedLibCall } from "solady/utils/OptimizedLibCall.sol";
 
 /// @title VaultAdapter
 contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
@@ -76,12 +76,12 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
     }
 
     /// @notice Initializes the VaultAdapter contract
-    /// @param registry_ Address of the registry contract
-    function initialize(address registry_) external initializer {
-        _checkZeroAddress(registry_);
+    /// @param _registry Address of the registry contract
+    function initialize(address _registry) external initializer {
+        _checkZeroAddress(_registry);
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        $.registry = IkRegistry(registry_);
-        emit ContractInitialized(registry_);
+        $.registry = IkRegistry(_registry);
+        emit ContractInitialized(_registry);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -89,33 +89,33 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IVaultAdapter
-    function setPaused(bool paused_) external {
+    function setPaused(bool _paused) external {
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
         require($.registry.isEmergencyAdmin(msg.sender), VAULTADAPTER_WRONG_ROLE);
-        $.paused = paused_;
-        emit Paused(paused_);
+        $.paused = _paused;
+        emit Paused(_paused);
     }
 
     /// @inheritdoc IVaultAdapter
-    function rescueAssets(address asset_, address to_, uint256 amount_) external payable {
+    function rescueAssets(address _asset, address _to, uint256 _amount) external payable {
         _checkAdmin(msg.sender);
-        _checkZeroAddress(to_);
+        _checkZeroAddress(_to);
 
-        if (asset_ == address(0)) {
+        if (_asset == address(0)) {
             // Rescue ETH
-            require(amount_ > 0 && amount_ <= address(this).balance, VAULTADAPTER_ZERO_AMOUNT);
+            require(_amount > 0 && _amount <= address(this).balance, VAULTADAPTER_ZERO_AMOUNT);
 
-            (bool success,) = to_.call{ value: amount_ }("");
-            require(success, VAULTADAPTER_TRANSFER_FAILED);
+            (bool _success,) = _to.call{ value: _amount }("");
+            require(_success, VAULTADAPTER_TRANSFER_FAILED);
 
-            emit RescuedETH(to_, amount_);
+            emit RescuedETH(_to, _amount);
         } else {
             // Rescue ERC20 tokens
-            _checkAsset(asset_);
-            require(amount_ > 0 && amount_ <= asset_.balanceOf(address(this)), VAULTADAPTER_ZERO_AMOUNT);
+            _checkAsset(_asset);
+            require(_amount > 0 && _amount <= _asset.balanceOf(address(this)), VAULTADAPTER_ZERO_AMOUNT);
 
-            asset_.safeTransfer(to_, amount_);
-            emit RescuedAssets(asset_, to_, amount_);
+            _asset.safeTransfer(_to, _amount);
+            emit RescuedAssets(_asset, _to, _amount);
         }
     }
 
@@ -125,47 +125,49 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
 
     /// @inheritdoc IVaultAdapter
     function execute(
-        address[] calldata targets,
-        bytes[] calldata data,
-        uint256[] calldata values
+        address[] calldata _targets,
+        bytes[] calldata _data,
+        uint256[] calldata _values
     )
         external
         payable
-        returns (bytes[] memory result)
+        returns (bytes[] memory _result)
     {
-        uint256 length = targets.length;
-        require(length != 0, VAULTADAPTER_ZERO_ARRAY);
-        require(length == data.length && length == values.length, VAULTADAPTER_ARRAY_MISMATCH);
+        uint256 _length = _targets.length;
+        require(_length != 0, VAULTADAPTER_ZERO_ARRAY);
+        require(_length == _data.length && _length == _values.length, VAULTADAPTER_ARRAY_MISMATCH);
 
         // Cache storage reads outside loop
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        IkRegistry registry = $.registry;
+        IkRegistry _registry = $.registry;
 
         // Single authorization and pause check
         _checkPaused($);
-        require(registry.isManager(msg.sender), VAULTADAPTER_WRONG_ROLE);
+        require(_registry.isManager(msg.sender), VAULTADAPTER_WRONG_ROLE);
 
         // Pre-allocate result array
-        result = new bytes[](length);
+        _result = new bytes[](_length);
 
         // Execute calls with optimized loop
-        for (uint256 i; i < length; ++i) {
+        for (uint256 _i; _i < _length; ++_i) {
             // Extract selector and validate vault-specific permission
-            bytes4 functionSig = bytes4(data[i]);
-            bytes memory params = data[i][4:];
-            registry.authorizeAdapterCall(targets[i], functionSig, params);
+            bytes4 _functionSig = bytes4(_data[_i]);
+            bytes memory _params = _data[_i][4:];
+            _registry.authorizeAdapterCall(_targets[_i], _functionSig, _params);
 
             // Execute and store result
-            result[i] = targets[i].callContract(values[i], data[i]);
-            emit Executed(msg.sender, targets[i], data[i], values[i], result[i]);
+            _result[_i] = _targets[_i].callContract(_values[_i], _data[_i]);
+            emit Executed(msg.sender, _targets[_i], _data[_i], _values[_i], _result[_i]);
         }
     }
 
     /// @inheritdoc IVaultAdapter
-    function setTotalAssets(uint256 totalAssets_) external {
+    function setTotalAssets(uint256 _totalAssets) external {
         _checkRouter(_getVaultAdapterStorage());
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        $.lastTotalAssets = totalAssets_;
+        uint256 _oldTotalAssets = $.lastTotalAssets;
+        $.lastTotalAssets = _totalAssets;
+        emit TotalAssetsUpdated(_oldTotalAssets, _totalAssets);
     }
 
     /// @inheritdoc IVaultAdapter
@@ -175,9 +177,9 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
     }
 
     /// @inheritdoc IVaultAdapter
-    function pull(address asset_, uint256 amount_) external {
+    function pull(address _asset, uint256 _amount) external {
         _checkRouter(_getVaultAdapterStorage());
-        asset_.safeTransfer(msg.sender, amount_);
+        _asset.safeTransfer(msg.sender, _amount);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -185,10 +187,10 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Check if caller has admin role
-    /// @param user Address to check
-    function _checkAdmin(address user) private view {
+    /// @param _user Address to check
+    function _checkAdmin(address _user) private view {
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        require($.registry.isAdmin(user), VAULTADAPTER_WRONG_ROLE);
+        require($.registry.isAdmin(_user), VAULTADAPTER_WRONG_ROLE);
     }
 
     /// @notice Ensures the contract is not paused
@@ -198,32 +200,32 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
 
     /// @notice Ensures the caller is the kAssetRouter
     function _checkRouter(VaultAdapterStorage storage $) internal view {
-        address router = $.registry.getContractById(K_ASSET_ROUTER);
-        require(msg.sender == router, VAULTADAPTER_WRONG_ROLE);
+        address _router = $.registry.getContractById(K_ASSET_ROUTER);
+        require(msg.sender == _router, VAULTADAPTER_WRONG_ROLE);
     }
 
     /// @notice Validates that a vault can call a specific selector on a target
     /// @dev This function enforces the new vault-specific permission model where each vault
     /// has granular permissions for specific functions on specific targets. This replaces
     /// the old global allowedTargets approach with better security isolation.
-    /// @param target The target contract to be called
-    /// @param selector The function selector being called
-    function _checkVaultCanCallSelector(address target, bytes4 selector) internal view {
+    /// @param _target The target contract to be called
+    /// @param _selector The function selector being called
+    function _checkVaultCanCallSelector(address _target, bytes4 _selector) internal view {
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        require($.registry.isAdapterSelectorAllowed(address(this), target, selector));
+        require($.registry.isAdapterSelectorAllowed(address(this), _target, _selector));
     }
 
     /// @notice Reverts if its a zero address
-    /// @param addr Address to check
-    function _checkZeroAddress(address addr) internal pure {
-        require(addr != address(0), VAULTADAPTER_ZERO_ADDRESS);
+    /// @param _addr Address to check
+    function _checkZeroAddress(address _addr) internal pure {
+        require(_addr != address(0), VAULTADAPTER_ZERO_ADDRESS);
     }
 
     /// @notice Reverts if the asset is not supported by the protocol
-    /// @param asset Asset address to check
-    function _checkAsset(address asset) private view {
+    /// @param _asset Asset address to check
+    function _checkAsset(address _asset) private view {
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        require($.registry.isAsset(asset), VAULTADAPTER_WRONG_ASSET);
+        require($.registry.isAsset(_asset), VAULTADAPTER_WRONG_ASSET);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -232,10 +234,10 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
 
     /// @notice Authorizes contract upgrades
     /// @dev Only callable by ADMIN_ROLE
-    /// @param newImplementation New implementation address
-    function _authorizeUpgrade(address newImplementation) internal view override {
+    /// @param _newImplementation New implementation address
+    function _authorizeUpgrade(address _newImplementation) internal view override {
         _checkAdmin(msg.sender);
-        require(newImplementation != address(0), VAULTADAPTER_ZERO_ADDRESS);
+        require(_newImplementation != address(0), VAULTADAPTER_ZERO_ADDRESS);
     }
 
     /* //////////////////////////////////////////////////////////////

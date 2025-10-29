@@ -1,5 +1,7 @@
 # KAM Protocol Architecture
 
+> 📘 **Note**: For detailed coding standards and conventions used throughout the codebase, see [Coding Standards](./coding-standards.md).
+
 ## Overview
 
 KAM is an institutional-grade tokenization protocol that creates kTokens (kUSDC, kWBTC, etc.) backed 1:1 by real-world assets (USDC, WBTC, etc.). The protocol bridges traditional finance and DeFi by serving two distinct user bases through separate but interconnected pathways.
@@ -270,7 +272,7 @@ The kMinter contract implements a "push-pull" model for institutional operations
 
 Burns use an asynchronous request-response pattern. Institutions call requestBurn() which transfers kTokens to the kMinter contract for escrow (not burning immediately). A unique request ID is generated and stored with request details, and the request is added to the current batch for settlement processing. During settlement, assets are retrieved from strategies, and institutions later call burn() which burns the escrowed kTokens and claims underlying assets from the batch receiver.
 
-The contract utilizes Solady's EnumerableSet for O(1) addition/removal of user requests, allowing efficient iteration over pending requests with automatic cleanup when processed or cancelled. Request states track the lifecycle from PENDING to REDEEMED or CANCELLED.
+The contract utilizes Solady's EnumerableSet for O(1) addition/removal of user requests, allowing efficient iteration over pending requests with automatic cleanup when processed. Request states track the lifecycle from PENDING to REDEEMED.
 
 ### Settlement and Routing Infrastructure
 

@@ -51,7 +51,7 @@ contract DeploymentTest is DeploymentBaseTest {
         assertEq(betaVault.decimals(), 6, "Beta Vault decimals incorrect");
     }
 
-    function test_RoleAssignments() public {
+    function test_RoleAssignments() public view {
         assertHasRole(address(registry), users.admin, ADMIN_ROLE);
         assertHasRole(address(kUSD), users.admin, ADMIN_ROLE);
         assertHasRole(address(kBTC), users.admin, ADMIN_ROLE);

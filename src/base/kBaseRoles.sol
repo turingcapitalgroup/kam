@@ -92,11 +92,11 @@ contract kBaseRoles is OptimizedOwnableRoles {
     //////////////////////////////////////////////////////////////*/
 
     function __kBaseRoles_init(
-        address owner_,
-        address admin_,
-        address emergencyAdmin_,
-        address guardian_,
-        address relayer_
+        address _owner,
+        address _admin,
+        address _emergencyAdmin,
+        address _guardian,
+        address _relayer
     )
         internal
     {
@@ -107,13 +107,13 @@ contract kBaseRoles is OptimizedOwnableRoles {
         $.paused = false;
         $.initialized = true;
 
-        _initializeOwner(owner_);
-        _grantRoles(admin_, ADMIN_ROLE);
-        _grantRoles(admin_, VENDOR_ROLE);
-        _grantRoles(emergencyAdmin_, EMERGENCY_ADMIN_ROLE);
-        _grantRoles(guardian_, GUARDIAN_ROLE);
-        _grantRoles(relayer_, RELAYER_ROLE);
-        _grantRoles(relayer_, MANAGER_ROLE);
+        _initializeOwner(_owner);
+        _grantRoles(_admin, ADMIN_ROLE);
+        _grantRoles(_admin, VENDOR_ROLE);
+        _grantRoles(_emergencyAdmin, EMERGENCY_ADMIN_ROLE);
+        _grantRoles(_guardian, GUARDIAN_ROLE);
+        _grantRoles(_relayer, RELAYER_ROLE);
+        _grantRoles(_relayer, MANAGER_ROLE);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -128,13 +128,13 @@ contract kBaseRoles is OptimizedOwnableRoles {
     /// halting operations protocol-wide, (4) Requires emergency admin role ensuring only authorized governance
     /// can trigger pauses. Inheriting contracts should check _isPaused() modifier in critical functions to
     /// respect the pause state. The external visibility with role check prevents unauthorized pause manipulation.
-    /// @param paused_ The desired pause state (true = halt operations, false = resume normal operation)
-    function setPaused(bool paused_) external {
+    /// @param _paused The desired pause state (true = halt operations, false = resume normal operation)
+    function setPaused(bool _paused) external {
         _checkEmergencyAdmin(msg.sender);
         kBaseRolesStorage storage $ = _getkBaseRolesStorage();
         require($.initialized, KROLESBASE_NOT_INITIALIZED);
-        $.paused = paused_;
-        emit Paused(paused_);
+        $.paused = _paused;
+        emit Paused(_paused);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -143,58 +143,58 @@ contract kBaseRoles is OptimizedOwnableRoles {
 
     /// @notice Internal helper to check if a user has a specific role
     /// @dev Wraps the OptimizedOwnableRoles hasAnyRole function for role verification
-    /// @param user The address to check for role membership
-    /// @param role_ The role constant to check (e.g., ADMIN_ROLE, VENDOR_ROLE)
+    /// @param _user The address to check for role membership
+    /// @param _role The role constant to check (e.g., ADMIN_ROLE, VENDOR_ROLE)
     /// @return True if the user has the specified role, false otherwise
-    function _hasRole(address user, uint256 role_) internal view returns (bool) {
-        return hasAnyRole(user, role_);
+    function _hasRole(address _user, uint256 _role) internal view returns (bool) {
+        return hasAnyRole(_user, _role);
     }
 
     /// @notice Check if caller has Admin role
-    /// @param user Address to check
-    function _checkAdmin(address user) internal view {
-        require(_hasRole(user, ADMIN_ROLE), KROLESBASE_WRONG_ROLE);
+    /// @param _user Address to check
+    function _checkAdmin(address _user) internal view {
+        require(_hasRole(_user, ADMIN_ROLE), KROLESBASE_WRONG_ROLE);
     }
 
     /// @notice Check if caller has Emergency Admin role
-    /// @param user Address to check
-    function _checkEmergencyAdmin(address user) internal view {
-        require(_hasRole(user, EMERGENCY_ADMIN_ROLE), KROLESBASE_WRONG_ROLE);
+    /// @param _user Address to check
+    function _checkEmergencyAdmin(address _user) internal view {
+        require(_hasRole(_user, EMERGENCY_ADMIN_ROLE), KROLESBASE_WRONG_ROLE);
     }
 
     /// @notice Check if caller has Guardian role
-    /// @param user Address to check
-    function _checkGuardian(address user) internal view {
-        require(_hasRole(user, GUARDIAN_ROLE), KROLESBASE_WRONG_ROLE);
+    /// @param _user Address to check
+    function _checkGuardian(address _user) internal view {
+        require(_hasRole(_user, GUARDIAN_ROLE), KROLESBASE_WRONG_ROLE);
     }
 
     /// @notice Check if caller has relayer role
-    /// @param user Address to check
-    function _checkRelayer(address user) internal view {
-        require(_hasRole(user, RELAYER_ROLE), KROLESBASE_WRONG_ROLE);
+    /// @param _user Address to check
+    function _checkRelayer(address _user) internal view {
+        require(_hasRole(_user, RELAYER_ROLE), KROLESBASE_WRONG_ROLE);
     }
 
     /// @notice Check if caller has Institution role
-    /// @param user Address to check
-    function _checkInstitution(address user) internal view {
-        require(_hasRole(user, INSTITUTION_ROLE), KROLESBASE_WRONG_ROLE);
+    /// @param _user Address to check
+    function _checkInstitution(address _user) internal view {
+        require(_hasRole(_user, INSTITUTION_ROLE), KROLESBASE_WRONG_ROLE);
     }
 
     /// @notice Check if caller has Vendor role
-    /// @param user Address to check
-    function _checkVendor(address user) internal view {
-        require(_hasRole(user, VENDOR_ROLE), KROLESBASE_WRONG_ROLE);
+    /// @param _user Address to check
+    function _checkVendor(address _user) internal view {
+        require(_hasRole(_user, VENDOR_ROLE), KROLESBASE_WRONG_ROLE);
     }
 
     /// @notice Check if caller has Manager role
-    /// @param user Address to check
-    function _checkManager(address user) internal view {
-        require(_hasRole(user, MANAGER_ROLE), KROLESBASE_WRONG_ROLE);
+    /// @param _user Address to check
+    function _checkManager(address _user) internal view {
+        require(_hasRole(_user, MANAGER_ROLE), KROLESBASE_WRONG_ROLE);
     }
 
     /// @notice Check if address is not zero
-    /// @param addr Address to check
-    function _checkAddressNotZero(address addr) internal pure {
-        require(addr != address(0), KROLESBASE_ZERO_ADDRESS);
+    /// @param _addr Address to check
+    function _checkAddressNotZero(address _addr) internal pure {
+        require(_addr != address(0), KROLESBASE_ZERO_ADDRESS);
     }
 }

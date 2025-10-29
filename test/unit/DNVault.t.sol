@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
 import { BaseVaultTest, DeploymentBaseTest } from "../utils/BaseVaultTest.sol";
@@ -5,6 +6,7 @@ import { _1_USDC } from "../utils/Constants.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
+import { IVault } from "kam/src/interfaces/IVault.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 
 import {
@@ -51,7 +53,7 @@ contract DNVaultTest is BaseVaultTest {
 
         vm.prank(users.alice);
         vm.expectEmit(true, false, true, true);
-        emit kStakingVault.StakingSharesClaimed(batchId, requestId, users.alice, 1000 * _1_USDC);
+        emit IVault.StakingSharesClaimed(batchId, requestId, users.alice, 1000 * _1_USDC);
         vault.claimStakedShares(requestId);
 
         uint256 balanceAfter = vault.balanceOf(users.alice);
@@ -171,7 +173,6 @@ contract DNVaultTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         uint256 lastTotalAssets = assetRouter.virtualBalance(address(vault), tokens.usdc);
-        uint256 totalAmount = 1000 * _1_USDC + 500 * _1_USDC + 750 * _1_USDC;
         _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
 
         vm.prank(users.alice);
@@ -212,7 +213,7 @@ contract DNVaultTest is BaseVaultTest {
 
         vm.prank(users.alice);
         vm.expectEmit(true, false, true, true);
-        emit kStakingVault.KTokenUnstaked(users.alice, stkBalance, stkBalance);
+        emit IVault.KTokenUnstaked(users.alice, stkBalance, stkBalance);
         vault.claimUnstakedAssets(unstakeRequestId);
 
         uint256 kTokenBalanceAfter = kUSD.balanceOf(users.alice);
@@ -223,8 +224,6 @@ contract DNVaultTest is BaseVaultTest {
 
     function test_ClaimUnstakedAssets_BatchNotSettled() public {
         _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
-
-        bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
         bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);

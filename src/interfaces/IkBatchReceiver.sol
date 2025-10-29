@@ -59,7 +59,7 @@ interface IkBatchReceiver {
     /// kMinter can manage asset distribution for this batch. Critical for maintaining access control
     /// and preventing unauthorized asset movements during the redemption settlement process.
     /// @return The address of the kMinter contract with administrative permissions over this receiver
-    function kMinter() external view returns (address);
+    function K_MINTER() external view returns (address);
 
     /// @notice Retrieves the underlying asset contract address managed by this receiver
     /// @dev Returns the asset address configured during initialization (e.g., USDC, WBTC). This

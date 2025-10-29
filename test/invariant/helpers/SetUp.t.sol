@@ -114,7 +114,7 @@ abstract contract SetUp is StdInvariant, DeploymentBaseTest {
         vm.label(address(minterHandler), "kMinterHandler");
     }
 
-    function _getMinterActors() internal returns (address[] memory) {
+    function _getMinterActors() internal view returns (address[] memory) {
         address[] memory _actors = new address[](4);
         _actors[0] = address(users.institution);
         _actors[1] = address(users.institution2);
@@ -123,7 +123,7 @@ abstract contract SetUp is StdInvariant, DeploymentBaseTest {
         return _actors;
     }
 
-    function _getVaultActors() internal returns (address[] memory) {
+    function _getVaultActors() internal view returns (address[] memory) {
         address[] memory _actors = new address[](3);
         _actors[0] = address(users.alice);
         _actors[1] = address(users.bob);

@@ -41,7 +41,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_Deployment() public view {
-        assertEq(batchReceiver.kMinter(), address(minter), "kMinter mismatch");
+        assertEq(batchReceiver.K_MINTER(), address(minter), "kMinter mismatch");
         assertEq(batchReceiver.asset(), tokens.usdc, "Asset mismatch");
         assertEq(batchReceiver.batchId(), TEST_BATCH_ID, "Batch ID mismatch");
     }
@@ -85,7 +85,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         assertEq(IERC20(tokens.usdc).balanceOf(testReceiver), TEST_AMOUNT, "Total pulled amount incorrect");
     }
 
-    function test_PullAssets_RevertNotKMinter() public {
+    function test_PullAssets_RevertNotK_MINTER() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
         batchReceiver.pullAssets(testReceiver, TEST_AMOUNT, TEST_BATCH_ID);
@@ -161,7 +161,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         assertTrue(newReceiver.isInitialised(), "Should be initialized");
         assertEq(newReceiver.batchId(), validBatchId, "Batch ID should match");
         assertEq(newReceiver.asset(), tokens.usdc, "Asset should match");
-        assertEq(newReceiver.kMinter(), address(minter), "kMinter should match");
+        assertEq(newReceiver.K_MINTER(), address(minter), "kMinter should match");
     }
 
     function test_Initialization_DoubleInitializationProtection() public {
@@ -229,6 +229,8 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         address[] memory receivers = new address[](5);
 
         for (uint256 i = 0; i < 5; i++) {
+            // casting to 'uint160' is safe because 0x2000 + i fits in uint160
+            // forge-lint: disable-next-line(unsafe-typecast)
             receivers[i] = address(uint160(0x2000 + i));
         }
 
@@ -341,6 +343,8 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         uint256 runningBalance = initialBalance;
 
         for (uint256 i = 0; i < pullAmounts.length; i++) {
+            // casting to 'uint160' is safe because 0x5000 + i fits in uint160
+            // forge-lint: disable-next-line(unsafe-typecast)
             address receiver = address(uint160(0x5000 + i));
 
             vm.prank(address(minter));
@@ -429,13 +433,13 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     }
 
     function test_AccessControl_StateConsistency() public {
-        assertEq(batchReceiver.kMinter(), address(minter), "kMinter should be set correctly");
+        assertEq(batchReceiver.K_MINTER(), address(minter), "kMinter should be set correctly");
 
         kBatchReceiver receiver1 = new kBatchReceiver(address(minter));
         kBatchReceiver receiver2 = new kBatchReceiver(users.admin);
 
-        assertEq(receiver1.kMinter(), address(minter), "Receiver1 kMinter incorrect");
-        assertEq(receiver2.kMinter(), users.admin, "Receiver2 kMinter incorrect");
+        assertEq(receiver1.K_MINTER(), address(minter), "Receiver1 kMinter incorrect");
+        assertEq(receiver2.K_MINTER(), users.admin, "Receiver2 kMinter incorrect");
 
         receiver1.initialize(bytes32(uint256(777)), tokens.usdc);
         receiver2.initialize(bytes32(uint256(888)), tokens.usdc);

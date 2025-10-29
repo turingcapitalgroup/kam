@@ -1,12 +1,49 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
-
 /// @title IkToken
 /// @notice Interface for kToken with role-based minting and burning capabilities
 /// @dev Defines the standard interface for kToken implementations with ERC20 compatibility
-interface IkToken is IVersioned {
+interface IkToken {
+    /* //////////////////////////////////////////////////////////////
+                                EVENTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Emitted when a new token is created
+    /// @param token The address of the new token
+    /// @param owner The owner of the new token
+    /// @param name The name of the new token
+    /// @param symbol The symbol of the new token
+    /// @param decimals The decimals of the new token
+    event TokenCreated(address indexed token, address owner, string name, string symbol, uint8 decimals);
+
+    /// @notice Emitted when the pause state is changed
+    /// @param isPaused The new pause state
+    event PauseState(bool isPaused);
+
+    /// @notice Emitted when an authorized caller is updated
+    /// @param caller The address of the caller
+    /// @param authorized Whether the caller is authorized
+    event AuthorizedCallerUpdated(address indexed caller, bool authorized);
+
+    /// @notice Emitted when an emergency withdrawal is requested
+    /// @param token The address of the token
+    /// @param to The address to which the tokens will be sent
+    /// @param amount The amount of tokens to withdraw
+    /// @param admin The address of the admin
+    event EmergencyWithdrawal(address indexed token, address indexed to, uint256 amount, address indexed admin);
+
+    /// @notice Emitted when assets are rescued
+    /// @param asset The address of the asset
+    /// @param to The address to which the assets will be sent
+    /// @param amount The amount of assets rescued
+    event RescuedAssets(address indexed asset, address indexed to, uint256 amount);
+
+    /// @notice Emitted when ETH is rescued
+    /// @param asset The address of the asset
+    /// @param amount The amount of ETH rescued
+    event RescuedETH(address indexed asset, uint256 amount);
+
     /* //////////////////////////////////////////////////////////////
                             CORE OPERATIONS
     //////////////////////////////////////////////////////////////*/
@@ -129,6 +166,4 @@ interface IkToken is IVersioned {
     /// @dev Only callable by addresses with ADMIN_ROLE
     /// @param minter The address to revoke minter role from
     function revokeMinterRole(address minter) external;
-
-    // contractName() and contractVersion() functions are inherited from IVersioned
 }

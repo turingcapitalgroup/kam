@@ -9,15 +9,16 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentrancyGuardTransient.sol";
 
+import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
+import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
+import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
+
 import {
     BASEVAULT_ALREADY_INITIALIZED,
     BASEVAULT_CONTRACT_NOT_FOUND,
     BASEVAULT_INVALID_REGISTRY,
     BASEVAULT_NOT_INITIALIZED
 } from "kam/src/errors/Errors.sol";
-import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
-import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
-import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 
 /// @title BaseVault
 /// @notice Foundation contract providing essential shared functionality for all kStakingVault implementations
@@ -41,55 +42,9 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Emitted when a stake request is created
-    /// @param requestId The unique identifier of the stake request
-    /// @param user The address of the user who created the request
-    /// @param kToken The address of the kToken associated with the request
-    /// @param amount The amount of kTokens requested
-    /// @param recipient The address to which the kTokens will be sent
-    /// @param batchId The batch ID associated with the request
-    event StakeRequestCreated(
-        bytes32 indexed requestId,
-        address indexed user,
-        address indexed kToken,
-        uint256 amount,
-        address recipient,
-        bytes32 batchId
-    );
-
-    /// @notice Emitted when a stake request is redeemed
-    /// @param requestId The unique identifier of the stake request
-    event StakeRequestRedeemed(bytes32 indexed requestId);
-
-    /// @notice Emitted when a stake request is cancelled
-    /// @param requestId The unique identifier of the stake request
-    event StakeRequestCancelled(bytes32 indexed requestId);
-
-    /// @notice Emitted when an unstake request is created
-    /// @param requestId The unique identifier of the unstake request
-    /// @param user The address of the user who created the request
-    /// @param amount The amount of kTokens requested
-    /// @param recipient The address to which the kTokens will be sent
-    /// @param batchId The batch ID associated with the request
-    event UnstakeRequestCreated(
-        bytes32 indexed requestId, address indexed user, uint256 amount, address recipient, bytes32 batchId
-    );
-
-    /// @notice Emitted when an unstake request is cancelled
-    /// @param requestId The unique identifier of the unstake request
-    event UnstakeRequestCancelled(bytes32 indexed requestId);
-
     /// @notice Emitted when the vault is paused
     /// @param paused The new paused state
     event Paused(bool paused);
-
-    /// @notice Emitted when the vault is initialized
-    /// @param registry The registry address
-    /// @param name The name of the vault
-    /// @param symbol The symbol of the vault
-    /// @param decimals The decimals of the vault
-    /// @param asset The asset of the vault
-    event Initialized(address registry, string name, string symbol, uint8 decimals, address asset);
 
     /* //////////////////////////////////////////////////////////////
                               CONSTANTS
@@ -171,11 +126,13 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     //////////////////////////////////////////////////////////////*/
 
     function _getDecimals(BaseVaultStorage storage $) internal view returns (uint8) {
+        // casting to 'uint8' is safe because DECIMALS_MASK ensures value fits in uint8
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint8(($.config >> DECIMALS_SHIFT) & DECIMALS_MASK);
     }
 
-    function _setDecimals(BaseVaultStorage storage $, uint8 value) internal {
-        $.config = ($.config & ~(DECIMALS_MASK << DECIMALS_SHIFT)) | (uint256(value) << DECIMALS_SHIFT);
+    function _setDecimals(BaseVaultStorage storage $, uint8 _value) internal {
+        $.config = ($.config & ~(DECIMALS_MASK << DECIMALS_SHIFT)) | (uint256(_value) << DECIMALS_SHIFT);
     }
 
     function _getHurdleRate(BaseVaultStorage storage $) internal view returns (uint16) {
@@ -183,64 +140,73 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     }
 
     function _getPerformanceFee(BaseVaultStorage storage $) internal view returns (uint16) {
+        // casting to 'uint16' is safe because PERFORMANCE_FEE_MASK ensures value fits in uint16
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint16(($.config >> PERFORMANCE_FEE_SHIFT) & PERFORMANCE_FEE_MASK);
     }
 
-    function _setPerformanceFee(BaseVaultStorage storage $, uint16 value) internal {
+    function _setPerformanceFee(BaseVaultStorage storage $, uint16 _value) internal {
         $.config =
-            ($.config & ~(PERFORMANCE_FEE_MASK << PERFORMANCE_FEE_SHIFT)) | (uint256(value) << PERFORMANCE_FEE_SHIFT);
+            ($.config & ~(PERFORMANCE_FEE_MASK << PERFORMANCE_FEE_SHIFT)) | (uint256(_value) << PERFORMANCE_FEE_SHIFT);
     }
 
     function _getManagementFee(BaseVaultStorage storage $) internal view returns (uint16) {
+        // casting to 'uint16' is safe because MANAGEMENT_FEE_MASK ensures value fits in uint16
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint16(($.config >> MANAGEMENT_FEE_SHIFT) & MANAGEMENT_FEE_MASK);
     }
 
-    function _setManagementFee(BaseVaultStorage storage $, uint16 value) internal {
+    function _setManagementFee(BaseVaultStorage storage $, uint16 _value) internal {
         $.config =
-            ($.config & ~(MANAGEMENT_FEE_MASK << MANAGEMENT_FEE_SHIFT)) | (uint256(value) << MANAGEMENT_FEE_SHIFT);
+            ($.config & ~(MANAGEMENT_FEE_MASK << MANAGEMENT_FEE_SHIFT)) | (uint256(_value) << MANAGEMENT_FEE_SHIFT);
     }
 
     function _getInitialized(BaseVaultStorage storage $) internal view returns (bool) {
         return (($.config >> INITIALIZED_SHIFT) & INITIALIZED_MASK) != 0;
     }
 
-    function _setInitialized(BaseVaultStorage storage $, bool value) internal {
-        $.config = ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT)) | (uint256(value ? 1 : 0) << INITIALIZED_SHIFT);
+    function _setInitialized(BaseVaultStorage storage $, bool _value) internal {
+        $.config =
+            ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT)) | (uint256(_value ? 1 : 0) << INITIALIZED_SHIFT);
     }
 
     function _getPaused(BaseVaultStorage storage $) internal view returns (bool) {
         return (($.config >> PAUSED_SHIFT) & PAUSED_MASK) != 0;
     }
 
-    function _setPaused(BaseVaultStorage storage $, bool value) internal {
-        $.config = ($.config & ~(PAUSED_MASK << PAUSED_SHIFT)) | (uint256(value ? 1 : 0) << PAUSED_SHIFT);
+    function _setPaused(BaseVaultStorage storage $, bool _value) internal {
+        $.config = ($.config & ~(PAUSED_MASK << PAUSED_SHIFT)) | (uint256(_value ? 1 : 0) << PAUSED_SHIFT);
     }
 
     function _getIsHardHurdleRate(BaseVaultStorage storage $) internal view returns (bool) {
         return (($.config >> IS_HARD_HURDLE_RATE_SHIFT) & IS_HARD_HURDLE_RATE_MASK) != 0;
     }
 
-    function _setIsHardHurdleRate(BaseVaultStorage storage $, bool value) internal {
+    function _setIsHardHurdleRate(BaseVaultStorage storage $, bool _value) internal {
         $.config = ($.config & ~(IS_HARD_HURDLE_RATE_MASK << IS_HARD_HURDLE_RATE_SHIFT))
-            | (uint256(value ? 1 : 0) << IS_HARD_HURDLE_RATE_SHIFT);
+            | (uint256(_value ? 1 : 0) << IS_HARD_HURDLE_RATE_SHIFT);
     }
 
     function _getLastFeesChargedManagement(BaseVaultStorage storage $) internal view returns (uint64) {
+        // casting to 'uint64' is safe because LAST_FEES_CHARGED_MANAGEMENT_MASK ensures value fits in uint64
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint64(($.config >> LAST_FEES_CHARGED_MANAGEMENT_SHIFT) & LAST_FEES_CHARGED_MANAGEMENT_MASK);
     }
 
-    function _setLastFeesChargedManagement(BaseVaultStorage storage $, uint64 value) internal {
+    function _setLastFeesChargedManagement(BaseVaultStorage storage $, uint64 _value) internal {
         $.config = ($.config & ~(LAST_FEES_CHARGED_MANAGEMENT_MASK << LAST_FEES_CHARGED_MANAGEMENT_SHIFT))
-            | (uint256(value) << LAST_FEES_CHARGED_MANAGEMENT_SHIFT);
+            | (uint256(_value) << LAST_FEES_CHARGED_MANAGEMENT_SHIFT);
     }
 
     function _getLastFeesChargedPerformance(BaseVaultStorage storage $) internal view returns (uint64) {
+        // casting to 'uint64' is safe because LAST_FEES_CHARGED_PERFORMANCE_MASK ensures value fits in uint64
+        // forge-lint: disable-next-line(unsafe-typecast)
         return uint64(($.config >> LAST_FEES_CHARGED_PERFORMANCE_SHIFT) & LAST_FEES_CHARGED_PERFORMANCE_MASK);
     }
 
-    function _setLastFeesChargedPerformance(BaseVaultStorage storage $, uint64 value) internal {
+    function _setLastFeesChargedPerformance(BaseVaultStorage storage $, uint64 _value) internal {
         $.config = ($.config & ~(LAST_FEES_CHARGED_PERFORMANCE_MASK << LAST_FEES_CHARGED_PERFORMANCE_SHIFT))
-            | (uint256(value) << LAST_FEES_CHARGED_PERFORMANCE_SHIFT);
+            | (uint256(_value) << LAST_FEES_CHARGED_PERFORMANCE_SHIFT);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -255,16 +221,16 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// to current block time for accurate fee accrual calculations, (5) Marks initialization complete to prevent
     /// future calls. The registry serves as the single source of truth for protocol configuration, role management,
     /// and contract discovery. Fee timestamps are initialized to prevent immediate fee charges on new vaults.
-    /// @param registry_ The kRegistry contract address providing protocol configuration and role management
-    /// @param paused_ Initial operational state (true = paused, false = active)
-    function __BaseVault_init(address registry_, bool paused_) internal {
+    /// @param _registryAddress The kRegistry contract address providing protocol configuration and role management
+    /// @param _paused Initial operational state (true = paused, false = active)
+    function __BaseVault_init(address _registryAddress, bool _paused) internal {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
 
         require(!_getInitialized($), BASEVAULT_ALREADY_INITIALIZED);
-        require(registry_ != address(0), BASEVAULT_INVALID_REGISTRY);
+        require(_registryAddress != address(0), BASEVAULT_INVALID_REGISTRY);
 
-        $.registry = registry_;
-        _setPaused($, paused_);
+        $.registry = _registryAddress;
+        _setPaused($, _paused);
         _setInitialized($, true);
         _setLastFeesChargedManagement($, uint64(block.timestamp));
         _setLastFeesChargedPerformance($, uint64(block.timestamp));
@@ -288,19 +254,19 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Gets the kMinter singleton contract address
-    /// @return minter The kMinter contract address
+    /// @return _minter The kMinter contract address
     /// @dev Reverts if kMinter not set in registry
-    function _getKMinter() internal view returns (address minter) {
-        minter = _registry().getContractById(K_MINTER);
-        require(minter != address(0), BASEVAULT_CONTRACT_NOT_FOUND);
+    function _getKMinter() internal view returns (address _minter) {
+        _minter = _registry().getContractById(K_MINTER);
+        require(_minter != address(0), BASEVAULT_CONTRACT_NOT_FOUND);
     }
 
     /// @notice Gets the kAssetRouter singleton contract address
-    /// @return router The kAssetRouter contract address
+    /// @return _router The kAssetRouter contract address
     /// @dev Reverts if kAssetRouter not set in registry
-    function _getKAssetRouter() internal view returns (address router) {
-        router = _registry().getContractById(K_ASSET_ROUTER);
-        require(router != address(0), BASEVAULT_CONTRACT_NOT_FOUND);
+    function _getKAssetRouter() internal view returns (address _router) {
+        _router = _registry().getContractById(K_ASSET_ROUTER);
+        require(_router != address(0), BASEVAULT_CONTRACT_NOT_FOUND);
     }
 
     /// @notice Returns the vault shares token name
@@ -332,12 +298,12 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// state-changing operations should be blocked while view functions remain accessible for monitoring. The pause
     /// state is stored in packed config for gas efficiency. This function provides the foundation for emergency
     /// controls while maintaining transparency through event emission.
-    /// @param paused_ The desired pause state (true = halt operations, false = resume normal operation)
-    function _setPaused(bool paused_) internal {
+    /// @param _paused The desired pause state (true = halt operations, false = resume normal operation)
+    function _setPaused(bool _paused) internal {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require(_getInitialized($), BASEVAULT_NOT_INITIALIZED);
-        _setPaused($, paused_);
-        emit Paused(paused_);
+        _setPaused($, _paused);
+        emit Paused(_paused);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -350,13 +316,20 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// (3) Applies current total net assets (after fees) to ensure accurate user valuations. The calculation
     /// maintains precision through fullMulDiv to prevent rounding errors that could accumulate over time. This
     /// function is critical for determining redemption values, share price calculations, and user balance queries.
-    /// @param shares The quantity of stkTokens to convert to underlying asset terms
-    /// @param totalAssets The total asset value managed by the vault including yields but excluding pending operations
-    /// @return assets The equivalent value in underlying assets based on current vault performance
-    function _convertToAssetsWithTotals(uint256 shares, uint256 totalAssets) internal view returns (uint256 assets) {
-        uint256 totalSupply_ = totalSupply();
-        if (totalSupply_ == 0) return shares;
-        return shares.fullMulDiv(totalAssets, totalSupply_);
+    /// @param _shares The quantity of stkTokens to convert to underlying asset terms
+    /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
+    /// @return _assets The equivalent value in underlying assets based on current vault performance
+    function _convertToAssetsWithTotals(
+        uint256 _shares,
+        uint256 _totalAssetsValue
+    )
+        internal
+        view
+        returns (uint256 _assets)
+    {
+        uint256 _totalSupply = totalSupply();
+        if (_totalSupply == 0) return _shares;
+        return _shares.fullMulDiv(_totalAssetsValue, _totalSupply);
     }
 
     /// @notice Converts underlying asset amount to equivalent stkToken shares at current vault valuation
@@ -366,13 +339,20 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// (3) Uses total net assets to ensure new shares are priced fairly relative to existing holders. The precise
     /// fixed-point mathematics prevent dilution attacks and ensure fair pricing for all participants. This function
     /// is essential for determining share issuance during staking operations and maintaining equitable vault ownership.
-    /// @param assets The underlying asset amount to convert to share terms
-    /// @param totalAssets The total asset value managed by the vault including yields but excluding pending operations
-    /// @return shares The equivalent stkToken amount based on current share price
-    function _convertToSharesWithTotals(uint256 assets, uint256 totalAssets) internal view returns (uint256 shares) {
-        uint256 totalSupply_ = totalSupply();
-        if (totalSupply_ == 0) return assets;
-        return assets.fullMulDiv(totalSupply_, totalAssets);
+    /// @param _assets The underlying asset amount to convert to share terms
+    /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
+    /// @return _shares The equivalent stkToken amount based on current share price
+    function _convertToSharesWithTotals(
+        uint256 _assets,
+        uint256 _totalAssetsValue
+    )
+        internal
+        view
+        returns (uint256 _shares)
+    {
+        uint256 _totalSupply = totalSupply();
+        if (_totalSupply == 0) return _assets;
+        return _assets.fullMulDiv(_totalSupply, _totalAssetsValue);
     }
 
     /// @notice Calculates net share price per stkToken after deducting accumulated fees
@@ -448,39 +428,39 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// @notice Validates admin role permissions for vault configuration and emergency functions
     /// @dev Queries the protocol registry to verify admin status for access control. Admins can execute
     /// critical vault management functions including fee parameter changes and emergency interventions.
-    /// @param user The address to validate for admin privileges
+    /// @param _user The address to validate for admin privileges
     /// @return True if the address is registered as an admin in the protocol registry
-    function _isAdmin(address user) internal view returns (bool) {
-        return _registry().isAdmin(user);
+    function _isAdmin(address _user) internal view returns (bool) {
+        return _registry().isAdmin(_user);
     }
 
     /// @notice Validates emergency admin role for critical pause/unpause operations
     /// @dev Emergency admins have elevated privileges to halt vault operations during security incidents
     /// or market anomalies. This role provides rapid response capability for risk management.
-    /// @param user The address to validate for emergency admin privileges
+    /// @param _user The address to validate for emergency admin privileges
     /// @return True if the address is registered as an emergency admin in the protocol registry
-    function _isEmergencyAdmin(address user) internal view returns (bool) {
-        return _registry().isEmergencyAdmin(user);
+    function _isEmergencyAdmin(address _user) internal view returns (bool) {
+        return _registry().isEmergencyAdmin(_user);
     }
 
     /// @notice Validates relayer role for automated batch processing operations
     /// @dev Relayers execute scheduled operations including batch creation, closure, and settlement
     /// coordination. This role enables automation while maintaining security through limited permissions.
-    /// @param user The address to validate for relayer privileges
+    /// @param _user The address to validate for relayer privileges
     /// @return True if the address is registered as a relayer in the protocol registry
-    function _isRelayer(address user) internal view returns (bool) {
-        return _registry().isRelayer(user);
+    function _isRelayer(address _user) internal view returns (bool) {
+        return _registry().isRelayer(_user);
     }
 
     /// @notice Validates kAssetRouter contract identity for settlement coordination
     /// @dev Only the protocol's kAssetRouter singleton can trigger vault settlements and coordinate
     /// cross-vault asset flows. This validation ensures settlement integrity and prevents unauthorized access.
-    /// @param kAssetRouter_ The address to validate against the registered kAssetRouter
+    /// @param _kAssetRouter The address to validate against the registered kAssetRouter
     /// @return True if the address matches the registered kAssetRouter contract
-    function _isKAssetRouter(address kAssetRouter_) internal view returns (bool) {
-        bool isTrue;
-        address _kAssetRouter = _registry().getContractById(K_ASSET_ROUTER);
-        if (_kAssetRouter == kAssetRouter_) isTrue = true;
-        return isTrue;
+    function _isKAssetRouter(address _kAssetRouter) internal view returns (bool) {
+        bool _isTrue;
+        address _kAssetRouterAddr = _registry().getContractById(K_ASSET_ROUTER);
+        if (_kAssetRouterAddr == _kAssetRouter) _isTrue = true;
+        return _isTrue;
     }
 }

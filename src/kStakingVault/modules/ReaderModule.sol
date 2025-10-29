@@ -2,8 +2,6 @@
 pragma solidity 0.8.30;
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
-
-import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { OptimizedDateTimeLib } from "solady/utils/OptimizedDateTimeLib.sol";
 import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { Extsload } from "uniswap/Extsload.sol";
@@ -56,51 +54,55 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
         returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        uint256 lastSharePrice = $.sharePriceWatermark;
+        uint256 _lastSharePrice = $.sharePriceWatermark;
 
-        uint256 lastFeesChargedManagement_ = _getLastFeesChargedManagement($);
-        uint256 lastFeesChargedPerformance_ = _getLastFeesChargedPerformance($);
+        uint256 _lastFeesChargedManagement = _getLastFeesChargedManagement($);
+        uint256 _lastFeesChargedPerformance = _getLastFeesChargedPerformance($);
 
-        uint256 durationManagement = block.timestamp - lastFeesChargedManagement_;
-        uint256 durationPerformance = block.timestamp - lastFeesChargedPerformance_;
-        uint256 currentTotalAssets = _totalAssets();
-        uint256 lastTotalAssets = totalSupply().fullMulDiv(lastSharePrice, 10 ** _getDecimals($));
+        uint256 _durationManagement = block.timestamp - _lastFeesChargedManagement;
+        uint256 _durationPerformance = block.timestamp - _lastFeesChargedPerformance;
+        uint256 _currentTotalAssets = _totalAssets();
+        uint256 _lastTotalAssets = totalSupply().fullMulDiv(_lastSharePrice, 10 ** _getDecimals($));
 
         // Calculate time-based fees (management)
         // These are charged on total assets, prorated for the time period
         managementFees =
-            (currentTotalAssets * durationManagement).fullMulDiv(_getManagementFee($), SECS_PER_YEAR) / MAX_BPS;
-        currentTotalAssets -= managementFees;
+            (_currentTotalAssets * _durationManagement).fullMulDiv(_getManagementFee($), SECS_PER_YEAR) / MAX_BPS;
+        _currentTotalAssets -= managementFees;
         totalFees = managementFees;
 
         // Calculate the asset's value change since entry
         // This gives us the raw profit/loss in asset terms after management fees
-        int256 assetsDelta = int256(currentTotalAssets) - int256(lastTotalAssets);
+        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int256 _assetsDelta = int256(_currentTotalAssets) - int256(_lastTotalAssets);
 
         // Only calculate fees if there's a profit
-        if (assetsDelta > 0) {
-            uint256 excessReturn;
+        if (_assetsDelta > 0) {
+            uint256 _excessReturn;
 
             // Calculate returns relative to hurdle rate
-            uint256 hurdleReturn =
-                (lastTotalAssets * _getHurdleRate($)).fullMulDiv(durationPerformance, SECS_PER_YEAR) / MAX_BPS;
+            uint256 _hurdleReturn =
+                (_lastTotalAssets * _getHurdleRate($)).fullMulDiv(_durationPerformance, SECS_PER_YEAR) / MAX_BPS;
 
             // Calculate returns relative to hurdle rate
-            uint256 totalReturn = uint256(assetsDelta);
+            // casting to 'uint256' is safe because _assetsDelta is positive in this branch
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint256 _totalReturn = uint256(_assetsDelta);
 
             // Only charge performance fees if:
             // 1. Current share price is not below
             // 2. Returns exceed hurdle rate
-            if (totalReturn > hurdleReturn) {
+            if (_totalReturn > _hurdleReturn) {
                 // Only charge performance fees on returns above hurdle rate
-                excessReturn = totalReturn - hurdleReturn;
+                _excessReturn = _totalReturn - _hurdleReturn;
 
                 // If its a hard hurdle rate, only charge fees above the hurdle performance
                 // Otherwise, charge fees to all return if its above hurdle return
                 if (_getIsHardHurdleRate($)) {
-                    performanceFees = (excessReturn * _getPerformanceFee($)) / MAX_BPS;
+                    performanceFees = (_excessReturn * _getPerformanceFee($)) / MAX_BPS;
                 } else {
-                    performanceFees = (totalReturn * _getPerformanceFee($)) / MAX_BPS;
+                    performanceFees = (_totalReturn * _getPerformanceFee($)) / MAX_BPS;
                 }
             }
 
@@ -143,59 +145,59 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
 
     /// @inheritdoc IVaultReader
     function nextPerformanceFeeTimestamp() external view returns (uint256) {
-        uint256 lastCharged = _getLastFeesChargedPerformance(_getBaseVaultStorage());
+        uint256 _lastCharged = _getLastFeesChargedPerformance(_getBaseVaultStorage());
 
         // Get the date components from the last charged timestamp
-        (uint256 year, uint256 month, uint256 day) = OptimizedDateTimeLib.timestampToDate(lastCharged);
+        (uint256 _year, uint256 _month, uint256 _day) = OptimizedDateTimeLib.timestampToDate(_lastCharged);
 
         // Get the last day of the month
-        uint256 lastDay = OptimizedDateTimeLib.daysInMonth(year, month);
+        uint256 _lastDay = OptimizedDateTimeLib.daysInMonth(_year, _month);
 
         // Add 3 months
-        uint256 targetMonth = day != lastDay ? month + 2 : month + 3;
-        uint256 targetYear = year;
+        uint256 _targetMonth = _day != _lastDay ? _month + 2 : _month + 3;
+        uint256 _targetYear = _year;
 
         // Handle year overflow
-        if (targetMonth > 12) {
-            targetYear += (targetMonth - 1) / 12;
-            targetMonth = ((targetMonth - 1) % 12) + 1;
+        if (_targetMonth > 12) {
+            _targetYear += (_targetMonth - 1) / 12;
+            _targetMonth = ((_targetMonth - 1) % 12) + 1;
         }
 
         // Get the last day of the target month
-        lastDay = OptimizedDateTimeLib.daysInMonth(targetYear, targetMonth);
+        _lastDay = OptimizedDateTimeLib.daysInMonth(_targetYear, _targetMonth);
 
         // Return timestamp for end of day (23:59:59) on the last day of the month
-        return OptimizedDateTimeLib.dateTimeToTimestamp(targetYear, targetMonth, lastDay, 23, 59, 59);
+        return OptimizedDateTimeLib.dateTimeToTimestamp(_targetYear, _targetMonth, _lastDay, 23, 59, 59);
     }
 
     /// @inheritdoc IVaultReader
     function nextManagementFeeTimestamp() external view returns (uint256) {
-        uint256 lastCharged = _getLastFeesChargedManagement(_getBaseVaultStorage());
+        uint256 _lastCharged = _getLastFeesChargedManagement(_getBaseVaultStorage());
 
         // Get the date components from the last charged timestamp
-        (uint256 year, uint256 month, uint256 day) = OptimizedDateTimeLib.timestampToDate(lastCharged);
+        (uint256 _year, uint256 _month, uint256 _day) = OptimizedDateTimeLib.timestampToDate(_lastCharged);
 
         // Get the last day of the month
-        uint256 lastDay = OptimizedDateTimeLib.daysInMonth(year, month);
+        uint256 _lastDay = OptimizedDateTimeLib.daysInMonth(_year, _month);
 
         // If its the same month return the last day of the current month
-        if (day != lastDay) return OptimizedDateTimeLib.dateTimeToTimestamp(year, month, lastDay, 23, 59, 59);
+        if (_day != _lastDay) return OptimizedDateTimeLib.dateTimeToTimestamp(_year, _month, _lastDay, 23, 59, 59);
 
         // Add 1 month
-        uint256 targetMonth = month + 1;
-        uint256 targetYear = year;
+        uint256 _targetMonth = _month + 1;
+        uint256 _targetYear = _year;
 
         // Handle year overflow
-        if (targetMonth > 12) {
-            targetYear += 1;
-            targetMonth = 1;
+        if (_targetMonth > 12) {
+            _targetYear += 1;
+            _targetMonth = 1;
         }
 
         // Get the last day of the target month
-        lastDay = OptimizedDateTimeLib.daysInMonth(targetYear, targetMonth);
+        _lastDay = OptimizedDateTimeLib.daysInMonth(_targetYear, _targetMonth);
 
         // Return timestamp for end of day (23:59:59) on the last day of the month
-        return OptimizedDateTimeLib.dateTimeToTimestamp(targetYear, targetMonth, lastDay, 23, 59, 59);
+        return OptimizedDateTimeLib.dateTimeToTimestamp(_targetYear, _targetMonth, _lastDay, 23, 59, 59);
     }
 
     /// @inheritdoc IVaultReader
@@ -223,7 +225,7 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
     function getCurrentBatchInfo()
         external
         view
-        returns (bytes32 batchId, address batchReceiver, bool isClosed, bool isSettled)
+        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled)
     {
         return (
             _getBaseVaultStorage().currentBatchId,
@@ -234,36 +236,36 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
     }
 
     /// @inheritdoc IVaultReader
-    function getBatchIdInfo(bytes32 batchId)
+    function getBatchIdInfo(bytes32 _batchId)
         external
         view
         returns (address batchReceiver, bool isClosed_, bool isSettled, uint256 sharePrice_, uint256 netSharePrice_)
     {
         return (
-            _getBaseVaultStorage().batches[batchId].batchReceiver,
-            _getBaseVaultStorage().batches[batchId].isClosed,
-            _getBaseVaultStorage().batches[batchId].isSettled,
-            _getBaseVaultStorage().batches[batchId].sharePrice,
-            _getBaseVaultStorage().batches[batchId].netSharePrice
+            _getBaseVaultStorage().batches[_batchId].batchReceiver,
+            _getBaseVaultStorage().batches[_batchId].isClosed,
+            _getBaseVaultStorage().batches[_batchId].isSettled,
+            _getBaseVaultStorage().batches[_batchId].sharePrice,
+            _getBaseVaultStorage().batches[_batchId].netSharePrice
         );
     }
 
     /// @inheritdoc IVaultReader
-    function isClosed(bytes32 batchId_) external view returns (bool isClosed_) {
+    function isClosed(bytes32 _batchId) external view returns (bool isClosed_) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        isClosed_ = $.batches[batchId_].isClosed;
+        isClosed_ = $.batches[_batchId].isClosed;
     }
 
     /// @inheritdoc IVaultReader
-    function getBatchReceiver(bytes32 batchId) external view returns (address) {
-        return _getBaseVaultStorage().batches[batchId].batchReceiver;
+    function getBatchReceiver(bytes32 _batchId) external view returns (address) {
+        return _getBaseVaultStorage().batches[_batchId].batchReceiver;
     }
 
     /// @inheritdoc IVaultReader
-    function getSafeBatchReceiver(bytes32 batchId) external view returns (address) {
+    function getSafeBatchReceiver(bytes32 _batchId) external view returns (address) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        require(!$.batches[batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
-        return $.batches[batchId].batchReceiver;
+        require(!$.batches[_batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        return $.batches[_batchId].batchReceiver;
     }
 
     /// @inheritdoc IVaultReader
@@ -294,30 +296,30 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
     /// @inheritdoc IVaultReader
     function getSafeBatchId() external view returns (bytes32) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        bytes32 batchId = getBatchId();
-        require(!$.batches[batchId].isClosed, KSTAKINGVAULT_VAULT_CLOSED);
-        require(!$.batches[batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
-        return batchId;
+        bytes32 _batchId = getBatchId();
+        require(!$.batches[_batchId].isClosed, KSTAKINGVAULT_VAULT_CLOSED);
+        require(!$.batches[_batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        return _batchId;
     }
 
     /// @inheritdoc IVaultReader
-    function convertToShares(uint256 shares) external view returns (uint256) {
-        return _convertToSharesWithTotals(shares, _totalNetAssets());
+    function convertToShares(uint256 _shares) external view returns (uint256) {
+        return _convertToSharesWithTotals(_shares, _totalNetAssets());
     }
 
     /// @inheritdoc IVaultReader
-    function convertToAssets(uint256 assets) external view returns (uint256) {
-        return _convertToAssetsWithTotals(assets, _totalNetAssets());
+    function convertToAssets(uint256 _assets) external view returns (uint256) {
+        return _convertToAssetsWithTotals(_assets, _totalNetAssets());
     }
 
     /// @inheritdoc IVaultReader
-    function convertToSharesWithTotals(uint256 shares, uint256 totalAssets_) external view returns (uint256) {
-        return _convertToSharesWithTotals(shares, totalAssets_);
+    function convertToSharesWithTotals(uint256 _shares, uint256 _totalAssets) external view returns (uint256) {
+        return _convertToSharesWithTotals(_shares, _totalAssets);
     }
 
     /// @inheritdoc IVaultReader
-    function convertToAssetsWithTotals(uint256 assets, uint256 totalAssets_) external view returns (uint256) {
-        return _convertToAssetsWithTotals(assets, totalAssets_);
+    function convertToAssetsWithTotals(uint256 _assets, uint256 _totalAssets) external view returns (uint256) {
+        return _convertToAssetsWithTotals(_assets, _totalAssets);
     }
 
     /// @inheritdoc IVaultReader
@@ -332,29 +334,29 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
     /// REQUEST GETTERS
 
     /// @inheritdoc IVaultReader
-    function getUserRequests(address user) external view returns (bytes32[] memory requestIds) {
+    function getUserRequests(address _user) external view returns (bytes32[] memory requestIds) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return $.userRequests[user].values();
+        return $.userRequests[_user].values();
     }
 
     /// @inheritdoc IVaultReader
-    function getStakeRequest(bytes32 requestId)
+    function getStakeRequest(bytes32 _requestId)
         external
         view
         returns (BaseVaultTypes.StakeRequest memory stakeRequest)
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return $.stakeRequests[requestId];
+        return $.stakeRequests[_requestId];
     }
 
     /// @inheritdoc IVaultReader
-    function getUnstakeRequest(bytes32 requestId)
+    function getUnstakeRequest(bytes32 _requestId)
         external
         view
         returns (BaseVaultTypes.UnstakeRequest memory unstakeRequest)
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return $.unstakeRequests[requestId];
+        return $.unstakeRequests[_requestId];
     }
 
     /// @inheritdoc IVersioned
@@ -369,43 +371,43 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](36);
-        moduleSelectors[0] = this.registry.selector;
-        moduleSelectors[1] = this.asset.selector;
-        moduleSelectors[2] = this.underlyingAsset.selector;
-        moduleSelectors[3] = this.computeLastBatchFees.selector;
-        moduleSelectors[4] = this.lastFeesChargedManagement.selector;
-        moduleSelectors[5] = this.lastFeesChargedPerformance.selector;
-        moduleSelectors[6] = this.hurdleRate.selector;
-        moduleSelectors[7] = this.isHardHurdleRate.selector;
-        moduleSelectors[8] = this.performanceFee.selector;
-        moduleSelectors[9] = this.nextPerformanceFeeTimestamp.selector;
-        moduleSelectors[10] = this.nextManagementFeeTimestamp.selector;
-        moduleSelectors[11] = this.managementFee.selector;
-        moduleSelectors[12] = this.sharePriceWatermark.selector;
-        moduleSelectors[13] = this.isBatchClosed.selector;
-        moduleSelectors[14] = this.isBatchSettled.selector;
-        moduleSelectors[15] = this.getCurrentBatchInfo.selector;
-        moduleSelectors[16] = this.getBatchIdInfo.selector;
-        moduleSelectors[17] = this.isClosed.selector;
-        moduleSelectors[18] = this.getBatchReceiver.selector;
-        moduleSelectors[19] = this.getSafeBatchReceiver.selector;
-        moduleSelectors[20] = this.sharePrice.selector;
-        moduleSelectors[21] = this.netSharePrice.selector;
-        moduleSelectors[22] = this.totalAssets.selector;
-        moduleSelectors[23] = this.totalNetAssets.selector;
-        moduleSelectors[24] = this.getBatchId.selector;
-        moduleSelectors[25] = this.getSafeBatchId.selector;
-        moduleSelectors[26] = this.convertToShares.selector;
-        moduleSelectors[27] = this.convertToAssets.selector;
-        moduleSelectors[28] = this.convertToSharesWithTotals.selector;
-        moduleSelectors[29] = this.convertToAssetsWithTotals.selector;
-        moduleSelectors[30] = this.getTotalPendingStake.selector;
-        moduleSelectors[31] = this.getUserRequests.selector;
-        moduleSelectors[32] = this.getStakeRequest.selector;
-        moduleSelectors[33] = this.getUnstakeRequest.selector;
-        moduleSelectors[34] = this.contractName.selector;
-        moduleSelectors[35] = this.contractVersion.selector;
-        return moduleSelectors;
+        bytes4[] memory _moduleSelectors = new bytes4[](36);
+        _moduleSelectors[0] = this.registry.selector;
+        _moduleSelectors[1] = this.asset.selector;
+        _moduleSelectors[2] = this.underlyingAsset.selector;
+        _moduleSelectors[3] = this.computeLastBatchFees.selector;
+        _moduleSelectors[4] = this.lastFeesChargedManagement.selector;
+        _moduleSelectors[5] = this.lastFeesChargedPerformance.selector;
+        _moduleSelectors[6] = this.hurdleRate.selector;
+        _moduleSelectors[7] = this.isHardHurdleRate.selector;
+        _moduleSelectors[8] = this.performanceFee.selector;
+        _moduleSelectors[9] = this.nextPerformanceFeeTimestamp.selector;
+        _moduleSelectors[10] = this.nextManagementFeeTimestamp.selector;
+        _moduleSelectors[11] = this.managementFee.selector;
+        _moduleSelectors[12] = this.sharePriceWatermark.selector;
+        _moduleSelectors[13] = this.isBatchClosed.selector;
+        _moduleSelectors[14] = this.isBatchSettled.selector;
+        _moduleSelectors[15] = this.getCurrentBatchInfo.selector;
+        _moduleSelectors[16] = this.getBatchIdInfo.selector;
+        _moduleSelectors[17] = this.isClosed.selector;
+        _moduleSelectors[18] = this.getBatchReceiver.selector;
+        _moduleSelectors[19] = this.getSafeBatchReceiver.selector;
+        _moduleSelectors[20] = this.sharePrice.selector;
+        _moduleSelectors[21] = this.netSharePrice.selector;
+        _moduleSelectors[22] = this.totalAssets.selector;
+        _moduleSelectors[23] = this.totalNetAssets.selector;
+        _moduleSelectors[24] = this.getBatchId.selector;
+        _moduleSelectors[25] = this.getSafeBatchId.selector;
+        _moduleSelectors[26] = this.convertToShares.selector;
+        _moduleSelectors[27] = this.convertToAssets.selector;
+        _moduleSelectors[28] = this.convertToSharesWithTotals.selector;
+        _moduleSelectors[29] = this.convertToAssetsWithTotals.selector;
+        _moduleSelectors[30] = this.getTotalPendingStake.selector;
+        _moduleSelectors[31] = this.getUserRequests.selector;
+        _moduleSelectors[32] = this.getStakeRequest.selector;
+        _moduleSelectors[33] = this.getUnstakeRequest.selector;
+        _moduleSelectors[34] = this.contractName.selector;
+        _moduleSelectors[35] = this.contractVersion.selector;
+        return _moduleSelectors;
     }
 }

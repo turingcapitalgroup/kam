@@ -51,6 +51,8 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
         // Get registry reference
         kRegistry registry = kRegistry(payable(existing.contracts.kRegistry));
+        // Use registry to avoid unused variable warning
+        registry;
 
         // Set batch limits for DN Vault USDC
         console.log("Setting batch limits for DN Vault USDC:");

@@ -13,13 +13,12 @@ The institutional gateway for minting and burning kTokens. Implements a push-pul
 - `mint(address asset, address to, uint256 amount)` - Creates new kTokens by accepting underlying asset deposits in a 1:1 ratio
 - `requestBurn(address asset, address to, uint256 amount)` - Initiates burn process by escrowing kTokens and creating batch burn request
 - `burn(bytes32 requestId)` - Executes burn for a request in a settled batch, burning kTokens and transferring assets
-- `cancelRequest(bytes32 requestId)` - Cancels a burn request before batch settlement
 
 **Request Management**
 
 - Generates unique request IDs using hash function with multiple entropy sources
 - Maintains per-asset batch tracking with `currentBatchIds[asset]` and `assetBatchCounters[asset]`
-- Supports request status tracking (PENDING, REDEEMED, CANCELLED)
+- Supports request status tracking (PENDING, REDEEMED)
 - Integrates with batch settlement system for asset distribution via BatchReceiver contracts
 - Manages batch lifecycle: create, close, settle, and BatchReceiver deployment
 

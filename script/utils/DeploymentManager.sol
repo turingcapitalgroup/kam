@@ -240,7 +240,7 @@ abstract contract DeploymentManager is Script {
         return config;
     }
 
-    function _readKTokenConfig(string memory json, string memory path) private view returns (KTokenConfig memory) {
+    function _readKTokenConfig(string memory json, string memory path) private pure returns (KTokenConfig memory) {
         KTokenConfig memory config;
         config.name = json.readString(string.concat(path, ".name"));
         config.symbol = json.readString(string.concat(path, ".symbol"));
@@ -255,7 +255,7 @@ abstract contract DeploymentManager is Script {
         return config;
     }
 
-    function _readVaultConfig(string memory json, string memory path) private view returns (VaultConfig memory) {
+    function _readVaultConfig(string memory json, string memory path) private pure returns (VaultConfig memory) {
         VaultConfig memory config;
         config.name = json.readString(string.concat(path, ".name"));
         config.symbol = json.readString(string.concat(path, ".symbol"));
@@ -268,7 +268,7 @@ abstract contract DeploymentManager is Script {
         return config;
     }
 
-    function _readParameterCheckerConfig(string memory json) private view returns (ParameterCheckerConfig memory) {
+    function _readParameterCheckerConfig(string memory json) private pure returns (ParameterCheckerConfig memory) {
         ParameterCheckerConfig memory config;
 
         // Read max single transfer amounts

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
+import { AddressSet, LibAddressSet } from "../helpers/AddressSet.sol";
 import { Bytes32Set, LibBytes32Set } from "../helpers/Bytes32Set.sol";
 import { VaultMathLib } from "../helpers/VaultMathLib.sol";
-import { AddressSet, BaseHandler, LibAddressSet } from "./BaseHandler.t.sol";
+import { BaseHandler } from "./BaseHandler.t.sol";
 import { console2 } from "forge-std/console2.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
@@ -151,14 +152,13 @@ contract kStakingVaultHandler is BaseHandler {
     function kStakingVault_advanceTime(uint256 amount) public {
         amount = bound(amount, 0, 30 days);
         vm.warp(block.timestamp + amount);
-        bytes32 batchId = kStakingVault_vault.getBatchId();
-        (uint256 managementFee, uint256 performanceFee, uint256 totalFees) = kStakingVault_vault.computeLastBatchFees();
+        (,, uint256 totalFees) = kStakingVault_vault.computeLastBatchFees();
         kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - totalFees;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
     }
 
     function kStakingVault_chargeFees(bool management, bool performance) public {
-        (uint256 managementFee, uint256 performanceFee, uint256 totalFees) = kStakingVault_vault.computeLastBatchFees();
+        (uint256 managementFee, uint256 performanceFee,) = kStakingVault_vault.computeLastBatchFees();
         if (management && managementFee > 0) {
             kStakingVault_chargedManagementInBatch[kStakingVault_vault.getBatchId()] += managementFee;
             kStakingVault_lastFeesChargedManagement = block.timestamp;
@@ -187,7 +187,13 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_totalYieldInBatch[kStakingVault_vault.getBatchId()] -= int256(amount);
     }
 
-    function kStakingVault_claimStakedShares(uint256 actorSeed, uint256 requestSeedIndex) public useActor(actorSeed) {
+    function kStakingVault_claimStakedShares(
+        uint256 actorSeed,
+        uint256 requestSeedIndex
+    )
+        public
+        useActor(actorSeed)
+    {
         vm.startPrank(currentActor);
         if (kStakingVault_actorStakeRequests[currentActor].count() == 0) {
             vm.stopPrank();
@@ -196,8 +202,7 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorStakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.StakeRequest memory stakeRequest = kStakingVault_vault.getStakeRequest(requestId);
         bytes32 batchId = stakeRequest.batchId;
-        (address batchReceiver, bool isClosed, bool isSettled, uint256 sharePrice, uint256 netSharePrice) =
-            kStakingVault_vault.getBatchIdInfo(batchId);
+        (,, bool isSettled,, uint256 netSharePrice) = kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
             kStakingVault_vault.claimStakedShares(requestId);
@@ -251,8 +256,7 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorUnstakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.UnstakeRequest memory unstakeRequest = kStakingVault_vault.getUnstakeRequest(requestId);
         bytes32 batchId = unstakeRequest.batchId;
-        (address batchReceiver, bool isClosed, bool isSettled, uint256 sharePrice, uint256 netSharePrice) =
-            kStakingVault_vault.getBatchIdInfo(batchId);
+        (,, bool isSettled, uint256 sharePrice, uint256 netSharePrice) = kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
             kStakingVault_vault.claimUnstakedAssets(requestId);
@@ -378,10 +382,10 @@ contract kStakingVaultHandler is BaseHandler {
             console2.log("  New Value:", newBalance);
             kStakingVault_minterHandler.set_kMinter_actualAdapterBalance(newBalance);
 
-            uint256 newTotalAssets = kStakingVault_minterAdapter.totalAssets();
+            uint256 minterAdapterTotalAssets = kStakingVault_minterAdapter.totalAssets();
             console2.log("kStakingVault_proposeSettlement: Updating minterHandler.kMinter_actualAdapterTotalAssets");
-            console2.log("  New Value:", newTotalAssets);
-            kStakingVault_minterHandler.set_kMinter_actualAdapterTotalAssets(newTotalAssets);
+            console2.log("  New Value:", minterAdapterTotalAssets);
+            kStakingVault_minterHandler.set_kMinter_actualAdapterTotalAssets(minterAdapterTotalAssets);
         }
         kStakingVault_actualAdapterBalance = (kStakingVault_token).balanceOf(address(kStakingVault_vaultAdapter));
 
@@ -449,8 +453,7 @@ contract kStakingVaultHandler is BaseHandler {
                 - int256(kStakingVault_pendingStakeInBatch[proposal.batchId])
         );
 
-        (address batchReceiver, bool isClosed, bool isSettled, uint256 sharePrice, uint256 netSharePrice) =
-            kStakingVault_vault.getBatchIdInfo(proposal.batchId);
+        (,,, uint256 sharePrice, uint256 netSharePrice) = kStakingVault_vault.getBatchIdInfo(proposal.batchId);
         uint256 expectedSharesToBurn;
         if (totalRequestedShares != 0) {
             // Discount protocol fees
