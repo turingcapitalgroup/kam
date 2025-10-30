@@ -18,12 +18,13 @@ import {
     VAULTADAPTER_ZERO_ARRAY
 } from "kam/src/errors/Errors.sol";
 
+import { ERC7579Minimal, ModeCode } from "erc7579-minimal/ERC7579Minimal.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 /// @title VaultAdapter
-contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
+contract VaultAdapter is ERC7579Minimal {
     using SafeTransferLib for address;
     using OptimizedLibCall for address;
     using OptimizedAddressEnumerableSetLib for OptimizedAddressEnumerableSetLib.AddressSet;
@@ -37,8 +38,6 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
     /// Uses the diamond storage pattern to avoid storage collisions in upgradeable contracts.
     /// @custom:storage-location erc7201:kam.storage.VaultAdapter
     struct VaultAdapterStorage {
-        /// @dev Address of the kRegistry singleton that serves as the protocol's configuration hub
-        IkRegistry registry;
         /// @dev Emergency pause state affecting all protocol operations in inheriting contracts
         bool paused;
         /// @dev Last recorded total assets for vault accounting and performance tracking
@@ -73,15 +72,6 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
     /// @notice Disables initializers to prevent implementation contract initialization
     constructor() {
         _disableInitializers();
-    }
-
-    /// @notice Initializes the VaultAdapter contract
-    /// @param _registry Address of the registry contract
-    function initialize(address _registry) external initializer {
-        _checkZeroAddress(_registry);
-        VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        $.registry = IkRegistry(_registry);
-        emit ContractInitialized(_registry);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -123,42 +113,14 @@ contract VaultAdapter is IVaultAdapter, Initializable, UUPSUpgradeable {
                             CORE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IVaultAdapter
-    function execute(
-        address[] calldata _targets,
-        bytes[] calldata _data,
-        uint256[] calldata _values
-    )
-        external
-        payable
-        returns (bytes[] memory _result)
-    {
-        uint256 _length = _targets.length;
-        require(_length != 0, VAULTADAPTER_ZERO_ARRAY);
-        require(_length == _data.length && _length == _values.length, VAULTADAPTER_ARRAY_MISMATCH);
-
-        // Cache storage reads outside loop
+    /// @dev Check if contract is paused
+    function _authorizeExecute(address user) internal override returns (bytes[] memory result) {
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        IkRegistry _registry = $.registry;
 
         // Single authorization and pause check
         _checkPaused($);
-        require(_registry.isManager(msg.sender), VAULTADAPTER_WRONG_ROLE);
 
-        // Pre-allocate result array
-        _result = new bytes[](_length);
-
-        // Execute calls with optimized loop
-        for (uint256 _i; _i < _length; ++_i) {
-            // Extract selector and validate vault-specific permission
-            bytes4 _functionSig = bytes4(_data[_i]);
-            bytes memory _params = _data[_i][4:];
-            _registry.authorizeAdapterCall(_targets[_i], _functionSig, _params);
-
-            // Execute and store result
-            _result[_i] = _targets[_i].callContract(_values[_i], _data[_i]);
-            emit Executed(msg.sender, _targets[_i], _data[_i], _values[_i], _result[_i]);
-        }
+        super._authorizeExecute(user);
     }
 
     /// @inheritdoc IVaultAdapter

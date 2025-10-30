@@ -1,4 +1,10 @@
 [[dependencies]]
+name = "erc7579-minimal"
+version = "1.0"
+git = "https://github.com/turingcapitalgroup/erc7579-minimal.git"
+rev = "4c9ecacbb52cb1007f1d7f99bc53646bb6db129a"
+
+[[dependencies]]
 name = "forge-std"
 version = "1.9.7"
 url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_7_28-04-2025_15:55:08_forge-std-1.9.zip"
