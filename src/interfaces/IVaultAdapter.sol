@@ -36,26 +36,6 @@ interface IVaultAdapter is IVersioned {
     /// @param amount_ The quantity of ETH rescued in wei (must not exceed contract balance)
     event RescuedETH(address indexed to_, uint256 amount_);
 
-    /// @notice Emitted when the relayer executes an arbitrary call on behalf of the protocol
-    /// @dev This event provides transparency into all external interactions initiated by the relayer.
-    /// It logs the caller, target contract, function data, value sent, and the resulting returndata.
-    /// This is critical for auditing and monitoring protocol actions executed via the relayer role.
-    /// @param caller The relayer address that initiated the call
-    /// @param target The target contract address that was called
-    /// @param data The calldata sent to the target contract
-    /// @param value The amount of assets sent with the call
-    /// @param result The returndata returned from the call
-    event Executed(address indexed caller, address indexed target, bytes data, uint256 value, bytes result);
-
-    /// @notice Emmited when the relayer executes a transfer of assets on behalf of the protocol
-    /// @dev This event provides transparency into all asset transfers initiated by the relayer.
-    /// It logs the caller, asset, recipient, and amount transferred. This is critical for auditing
-    /// and monitoring protocol asset movements executed via the relayer role.
-    /// @param asset The asset address that was transferred (address(0) for native ETH)
-    /// @param to The recipient address that received the assets
-    /// @param amount The quantity of assets transferred
-    event TransferExecuted(address indexed asset, address indexed to, uint256 amount);
-
     /// @notice Emitted when total assets are updated
     /// @param oldTotalAssets The previous total assets value
     /// @param newTotalAssets The new total assets value
@@ -89,25 +69,6 @@ interface IVaultAdapter is IVersioned {
     /// @param to_ The recipient address that will receive the rescued assets (cannot be zero address)
     /// @param amount_ The quantity to rescue (must not exceed available balance)
     function rescueAssets(address asset_, address to_, uint256 amount_) external payable;
-
-    /// @notice Allows the relayer to execute arbitrary calls on behalf of the protocol
-    /// @dev This function enables the relayer role to perform flexible interactions with external contracts
-    /// as part of protocol operations. Key aspects of this function include: (1) Authorization restricted to relayer
-    /// role to prevent misuse, (2) Pause state check to ensure operations are halted during emergencies, (3) Validates
-    /// target addresses are non-zero to prevent calls to the zero address, (4) Uses low-level calls to enable arbitrary
-    /// function execution
-    /// @param targets Array of target contracts to make calls to
-    /// @param data Array of calldata to send to each target contract
-    /// @param values Array of asset amounts to send with each call
-    /// @return result The combined return data from all calls
-    function execute(
-        address[] calldata targets,
-        bytes[] calldata data,
-        uint256[] calldata values
-    )
-        external
-        payable
-        returns (bytes[] memory result);
 
     /// @notice Sets the last recorded total assets for vault accounting and performance tracking
     /// @dev This function allows the admin to update the lastTotalAssets variable, which is

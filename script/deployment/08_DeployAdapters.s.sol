@@ -6,7 +6,7 @@ import { console2 as console } from "forge-std/console2.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
-import { VaultAdapter } from "src/adapters/VaultAdapter.sol";
+import { ERC7579Minimal, VaultAdapter } from "src/adapters/VaultAdapter.sol";
 
 contract DeployAdaptersScript is Script, DeploymentManager {
     function run() public {
@@ -31,9 +31,11 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         // Deploy VaultAdapter implementation (shared by all adapters)
         VaultAdapter vaultAdapterImpl = new VaultAdapter();
 
+        revert("TODO : think about adapter owner and accountId for wallet");
+
         // Deploy DN Vault USDC Adapter
         bytes memory adapterInitData =
-            abi.encodeWithSelector(VaultAdapter.initialize.selector, existing.contracts.kRegistry);
+            abi.encodeWithSelector(ERC7579Minimal.initialize.selector, existing.contracts.kRegistry);
         address dnVaultAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitData);
 
         // Deploy DN Vault WBTC Adapter

@@ -21,9 +21,8 @@ import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 /// @title VaultAdapter
-contract VaultAdapter is ERC7579Minimal {
+contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
     using SafeTransferLib for address;
-    using OptimizedLibCall for address;
     using OptimizedAddressEnumerableSetLib for OptimizedAddressEnumerableSetLib.AddressSet;
 
     /* //////////////////////////////////////////////////////////////
@@ -77,8 +76,11 @@ contract VaultAdapter is ERC7579Minimal {
 
     /// @inheritdoc IVaultAdapter
     function setPaused(bool _paused) external {
+        require(
+            IkRegistry(address(_getMinimalAccountStorage().registry)).isEmergencyAdmin(msg.sender),
+            VAULTADAPTER_WRONG_ROLE
+        );
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        require($.registry.isEmergencyAdmin(msg.sender), VAULTADAPTER_WRONG_ROLE);
         $.paused = _paused;
         emit Paused(_paused);
     }
@@ -111,7 +113,7 @@ contract VaultAdapter is ERC7579Minimal {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Check if contract is paused
-    function _authorizeExecute(address user) internal override returns (bytes[] memory result) {
+    function _authorizeExecute(address user) internal override {
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
 
         // Single authorization and pause check
@@ -148,8 +150,7 @@ contract VaultAdapter is ERC7579Minimal {
     /// @notice Check if caller has admin role
     /// @param _user Address to check
     function _checkAdmin(address _user) private view {
-        VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        require($.registry.isAdmin(_user), VAULTADAPTER_WRONG_ROLE);
+        require(IkRegistry(address(_getMinimalAccountStorage().registry)).isAdmin(_user), VAULTADAPTER_WRONG_ROLE);
     }
 
     /// @notice Ensures the contract is not paused
@@ -159,7 +160,7 @@ contract VaultAdapter is ERC7579Minimal {
 
     /// @notice Ensures the caller is the kAssetRouter
     function _checkRouter(VaultAdapterStorage storage $) internal view {
-        address _router = $.registry.getContractById(K_ASSET_ROUTER);
+        address _router = IkRegistry(address(_getMinimalAccountStorage().registry)).getContractById(K_ASSET_ROUTER);
         require(msg.sender == _router, VAULTADAPTER_WRONG_ROLE);
     }
 
@@ -170,8 +171,10 @@ contract VaultAdapter is ERC7579Minimal {
     /// @param _target The target contract to be called
     /// @param _selector The function selector being called
     function _checkVaultCanCallSelector(address _target, bytes4 _selector) internal view {
-        VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        require($.registry.isAdapterSelectorAllowed(address(this), _target, _selector));
+        require(
+            IkRegistry(address(_getMinimalAccountStorage().registry))
+                .isAdapterSelectorAllowed(address(this), _target, _selector)
+        );
     }
 
     /// @notice Reverts if its a zero address
@@ -183,8 +186,7 @@ contract VaultAdapter is ERC7579Minimal {
     /// @notice Reverts if the asset is not supported by the protocol
     /// @param _asset Asset address to check
     function _checkAsset(address _asset) private view {
-        VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-        require($.registry.isAsset(_asset), VAULTADAPTER_WRONG_ASSET);
+        require(IkRegistry(address(_getMinimalAccountStorage().registry)).isAsset(_asset), VAULTADAPTER_WRONG_ASSET);
     }
 
     /* //////////////////////////////////////////////////////////////
