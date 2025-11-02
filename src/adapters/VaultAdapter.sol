@@ -2,10 +2,7 @@
 pragma solidity 0.8.30;
 
 import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedAddressEnumerableSetLib.sol";
-import { Initializable } from "solady/utils/Initializable.sol";
-import { OptimizedLibCall } from "solady/utils/OptimizedLibCall.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
-import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import {
     VAULTADAPTER_ARRAY_MISMATCH,
