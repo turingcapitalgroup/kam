@@ -2,7 +2,7 @@
 name = "erc7579-minimal"
 version = "1.0"
 git = "https://github.com/turingcapitalgroup/erc7579-minimal.git"
-rev = "8d8b84c5cb2abb831722dced817bf0014c92c705"
+rev = "01f84bc00a95e3530401222642d862c3d27e97b7"
 
 [[dependencies]]
 name = "forge-std"
