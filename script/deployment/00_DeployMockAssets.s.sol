@@ -141,13 +141,7 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
 
     // ... (rest of the helper functions remain the same)
 
-    function _mintTokensForTesting(
-        MockERC20 mockUSDC,
-        MockERC20 mockWBTC,
-        NetworkConfig memory config
-    )
-        internal
-    {
+    function _mintTokensForTesting(MockERC20 mockUSDC, MockERC20 mockWBTC, NetworkConfig memory config) internal {
         console.log("=== MINTING TOKENS FOR TESTING (from config) ===");
 
         vm.startBroadcast();

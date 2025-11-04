@@ -403,14 +403,7 @@ library SafeTransferLib {
     /// @dev Performs a `token.balanceOf(account)` check.
     /// `implemented` denotes whether the `token` does not implement `balanceOf`.
     /// `amount` is zero if the `token` does not implement `balanceOf`.
-    function checkBalanceOf(
-        address token,
-        address account
-    )
-        internal
-        view
-        returns (bool implemented, uint256 amount)
-    {
+    function checkBalanceOf(address token, address account) internal view returns (bool implemented, uint256 amount) {
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x14, account) // Store the `account` argument.

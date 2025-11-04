@@ -21,7 +21,7 @@ import { AdapterGuardianModule } from "kam/src/kRegistry/modules/AdapterGuardian
 import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
 // Adapters
-import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
+import { ERC7579Minimal, VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 
 // Interfaces
 import { IRegistry, IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
@@ -270,7 +270,9 @@ contract DeploymentBaseTest is BaseTest {
         vaultAdapterImpl = new VaultAdapter();
 
         // Deploy ERC1967 proxy with initialization (UUPSUpgradeable pattern)
-        bytes memory adapterInitData = abi.encodeWithSelector(VaultAdapter.initialize.selector, address(registry));
+        bytes memory adapterInitData = abi.encodeWithSelector(
+            ERC7579Minimal.initialize.selector, address(0), address(registry), "kam.vaultAdapter"
+        );
 
         // Deploy proxy with initialization using ERC1967Factory
         minterAdapterUSDC = VaultAdapter(factory.deployAndCall(address(vaultAdapterImpl), users.admin, adapterInitData));
