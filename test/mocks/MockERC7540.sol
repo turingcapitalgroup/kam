@@ -155,15 +155,7 @@ contract MockERC7540 is IERC7540, ERC20 {
         requestId = ++_requestCounter;
     }
 
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address controller
-    )
-        external
-        override
-        returns (uint256 assets)
-    {
+    function redeem(uint256 shares, address receiver, address controller) external override returns (uint256 assets) {
         require(_claimableRedeemRequests[controller] >= shares, "Insufficient claimable redeem");
 
         _claimableRedeemRequests[controller] -= shares;
@@ -173,15 +165,7 @@ contract MockERC7540 is IERC7540, ERC20 {
         _asset.safeTransfer(receiver, assets);
     }
 
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address controller
-    )
-        external
-        override
-        returns (uint256 shares)
-    {
+    function withdraw(uint256 assets, address receiver, address controller) external override returns (uint256 shares) {
         shares = assets; // 1:1 conversion
         require(_claimableRedeemRequests[controller] >= shares, "Insufficient claimable redeem");
 

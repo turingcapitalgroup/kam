@@ -25,17 +25,7 @@ library OptimizedEfficientHashLib {
     }
 
     /// @dev Returns `keccak256(abi.encode(v0, .., v4))`.
-    function hash(
-        uint256 v0,
-        uint256 v1,
-        uint256 v2,
-        uint256 v3,
-        uint256 v4
-    )
-        internal
-        pure
-        returns (bytes32 result)
-    {
+    function hash(uint256 v0, uint256 v1, uint256 v2, uint256 v3, uint256 v4) internal pure returns (bytes32 result) {
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)

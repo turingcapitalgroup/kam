@@ -309,14 +309,7 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// @param _token The token contract address to withdraw (use address(0) for native ETH)
     /// @param _to The destination address to receive the recovered assets
     /// @param _amount The quantity of tokens or ETH to recover
-    function emergencyWithdraw(
-        address _token,
-        address _to,
-        uint256 _amount
-    )
-        external
-        onlyRoles(EMERGENCY_ADMIN_ROLE)
-    {
+    function emergencyWithdraw(address _token, address _to, uint256 _amount) external onlyRoles(EMERGENCY_ADMIN_ROLE) {
         require(_to != address(0), KTOKEN_ZERO_ADDRESS);
         require(_amount != 0, KTOKEN_ZERO_AMOUNT);
 
