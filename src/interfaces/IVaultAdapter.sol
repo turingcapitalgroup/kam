@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import { IERC7579Minimal, ModeCode } from "erc7579-minimal/interfaces/IERC7579Minimal.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
-import {IERC7579Minimal, ModeCode} from "erc7579-minimal/interfaces/IERC7579Minimal.sol";
 
 interface IVaultAdapter is IVersioned {
     /* //////////////////////////////////////////////////////////////
