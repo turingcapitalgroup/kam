@@ -32,7 +32,7 @@ contract DeployVaultModulesScript is Script, DeploymentManager {
         console.log("ReaderModule:", address(readerModule));
 
         // Return deployed addresses
-        deployment = VaultModulesDeployment({readerModule: address(readerModule)});
+        deployment = VaultModulesDeployment({ readerModule: address(readerModule) });
 
         // Write to JSON only if requested
         if (writeToJson) {

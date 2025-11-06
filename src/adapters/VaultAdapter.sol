@@ -157,7 +157,12 @@ contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
     }
 
     /// @notice Ensures the caller is the kAssetRouter
-    function _checkRouter(VaultAdapterStorage storage /* $ */) internal view {
+    function _checkRouter(
+        VaultAdapterStorage storage /* $ */
+    )
+        internal
+        view
+    {
         address _router = IkRegistry(address(_getMinimalAccountStorage().registry)).getContractById(K_ASSET_ROUTER);
         require(msg.sender == _router, VAULTADAPTER_WRONG_ROLE);
     }

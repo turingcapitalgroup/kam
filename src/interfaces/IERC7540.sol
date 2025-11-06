@@ -24,13 +24,25 @@ interface IERC7540 {
 
     function isOperator(address, address) external view returns (bool);
 
-    function requestDeposit(uint256 assets, address controller, address owner) external returns (uint256 requestId);
+    function requestDeposit(
+        uint256 assets,
+        address controller,
+        address owner
+    )
+        external
+        returns (uint256 requestId);
 
     function deposit(uint256 assets, address to) external returns (uint256 shares);
 
     function deposit(uint256 assets, address to, address controller) external returns (uint256 shares);
 
-    function requestRedeem(uint256 shares, address controller, address owner) external returns (uint256 requestId);
+    function requestRedeem(
+        uint256 shares,
+        address controller,
+        address owner
+    )
+        external
+        returns (uint256 requestId);
 
     function redeem(uint256 shares, address receiver, address controller) external returns (uint256 assets);
 

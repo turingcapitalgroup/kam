@@ -19,7 +19,11 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
     /// @param factoryAddr Address of ERC1967Factory (if zero, reads from JSON)
     /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
     /// @return deployment Struct containing deployed addresses
-    function run(bool writeToJson, address factoryAddr, address registryAddr)
+    function run(
+        bool writeToJson,
+        address factoryAddr,
+        address registryAddr
+    )
         public
         returns (AssetRouterDeployment memory deployment)
     {
@@ -65,8 +69,7 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         console.log("Settlement cooldown set to:", config.assetRouter.settlementCooldown);
 
         // Return deployed addresses
-        deployment =
-            AssetRouterDeployment({assetRouterImpl: address(assetRouterImpl), assetRouter: assetRouterProxy});
+        deployment = AssetRouterDeployment({ assetRouterImpl: address(assetRouterImpl), assetRouter: assetRouterProxy });
 
         // Write to JSON only if requested
         if (writeToJson) {

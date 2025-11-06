@@ -80,11 +80,11 @@ contract kStakingVaultHandler is BaseHandler {
         for (uint256 i = 0; i < _minterActors.length; i++) {
             kStakingVault_minterActors.add(_minterActors[i]);
         }
-    
+
         vm.startPrank(_admin);
         IkStakingVault(_vault).setMaxTotalAssets(type(uint128).max);
         vm.stopPrank();
-        
+
         kStakingVault_vault = IkStakingVault(_vault);
         kStakingVault_assetRouter = IkAssetRouter(_assetRouter);
         kStakingVault_vaultAdapter = IVaultAdapter(_vaultAdapter);
@@ -193,7 +193,13 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_totalYieldInBatch[kStakingVault_vault.getBatchId()] -= int256(amount);
     }
 
-    function kStakingVault_claimStakedShares(uint256 actorSeed, uint256 requestSeedIndex) public useActor(actorSeed) {
+    function kStakingVault_claimStakedShares(
+        uint256 actorSeed,
+        uint256 requestSeedIndex
+    )
+        public
+        useActor(actorSeed)
+    {
         vm.startPrank(currentActor);
         if (kStakingVault_actorStakeRequests[currentActor].count() == 0) {
             vm.stopPrank();
@@ -241,7 +247,13 @@ contract kStakingVaultHandler is BaseHandler {
         vm.stopPrank();
     }
 
-    function kStakingVault_claimUnstakedAssets(uint256 actorSeed, uint256 requestSeedIndex) public useActor(actorSeed) {
+    function kStakingVault_claimUnstakedAssets(
+        uint256 actorSeed,
+        uint256 requestSeedIndex
+    )
+        public
+        useActor(actorSeed)
+    {
         vm.startPrank(currentActor);
         if (kStakingVault_actorUnstakeRequests[currentActor].count() == 0) {
             vm.stopPrank();

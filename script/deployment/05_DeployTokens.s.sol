@@ -88,7 +88,7 @@ contract DeployTokensScript is Script, DeploymentManager {
         console.log("Registry address:", registryAddr);
 
         // Return deployed addresses
-        deployment = TokenDeployment({kUSD: kUSDAddress, kBTC: kBTCAddress});
+        deployment = TokenDeployment({ kUSD: kUSDAddress, kBTC: kBTCAddress });
 
         // Write to JSON only if requested
         if (writeToJson) {

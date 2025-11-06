@@ -43,7 +43,9 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         address betaVaultAdapterAddr,
         address minterAdapterUSDCAddr,
         address minterAdapterWBTCAddr
-    ) public {
+    )
+        public
+    {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
 

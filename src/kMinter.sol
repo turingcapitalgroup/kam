@@ -163,7 +163,15 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
     }
 
     /// @inheritdoc IkMinter
-    function requestBurn(address _asset, address _to, uint256 _amount) external payable returns (bytes32 _requestId) {
+    function requestBurn(
+        address _asset,
+        address _to,
+        uint256 _amount
+    )
+        external
+        payable
+        returns (bytes32 _requestId)
+    {
         _lockReentrant();
         _checkNotPaused();
         _checkInstitution(msg.sender);
@@ -494,7 +502,14 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IkMinter
-    function rescueReceiverAssets(address _batchReceiver, address _asset, address _to, uint256 _amount) external {
+    function rescueReceiverAssets(
+        address _batchReceiver,
+        address _asset,
+        address _to,
+        uint256 _amount
+    )
+        external
+    {
         require(_batchReceiver != address(0) && _asset != address(0) && _to != address(0), KMINTER_ZERO_ADDRESS);
         kBatchReceiver(_batchReceiver).rescueAssets(_asset);
         this.rescueAssets(_asset, _to, _amount);

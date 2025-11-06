@@ -20,7 +20,9 @@ contract RegisterModulesScript is DeploymentManager {
         address dnVaultWBTCAddr,
         address alphaVaultAddr,
         address betaVaultAddr
-    ) public {
+    )
+        public
+    {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
 

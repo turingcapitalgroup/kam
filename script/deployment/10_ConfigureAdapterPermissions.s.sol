@@ -20,7 +20,9 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         address vault,
         address asset,
         bool isKMinterAdapter
-    ) internal {
+    )
+        internal
+    {
         bytes4 approveSelector = IERC7540.approve.selector;
         bytes4 transferSelector = IERC7540.transfer.selector;
         bytes4 transferFromSelector = IERC7540.transferFrom.selector;
@@ -47,7 +49,11 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
     }
 
     // Helper function to configure custodial adapter permissions (targetType = 1)
-    function configureCustodialAdapterPermissions(IkRegistry registry, address adapter, address custodialAddress)
+    function configureCustodialAdapterPermissions(
+        IkRegistry registry,
+        address adapter,
+        address custodialAddress
+    )
         internal
     {
         bytes4 approveSelector = IERC7540.approve.selector;
@@ -63,7 +69,9 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         address target,
         address paramChecker,
         bool isTransferFrom
-    ) internal {
+    )
+        internal
+    {
         bytes4 transferSelector = IERC7540.transfer.selector;
         bytes4 approveSelector = IERC7540.approve.selector;
 
@@ -100,18 +108,20 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         address erc7540USDCAddr,
         address erc7540WBTCAddr,
         address walletUSDCAddr
-    ) public returns (AdapterPermissionsDeployment memory deployment) {
+    )
+        public
+        returns (AdapterPermissionsDeployment memory deployment)
+    {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
         DeploymentOutput memory existing;
 
         // If any address is zero, read from JSON (for real deployments)
         if (
-            registryAddr == address(0) || kMinterAdapterUSDCAddr == address(0)
-                || kMinterAdapterWBTCAddr == address(0) || dnVaultAdapterUSDCAddr == address(0)
-                || dnVaultAdapterWBTCAddr == address(0) || alphaVaultAdapterAddr == address(0)
-                || betaVaultAdapterAddr == address(0) || erc7540USDCAddr == address(0) || erc7540WBTCAddr == address(0)
-                || walletUSDCAddr == address(0)
+            registryAddr == address(0) || kMinterAdapterUSDCAddr == address(0) || kMinterAdapterWBTCAddr == address(0)
+                || dnVaultAdapterUSDCAddr == address(0) || dnVaultAdapterWBTCAddr == address(0)
+                || alphaVaultAdapterAddr == address(0) || betaVaultAdapterAddr == address(0)
+                || erc7540USDCAddr == address(0) || erc7540WBTCAddr == address(0) || walletUSDCAddr == address(0)
         ) {
             existing = readDeploymentOutput();
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
@@ -219,7 +229,19 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
 
     /// @notice Convenience wrapper for real deployments (reads addresses from JSON)
     function run() public returns (AdapterPermissionsDeployment memory) {
-        return run(true, address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0));
+        return run(
+            true,
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0)
+        );
     }
 
     function _configureAllowedReceivers(
@@ -229,7 +251,9 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         address usdc,
         address usdcVault,
         address /* usdcWallet */
-    ) internal {
+    )
+        internal
+    {
         console.log("   - Set allowed receivers from config");
 
         // USDC receivers
@@ -273,7 +297,9 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         DeploymentOutput memory existing,
         address usdcVault,
         address wbtcVault
-    ) internal {
+    )
+        internal
+    {
         console.log("   - Set allowed sources from config");
 
         // ERC7540USDC sources
@@ -301,7 +327,9 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         address wbtc,
         address, /* usdcVault */
         address /* wbtcVault */
-    ) internal {
+    )
+        internal
+    {
         console.log("   - Set allowed spenders from config");
 
         // USDC spenders
@@ -321,7 +349,11 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         }
     }
 
-    function _resolveAddress(string memory key, NetworkConfig memory config, DeploymentOutput memory existing)
+    function _resolveAddress(
+        string memory key,
+        NetworkConfig memory config,
+        DeploymentOutput memory existing
+    )
         internal
         pure
         returns (address)

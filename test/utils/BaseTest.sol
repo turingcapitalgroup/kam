@@ -3,12 +3,12 @@ pragma solidity 0.8.30;
 
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { Utilities } from "./Utilities.sol";
-import { Test } from "forge-std/Test.sol";
 import { stdJson } from "forge-std/StdJson.sol";
+import { Test } from "forge-std/Test.sol";
 
 contract BaseTest is Test {
     using stdJson for string;
-    
+
     Utilities internal utils;
 
     // Test users
@@ -67,12 +67,12 @@ contract BaseTest is Test {
         users.alice = utils.createUser("Alice");
         users.bob = utils.createUser("Bob");
         users.charlie = utils.createUser("Charlie");
-        
+
         string memory configPath = "deployments/config/localhost.json";
         require(vm.exists(configPath), "Config file not found: deployments/config/localhost.json");
-        
+
         string memory json = vm.readFile(configPath);
-        
+
         users.owner = payable(json.readAddress(".roles.owner"));
         users.admin = payable(json.readAddress(".roles.admin"));
         users.emergencyAdmin = payable(json.readAddress(".roles.emergencyAdmin"));
@@ -80,7 +80,7 @@ contract BaseTest is Test {
         users.relayer = payable(json.readAddress(".roles.relayer"));
         users.institution = payable(json.readAddress(".roles.institution"));
         users.treasury = payable(json.readAddress(".roles.treasury"));
-        
+
         // Additional test institutions (random)
         users.institution2 = utils.createUser("Institution2");
         users.institution3 = utils.createUser("Institution3");
@@ -91,12 +91,12 @@ contract BaseTest is Test {
     function _setupAssets(address usdcAddr, address wbtcAddr) internal {
         require(usdcAddr != address(0), "USDC address is zero");
         require(wbtcAddr != address(0), "WBTC address is zero");
-        
+
         mockUSDC = MockERC20(usdcAddr);
         mockWBTC = MockERC20(wbtcAddr);
         tokens.usdc = usdcAddr;
         tokens.wbtc = wbtcAddr;
-        
+
         vm.label(tokens.usdc, "USDC");
         vm.label(tokens.wbtc, "WBTC");
     }
@@ -105,16 +105,16 @@ contract BaseTest is Test {
     function _setupAssets() internal {
         string memory configPath = "deployments/config/localhost.json";
         require(vm.exists(configPath), "Config file not found: deployments/config/localhost.json");
-        
+
         string memory json = vm.readFile(configPath);
-        
+
         // Read deployed mock assets from config (scripts update this)
         require(json.keyExists(".assets.USDC"), "USDC address not found in config - run 00_DeployMockAssets.s.sol");
         require(json.keyExists(".assets.WBTC"), "WBTC address not found in config - run 00_DeployMockAssets.s.sol");
-        
+
         address usdcAddr = json.readAddress(".assets.USDC");
         address wbtcAddr = json.readAddress(".assets.WBTC");
-        
+
         _setupAssets(usdcAddr, wbtcAddr);
     }
 

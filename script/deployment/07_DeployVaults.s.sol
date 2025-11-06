@@ -38,7 +38,10 @@ contract DeployVaultsScript is Script, DeploymentManager {
         address readerModuleAddr,
         address kUSDAddr,
         address kBTCAddr
-    ) public returns (VaultsDeployment memory deployment) {
+    )
+        public
+        returns (VaultsDeployment memory deployment)
+    {
         // Read network configuration
         config = readNetworkConfig();
 

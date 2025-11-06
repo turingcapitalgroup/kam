@@ -339,7 +339,13 @@ interface IRegistry is IVersioned {
     /// @param asset The asset address to set limits for
     /// @param maxMintPerBatch_ Maximum amount of the asset that can be minted in a single batch
     /// @param maxBurnPerBatch_ Maximum amount of the asset that can be redeemed in a single batch
-    function setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
+    function setAssetBatchLimits(
+        address asset,
+        uint256 maxMintPerBatch_,
+        uint256 maxBurnPerBatch_
+    )
+        external
+        payable;
 
     /// @notice Gets the maximum mint amount per batch for an asset
     /// @dev Used to enforce minting limits for liquidity and risk management. Reverts if asset not registered.

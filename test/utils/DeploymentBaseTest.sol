@@ -2,8 +2,8 @@
 pragma solidity 0.8.30;
 
 import { BaseTest } from "./BaseTest.sol";
-import { Utilities } from "./Utilities.sol";
 import { _1_USDC, _1_WBTC } from "./Constants.sol";
+import { Utilities } from "./Utilities.sol";
 import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
@@ -27,21 +27,21 @@ import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 import { IRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 // Scripts
-import {DeployMockAssetsScript} from "kam/script/deployment/00_DeployMockAssets.s.sol";
-import {DeployRegistryScript} from "kam/script/deployment/01_DeployRegistry.s.sol"; 
-import {DeployMinterScript} from "kam/script/deployment/02_DeployMinter.s.sol"; 
-import {DeployAssetRouterScript} from "kam/script/deployment/03_DeployAssetRouter.s.sol"; 
-import {RegisterSingletonsScript} from "kam/script/deployment/04_RegisterSingletons.s.sol"; 
-import {DeployTokensScript} from "kam/script/deployment/05_DeployTokens.s.sol"; 
-import {DeployVaultModulesScript} from "kam/script/deployment/06_DeployVaultModules.s.sol"; 
-import {DeployVaultsScript} from "kam/script/deployment/07_DeployVaults.s.sol"; 
-import {DeployAdaptersScript} from "kam/script/deployment/08_DeployAdapters.s.sol"; 
-import {ConfigureProtocolScript} from "kam/script/deployment/09_ConfigureProtocol.s.sol"; 
-import {ConfigureAdapterPermissionsScript} from "kam/script/deployment/10_ConfigureAdapterPermissions.s.sol";  
-import {RegisterModulesScript} from "kam/script/deployment/11_RegisterVaultModules.s.sol";
+import { DeployMockAssetsScript } from "kam/script/deployment/00_DeployMockAssets.s.sol";
+import { DeployRegistryScript } from "kam/script/deployment/01_DeployRegistry.s.sol";
+import { DeployMinterScript } from "kam/script/deployment/02_DeployMinter.s.sol";
+import { DeployAssetRouterScript } from "kam/script/deployment/03_DeployAssetRouter.s.sol";
+import { RegisterSingletonsScript } from "kam/script/deployment/04_RegisterSingletons.s.sol";
+import { DeployTokensScript } from "kam/script/deployment/05_DeployTokens.s.sol";
+import { DeployVaultModulesScript } from "kam/script/deployment/06_DeployVaultModules.s.sol";
+import { DeployVaultsScript } from "kam/script/deployment/07_DeployVaults.s.sol";
+import { DeployAdaptersScript } from "kam/script/deployment/08_DeployAdapters.s.sol";
+import { ConfigureProtocolScript } from "kam/script/deployment/09_ConfigureProtocol.s.sol";
+import { ConfigureAdapterPermissionsScript } from "kam/script/deployment/10_ConfigureAdapterPermissions.s.sol";
+import { RegisterModulesScript } from "kam/script/deployment/11_RegisterVaultModules.s.sol";
 
 // Deployment manager for reading addresses
-import {DeploymentManager} from "kam/script/utils/DeploymentManager.sol"; 
+import { DeploymentManager } from "kam/script/utils/DeploymentManager.sol";
 
 contract DeploymentBaseTest is BaseTest, DeploymentManager {
     // Core protocol contracts (proxied)
@@ -102,40 +102,51 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         _createUsers();
 
         DeployMockAssetsScript.MockAssets memory mocks = (new DeployMockAssetsScript()).run(false);
-        
+
         _setupAssets(mocks.USDC, mocks.WBTC);
-        
+
         _labelAddresses();
-        
+
         // Now deploy protocol contracts
         DeployRegistryScript.RegistryDeployment memory registryDeploy = (new DeployRegistryScript()).run(false);
-        
+
         // Deploy minter and asset router, passing factory and registry addresses
-        DeployMinterScript.MinterDeployment memory minterDeploy = 
+        DeployMinterScript.MinterDeployment memory minterDeploy =
             (new DeployMinterScript()).run(false, registryDeploy.factory, registryDeploy.registry);
-        
+
         DeployAssetRouterScript.AssetRouterDeployment memory assetRouterDeploy =
             (new DeployAssetRouterScript()).run(false, registryDeploy.factory, registryDeploy.registry);
-        
+
         // Register singletons (no JSON read/write in tests)
-        (new RegisterSingletonsScript()).run(registryDeploy.registry, assetRouterDeploy.assetRouter, minterDeploy.minter);
-        
+        (new RegisterSingletonsScript())
+        .run(registryDeploy.registry, assetRouterDeploy.assetRouter, minterDeploy.minter);
+
         // Deploy kTokens
-        DeployTokensScript.TokenDeployment memory tokenDeploy = (new DeployTokensScript()).run(false, registryDeploy.registry);
-        
+        DeployTokensScript.TokenDeployment memory tokenDeploy =
+            (new DeployTokensScript()).run(false, registryDeploy.registry);
+
         // Deploy vault modules
-        DeployVaultModulesScript.VaultModulesDeployment memory modulesDeploy = (new DeployVaultModulesScript()).run(false);
-        
+        DeployVaultModulesScript.VaultModulesDeployment memory modulesDeploy =
+            (new DeployVaultModulesScript()).run(false);
+
         // Deploy vaults
-        DeployVaultsScript.VaultsDeployment memory vaultsDeploy = 
-            (new DeployVaultsScript()).run(false, registryDeploy.factory, registryDeploy.registry, modulesDeploy.readerModule, tokenDeploy.kUSD, tokenDeploy.kBTC);
-        
+        DeployVaultsScript.VaultsDeployment memory vaultsDeploy = (new DeployVaultsScript())
+        .run(
+            false,
+            registryDeploy.factory,
+            registryDeploy.registry,
+            modulesDeploy.readerModule,
+            tokenDeploy.kUSD,
+            tokenDeploy.kBTC
+        );
+
         // Deploy adapters
-        DeployAdaptersScript.AdaptersDeployment memory adaptersDeploy = 
+        DeployAdaptersScript.AdaptersDeployment memory adaptersDeploy =
             (new DeployAdaptersScript()).run(false, registryDeploy.factory, registryDeploy.registry);
-        
+
         // Configure protocol
-        (new ConfigureProtocolScript()).run(
+        (new ConfigureProtocolScript())
+        .run(
             registryDeploy.registry,
             minterDeploy.minter,
             assetRouterDeploy.assetRouter,
@@ -152,8 +163,9 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             adaptersDeploy.kMinterAdapterUSDC,
             adaptersDeploy.kMinterAdapterWBTC
         );
-        
-        (new ConfigureAdapterPermissionsScript()).run(
+
+        (new ConfigureAdapterPermissionsScript())
+        .run(
             false,
             registryDeploy.registry,
             adaptersDeploy.kMinterAdapterUSDC,
@@ -166,42 +178,43 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             mocks.ERC7540WBTC,
             mocks.WalletUSDC
         );
-        
-        (new RegisterModulesScript()).run(
+
+        (new RegisterModulesScript())
+        .run(
             modulesDeploy.readerModule,
             vaultsDeploy.dnVaultUSDC,
             vaultsDeploy.dnVaultWBTC,
             vaultsDeploy.alphaVault,
             vaultsDeploy.betaVault
         );
-        
+
         factory = ERC1967Factory(registryDeploy.factory);
         registryImpl = kRegistry(payable(registryDeploy.registryImpl));
         registry = kRegistry(payable(registryDeploy.registry));
-        
+
         minterImpl = kMinter(payable(minterDeploy.minterImpl));
         minter = kMinter(payable(minterDeploy.minter));
-        
+
         assetRouterImpl = kAssetRouter(payable(assetRouterDeploy.assetRouterImpl));
         assetRouter = kAssetRouter(payable(assetRouterDeploy.assetRouter));
-        
+
         kUSD = kToken(payable(tokenDeploy.kUSD));
         kBTC = kToken(payable(tokenDeploy.kBTC));
-        
+
         readerModule = ReaderModule(modulesDeploy.readerModule);
-        
+
         stakingVaultImpl = kStakingVault(payable(vaultsDeploy.stakingVaultImpl));
         dnVault = IkStakingVault(payable(vaultsDeploy.dnVaultUSDC));
         alphaVault = IkStakingVault(payable(vaultsDeploy.alphaVault));
         betaVault = IkStakingVault(payable(vaultsDeploy.betaVault));
-        
+
         vaultAdapterImpl = VaultAdapter(adaptersDeploy.vaultAdapterImpl);
         minterAdapterUSDC = VaultAdapter(adaptersDeploy.kMinterAdapterUSDC);
         minterAdapterWBTC = VaultAdapter(adaptersDeploy.kMinterAdapterWBTC);
         DNVaultAdapterUSDC = VaultAdapter(adaptersDeploy.dnVaultAdapterUSDC);
         ALPHAVaultAdapterUSDC = VaultAdapter(adaptersDeploy.alphaVaultAdapter);
         BETHAVaultAdapterUSDC = VaultAdapter(adaptersDeploy.betaVaultAdapter);
-        
+
         _labelContracts();
 
         // Set up roles and permissions (if not already done by scripts)

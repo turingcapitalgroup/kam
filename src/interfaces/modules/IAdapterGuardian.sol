@@ -18,7 +18,13 @@ error ParametersCheckerInvalidBlockAmount();
 error ParametersCheckerInvalidFrom();
 
 interface IParametersChecker {
-    function authorizeAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params) external;
+    function authorizeAdapterCall(
+        address adapter,
+        address target,
+        bytes4 selector,
+        bytes calldata params
+    )
+        external;
 }
 
 /// @title IAdapterGuardian
@@ -86,7 +92,14 @@ interface IAdapterGuardian {
     /// @param target The target contract address
     /// @param selector The function selector
     /// @return Whether the selector is allowed
-    function isAdapterSelectorAllowed(address adapter, address target, bytes4 selector) external view returns (bool);
+    function isAdapterSelectorAllowed(
+        address adapter,
+        address target,
+        bytes4 selector
+    )
+        external
+        view
+        returns (bool);
 
     /// @notice Get the parameter checker for an adapter selector
     /// @param adapter The adapter address

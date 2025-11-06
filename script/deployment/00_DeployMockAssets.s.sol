@@ -29,7 +29,13 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         if (!config.mockAssets.enabled) {
             console.log("=== MOCK ASSETS DISABLED IN CONFIG ===");
             console.log("Set mockAssets.enabled to true in config to deploy mocks");
-            return MockAssets({USDC: address(0), WBTC: address(0), ERC7540USDC: address(0), ERC7540WBTC: address(0), WalletUSDC: address(0)});
+            return MockAssets({
+                USDC: address(0),
+                WBTC: address(0),
+                ERC7540USDC: address(0),
+                ERC7540WBTC: address(0),
+                WalletUSDC: address(0)
+            });
         }
 
         // Only deploy mock assets for testnets (localhost and sepolia)
@@ -47,7 +53,13 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
                 console.log("USDC:", config.assets.USDC);
                 console.log("WBTC:", config.assets.WBTC);
                 console.log("Skipping mock asset deployment");
-                return MockAssets({USDC: config.assets.USDC, WBTC: config.assets.WBTC, ERC7540USDC: address(0), ERC7540WBTC: address(0), WalletUSDC: address(0)});
+                return MockAssets({
+                    USDC: config.assets.USDC,
+                    WBTC: config.assets.WBTC,
+                    ERC7540USDC: address(0),
+                    ERC7540WBTC: address(0),
+                    WalletUSDC: address(0)
+                });
             }
         }
 
@@ -158,7 +170,13 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         console.log("Updated config file with mock asset addresses");
     }
 
-    function _mintTokensForTesting(MockERC20 mockUSDC, MockERC20 mockWBTC, NetworkConfig memory config) internal {
+    function _mintTokensForTesting(
+        MockERC20 mockUSDC,
+        MockERC20 mockWBTC,
+        NetworkConfig memory config
+    )
+        internal
+    {
         console.log("=== MINTING TOKENS FOR TESTING (from config) ===");
 
         vm.startBroadcast(config.roles.admin);

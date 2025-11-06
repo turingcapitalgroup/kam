@@ -647,7 +647,14 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     /// @notice Check if virtual balance is sufficient
     /// @param _vault Vault address
     /// @param _requiredAmount Required amount
-    function _checkSufficientVirtualBalance(address _vault, address _asset, uint256 _requiredAmount) private view {
+    function _checkSufficientVirtualBalance(
+        address _vault,
+        address _asset,
+        uint256 _requiredAmount
+    )
+        private
+        view
+    {
         require(_virtualBalance(_vault, _asset) >= _requiredAmount, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
     }
 
