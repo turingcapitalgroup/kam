@@ -103,6 +103,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
     ) public returns (AdapterPermissionsDeployment memory deployment) {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        DeploymentOutput memory existing;
 
         // If any address is zero, read from JSON (for real deployments)
         if (
@@ -112,7 +113,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
                 || betaVaultAdapterAddr == address(0) || erc7540USDCAddr == address(0) || erc7540WBTCAddr == address(0)
                 || walletUSDCAddr == address(0)
         ) {
-            DeploymentOutput memory existing = readDeploymentOutput();
+            existing = readDeploymentOutput();
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
             if (kMinterAdapterUSDCAddr == address(0)) kMinterAdapterUSDCAddr = existing.contracts.kMinterAdapterUSDC;
             if (kMinterAdapterWBTCAddr == address(0)) kMinterAdapterWBTCAddr = existing.contracts.kMinterAdapterWBTC;
@@ -169,7 +170,6 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         console.log("3. Configuring parameter checker permissions from config...");
 
         // Create a temporary DeploymentOutput struct for _resolveAddress helper
-        DeploymentOutput memory existing;
         existing.contracts.kMinterAdapterUSDC = kMinterAdapterUSDCAddr;
         existing.contracts.kMinterAdapterWBTC = kMinterAdapterWBTCAddr;
         existing.contracts.dnVaultAdapterUSDC = dnVaultAdapterUSDCAddr;

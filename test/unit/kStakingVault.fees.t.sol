@@ -434,11 +434,12 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
     function test_NextFeeTimestamps() public {
         vm.warp(TEST_TIMESTAMP);
-        vm.prank(users.admin);
+        address router = address(assetRouter);
+        vm.prank(router);
         // casting to 'uint64' is safe because TEST_TIMESTAMP fits in uint64
         // forge-lint: disable-next-line(unsafe-typecast)
         vault.notifyManagementFeesCharged(uint64(TEST_TIMESTAMP));
-        vm.prank(users.admin);
+        vm.prank(router);
         // casting to 'uint64' is safe because TEST_TIMESTAMP fits in uint64
         // forge-lint: disable-next-line(unsafe-typecast)
         vault.notifyPerformanceFeesCharged(uint64(TEST_TIMESTAMP));
@@ -480,11 +481,11 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 newTimestamp = TEST_TIMESTAMP + 22 days;
 
         vm.warp(newTimestamp); // Go to end of month
-        vm.prank(users.admin);
+        vm.prank(router);
         // casting to 'uint64' is safe because newTimestamp fits in uint64
         // forge-lint: disable-next-line(unsafe-typecast)
         vault.notifyManagementFeesCharged(uint64(newTimestamp));
-        vm.prank(users.admin);
+        vm.prank(router);
         // casting to 'uint64' is safe because newTimestamp fits in uint64
         // forge-lint: disable-next-line(unsafe-typecast)
         vault.notifyPerformanceFeesCharged(uint64(newTimestamp));
