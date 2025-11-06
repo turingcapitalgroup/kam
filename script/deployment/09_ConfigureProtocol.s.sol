@@ -22,7 +22,7 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         console.log("Network:", config.network);
         console.log("");
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         kRegistry registry = kRegistry(payable(existing.contracts.kRegistry));
 

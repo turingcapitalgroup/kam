@@ -34,7 +34,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         console.log("=== DEPLOYING VAULTS ===");
         console.log("Network:", config.network);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         // Get factory reference and deploy implementation
         factory = ERC1967Factory(existing.contracts.ERC1967Factory);

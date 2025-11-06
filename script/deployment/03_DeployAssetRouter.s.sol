@@ -20,7 +20,7 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         );
         require(existing.contracts.kRegistry != address(0), "kRegistry not deployed - run 01_DeployRegistry first");
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         // Get factory reference
         ERC1967Factory factory = ERC1967Factory(existing.contracts.ERC1967Factory);

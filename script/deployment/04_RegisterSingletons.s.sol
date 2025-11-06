@@ -23,7 +23,7 @@ contract RegisterSingletonsScript is Script, DeploymentManager {
         console.log("=== REGISTRY SINGLETON REGISTRATION ===");
         console.log("Network:", config.network);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         kRegistry registry = kRegistry(payable(existing.contracts.kRegistry));
 

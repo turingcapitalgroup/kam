@@ -92,7 +92,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         console.log("Network:", config.network);
         console.log("");
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         IkRegistry registry = IkRegistry(payable(existing.contracts.kRegistry));
 

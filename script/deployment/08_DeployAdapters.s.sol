@@ -23,7 +23,7 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         console.log("=== DEPLOYING ADAPTERS ===");
         console.log("Network:", config.network);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         // Get factory reference
         ERC1967Factory factory = ERC1967Factory(existing.contracts.ERC1967Factory);
@@ -31,27 +31,59 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         // Deploy VaultAdapter implementation (shared by all adapters)
         VaultAdapter vaultAdapterImpl = new VaultAdapter();
 
-        revert("TODO : think about adapter owner and accountId for wallet");
-
         // Deploy DN Vault USDC Adapter
-        bytes memory adapterInitData =
-            abi.encodeWithSelector(ERC7579Minimal.initialize.selector, existing.contracts.kRegistry);
-        address dnVaultAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitData);
+        bytes memory adapterInitDataUSDC = abi.encodeWithSelector(
+            ERC7579Minimal.initialize.selector,
+            address(0), // owner (zero address = no specific owner, inherits from registry)
+            existing.contracts.kRegistry,
+            "kam.dnVault.usdc"
+        );
+        address dnVaultAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataUSDC);
 
         // Deploy DN Vault WBTC Adapter
-        address dnVaultAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitData);
+        bytes memory adapterInitDataWBTC = abi.encodeWithSelector(
+            ERC7579Minimal.initialize.selector,
+            address(0),
+            existing.contracts.kRegistry,
+            "kam.dnVault.wbtc"
+        );
+        address dnVaultAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataWBTC);
 
         // Deploy Alpha Vault Adapter
-        address alphaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitData);
+        bytes memory adapterInitDataAlpha = abi.encodeWithSelector(
+            ERC7579Minimal.initialize.selector,
+            address(0),
+            existing.contracts.kRegistry,
+            "kam.alphaVault.usdc"
+        );
+        address alphaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataAlpha);
 
         // Deploy Beta Vault Adapter
-        address betaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitData);
+        bytes memory adapterInitDataBeta = abi.encodeWithSelector(
+            ERC7579Minimal.initialize.selector,
+            address(0),
+            existing.contracts.kRegistry,
+            "kam.betaVault.usdc"
+        );
+        address betaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataBeta);
 
         // Deploy kMinter USDC Adapter
-        address kMinterAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitData);
+        bytes memory adapterInitDataMinterUSDC = abi.encodeWithSelector(
+            ERC7579Minimal.initialize.selector,
+            address(0),
+            existing.contracts.kRegistry,
+            "kam.minter.usdc"
+        );
+        address kMinterAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataMinterUSDC);
 
         // Deploy kMinter WBTC Adapter
-        address kMinterAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitData);
+        bytes memory adapterInitDataMinterWBTC = abi.encodeWithSelector(
+            ERC7579Minimal.initialize.selector,
+            address(0),
+            existing.contracts.kRegistry,
+            "kam.minter.wbtc"
+        );
+        address kMinterAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataMinterWBTC);
 
         vm.stopBroadcast();
 

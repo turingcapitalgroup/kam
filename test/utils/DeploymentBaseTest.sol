@@ -5,6 +5,7 @@ import { BaseTest } from "./BaseTest.sol";
 import { ADMIN_ROLE, _1_USDC, _1_WBTC } from "./Constants.sol";
 import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { Script } from "forge-std/Script.sol";
 
 // Protocol contracts
 
@@ -26,7 +27,24 @@ import { ERC7579Minimal, VaultAdapter } from "kam/src/adapters/VaultAdapter.sol"
 // Interfaces
 import { IRegistry, IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
-contract DeploymentBaseTest is BaseTest {
+// Scripts
+import {DeployMockAssetsScript} from "kam/script/deployment/00_DeployMockAssets.s.sol";
+import {DeployRegistryScript} from "kam/script/deployment/01_DeployRegistry.s.sol"; 
+import {DeployMinterScript} from "kam/script/deployment/02_DeployMinter.s.sol"; 
+import {DeployAssetRouterScript} from "kam/script/deployment/03_DeployAssetRouter.s.sol"; 
+import {RegisterSingletonsScript} from "kam/script/deployment/04_RegisterSingletons.s.sol"; 
+import {DeployTokensScript} from "kam/script/deployment/05_DeployTokens.s.sol"; 
+import {DeployVaultModulesScript} from "kam/script/deployment/06_DeployVaultModules.s.sol"; 
+import {DeployVaultsScript} from "kam/script/deployment/07_DeployVaults.s.sol"; 
+import {DeployAdaptersScript} from "kam/script/deployment/08_DeployAdapters.s.sol"; 
+import {ConfigureProtocolScript} from "kam/script/deployment/09_ConfigureProtocol.s.sol"; 
+import {ConfigureAdapterPermissionsScript} from "kam/script/deployment/10_ConfigureAdapterPermissions.s.sol";  
+import {RegisterModulesScript} from "kam/script/deployment/11_RegisterVaultModules.s.sol";
+
+// Deployment manager for reading addresses
+import {DeploymentManager} from "kam/script/utils/DeploymentManager.sol"; 
+
+contract DeploymentBaseTest is BaseTest, DeploymentManager {
     // Core protocol contracts (proxied)
     ERC1967Factory public factory;
     kRegistry public registry;
@@ -84,307 +102,100 @@ contract DeploymentBaseTest is BaseTest {
         // Call parent setup (creates users, etc.)
         super.setUp();
 
-        // Deploy factory for the proxies
-        factory = new ERC1967Factory();
+        (new DeployMockAssetsScript()).run();
+        (new DeployRegistryScript()).run();
+        (new DeployMinterScript()).run();
+        (new DeployAssetRouterScript()).run();
+        (new RegisterSingletonsScript()).run();
+        (new DeployTokensScript()).run();
+        (new DeployVaultModulesScript()).run();
+        (new DeployVaultsScript()).run();
+        (new DeployAdaptersScript()).run();
+        (new ConfigureProtocolScript()).run();
+        (new ConfigureAdapterPermissionsScript()).run();
+        (new RegisterModulesScript()).run();
+        
+        // Read deployed addresses from JSON (single source of truth)
+        _loadDeployedContracts();
 
-        // Deploy the complete protocol
-        _deployProtocol();
-
-        // Set up roles and permissions
+        // Set up roles and permissions (if not already done by scripts)
         _setupRoles();
 
         // Fund test users with assets
         _fundUsers();
-
-        // Initialize batches for all vaults
-        _initializeBatches(); // Disabled due to setup issues
     }
 
-    function _deployProtocol() internal {
-        // 1. Deploy kRegistry (central coordinator)
-        _deployRegistry();
-
-        // 2. Deploy kAssetRouter (needs registry)
-        _deployAssetRouter();
-
-        // 3. Deploy kMinter (needs registry, assetRouter)
-        _deployMinter();
-
-        // 4. Register singleton contracts in registry (required before deploying kTokens)
-        vm.startPrank(users.admin);
-        registry.setSingletonContract(registry.K_ASSET_ROUTER(), address(assetRouter));
-        registry.setSingletonContract(registry.K_MINTER(), address(minter));
-        vm.stopPrank();
-
-        // 5. Deploy kToken contracts (needs minter to be registered in registry)
-        _deployTokens();
-
-        // 6. Deploy kStakingVaults + Modules (needs registry, assetRouter, tokens, and asset registration)
-        _deployStakingVaults();
-
-        // 7. Deploy adapters (needs registry, independent of other components)
-        _deployAdapters();
-
-        // Configure the protocol
-        _configureProtocol();
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        DEPLOYMENT FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    function _deployRegistry() internal {
-        // Deploy implementation
-        registryImpl = new kRegistry();
-
-        // Deploy proxy with initialization
-        bytes memory initData = abi.encodeWithSelector(
-            kRegistry.initialize.selector,
-            users.owner,
-            users.admin,
-            users.emergencyAdmin,
-            users.guardian,
-            users.relayer,
-            users.treasury
-        );
-
-        address registryProxy = factory.deployAndCall(address(registryImpl), users.admin, initData);
-        registry = kRegistry(payable(registryProxy));
-
-        AdapterGuardianModule registryModule = new AdapterGuardianModule();
-        bytes4[] memory registrySelectors = registryModule.selectors();
-
-        vm.prank(users.owner);
-        // Add registry module functions to all vaults
-        kRegistry(payable(address(registry))).addFunctions(registrySelectors, address(registryModule), true);
-
+    /**
+     * @notice Load deployed contracts from JSON output
+     * @dev This is the single source of truth for deployed addresses
+     */
+    function _loadDeployedContracts() internal {
+        DeploymentOutput memory output = readDeploymentOutput();
+        
+        // Load factory
+        factory = ERC1967Factory(output.contracts.ERC1967Factory);
+        
+        // Load registry
+        registryImpl = kRegistry(payable(output.contracts.kRegistryImpl));
+        registry = kRegistry(payable(output.contracts.kRegistry));
+        
+        // Load asset router
+        assetRouterImpl = kAssetRouter(payable(output.contracts.kAssetRouterImpl));
+        assetRouter = kAssetRouter(payable(output.contracts.kAssetRouter));
+        
+        // Load minter
+        minterImpl = kMinter(payable(output.contracts.kMinterImpl));
+        minter = kMinter(payable(output.contracts.kMinter));
+        
+        // Load kTokens
+        kUSD = kToken(payable(output.contracts.kUSD));
+        kBTC = kToken(payable(output.contracts.kBTC));
+        
+        // Load staking vaults
+        stakingVaultImpl = kStakingVault(payable(output.contracts.kStakingVaultImpl));
+        dnVault = IkStakingVault(payable(output.contracts.dnVaultUSDC));
+        alphaVault = IkStakingVault(payable(output.contracts.alphaVault));
+        betaVault = IkStakingVault(payable(output.contracts.betaVault));
+        
+        // Load modules
+        readerModule = ReaderModule(output.contracts.readerModule);
+        
+        // Load adapters
+        vaultAdapterImpl = VaultAdapter(output.contracts.vaultAdapterImpl);
+        minterAdapterUSDC = VaultAdapter(output.contracts.kMinterAdapterUSDC);
+        minterAdapterWBTC = VaultAdapter(output.contracts.kMinterAdapterWBTC);
+        DNVaultAdapterUSDC = VaultAdapter(output.contracts.dnVaultAdapterUSDC);
+        ALPHAVaultAdapterUSDC = VaultAdapter(output.contracts.alphaVaultAdapter);
+        BETHAVaultAdapterUSDC = VaultAdapter(output.contracts.betaVaultAdapter);
+        
         // Label for debugging
+        vm.label(address(factory), "ERC1967Factory");
         vm.label(address(registry), "kRegistry");
         vm.label(address(registryImpl), "kRegistryImpl");
-    }
-
-    function _deployAssetRouter() internal {
-        // Deploy implementation
-        assetRouterImpl = new kAssetRouter();
-
-        // Deploy proxy with initialization
-        bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, address(registry));
-
-        address assetRouterProxy = factory.deployAndCall(address(assetRouterImpl), users.admin, initData);
-        assetRouter = kAssetRouter(payable(assetRouterProxy));
-        vm.prank(users.admin);
-        assetRouter.setSettlementCooldown(0);
-
-        // Label for debugging
         vm.label(address(assetRouter), "kAssetRouter");
         vm.label(address(assetRouterImpl), "kAssetRouterImpl");
-    }
-
-    function _deployTokens() internal {
-        // Deploy kUSD through registry using mock USDC address
-        vm.startPrank(users.admin);
-        address kUSDAddress = registry.registerAsset(
-            KUSD_NAME, KUSD_SYMBOL, tokens.usdc, registry.USDC(), type(uint256).max, type(uint256).max
-        );
-        kUSD = kToken(payable(kUSDAddress));
-        kUSD.grantEmergencyRole(users.emergencyAdmin);
-
-        address kBTCAddress = registry.registerAsset(
-            KBTC_NAME, KBTC_SYMBOL, tokens.wbtc, registry.WBTC(), type(uint256).max, type(uint256).max
-        );
-        kBTC = kToken(payable(kBTCAddress));
-        kBTC.grantEmergencyRole(users.emergencyAdmin);
-        vm.stopPrank();
-
-        // Label for debugging
-        vm.label(address(kUSD), "kUSD");
-        vm.label(address(kBTC), "kBTC");
-    }
-
-    function _deployMinter() internal {
-        // Deploy implementation
-        minterImpl = new kMinter();
-
-        // Deploy proxy with initialization
-        bytes memory initData = abi.encodeWithSelector(kMinter.initialize.selector, address(registry));
-
-        address minterProxy = factory.deployAndCall(address(minterImpl), users.admin, initData);
-        minter = kMinter(payable(minterProxy));
-
-        // Label for debugging
         vm.label(address(minter), "kMinter");
         vm.label(address(minterImpl), "kMinterImpl");
-    }
-
-    function _deployStakingVaults() internal {
-        vm.startPrank(users.admin);
-
-        // Deploy implementation (shared across all vaults)
-        stakingVaultImpl = new kStakingVault();
-
-        // Deploy DN Vault (Type 0 - works with kMinter for institutional flows)
-        dnVault = _deployVault(DN_VAULT_NAME, DN_VAULT_SYMBOL, "DN");
-
-        // Deploy Alpha Vault (Type 1 - for retail staking)
-        alphaVault = _deployVault(ALPHA_VAULT_NAME, ALPHA_VAULT_SYMBOL, "Alpha");
-
-        // Deploy Beta Vault (Type 2 - for advanced staking strategies)
-        betaVault = _deployVault(BETA_VAULT_NAME, BETA_VAULT_SYMBOL, "Beta");
-
-        // Label shared components
+        vm.label(address(kUSD), "kUSD");
+        vm.label(address(kBTC), "kBTC");
         vm.label(address(stakingVaultImpl), "kStakingVaultImpl");
+        vm.label(address(dnVault), "DNVault");
+        vm.label(address(alphaVault), "AlphaVault");
+        vm.label(address(betaVault), "BetaVault");
         vm.label(address(readerModule), "ReaderModule");
-    }
-
-    function _deployVault(
-        string memory name,
-        string memory symbol,
-        string memory label
-    )
-        internal
-        returns (IkStakingVault vault)
-    {
-        // Deploy proxy with initialization
-        bytes memory initData = abi.encodeWithSelector(
-            kStakingVault.initialize.selector,
-            users.owner,
-            address(registry),
-            false, // paused
-            name,
-            symbol,
-            6, // decimals
-            tokens.usdc // underlying asset (USDC for now)
-        );
-
-        address vaultProxy = factory.deployAndCall(address(stakingVaultImpl), users.admin, initData);
-        vault = IkStakingVault(payable(vaultProxy));
-
-        // Label for debugging
-        vm.label(address(vault), string(abi.encodePacked(label, "Vault")));
-
-        return vault;
-    }
-
-    function _deployAdapters() internal {
-        // Deploy VaultAdapter implementation
-        vaultAdapterImpl = new VaultAdapter();
-
-        // Deploy ERC1967 proxy with initialization (UUPSUpgradeable pattern)
-        bytes memory adapterInitData = abi.encodeWithSelector(
-            ERC7579Minimal.initialize.selector, address(0), address(registry), "kam.vaultAdapter"
-        );
-
-        // Deploy proxy with initialization using ERC1967Factory
-        minterAdapterUSDC = VaultAdapter(factory.deployAndCall(address(vaultAdapterImpl), users.admin, adapterInitData));
-        minterAdapterWBTC = VaultAdapter(factory.deployAndCall(address(vaultAdapterImpl), users.admin, adapterInitData));
-        DNVaultAdapterUSDC =
-            VaultAdapter(factory.deployAndCall(address(vaultAdapterImpl), users.admin, adapterInitData));
-        ALPHAVaultAdapterUSDC =
-            VaultAdapter(factory.deployAndCall(address(vaultAdapterImpl), users.admin, adapterInitData));
-        BETHAVaultAdapterUSDC =
-            VaultAdapter(factory.deployAndCall(address(vaultAdapterImpl), users.admin, adapterInitData));
-        vaultAdapter6 = VaultAdapter(factory.deployAndCall(address(vaultAdapterImpl), users.admin, adapterInitData));
-
-        // Label for debugging
-        vm.label(address(minterAdapterUSDC), "VaultAdapter1");
-        vm.label(address(minterAdapterWBTC), "VaultAdapter2");
-        vm.label(address(DNVaultAdapterUSDC), "VaultAdapter3");
-        vm.label(address(ALPHAVaultAdapterUSDC), "VaultAdapter4");
-        vm.label(address(BETHAVaultAdapterUSDC), "VaultAdapter5");
-        vm.label(address(vaultAdapter6), "VaultAdapter6");
+        vm.label(address(minterAdapterUSDC), "MinterAdapterUSDC");
+        vm.label(address(minterAdapterWBTC), "MinterAdapterWBTC");
+        vm.label(address(DNVaultAdapterUSDC), "DNVaultAdapterUSDC");
+        vm.label(address(ALPHAVaultAdapterUSDC), "ALPHAVaultAdapterUSDC");
+        vm.label(address(BETHAVaultAdapterUSDC), "BETHAVaultAdapterUSDC");
         vm.label(address(vaultAdapterImpl), "VaultAdapterImpl");
     }
 
-    /* //////////////////////////////////////////////////////////////
-                        CONFIGURATION FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    function _configureProtocol() internal {
-        // Register Vaults
-        vm.startPrank(users.admin);
-        registry.registerVault(address(minter), IRegistry.VaultType.MINTER, tokens.usdc);
-        registry.registerVault(address(dnVault), IRegistry.VaultType.DN, tokens.usdc);
-        registry.registerVault(address(alphaVault), IRegistry.VaultType.ALPHA, tokens.usdc);
-        registry.registerVault(address(betaVault), IRegistry.VaultType.BETA, tokens.usdc);
-
-        // Register adapters for vaults (if adapters were deployed)
-        registry.registerAdapter(address(minter), tokens.usdc, address(minterAdapterUSDC));
-        registry.registerAdapter(address(minter), tokens.wbtc, address(minterAdapterWBTC));
-        registry.registerAdapter(address(dnVault), tokens.usdc, address(DNVaultAdapterUSDC));
-        registry.registerAdapter(address(alphaVault), tokens.usdc, address(ALPHAVaultAdapterUSDC));
-        registry.registerAdapter(address(betaVault), tokens.usdc, address(BETHAVaultAdapterUSDC));
-
-        IkRegistry(address(registry))
-            .setAdapterAllowedSelector(
-                address(minterAdapterUSDC), tokens.usdc, 1, bytes4(keccak256("transfer(address,uint256)")), true
-            );
-
-        IkRegistry(address(registry))
-            .setAdapterAllowedSelector(
-                address(ALPHAVaultAdapterUSDC), tokens.usdc, 1, bytes4(keccak256("transfer(address,uint256)")), true
-            );
-
-        registry.setAssetBatchLimits(address(dnVault), type(uint256).max, type(uint256).max);
-        registry.setAssetBatchLimits(address(alphaVault), type(uint256).max, type(uint256).max);
-        registry.setAssetBatchLimits(address(betaVault), type(uint256).max, type(uint256).max);
-
-        dnVault.setMaxTotalAssets(type(uint128).max);
-        alphaVault.setMaxTotalAssets(type(uint128).max);
-        betaVault.setMaxTotalAssets(type(uint128).max);
-
-        vm.stopPrank();
-
-        // Give admin permissions to router
-        vm.prank(users.owner);
-        registry.grantRoles(address(assetRouter), ADMIN_ROLE);
-    }
-
-    function _initializeBatches() internal {
-        _registerModules();
-
-        vm.startPrank(users.relayer);
-
-        bytes4 createBatchSelector = bytes4(keccak256("createNewBatch()"));
-
-        (bool success1,) = address(dnVault).call(abi.encodeWithSelector(createBatchSelector));
-        require(success1, "DN vault batch creation failed");
-
-        (bool success2,) = address(alphaVault).call(abi.encodeWithSelector(createBatchSelector));
-        require(success2, "Alpha vault batch creation failed");
-
-        (bool success3,) = address(betaVault).call(abi.encodeWithSelector(createBatchSelector));
-        require(success3, "Beta vault batch creation failed");
-
-        // // Create initial batch for Minter vault
-        // (bool success4,) = address(minter).call(abi.encodeWithSelector(createBatchSelector));
-        // require(success4, "Minter vault batch creation failed");
-
-        vm.stopPrank();
-    }
-
-    function _registerModules() internal {
-        readerModule = new ReaderModule();
-        bytes4[] memory readerSelectors = readerModule.selectors();
-
-        // Register modules as vault admin
-        vm.startPrank(users.owner);
-
-        kStakingVault(payable(address(dnVault))).addFunctions(readerSelectors, address(readerModule), true);
-        kStakingVault(payable(address(alphaVault))).addFunctions(readerSelectors, address(readerModule), true);
-        kStakingVault(payable(address(betaVault))).addFunctions(readerSelectors, address(readerModule), true);
-
-        vm.stopPrank();
-    }
-
-    /// @dev Set up complete role hierarchy
+    /// @dev Set up additional roles for testing (scripts handle main roles)
     function _setupRoles() internal {
         vm.startPrank(users.admin);
-        kUSD.grantMinterRole(address(minter));
-        kBTC.grantMinterRole(address(minter));
-        kUSD.grantMinterRole(address(assetRouter));
-        kBTC.grantMinterRole(address(assetRouter));
 
-        registry.grantInstitutionRole(users.institution);
+        // Grant additional institution roles for testing
         registry.grantInstitutionRole(users.institution2);
         registry.grantInstitutionRole(users.institution3);
         registry.grantInstitutionRole(users.institution4);

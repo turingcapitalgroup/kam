@@ -17,7 +17,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
         validateConfig(config);
         logConfig(config);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.owner);
 
         // Deploy factory for proxy deployment
         ERC1967Factory factory = new ERC1967Factory();

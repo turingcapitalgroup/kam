@@ -24,7 +24,7 @@ contract DeployTokensScript is Script, DeploymentManager {
         console.log("=== KTOKEN DEPLOYMENT ===");
         console.log("Network:", config.network);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         kRegistry registry = kRegistry(payable(existing.contracts.kRegistry));
 

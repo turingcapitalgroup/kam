@@ -44,7 +44,7 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         console.log("Network:", config.network);
         console.log("Chain ID:", config.chainId);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         MockERC20 mockUSDC = new MockERC20("Mock USDC", "USDC", 6);
         MockERC20 mockWBTC = new MockERC20("Mock WBTC", "WBTC", 8);
@@ -102,14 +102,13 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         return usdcDeployed && wbtcDeployed;
     }
 
-    // New function signature including the MockWallet address
     function _updateNetworkConfig(
         string memory network,
         address mockUSDC,
         address mockWBTC,
         address mockERC7540USDC,
         address mockERC7540WBTC,
-        address mockWalletUSDC // Added MockWallet address
+        address mockWalletUSDC
     )
         internal
     {
@@ -127,24 +126,15 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         vm.writeJson(vm.toString(mockERC7540WBTC), configPath, ".ERC7540s.WBTC");
 
         // 3. Update the MockWallet Address
-        // This key may not exist in the original config, so we add a new top-level
-        // key or update an existing key where the MockWallet address should reside.
-        // Assuming there is a 'mockTargets' key or similar structure for non-standard assets.
-        // For simplicity, let's update an existing role or add a new key if needed.
-        // Based on the provided JSON structure, it's safer to add a new top-level key for mock-specific addresses.
-        // Since `MockWallet` isn't a main asset, we'll write it to a new mock-specific section.
-        // NOTE: If you need it in a specific existing key (like 'roles'), change the path here.
         vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".mockAssets.WalletUSDC");
 
         console.log("Updated config file with mock asset addresses");
     }
 
-    // ... (rest of the helper functions remain the same)
-
     function _mintTokensForTesting(MockERC20 mockUSDC, MockERC20 mockWBTC, NetworkConfig memory config) internal {
         console.log("=== MINTING TOKENS FOR TESTING (from config) ===");
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         // Use mint amounts from config
         uint256 usdcMintAmount = config.mockAssets.mintAmounts.USDC;
@@ -207,7 +197,7 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
     {
         console.log("=== MINTING TOKENS TO MOCK TARGETS (from config) ===");
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         // Use mock target amounts from config
         uint256 usdcAmount = config.mockAssets.mockTargetAmounts.USDC;

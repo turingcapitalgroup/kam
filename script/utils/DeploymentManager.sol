@@ -188,6 +188,16 @@ abstract contract DeploymentManager is Script {
         config.network = json.readString(".network");
         config.chainId = json.readUint(".chainId");
 
+        // Parse in smaller chunks to avoid stack too deep
+        _readRolesAndAssets(json, config);
+        _readCustodialTargets(json, config);
+        _readTokensAndVaults(json, config);
+        _readRouterAndMocks(json, config);
+
+        return config;
+    }
+
+    function _readRolesAndAssets(string memory json, NetworkConfig memory config) private view {
         // Parse role addresses
         config.roles.owner = json.readAddress(".roles.owner");
         config.roles.admin = json.readAddress(".roles.admin");
@@ -204,15 +214,17 @@ abstract contract DeploymentManager is Script {
         // Parse ERC7540 addresses
         config.ERC7540s.USDC = json.readAddress(".ERC7540s.USDC");
         config.ERC7540s.WBTC = json.readAddress(".ERC7540s.WBTC");
+    }
 
-        // Parse custodial targets (optional, may be zero for production)
-        if (json.keyExists(".custodialTargets.walletUSDC")) {
-            config.custodialTargets.walletUSDC = json.readAddress(".custodialTargets.walletUSDC");
-        }
-        if (json.keyExists(".custodialTargets.walletWBTC")) {
-            config.custodialTargets.walletWBTC = json.readAddress(".custodialTargets.walletWBTC");
-        }
+    function _readCustodialTargets(string memory json, NetworkConfig memory config) private pure {
+        // Parse custodial wallet addresses (for CEFFU mock / real custody)
+        // Read from mockAssets.WalletUSDC for now (will migrate to custodialTargets later)
+        config.custodialTargets.walletUSDC = json.readAddress(".mockAssets.WalletUSDC");
+        // WBTC wallet can be same or different - add to config if needed
+        config.custodialTargets.walletWBTC = config.custodialTargets.walletUSDC; // Using same wallet for now
+    }
 
+    function _readTokensAndVaults(string memory json, NetworkConfig memory config) private pure {
         // Parse kToken configs
         config.kUSD = _readKTokenConfig(json, ".kTokens.kUSD");
         config.kBTC = _readKTokenConfig(json, ".kTokens.kBTC");
@@ -222,7 +234,9 @@ abstract contract DeploymentManager is Script {
         config.dnVaultWBTC = _readVaultConfig(json, ".vaults.dnVaultWBTC");
         config.alphaVault = _readVaultConfig(json, ".vaults.alphaVault");
         config.betaVault = _readVaultConfig(json, ".vaults.betaVault");
+    }
 
+    function _readRouterAndMocks(string memory json, NetworkConfig memory config) private pure {
         // Parse asset router config
         config.assetRouter.settlementCooldown = json.readUint(".assetRouter.settlementCooldown");
         config.assetRouter.maxAllowedDelta = json.readUint(".assetRouter.maxAllowedDelta");
@@ -236,8 +250,6 @@ abstract contract DeploymentManager is Script {
         config.mockAssets.mintAmounts.WBTC = json.readUint(".mockAssets.mintAmounts.WBTC");
         config.mockAssets.mockTargetAmounts.USDC = json.readUint(".mockAssets.mockTargetAmounts.USDC");
         config.mockAssets.mockTargetAmounts.WBTC = json.readUint(".mockAssets.mockTargetAmounts.WBTC");
-
-        return config;
     }
 
     function _readKTokenConfig(string memory json, string memory path) private pure returns (KTokenConfig memory) {

@@ -14,7 +14,7 @@ contract DeployVaultModulesScript is Script, DeploymentManager {
         console.log("=== DEPLOYING VAULT MODULES ===");
         console.log("Network:", config.network);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
         // Deploy modules (these are facet implementations, no proxy needed)
         ReaderModule readerModule = new ReaderModule();

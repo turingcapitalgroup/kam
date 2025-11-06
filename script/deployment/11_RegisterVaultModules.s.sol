@@ -30,7 +30,7 @@ contract RegisterModulesScript is DeploymentManager {
         ReaderModule readerModule = ReaderModule(existing.contracts.readerModule);
         bytes4[] memory readerSelectors = readerModule.selectors();
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.owner);
 
         // Register ReaderModule to DN Vault USDC
         kStakingVault dnVaultUSDC = kStakingVault(payable(existing.contracts.dnVaultUSDC));
