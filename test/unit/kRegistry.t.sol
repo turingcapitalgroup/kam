@@ -358,7 +358,7 @@ contract kRegistryTest is DeploymentBaseTest {
     function test_AuthorizeUpgrade_OnlyOwner() public {
         address newImpl = address(new kRegistry());
 
-        vm.prank(users.admin);
+        vm.prank(address(assetRouter));
         vm.expectRevert();
         registry.upgradeToAndCall(newImpl, "");
 

@@ -344,7 +344,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vm.expectEmit(true, false, false, true);
         emit ManagementFeesCharged(timestamp);
 
-        vm.prank(users.admin);
+        vm.prank(address(assetRouter));
         vault.notifyManagementFeesCharged(timestamp);
 
         assertEq(vault.lastFeesChargedManagement(), timestamp);
@@ -354,14 +354,15 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         // set a management fee timestamp
         // we warped so we can go back in time
         vm.warp(5000);
-        vm.prank(users.admin);
+        address router = address(assetRouter);
+        vm.prank(router);
         vault.notifyManagementFeesCharged(uint64(block.timestamp));
 
         // set timestamp in the past (before the last timestamp)
         uint64 pastTimestamp = uint64(block.timestamp - 1000);
 
         vm.expectRevert(bytes(VAULTFEES_INVALID_TIMESTAMP));
-        vm.prank(users.admin);
+        vm.prank(router);
         vault.notifyManagementFeesCharged(pastTimestamp);
     }
 
@@ -370,7 +371,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint64 futureTimestamp = uint64(block.timestamp + 1000);
 
         vm.expectRevert(bytes(VAULTFEES_INVALID_TIMESTAMP));
-        vm.prank(users.admin);
+        vm.prank(address(assetRouter));
         vault.notifyManagementFeesCharged(futureTimestamp);
     }
 
@@ -380,7 +381,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vm.expectEmit(true, false, false, true);
         emit PerformanceFeesCharged(timestamp);
 
-        vm.prank(users.admin);
+        vm.prank(address(assetRouter));
         vault.notifyPerformanceFeesCharged(timestamp);
 
         assertEq(vault.lastFeesChargedPerformance(), timestamp);
