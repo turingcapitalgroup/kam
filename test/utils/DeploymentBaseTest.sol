@@ -3,10 +3,9 @@ pragma solidity 0.8.30;
 
 import { BaseTest } from "./BaseTest.sol";
 import { Utilities } from "./Utilities.sol";
-import { ADMIN_ROLE, _1_USDC, _1_WBTC } from "./Constants.sol";
+import { _1_USDC, _1_WBTC } from "./Constants.sol";
 import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
-import { Script } from "forge-std/Script.sol";
 
 // Protocol contracts
 
@@ -19,14 +18,13 @@ import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 import { kToken } from "kam/src/kToken.sol";
 
 // Modules
-import { AdapterGuardianModule } from "kam/src/kRegistry/modules/AdapterGuardianModule.sol";
 import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
 // Adapters
-import { ERC7579Minimal, VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
+import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 
 // Interfaces
-import { IRegistry, IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
+import { IRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 // Scripts
 import {DeployMockAssetsScript} from "kam/script/deployment/00_DeployMockAssets.s.sol";
@@ -103,13 +101,10 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         utils = new Utilities();
         _createUsers();
 
-        // Deploy mocks and capture addresses (don't write to JSON in tests)
         DeployMockAssetsScript.MockAssets memory mocks = (new DeployMockAssetsScript()).run(false);
         
-        // Setup assets using captured addresses (instead of reading from JSON)
         _setupAssets(mocks.USDC, mocks.WBTC);
         
-        // Label addresses for better trace output
         _labelAddresses();
         
         // Now deploy protocol contracts
@@ -139,7 +134,7 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         DeployAdaptersScript.AdaptersDeployment memory adaptersDeploy = 
             (new DeployAdaptersScript()).run(false, registryDeploy.factory, registryDeploy.registry);
         
-        // Configure protocol (no JSON writes, just configuration)
+        // Configure protocol
         (new ConfigureProtocolScript()).run(
             registryDeploy.registry,
             minterDeploy.minter,
@@ -158,23 +153,20 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             adaptersDeploy.kMinterAdapterWBTC
         );
         
-        // Configure adapter permissions (no JSON writes, deploys parameter checker)
-        ConfigureAdapterPermissionsScript.AdapterPermissionsDeployment memory permissionsDeploy =
-            (new ConfigureAdapterPermissionsScript()).run(
-                false,
-                registryDeploy.registry,
-                adaptersDeploy.kMinterAdapterUSDC,
-                adaptersDeploy.kMinterAdapterWBTC,
-                adaptersDeploy.dnVaultAdapterUSDC,
-                adaptersDeploy.dnVaultAdapterWBTC,
-                adaptersDeploy.alphaVaultAdapter,
-                adaptersDeploy.betaVaultAdapter,
-                mocks.ERC7540USDC,
-                mocks.ERC7540WBTC,
-                mocks.WalletUSDC
-            );
+        (new ConfigureAdapterPermissionsScript()).run(
+            false,
+            registryDeploy.registry,
+            adaptersDeploy.kMinterAdapterUSDC,
+            adaptersDeploy.kMinterAdapterWBTC,
+            adaptersDeploy.dnVaultAdapterUSDC,
+            adaptersDeploy.dnVaultAdapterWBTC,
+            adaptersDeploy.alphaVaultAdapter,
+            adaptersDeploy.betaVaultAdapter,
+            mocks.ERC7540USDC,
+            mocks.ERC7540WBTC,
+            mocks.WalletUSDC
+        );
         
-        // Register modules to vaults (no JSON writes, just registration)
         (new RegisterModulesScript()).run(
             modulesDeploy.readerModule,
             vaultsDeploy.dnVaultUSDC,
@@ -183,7 +175,6 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             vaultsDeploy.betaVault
         );
         
-        // Load contracts from captured return values
         factory = ERC1967Factory(registryDeploy.factory);
         registryImpl = kRegistry(payable(registryDeploy.registryImpl));
         registry = kRegistry(payable(registryDeploy.registry));
@@ -199,13 +190,11 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         
         readerModule = ReaderModule(modulesDeploy.readerModule);
         
-        // Load staking vaults from captured return values
         stakingVaultImpl = kStakingVault(payable(vaultsDeploy.stakingVaultImpl));
         dnVault = IkStakingVault(payable(vaultsDeploy.dnVaultUSDC));
         alphaVault = IkStakingVault(payable(vaultsDeploy.alphaVault));
         betaVault = IkStakingVault(payable(vaultsDeploy.betaVault));
         
-        // Load adapters from captured return values
         vaultAdapterImpl = VaultAdapter(adaptersDeploy.vaultAdapterImpl);
         minterAdapterUSDC = VaultAdapter(adaptersDeploy.kMinterAdapterUSDC);
         minterAdapterWBTC = VaultAdapter(adaptersDeploy.kMinterAdapterWBTC);

@@ -197,7 +197,7 @@ abstract contract DeploymentManager is Script {
         return config;
     }
 
-    function _readRolesAndAssets(string memory json, NetworkConfig memory config) private view {
+    function _readRolesAndAssets(string memory json, NetworkConfig memory config) private pure {
         // Parse role addresses
         config.roles.owner = json.readAddress(".roles.owner");
         config.roles.admin = json.readAddress(".roles.admin");
