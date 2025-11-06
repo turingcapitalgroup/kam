@@ -8,7 +8,14 @@ import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
 contract DeployVaultModulesScript is Script, DeploymentManager {
-    function run() public {
+    struct VaultModulesDeployment {
+        address readerModule;
+    }
+
+    /// @notice Deploy vault modules
+    /// @param writeToJson If true, writes addresses to JSON (for real deployments)
+    /// @return deployment Struct containing deployed module addresses
+    function run(bool writeToJson) public returns (VaultModulesDeployment memory deployment) {
         NetworkConfig memory config = readNetworkConfig();
 
         console.log("=== DEPLOYING VAULT MODULES ===");
@@ -21,11 +28,22 @@ contract DeployVaultModulesScript is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        // Write addresses to deployment JSON
-        writeContractAddress("readerModule", address(readerModule));
-
         console.log("=== DEPLOYMENT COMPLETE ===");
         console.log("ReaderModule:", address(readerModule));
-        console.log("Addresses saved to deployments/output/", config.network, "/addresses.json");
+
+        // Return deployed addresses
+        deployment = VaultModulesDeployment({readerModule: address(readerModule)});
+
+        // Write to JSON only if requested
+        if (writeToJson) {
+            writeContractAddress("readerModule", address(readerModule));
+        }
+
+        return deployment;
+    }
+
+    /// @notice Convenience wrapper for real deployments (writes to JSON)
+    function run() public returns (VaultModulesDeployment memory) {
+        return run(true);
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import { BaseTest } from "./BaseTest.sol";
+import { Utilities } from "./Utilities.sol";
 import { ADMIN_ROLE, _1_USDC, _1_WBTC } from "./Constants.sol";
 import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
@@ -86,12 +87,12 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
     string public constant KBTC_NAME = "KAM BTC";
     string public constant KBTC_SYMBOL = "kBTC";
 
-    // Vault names and symbols
-    string public constant DN_VAULT_NAME = "DN KAM Vault";
+    // Vault names and symbols (must match deployments/config/localhost.json)
+    string public constant DN_VAULT_NAME = "KAM DN Vault USD";
     string public constant DN_VAULT_SYMBOL = "dnkUSD";
-    string public constant ALPHA_VAULT_NAME = "Alpha KAM Vault";
+    string public constant ALPHA_VAULT_NAME = "KAM Alpha Vault USD";
     string public constant ALPHA_VAULT_SYMBOL = "akUSD";
-    string public constant BETA_VAULT_NAME = "Beta KAM Vault";
+    string public constant BETA_VAULT_NAME = "KAM Beta Vault USD";
     string public constant BETA_VAULT_SYMBOL = "bkUSD";
 
     /* //////////////////////////////////////////////////////////////
@@ -99,24 +100,120 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
     //////////////////////////////////////////////////////////////*/
 
     function setUp() public virtual override {
-        // Call parent setup (creates users, etc.)
-        super.setUp();
+        utils = new Utilities();
+        _createUsers();
 
-        (new DeployMockAssetsScript()).run();
-        (new DeployRegistryScript()).run();
-        (new DeployMinterScript()).run();
-        (new DeployAssetRouterScript()).run();
-        (new RegisterSingletonsScript()).run();
-        (new DeployTokensScript()).run();
-        (new DeployVaultModulesScript()).run();
-        (new DeployVaultsScript()).run();
-        (new DeployAdaptersScript()).run();
-        (new ConfigureProtocolScript()).run();
-        (new ConfigureAdapterPermissionsScript()).run();
-        (new RegisterModulesScript()).run();
+        // Deploy mocks and capture addresses (don't write to JSON in tests)
+        DeployMockAssetsScript.MockAssets memory mocks = (new DeployMockAssetsScript()).run(false);
         
-        // Read deployed addresses from JSON (single source of truth)
-        _loadDeployedContracts();
+        // Setup assets using captured addresses (instead of reading from JSON)
+        _setupAssets(mocks.USDC, mocks.WBTC);
+        
+        // Label addresses for better trace output
+        _labelAddresses();
+        
+        // Now deploy protocol contracts
+        DeployRegistryScript.RegistryDeployment memory registryDeploy = (new DeployRegistryScript()).run(false);
+        
+        // Deploy minter and asset router, passing factory and registry addresses
+        DeployMinterScript.MinterDeployment memory minterDeploy = 
+            (new DeployMinterScript()).run(false, registryDeploy.factory, registryDeploy.registry);
+        
+        DeployAssetRouterScript.AssetRouterDeployment memory assetRouterDeploy =
+            (new DeployAssetRouterScript()).run(false, registryDeploy.factory, registryDeploy.registry);
+        
+        // Register singletons (no JSON read/write in tests)
+        (new RegisterSingletonsScript()).run(registryDeploy.registry, assetRouterDeploy.assetRouter, minterDeploy.minter);
+        
+        // Deploy kTokens
+        DeployTokensScript.TokenDeployment memory tokenDeploy = (new DeployTokensScript()).run(false, registryDeploy.registry);
+        
+        // Deploy vault modules
+        DeployVaultModulesScript.VaultModulesDeployment memory modulesDeploy = (new DeployVaultModulesScript()).run(false);
+        
+        // Deploy vaults
+        DeployVaultsScript.VaultsDeployment memory vaultsDeploy = 
+            (new DeployVaultsScript()).run(false, registryDeploy.factory, registryDeploy.registry, modulesDeploy.readerModule, tokenDeploy.kUSD, tokenDeploy.kBTC);
+        
+        // Deploy adapters
+        DeployAdaptersScript.AdaptersDeployment memory adaptersDeploy = 
+            (new DeployAdaptersScript()).run(false, registryDeploy.factory, registryDeploy.registry);
+        
+        // Configure protocol (no JSON writes, just configuration)
+        (new ConfigureProtocolScript()).run(
+            registryDeploy.registry,
+            minterDeploy.minter,
+            assetRouterDeploy.assetRouter,
+            tokenDeploy.kUSD,
+            tokenDeploy.kBTC,
+            vaultsDeploy.dnVaultUSDC,
+            vaultsDeploy.dnVaultWBTC,
+            vaultsDeploy.alphaVault,
+            vaultsDeploy.betaVault,
+            adaptersDeploy.dnVaultAdapterUSDC,
+            adaptersDeploy.dnVaultAdapterWBTC,
+            adaptersDeploy.alphaVaultAdapter,
+            adaptersDeploy.betaVaultAdapter,
+            adaptersDeploy.kMinterAdapterUSDC,
+            adaptersDeploy.kMinterAdapterWBTC
+        );
+        
+        // Configure adapter permissions (no JSON writes, deploys parameter checker)
+        ConfigureAdapterPermissionsScript.AdapterPermissionsDeployment memory permissionsDeploy =
+            (new ConfigureAdapterPermissionsScript()).run(
+                false,
+                registryDeploy.registry,
+                adaptersDeploy.kMinterAdapterUSDC,
+                adaptersDeploy.kMinterAdapterWBTC,
+                adaptersDeploy.dnVaultAdapterUSDC,
+                adaptersDeploy.dnVaultAdapterWBTC,
+                adaptersDeploy.alphaVaultAdapter,
+                adaptersDeploy.betaVaultAdapter,
+                mocks.ERC7540USDC,
+                mocks.ERC7540WBTC,
+                mocks.WalletUSDC
+            );
+        
+        // Register modules to vaults (no JSON writes, just registration)
+        (new RegisterModulesScript()).run(
+            modulesDeploy.readerModule,
+            vaultsDeploy.dnVaultUSDC,
+            vaultsDeploy.dnVaultWBTC,
+            vaultsDeploy.alphaVault,
+            vaultsDeploy.betaVault
+        );
+        
+        // Load contracts from captured return values
+        factory = ERC1967Factory(registryDeploy.factory);
+        registryImpl = kRegistry(payable(registryDeploy.registryImpl));
+        registry = kRegistry(payable(registryDeploy.registry));
+        
+        minterImpl = kMinter(payable(minterDeploy.minterImpl));
+        minter = kMinter(payable(minterDeploy.minter));
+        
+        assetRouterImpl = kAssetRouter(payable(assetRouterDeploy.assetRouterImpl));
+        assetRouter = kAssetRouter(payable(assetRouterDeploy.assetRouter));
+        
+        kUSD = kToken(payable(tokenDeploy.kUSD));
+        kBTC = kToken(payable(tokenDeploy.kBTC));
+        
+        readerModule = ReaderModule(modulesDeploy.readerModule);
+        
+        // Load staking vaults from captured return values
+        stakingVaultImpl = kStakingVault(payable(vaultsDeploy.stakingVaultImpl));
+        dnVault = IkStakingVault(payable(vaultsDeploy.dnVaultUSDC));
+        alphaVault = IkStakingVault(payable(vaultsDeploy.alphaVault));
+        betaVault = IkStakingVault(payable(vaultsDeploy.betaVault));
+        
+        // Load adapters from captured return values
+        vaultAdapterImpl = VaultAdapter(adaptersDeploy.vaultAdapterImpl);
+        minterAdapterUSDC = VaultAdapter(adaptersDeploy.kMinterAdapterUSDC);
+        minterAdapterWBTC = VaultAdapter(adaptersDeploy.kMinterAdapterWBTC);
+        DNVaultAdapterUSDC = VaultAdapter(adaptersDeploy.dnVaultAdapterUSDC);
+        ALPHAVaultAdapterUSDC = VaultAdapter(adaptersDeploy.alphaVaultAdapter);
+        BETHAVaultAdapterUSDC = VaultAdapter(adaptersDeploy.betaVaultAdapter);
+        
+        _labelContracts();
 
         // Set up roles and permissions (if not already done by scripts)
         _setupRoles();
@@ -126,49 +223,9 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
     }
 
     /**
-     * @notice Load deployed contracts from JSON output
-     * @dev This is the single source of truth for deployed addresses
+     * @notice Label contracts for debugging
      */
-    function _loadDeployedContracts() internal {
-        DeploymentOutput memory output = readDeploymentOutput();
-        
-        // Load factory
-        factory = ERC1967Factory(output.contracts.ERC1967Factory);
-        
-        // Load registry
-        registryImpl = kRegistry(payable(output.contracts.kRegistryImpl));
-        registry = kRegistry(payable(output.contracts.kRegistry));
-        
-        // Load asset router
-        assetRouterImpl = kAssetRouter(payable(output.contracts.kAssetRouterImpl));
-        assetRouter = kAssetRouter(payable(output.contracts.kAssetRouter));
-        
-        // Load minter
-        minterImpl = kMinter(payable(output.contracts.kMinterImpl));
-        minter = kMinter(payable(output.contracts.kMinter));
-        
-        // Load kTokens
-        kUSD = kToken(payable(output.contracts.kUSD));
-        kBTC = kToken(payable(output.contracts.kBTC));
-        
-        // Load staking vaults
-        stakingVaultImpl = kStakingVault(payable(output.contracts.kStakingVaultImpl));
-        dnVault = IkStakingVault(payable(output.contracts.dnVaultUSDC));
-        alphaVault = IkStakingVault(payable(output.contracts.alphaVault));
-        betaVault = IkStakingVault(payable(output.contracts.betaVault));
-        
-        // Load modules
-        readerModule = ReaderModule(output.contracts.readerModule);
-        
-        // Load adapters
-        vaultAdapterImpl = VaultAdapter(output.contracts.vaultAdapterImpl);
-        minterAdapterUSDC = VaultAdapter(output.contracts.kMinterAdapterUSDC);
-        minterAdapterWBTC = VaultAdapter(output.contracts.kMinterAdapterWBTC);
-        DNVaultAdapterUSDC = VaultAdapter(output.contracts.dnVaultAdapterUSDC);
-        ALPHAVaultAdapterUSDC = VaultAdapter(output.contracts.alphaVaultAdapter);
-        BETHAVaultAdapterUSDC = VaultAdapter(output.contracts.betaVaultAdapter);
-        
-        // Label for debugging
+    function _labelContracts() internal {
         vm.label(address(factory), "ERC1967Factory");
         vm.label(address(registry), "kRegistry");
         vm.label(address(registryImpl), "kRegistryImpl");

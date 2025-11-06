@@ -87,6 +87,21 @@ contract BaseTest is Test {
         users.institution4 = utils.createUser("Institution4");
     }
 
+    /// @notice Setup assets from deployment script return values
+    function _setupAssets(address usdcAddr, address wbtcAddr) internal {
+        require(usdcAddr != address(0), "USDC address is zero");
+        require(wbtcAddr != address(0), "WBTC address is zero");
+        
+        mockUSDC = MockERC20(usdcAddr);
+        mockWBTC = MockERC20(wbtcAddr);
+        tokens.usdc = usdcAddr;
+        tokens.wbtc = wbtcAddr;
+        
+        vm.label(tokens.usdc, "USDC");
+        vm.label(tokens.wbtc, "WBTC");
+    }
+
+    /// @notice Setup assets from JSON config (fallback for non-deployment tests)
     function _setupAssets() internal {
         string memory configPath = "deployments/config/localhost.json";
         require(vm.exists(configPath), "Config file not found: deployments/config/localhost.json");
@@ -100,16 +115,7 @@ contract BaseTest is Test {
         address usdcAddr = json.readAddress(".assets.USDC");
         address wbtcAddr = json.readAddress(".assets.WBTC");
         
-        require(usdcAddr != address(0), "USDC address is zero - check config");
-        require(wbtcAddr != address(0), "WBTC address is zero - check config");
-        
-        mockUSDC = MockERC20(usdcAddr);
-        mockWBTC = MockERC20(wbtcAddr);
-        tokens.usdc = usdcAddr;
-        tokens.wbtc = wbtcAddr;
-        
-        vm.label(tokens.usdc, "USDC");
-        vm.label(tokens.wbtc, "WBTC");
+        _setupAssets(usdcAddr, wbtcAddr);
     }
 
     function _labelAddresses() internal {

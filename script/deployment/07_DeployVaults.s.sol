@@ -10,26 +10,64 @@ import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 
 contract DeployVaultsScript is Script, DeploymentManager {
+    struct VaultsDeployment {
+        address stakingVaultImpl;
+        address dnVaultUSDC;
+        address dnVaultWBTC;
+        address alphaVault;
+        address betaVault;
+    }
+
     ERC1967Factory factory;
     address stakingVaultImpl;
     NetworkConfig config;
     DeploymentOutput existing;
 
-    function run() public {
-        // Read network configuration and existing deployments
+    /// @notice Deploy staking vaults
+    /// @param writeToJson If true, writes addresses to JSON (for real deployments)
+    /// @param factoryAddr Address of ERC1967Factory (if zero, reads from JSON)
+    /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
+    /// @param readerModuleAddr Address of ReaderModule (if zero, reads from JSON)
+    /// @param kUSDAddr Address of kUSD (if zero, reads from JSON)
+    /// @param kBTCAddr Address of kBTC (if zero, reads from JSON)
+    /// @return deployment Struct containing deployed vault addresses
+    function run(
+        bool writeToJson,
+        address factoryAddr,
+        address registryAddr,
+        address readerModuleAddr,
+        address kUSDAddr,
+        address kBTCAddr
+    ) public returns (VaultsDeployment memory deployment) {
+        // Read network configuration
         config = readNetworkConfig();
-        existing = readDeploymentOutput();
 
-        // Validate required contracts are deployed
-        require(
-            existing.contracts.ERC1967Factory != address(0), "ERC1967Factory not deployed - run 01_DeployRegistry first"
-        );
-        require(existing.contracts.kRegistry != address(0), "kRegistry not deployed - run 01_DeployRegistry first");
-        require(
-            existing.contracts.readerModule != address(0), "readerModule not deployed - run 06_DeployVaultModules first"
-        );
-        require(existing.contracts.kUSD != address(0), "kUSD not deployed - run 05_DeployTokens first");
-        require(existing.contracts.kBTC != address(0), "kBTC not deployed - run 05_DeployTokens first");
+        // If addresses not provided, read from JSON (for real deployments)
+        if (
+            factoryAddr == address(0) || registryAddr == address(0) || readerModuleAddr == address(0)
+                || kUSDAddr == address(0) || kBTCAddr == address(0)
+        ) {
+            existing = readDeploymentOutput();
+            if (factoryAddr == address(0)) factoryAddr = existing.contracts.ERC1967Factory;
+            if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
+            if (readerModuleAddr == address(0)) readerModuleAddr = existing.contracts.readerModule;
+            if (kUSDAddr == address(0)) kUSDAddr = existing.contracts.kUSD;
+            if (kBTCAddr == address(0)) kBTCAddr = existing.contracts.kBTC;
+        }
+
+        // Populate existing struct with provided addresses (for helper methods)
+        existing.contracts.ERC1967Factory = factoryAddr;
+        existing.contracts.kRegistry = registryAddr;
+        existing.contracts.readerModule = readerModuleAddr;
+        existing.contracts.kUSD = kUSDAddr;
+        existing.contracts.kBTC = kBTCAddr;
+
+        // Validate required contracts
+        require(factoryAddr != address(0), "ERC1967Factory address required");
+        require(registryAddr != address(0), "kRegistry address required");
+        require(readerModuleAddr != address(0), "readerModule address required");
+        require(kUSDAddr != address(0), "kUSD address required");
+        require(kBTCAddr != address(0), "kBTC address required");
 
         console.log("=== DEPLOYING VAULTS ===");
         console.log("Network:", config.network);
@@ -37,7 +75,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.admin);
 
         // Get factory reference and deploy implementation
-        factory = ERC1967Factory(existing.contracts.ERC1967Factory);
+        factory = ERC1967Factory(factoryAddr);
         stakingVaultImpl = address(new kStakingVault());
 
         // Deploy vaults
@@ -50,7 +88,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         console.log("=== SETTING BATCH LIMITS IN REGISTRY ===");
 
         // Get registry reference
-        kRegistry registry = kRegistry(payable(existing.contracts.kRegistry));
+        kRegistry registry = kRegistry(payable(registryAddr));
         // Use registry to avoid unused variable warning
         registry;
 
@@ -86,12 +124,30 @@ contract DeployVaultsScript is Script, DeploymentManager {
         console.log("Network:", config.network);
         console.log("");
 
-        // Auto-write contract addresses to deployment JSON
-        writeContractAddress("kStakingVaultImpl", stakingVaultImpl);
-        writeContractAddress("dnVaultUSDC", dnVaultUSDC);
-        writeContractAddress("dnVaultWBTC", dnVaultWBTC);
-        writeContractAddress("alphaVault", alphaVault);
-        writeContractAddress("betaVault", betaVault);
+        // Return deployed addresses
+        deployment = VaultsDeployment({
+            stakingVaultImpl: stakingVaultImpl,
+            dnVaultUSDC: dnVaultUSDC,
+            dnVaultWBTC: dnVaultWBTC,
+            alphaVault: alphaVault,
+            betaVault: betaVault
+        });
+
+        // Write to JSON only if requested
+        if (writeToJson) {
+            writeContractAddress("kStakingVaultImpl", stakingVaultImpl);
+            writeContractAddress("dnVaultUSDC", dnVaultUSDC);
+            writeContractAddress("dnVaultWBTC", dnVaultWBTC);
+            writeContractAddress("alphaVault", alphaVault);
+            writeContractAddress("betaVault", betaVault);
+        }
+
+        return deployment;
+    }
+
+    /// @notice Convenience wrapper for real deployments (writes to JSON, reads dependencies from JSON)
+    function run() public returns (VaultsDeployment memory) {
+        return run(true, address(0), address(0), address(0), address(0), address(0));
     }
 
     function _deployDNVaultUSDC() internal returns (address) {
