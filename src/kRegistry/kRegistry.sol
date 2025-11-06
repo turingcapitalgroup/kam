@@ -263,14 +263,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRegistry
-    function setAssetBatchLimits(
-        address _asset,
-        uint256 _maxMintPerBatch,
-        uint256 _maxBurnPerBatch
-    )
-        external
-        payable
-    {
+    function setAssetBatchLimits(address _asset, uint256 _maxMintPerBatch, uint256 _maxBurnPerBatch) external payable {
         _checkAdmin(msg.sender);
 
         kRegistryStorage storage $ = _getkRegistryStorage();

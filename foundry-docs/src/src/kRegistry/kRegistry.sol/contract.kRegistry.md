@@ -1,5 +1,5 @@
 # kRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/kRegistry/kRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/kRegistry/kRegistry.sol)
 
 **Inherits:**
 [IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
@@ -283,13 +283,7 @@ Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume ass
 
 
 ```solidity
-function setAssetBatchLimits(
-    address _asset,
-    uint256 _maxMintPerBatch,
-    uint256 _maxBurnPerBatch
-)
-    external
-    payable;
+function setAssetBatchLimits(address _asset, uint256 _maxMintPerBatch, uint256 _maxBurnPerBatch) external payable;
 ```
 **Parameters**
 

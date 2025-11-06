@@ -1,5 +1,5 @@
 # AdapterGuardianModule
-[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/kRegistry/modules/AdapterGuardianModule.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/kRegistry/modules/AdapterGuardianModule.sol)
 
 **Inherits:**
 [IAdapterGuardian](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IAdapterGuardian.sol/interface.IAdapterGuardian.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
@@ -115,11 +115,7 @@ Check if a selector is allowed for an adapter
 
 
 ```solidity
-function isAdapterSelectorAllowed(
-    address _adapter,
-    address _target,
-    bytes4 _selector
-)
+function isAdapterSelectorAllowed(address _adapter, address _target, bytes4 _selector)
     external
     view
     returns (bool);

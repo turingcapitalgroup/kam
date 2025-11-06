@@ -1,8 +1,8 @@
 # VaultAdapter
-[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/adapters/VaultAdapter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/adapters/VaultAdapter.sol)
 
 **Inherits:**
-[IVaultAdapter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md)
+ERC7579Minimal, [IVaultAdapter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md)
 
 
 ## State Variables
@@ -56,21 +56,6 @@ Disables initializers to prevent implementation contract initialization
 constructor() ;
 ```
 
-### initialize
-
-Initializes the VaultAdapter contract
-
-
-```solidity
-function initialize(address _registry) external initializer;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_registry`|`address`|Address of the registry contract|
-
-
 ### setPaused
 
 Toggles the emergency pause state affecting all protocol operations in this contract
@@ -120,41 +105,14 @@ function rescueAssets(address _asset, address _to, uint256 _amount) external pay
 |`_amount`|`uint256`||
 
 
-### execute
+### _authorizeExecute
 
-Allows the relayer to execute arbitrary calls on behalf of the protocol
-
-This function enables the relayer role to perform flexible interactions with external contracts
-as part of protocol operations. Key aspects of this function include: (1) Authorization restricted to relayer
-role to prevent misuse, (2) Pause state check to ensure operations are halted during emergencies, (3) Validates
-target addresses are non-zero to prevent calls to the zero address, (4) Uses low-level calls to enable arbitrary
-function execution
+Check if contract is paused
 
 
 ```solidity
-function execute(
-    address[] calldata _targets,
-    bytes[] calldata _data,
-    uint256[] calldata _values
-)
-    external
-    payable
-    returns (bytes[] memory _result);
+function _authorizeExecute(address user) internal override;
 ```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_targets`|`address[]`||
-|`_data`|`bytes[]`||
-|`_values`|`uint256[]`||
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_result`|`bytes[]`|result The combined return data from all calls|
-
 
 ### setTotalAssets
 
@@ -241,7 +199,11 @@ Ensures the caller is the kAssetRouter
 
 
 ```solidity
-function _checkRouter(VaultAdapterStorage storage $) internal view;
+function _checkRouter(
+    VaultAdapterStorage storage /* $ */
+)
+    internal
+    view;
 ```
 
 ### _checkVaultCanCallSelector
@@ -363,8 +325,6 @@ storage-location: erc7201:kam.storage.VaultAdapter
 
 ```solidity
 struct VaultAdapterStorage {
-    /// @dev Address of the kRegistry singleton that serves as the protocol's configuration hub
-    IkRegistry registry;
     /// @dev Emergency pause state affecting all protocol operations in inheriting contracts
     bool paused;
     /// @dev Last recorded total assets for vault accounting and performance tracking

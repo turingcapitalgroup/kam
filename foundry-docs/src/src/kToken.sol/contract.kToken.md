@@ -1,5 +1,5 @@
 # kToken
-[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/kToken.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/kToken.sol)
 
 **Inherits:**
 [IkToken](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkToken.sol/interface.IkToken.md), [ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedOwnableRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [Multicallable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Multicallable.sol/abstract.Multicallable.md)
@@ -534,13 +534,7 @@ to prevent unauthorized asset extraction. This should not be used for regular op
 
 
 ```solidity
-function emergencyWithdraw(
-    address _token,
-    address _to,
-    uint256 _amount
-)
-    external
-    onlyRoles(EMERGENCY_ADMIN_ROLE);
+function emergencyWithdraw(address _token, address _to, uint256 _amount) external onlyRoles(EMERGENCY_ADMIN_ROLE);
 ```
 **Parameters**
 
