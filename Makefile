@@ -125,12 +125,9 @@ verify:
 	@echo "📄 Check deployments/output/ for contract addresses"
 
 # Development helpers
-test:
-	@echo "🧪 Running tests sequentially (to avoid JSON file conflicts)..."
-	forge test -j 1
 
-test-parallel:
-	@echo "⚡ Running tests in parallel (may have JSON conflicts)..."
+test:
+	@echo "⚡ Running tests in parallel..."
 	forge test
 
 coverage:
