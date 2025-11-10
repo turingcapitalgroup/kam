@@ -9,7 +9,8 @@ import {
     KBATCHRECEIVER_ONLY_KMINTER,
     KBATCHRECEIVER_ALREADY_INITIALIZED,
     KBATCHRECEIVER_WRONG_ASSET,
-    KBATCHRECEIVER_ZERO_AMOUNT
+    KBATCHRECEIVER_ZERO_AMOUNT,
+    KBATCHRECEIVER_INSUFFICIENT_BALANCE
 } from "kam/src/errors/Errors.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
@@ -40,6 +41,11 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KBATCHRECEIVER_ALREADY_INITIALIZED));
         kBatchReceiver(_receiver).initialize(_batchId, USDC);
     }
+
+    /* //////////////////////////////////////////////////////////////
+                            PULL ASSETS
+    //////////////////////////////////////////////////////////////*/
+    
 
     /* //////////////////////////////////////////////////////////////
                           RESCUE ASSETS - ERC20
@@ -90,7 +96,7 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         kBatchReceiver(_receiver).rescueAssets(USDC, users.alice, _1_USDC);
     }
 
-    function test_RescueAssets_Require_Non_Zero_Balance() public {
+    function test_RescueAssets_Require_Non_Zero_Amount() public {
         bytes32 _batchId = minter.getBatchId(USDC);
         address _receiver = _createBatchReceiver(_batchId);
         assertEq(mockWBTC.balanceOf(_receiver), 0);
@@ -98,6 +104,16 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_AMOUNT));
         kBatchReceiver(_receiver).rescueAssets(WBTC, users.alice, 0);
+    }
+
+    function test_RescueAssets_Require_Not_Zero_Address() public {
+        bytes32 _batchId = minter.getBatchId(USDC);
+        address _receiver = _createBatchReceiver(_batchId);
+        mockWBTC.mint(_receiver, _1_WBTC);
+        
+        vm.prank(address(minter));
+        vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
+        kBatchReceiver(_receiver).rescueAssets(WBTC, address(0), _1_WBTC);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -130,8 +146,8 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         assertEq(_receiver.balance, 0);
 
         vm.prank(address(minter));
-        vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_AMOUNT));
-        kBatchReceiver(_receiver).rescueAssets(address(0), users.alice, 0);
+        vm.expectRevert(bytes(KBATCHRECEIVER_INSUFFICIENT_BALANCE));
+        kBatchReceiver(_receiver).rescueAssets(address(0), users.alice, _1_WBTC);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -141,6 +157,5 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
     function _createBatchReceiver(bytes32 _batchId) private returns (address _receiver) {
         vm.prank(router);
         _receiver = minter.createBatchReceiver(_batchId);
-    }
-    
+    }   
 }

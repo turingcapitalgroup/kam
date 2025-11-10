@@ -119,10 +119,10 @@ contract kBatchReceiver is IkBatchReceiver {
     function rescueAssets(address _asset, address _to, uint256 _amount) external payable {
         _checkMinter(msg.sender);
         _checkAddressNotZero(_to);
+        _checkAmountNotZero(_amount);
 
         if (_asset == address(0)) {
-            // Rescue ETH
-            _checkAmountNotZero(_amount);
+            // Rescue ETH    
             uint256 _balance = address(this).balance;
             _checkBalance(_balance, _amount);
 
@@ -133,8 +133,7 @@ contract kBatchReceiver is IkBatchReceiver {
         } else {
             // Rescue ERC20 tokens
             require(_asset != asset, KBATCHRECEIVER_WRONG_ASSET);
-
-            _checkAmountNotZero(_amount);
+            
             uint256 _balance = _asset.balanceOf(address(this));
             _checkBalance(_balance, _amount);
             
@@ -163,6 +162,6 @@ contract kBatchReceiver is IkBatchReceiver {
     }
 
     function _checkBalance(uint256 _balance, uint256 _amount) private pure {
-        require(_balance <= _amount, KBATCHRECEIVER_INSUFFICIENT_BALANCE);
+        require(_balance >= _amount, KBATCHRECEIVER_INSUFFICIENT_BALANCE);
     }
 }
