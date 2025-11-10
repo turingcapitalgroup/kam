@@ -57,6 +57,8 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         // Deploy VaultAdapter implementation (shared by all adapters)
         VaultAdapter vaultAdapterImpl = new VaultAdapter();
 
+        revert("TODO : think about adapter owner and accountId for wallet");
+
         // Deploy DN Vault USDC Adapter
         bytes memory adapterInitDataUSDC = abi.encodeWithSelector(
             ERC7579Minimal.initialize.selector,

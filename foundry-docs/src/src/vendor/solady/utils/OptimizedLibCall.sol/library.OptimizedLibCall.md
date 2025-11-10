@@ -18,7 +18,13 @@ Makes a call to `target`, with `data` and `value`.
 
 
 ```solidity
-function callContract(address target, uint256 value, bytes memory data) internal returns (bytes memory result);
+function callContract(
+    address target,
+    uint256 value,
+    bytes memory data
+)
+    internal
+    returns (bytes memory result);
 ```
 
 ## Errors

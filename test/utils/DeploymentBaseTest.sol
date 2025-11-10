@@ -21,7 +21,7 @@ import { kToken } from "kam/src/kToken.sol";
 import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
 // Adapters
-import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
+import { ERC7579Minimal, VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 
 // Interfaces
 import { IRegistry } from "kam/src/interfaces/IkRegistry.sol";

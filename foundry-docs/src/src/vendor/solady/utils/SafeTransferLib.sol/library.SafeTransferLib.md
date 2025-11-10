@@ -232,7 +232,13 @@ Performs a `token.balanceOf(account)` check.
 
 
 ```solidity
-function checkBalanceOf(address token, address account) internal view returns (bool implemented, uint256 amount);
+function checkBalanceOf(
+    address token,
+    address account
+)
+    internal
+    view
+    returns (bool implemented, uint256 amount);
 ```
 
 ### totalSupply

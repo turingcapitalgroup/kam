@@ -55,6 +55,45 @@ function rescueAssets(address asset_, address to_, uint256 amount_) external pay
 |`amount_`|`uint256`|The quantity to rescue (must not exceed available balance)|
 
 
+<<<<<<< HEAD
+=======
+### execute
+
+Allows the relayer to execute arbitrary calls on behalf of the protocol
+
+This function enables the relayer role to perform flexible interactions with external contracts
+as part of protocol operations. Key aspects of this function include: (1) Authorization restricted to relayer
+role to prevent misuse, (2) Pause state check to ensure operations are halted during emergencies, (3) Validates
+target addresses are non-zero to prevent calls to the zero address, (4) Uses low-level calls to enable arbitrary
+function execution
+
+
+```solidity
+function execute(
+    address[] calldata targets,
+    bytes[] calldata data,
+    uint256[] calldata values
+)
+    external
+    payable
+    returns (bytes[] memory result);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`targets`|`address[]`|Array of target contracts to make calls to|
+|`data`|`bytes[]`|Array of calldata to send to each target contract|
+|`values`|`uint256[]`|Array of asset amounts to send with each call|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`result`|`bytes[]`|The combined return data from all calls|
+
+
+>>>>>>> main
 ### setTotalAssets
 
 Sets the last recorded total assets for vault accounting and performance tracking
@@ -181,6 +220,58 @@ event RescuedETH(address indexed to_, uint256 amount_);
 |----|----|-----------|
 |`to_`|`address`|The recipient address receiving the rescued ETH (cannot be zero address)|
 |`amount_`|`uint256`|The quantity of ETH rescued in wei (must not exceed contract balance)|
+
+<<<<<<< HEAD
+### TotalAssetsUpdated
+Emitted when total assets are updated
+=======
+### Executed
+Emitted when the relayer executes an arbitrary call on behalf of the protocol
+
+This event provides transparency into all external interactions initiated by the relayer.
+It logs the caller, target contract, function data, value sent, and the resulting returndata.
+This is critical for auditing and monitoring protocol actions executed via the relayer role.
+>>>>>>> main
+
+
+```solidity
+event TotalAssetsUpdated(uint256 oldTotalAssets, uint256 newTotalAssets);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+<<<<<<< HEAD
+|`oldTotalAssets`|`uint256`|The previous total assets value|
+|`newTotalAssets`|`uint256`|The new total assets value|
+=======
+|`caller`|`address`|The relayer address that initiated the call|
+|`target`|`address`|The target contract address that was called|
+|`data`|`bytes`|The calldata sent to the target contract|
+|`value`|`uint256`|The amount of assets sent with the call|
+|`result`|`bytes`|The returndata returned from the call|
+
+### TransferExecuted
+Emmited when the relayer executes a transfer of assets on behalf of the protocol
+
+This event provides transparency into all asset transfers initiated by the relayer.
+It logs the caller, asset, recipient, and amount transferred. This is critical for auditing
+and monitoring protocol asset movements executed via the relayer role.
+
+
+```solidity
+event TransferExecuted(address indexed asset, address indexed to, uint256 amount);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`asset`|`address`|The asset address that was transferred (address(0) for native ETH)|
+|`to`|`address`|The recipient address that received the assets|
+|`amount`|`uint256`|The quantity of assets transferred|
+>>>>>>> main
 
 ### TotalAssetsUpdated
 Emitted when total assets are updated
