@@ -3,25 +3,14 @@ pragma solidity 0.8.30;
 
 import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
-
-import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
-
 import {
-    KBASE_WRONG_ROLE,
-    KMINTER_BATCH_MINT_REACHED,
-    KMINTER_BATCH_REDEEM_REACHED,
-    KMINTER_IS_PAUSED,
-    KMINTER_REQUEST_NOT_FOUND,
-    KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
-    KMINTER_ZERO_ADDRESS,
-    KMINTER_ZERO_AMOUNT,
-    KMINTER_BATCH_CLOSED
+    KMINTER_BATCH_CLOSED,
+    KMINTER_BATCH_NOT_VALID,
+    KMINTER_BATCH_SETTLED,
+    KMINTER_BATCH_NOT_CLOSED
 } from "kam/src/errors/Errors.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
-import { kMinter } from "kam/src/kMinter.sol";
 
 contract kMinterBatchesTest is DeploymentBaseTest {
     uint256 internal constant TEST_AMOUNT = 1000 * _1_USDC;
@@ -37,7 +26,7 @@ contract kMinterBatchesTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                      CREATE BATCHES
+                            CREATE BATCH
     //////////////////////////////////////////////////////////////*/
 
     function test_CreateNewBatch_Success() public {
@@ -66,7 +55,7 @@ contract kMinterBatchesTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                      CLOSE BATCHES
+                            CLOSE BATCH
     //////////////////////////////////////////////////////////////*/
 
     function test_CloseBatch_With_No_Batch_Creation_Success() public {
@@ -118,13 +107,87 @@ contract kMinterBatchesTest is DeploymentBaseTest {
         minter.closeBatch(_batchId, false);
     }
 
+    function test_CloseBatch_Requires_Valid_BatchId() public {
+        bytes32 _batchId = bytes32(0);     
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KMINTER_BATCH_NOT_VALID));
+        minter.closeBatch(_batchId, true);
+
+        _batchId = keccak256("Banana");    
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KMINTER_BATCH_NOT_VALID));
+        minter.closeBatch(_batchId, true);
+    }
+
     function test_CloseBatch_Requires_Not_Closed() public {
         bytes32 _batchId = minter.getBatchId(USDC);     
-        vm.prank(users.relayer);
-        minter.closeBatch(_batchId, false);
+        _closeBatch(_batchId, false);
         
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KMINTER_BATCH_CLOSED));
-        minter.closeBatch(_batchId, true);
+        minter.closeBatch(_batchId, false);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                            SETTLE BATCH
+    //////////////////////////////////////////////////////////////*/
+
+    function test_SettleBatch_Success() public {
+        bytes32 _batchId = minter.getBatchId(USDC);
+        _closeBatch(_batchId, false);
+
+        vm.prank(address(assetRouter));
+        vm.expectEmit(true, false, false, true);
+        emit IkMinter.BatchSettled(_batchId); 
+        minter.settleBatch(_batchId);
+    }
+
+    function test_SettleBatch_Requires_AssetRouter() public {
+        bytes32 _batchId = minter.getBatchId(USDC);
+        _closeBatch(_batchId, false);
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.settleBatch(_batchId);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.settleBatch(_batchId);
+    }
+
+    function test_SettleBatch_Requires_Closed() public {
+        bytes32 _batchId = minter.getBatchId(USDC);     
+        vm.prank(address(assetRouter));
+        vm.expectRevert(bytes(KMINTER_BATCH_NOT_CLOSED));
+        minter.settleBatch(_batchId);
+
+        _batchId = keccak256("Banana");     
+        vm.prank(address(assetRouter));
+        vm.expectRevert(bytes(KMINTER_BATCH_NOT_CLOSED));
+        minter.settleBatch(_batchId);
+    }
+
+    function test_SettleBatch_Requires_Not_Settled() public {
+        bytes32 _batchId = minter.getBatchId(USDC);     
+        _closeBatch(_batchId, false);
+        _settleBatch(_batchId);
+        
+        vm.prank(address(assetRouter));
+        vm.expectRevert(bytes(KMINTER_BATCH_SETTLED));
+        minter.settleBatch(_batchId);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                            Internals
+    //////////////////////////////////////////////////////////////*/
+
+    function _closeBatch(bytes32 _batchId, bool _create) internal {
+        vm.prank(users.relayer);
+        minter.closeBatch(_batchId, _create);
+    }
+
+    function _settleBatch(bytes32 _batchId) internal {
+        vm.prank(address(assetRouter));
+        minter.settleBatch(_batchId);
     }
 }
