@@ -25,7 +25,8 @@ import {
     KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
-    KMINTER_ZERO_AMOUNT
+    KMINTER_ZERO_AMOUNT,
+    KMINTER_BATCH_NOT_VALID
 } from "kam/src/errors/Errors.sol";
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
@@ -274,10 +275,12 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
     function closeBatch(bytes32 _batchId, bool _create) external {
         _checkRelayer(msg.sender);
         kMinterStorage storage $ = _getkMinterStorage();
-        require(!$.batches[_batchId].isClosed, KMINTER_BATCH_CLOSED);
+        BatchInfo storage _batch = $.batches[_batchId];
+        require(_batch.asset != address(0), KMINTER_BATCH_NOT_VALID); 
+        require(!_batch.isClosed, KMINTER_BATCH_CLOSED);
 
-        address _batchAsset = $.batches[_batchId].asset;
-        $.batches[_batchId].isClosed = true;
+        address _batchAsset = _batch.asset;
+        _batch.isClosed = true;
 
         bytes32 _newBatchId = _batchId;
         if (_create) {
