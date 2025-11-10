@@ -11,13 +11,23 @@ import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { AdapterGuardianModule } from "kam/src/kRegistry/modules/AdapterGuardianModule.sol";
 
 contract DeployRegistryScript is Script, DeploymentManager {
-    function run() public {
+    struct RegistryDeployment {
+        address factory;
+        address registryImpl;
+        address registry;
+        address adapterGuardianModule;
+    }
+
+    /// @notice Deploy registry contracts
+    /// @param writeToJson If true, writes addresses to JSON (for real deployments). If false, only returns values (for tests)
+    /// @return deployment Struct containing all deployed addresses
+    function run(bool writeToJson) public returns (RegistryDeployment memory deployment) {
         // Read network configuration from JSON
         NetworkConfig memory config = readNetworkConfig();
         validateConfig(config);
         logConfig(config);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.owner);
 
         // Deploy factory for proxy deployment
         ERC1967Factory factory = new ERC1967Factory();
@@ -56,10 +66,26 @@ contract DeployRegistryScript is Script, DeploymentManager {
         console.log("Network:", config.network);
         console.log("Chain ID:", config.chainId);
 
-        // Auto-write contract addresses to deployment JSON
-        writeContractAddress("ERC1967Factory", address(factory));
-        writeContractAddress("kRegistryImpl", address(registryImpl));
-        writeContractAddress("kRegistry", registryProxy);
-        writeContractAddress("AdapterGuardianModule", address(adapterGuardianModule));
+        deployment = RegistryDeployment({
+            factory: address(factory),
+            registryImpl: address(registryImpl),
+            registry: registryProxy,
+            adapterGuardianModule: address(adapterGuardianModule)
+        });
+
+        // Write to JSON only if requested (for real deployments)
+        if (writeToJson) {
+            writeContractAddress("ERC1967Factory", address(factory));
+            writeContractAddress("kRegistryImpl", address(registryImpl));
+            writeContractAddress("kRegistry", registryProxy);
+            writeContractAddress("AdapterGuardianModule", address(adapterGuardianModule));
+        }
+
+        return deployment;
+    }
+
+    /// @notice Convenience wrapper for real deployments (writes to JSON)
+    function run() public returns (RegistryDeployment memory) {
+        return run(true);
     }
 }

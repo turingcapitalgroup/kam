@@ -3,7 +3,7 @@
 -include .env
 export
 
-.PHONY: help deploy-mainnet deploy-sepolia deploy-localhost deploy-all deploy-mock-assets verify clean clean-all configure-adapters register-modules format-output
+.PHONY: help deploy-mainnet deploy-sepolia deploy-localhost deploy-all deploy-mock-assets verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage
 
 # Default target
 help:
@@ -62,56 +62,56 @@ format-output:
 # Mock assets (00) - Only for testnets
 deploy-mock-assets:
 	@echo "🪙 Deploying mock assets for testnet..."
-	forge script script/deployment/00_DeployMockAssets.s.sol $(FORGE_ARGS)
+	forge script script/deployment/00_DeployMockAssets.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Core contracts (01-03)
 deploy-core:
 	@echo "📦 Deploying core contracts..."
-	forge script script/deployment/01_DeployRegistry.s.sol $(FORGE_ARGS)
-	forge script script/deployment/02_DeployMinter.s.sol $(FORGE_ARGS)
-	forge script script/deployment/03_DeployAssetRouter.s.sol $(FORGE_ARGS)
+	forge script script/deployment/01_DeployRegistry.s.sol --sig "run()" $(FORGE_ARGS)
+	forge script script/deployment/02_DeployMinter.s.sol --sig "run()" $(FORGE_ARGS)
+	forge script script/deployment/03_DeployAssetRouter.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Registry setup (04)
 setup-singletons:
 	@echo "⚙️  Registry singleton setup..."
-	forge script script/deployment/04_RegisterSingletons.s.sol $(FORGE_ARGS)
+	forge script script/deployment/04_RegisterSingletons.s.sol --sig "run()" $(FORGE_ARGS)
 	@echo "⚠️  Execute the displayed admin calls via admin account"
 
 # Token deployment (05)
 deploy-tokens:
 	@echo "🪙 Token deployment setup..."
-	forge script script/deployment/05_DeployTokens.s.sol $(FORGE_ARGS)
+	forge script script/deployment/05_DeployTokens.s.sol --sig "run()" $(FORGE_ARGS)
 	@echo "⚠️  Execute the displayed admin calls via admin account"
 
 # Vault modules (06)
 deploy-modules:
 	@echo "🧩 Deploying vault modules..."
-	forge script script/deployment/06_DeployVaultModules.s.sol $(FORGE_ARGS)
+	forge script script/deployment/06_DeployVaultModules.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Vaults (07)
 deploy-vaults:
 	@echo "🏛️  Deploying vaults..."
-	forge script script/deployment/07_DeployVaults.s.sol $(FORGE_ARGS)
+	forge script script/deployment/07_DeployVaults.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Adapters (08)
 deploy-adapters:
 	@echo "🔌 Deploying adapters..."
-	forge script script/deployment/08_DeployAdapters.s.sol $(FORGE_ARGS)
+	forge script script/deployment/08_DeployAdapters.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Final configuration (09)
 configure:
 	@echo "⚙️  Executing protocol configuration..."
-	forge script script/deployment/09_ConfigureProtocol.s.sol $(FORGE_ARGS)
+	forge script script/deployment/09_ConfigureProtocol.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Adapter permissions configuration (10)
 configure-adapters:
 	@echo "🔐 Configuring adapter permissions..."
-	forge script script/deployment/10_ConfigureAdapterPermissions.s.sol $(FORGE_ARGS)
+	forge script script/deployment/10_ConfigureAdapterPermissions.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Register vault modules (11) - Optional step for adding ReaderModule to vaults
 register-modules:
 	@echo "📦 Registering vault modules..."
-	forge script script/deployment/11_RegisterVaultModules.s.sol $(FORGE_ARGS)
+	forge script script/deployment/11_RegisterVaultModules.s.sol --sig "run()" $(FORGE_ARGS)
 	@echo "⚠️  Execute the displayed admin calls via admin account"
 
 # Verification
@@ -125,7 +125,9 @@ verify:
 	@echo "📄 Check deployments/output/ for contract addresses"
 
 # Development helpers
+
 test:
+	@echo "⚡ Running tests in parallel..."
 	forge test
 
 coverage:

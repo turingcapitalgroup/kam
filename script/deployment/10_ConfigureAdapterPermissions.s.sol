@@ -10,6 +10,10 @@ import { IERC7540 } from "kam/src/interfaces/IERC7540.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
+    struct AdapterPermissionsDeployment {
+        address erc20ParameterChecker;
+    }
+
     function configureAdapterPermissions(
         IkRegistry registry,
         address adapter,
@@ -80,77 +84,164 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         }
     }
 
-    function run() public {
-        // Read network configuration and existing deployments
+    /// @notice Configure adapter permissions and deploy parameter checker
+    /// @param writeToJson Whether to write deployed addresses to JSON (true for real deployments, false for tests)
+    /// @param registryAddr Address of kRegistry
+    /// @param kMinterAdapterUSDCAddr Address of kMinterAdapterUSDC
+    /// @param kMinterAdapterWBTCAddr Address of kMinterAdapterWBTC
+    /// @param dnVaultAdapterUSDCAddr Address of dnVaultAdapterUSDC
+    /// @param dnVaultAdapterWBTCAddr Address of dnVaultAdapterWBTC
+    /// @param alphaVaultAdapterAddr Address of alphaVaultAdapter
+    /// @param betaVaultAdapterAddr Address of betaVaultAdapter
+    /// @param erc7540USDCAddr Address of ERC7540USDC mock vault
+    /// @param erc7540WBTCAddr Address of ERC7540WBTC mock vault
+    /// @param walletUSDCAddr Address of WalletUSDC mock
+    function run(
+        bool writeToJson,
+        address registryAddr,
+        address kMinterAdapterUSDCAddr,
+        address kMinterAdapterWBTCAddr,
+        address dnVaultAdapterUSDCAddr,
+        address dnVaultAdapterWBTCAddr,
+        address alphaVaultAdapterAddr,
+        address betaVaultAdapterAddr,
+        address erc7540USDCAddr,
+        address erc7540WBTCAddr,
+        address walletUSDCAddr
+    )
+        public
+        returns (AdapterPermissionsDeployment memory deployment)
+    {
+        // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
-        DeploymentOutput memory existing = readDeploymentOutput();
+        DeploymentOutput memory existing;
 
-        // Validate required contracts are deployed
-        validateAdapterDeployments(existing);
+        // If any address is zero, read from JSON (for real deployments)
+        if (
+            registryAddr == address(0) || kMinterAdapterUSDCAddr == address(0) || kMinterAdapterWBTCAddr == address(0)
+                || dnVaultAdapterUSDCAddr == address(0) || dnVaultAdapterWBTCAddr == address(0)
+                || alphaVaultAdapterAddr == address(0) || betaVaultAdapterAddr == address(0)
+                || erc7540USDCAddr == address(0) || erc7540WBTCAddr == address(0) || walletUSDCAddr == address(0)
+        ) {
+            existing = readDeploymentOutput();
+            if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
+            if (kMinterAdapterUSDCAddr == address(0)) kMinterAdapterUSDCAddr = existing.contracts.kMinterAdapterUSDC;
+            if (kMinterAdapterWBTCAddr == address(0)) kMinterAdapterWBTCAddr = existing.contracts.kMinterAdapterWBTC;
+            if (dnVaultAdapterUSDCAddr == address(0)) dnVaultAdapterUSDCAddr = existing.contracts.dnVaultAdapterUSDC;
+            if (dnVaultAdapterWBTCAddr == address(0)) dnVaultAdapterWBTCAddr = existing.contracts.dnVaultAdapterWBTC;
+            if (alphaVaultAdapterAddr == address(0)) alphaVaultAdapterAddr = existing.contracts.alphaVaultAdapter;
+            if (betaVaultAdapterAddr == address(0)) betaVaultAdapterAddr = existing.contracts.betaVaultAdapter;
+            if (erc7540USDCAddr == address(0)) erc7540USDCAddr = existing.contracts.ERC7540USDC;
+            if (erc7540WBTCAddr == address(0)) erc7540WBTCAddr = existing.contracts.ERC7540WBTC;
+            if (walletUSDCAddr == address(0)) walletUSDCAddr = existing.contracts.WalletUSDC;
+        }
+
+        // Validate required contracts
+        require(registryAddr != address(0), "kRegistry address required");
 
         console.log("=== CONFIGURING ADAPTER PERMISSIONS ===");
         console.log("Network:", config.network);
         console.log("");
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
-        IkRegistry registry = IkRegistry(payable(existing.contracts.kRegistry));
+        IkRegistry registry = IkRegistry(payable(registryAddr));
 
         // Deploy ERC20 parameters checker
-        ERC20ParameterChecker erc20ParameterChecker = new ERC20ParameterChecker(address(registry));
-        writeContractAddress("erc20ParameterChecker", address(erc20ParameterChecker));
+        ERC20ParameterChecker erc20ParameterChecker = new ERC20ParameterChecker(registryAddr);
+        console.log("Deployed ERC20ParameterChecker at:", address(erc20ParameterChecker));
 
-        // Get addresses from config and existing deployments
-        address usdcVault = existing.contracts.ERC7540USDC;
-        address wbtcVault = existing.contracts.ERC7540WBTC;
-        address usdcWallet = existing.contracts.WalletUSDC;
+        // Get addresses from config
         address usdc = config.assets.USDC;
         address wbtc = config.assets.WBTC;
 
+        console.log("");
         console.log("1. Configuring Adapter permissions...");
-        configureAdapterPermissions(registry, existing.contracts.kMinterAdapterUSDC, usdcVault, usdc, true);
-        configureAdapterPermissions(registry, existing.contracts.kMinterAdapterWBTC, wbtcVault, wbtc, true);
-        configureAdapterPermissions(registry, existing.contracts.dnVaultAdapterUSDC, usdcVault, usdc, false);
-        configureAdapterPermissions(registry, existing.contracts.dnVaultAdapterWBTC, wbtcVault, wbtc, false);
-        configureCustodialAdapterPermissions(registry, existing.contracts.alphaVaultAdapter, usdcWallet);
-        configureCustodialAdapterPermissions(registry, existing.contracts.betaVaultAdapter, usdcWallet);
+        configureAdapterPermissions(registry, kMinterAdapterUSDCAddr, erc7540USDCAddr, usdc, true);
+        configureAdapterPermissions(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, wbtc, true);
+        configureAdapterPermissions(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, usdc, false);
+        configureAdapterPermissions(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, wbtc, false);
+        configureCustodialAdapterPermissions(registry, alphaVaultAdapterAddr, walletUSDCAddr);
+        configureCustodialAdapterPermissions(registry, betaVaultAdapterAddr, walletUSDCAddr);
 
         console.log("");
         console.log("2. Configuring parameter checkers...");
         address paramChecker = address(erc20ParameterChecker);
-        configureParameterChecker(registry, existing.contracts.kMinterAdapterUSDC, usdc, paramChecker, true);
-        configureParameterChecker(registry, existing.contracts.kMinterAdapterWBTC, wbtc, paramChecker, true);
-        configureParameterChecker(registry, existing.contracts.kMinterAdapterUSDC, usdcVault, paramChecker, true);
-        configureParameterChecker(registry, existing.contracts.kMinterAdapterWBTC, wbtcVault, paramChecker, true);
-        configureParameterChecker(registry, existing.contracts.dnVaultAdapterUSDC, usdcVault, paramChecker, false);
-        configureParameterChecker(registry, existing.contracts.dnVaultAdapterWBTC, wbtcVault, paramChecker, false);
-        configureParameterChecker(registry, existing.contracts.alphaVaultAdapter, usdcWallet, paramChecker, false);
-        configureParameterChecker(registry, existing.contracts.betaVaultAdapter, usdcWallet, paramChecker, false);
+        configureParameterChecker(registry, kMinterAdapterUSDCAddr, usdc, paramChecker, true);
+        configureParameterChecker(registry, kMinterAdapterWBTCAddr, wbtc, paramChecker, true);
+        configureParameterChecker(registry, kMinterAdapterUSDCAddr, erc7540USDCAddr, paramChecker, true);
+        configureParameterChecker(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, paramChecker, true);
+        configureParameterChecker(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, paramChecker, false);
+        configureParameterChecker(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, paramChecker, false);
+        configureParameterChecker(registry, alphaVaultAdapterAddr, walletUSDCAddr, paramChecker, false);
+        configureParameterChecker(registry, betaVaultAdapterAddr, walletUSDCAddr, paramChecker, false);
 
         console.log("");
         console.log("3. Configuring parameter checker permissions from config...");
 
+        // Create a temporary DeploymentOutput struct for _resolveAddress helper
+        existing.contracts.kMinterAdapterUSDC = kMinterAdapterUSDCAddr;
+        existing.contracts.kMinterAdapterWBTC = kMinterAdapterWBTCAddr;
+        existing.contracts.dnVaultAdapterUSDC = dnVaultAdapterUSDCAddr;
+        existing.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
+        existing.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
+        existing.contracts.betaVaultAdapter = betaVaultAdapterAddr;
+        existing.contracts.ERC7540USDC = erc7540USDCAddr;
+        existing.contracts.ERC7540WBTC = erc7540WBTCAddr;
+        existing.contracts.WalletUSDC = walletUSDCAddr;
+
         // Set allowed receivers from config
-        _configureAllowedReceivers(erc20ParameterChecker, config, existing, usdc, usdcVault, usdcWallet);
+        _configureAllowedReceivers(erc20ParameterChecker, config, existing, usdc, erc7540USDCAddr, walletUSDCAddr);
 
         // Set allowed sources from config
-        _configureAllowedSources(erc20ParameterChecker, config, existing, usdcVault, wbtcVault);
+        _configureAllowedSources(erc20ParameterChecker, config, existing, erc7540USDCAddr, erc7540WBTCAddr);
 
         // Set allowed spenders from config
-        _configureAllowedSpenders(erc20ParameterChecker, config, existing, usdc, wbtc, usdcVault, wbtcVault);
+        _configureAllowedSpenders(erc20ParameterChecker, config, existing, usdc, wbtc, erc7540USDCAddr, erc7540WBTCAddr);
 
         // Set max transfer limits from config
         console.log("   - Set max transfer limits");
         erc20ParameterChecker.setMaxSingleTransfer(usdc, config.parameterChecker.maxSingleTransfer.USDC);
         erc20ParameterChecker.setMaxSingleTransfer(wbtc, config.parameterChecker.maxSingleTransfer.WBTC);
-        erc20ParameterChecker.setMaxSingleTransfer(usdcVault, config.parameterChecker.maxSingleTransfer.ERC7540USDC);
-        erc20ParameterChecker.setMaxSingleTransfer(wbtcVault, config.parameterChecker.maxSingleTransfer.ERC7540WBTC);
+        erc20ParameterChecker.setMaxSingleTransfer(
+            erc7540USDCAddr, config.parameterChecker.maxSingleTransfer.ERC7540USDC
+        );
+        erc20ParameterChecker.setMaxSingleTransfer(
+            erc7540WBTCAddr, config.parameterChecker.maxSingleTransfer.ERC7540WBTC
+        );
 
         vm.stopBroadcast();
+
+        // Populate return struct
+        deployment = AdapterPermissionsDeployment({ erc20ParameterChecker: address(erc20ParameterChecker) });
+
+        // Write to JSON only if requested (for real deployments)
+        if (writeToJson) {
+            writeContractAddress("erc20ParameterChecker", address(erc20ParameterChecker));
+        }
 
         console.log("");
         console.log("=======================================");
         console.log("Adapter permissions configuration complete!");
+
+        return deployment;
+    }
+
+    /// @notice Convenience wrapper for real deployments (reads addresses from JSON)
+    function run() public returns (AdapterPermissionsDeployment memory) {
+        return run(
+            true,
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0)
+        );
     }
 
     function _configureAllowedReceivers(
@@ -234,8 +325,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         DeploymentOutput memory existing,
         address usdc,
         address wbtc,
-        address,
-        /* usdcVault */
+        address, /* usdcVault */
         address /* wbtcVault */
     )
         internal

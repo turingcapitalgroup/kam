@@ -1,5 +1,5 @@
 # kMinter
-[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/kMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/kMinter.sol)
 
 **Inherits:**
 [IkMinter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md)
@@ -111,14 +111,7 @@ availability and yield distribution. The request can be cancelled before batch c
 
 
 ```solidity
-function requestBurn(
-    address _asset,
-    address _to,
-    uint256 _amount
-)
-    external
-    payable
-    returns (bytes32 _requestId);
+function requestBurn(address _asset, address _to, uint256 _amount) external payable returns (bytes32 _requestId);
 ```
 **Parameters**
 
@@ -586,13 +579,7 @@ function should only be used in emergency situations and requires admin privileg
 
 
 ```solidity
-function rescueReceiverAssets(
-    address _batchReceiver,
-    address _asset,
-    address _to,
-    uint256 _amount
-)
-    external;
+function rescueReceiverAssets(address _batchReceiver, address _asset, address _to, uint256 _amount) external;
 ```
 **Parameters**
 

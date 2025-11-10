@@ -1,5 +1,5 @@
 # ERC20
-[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/vendor/solady/tokens/ERC20.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/vendor/solady/tokens/ERC20.sol)
 
 **Authors:**
 Solady (https://github.com/vectorized/solady/blob/main/src/tokens/ERC20.sol), Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol), Modified from OpenZeppelin

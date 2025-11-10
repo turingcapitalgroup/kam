@@ -9,24 +9,34 @@ import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { kToken } from "kam/src/kToken.sol";
 
 contract DeployTokensScript is Script, DeploymentManager {
-    function run() public {
-        // Read network configuration and existing deployments
-        NetworkConfig memory config = readNetworkConfig();
-        DeploymentOutput memory existing = readDeploymentOutput();
+    struct TokenDeployment {
+        address kUSD;
+        address kBTC;
+    }
 
-        // Validate required contracts are deployed
-        require(existing.contracts.kRegistry != address(0), "kRegistry not deployed - run 01_DeployRegistry first");
-        require(existing.contracts.kMinter != address(0), "kMinter not deployed - run 02_DeployMinter first");
-        require(
-            existing.contracts.kAssetRouter != address(0), "kAssetRouter not deployed - run 03_DeployAssetRouter first"
-        );
+    /// @notice Deploy kTokens via registry
+    /// @param writeToJson If true, writes addresses to JSON (for real deployments)
+    /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
+    /// @return deployment Struct containing deployed token addresses
+    function run(bool writeToJson, address registryAddr) public returns (TokenDeployment memory deployment) {
+        // Read network configuration
+        NetworkConfig memory config = readNetworkConfig();
+
+        // If registry not provided, read from JSON (for real deployments)
+        if (registryAddr == address(0)) {
+            DeploymentOutput memory existing = readDeploymentOutput();
+            registryAddr = existing.contracts.kRegistry;
+        }
+
+        // Validate required contracts
+        require(registryAddr != address(0), "kRegistry address required");
 
         console.log("=== KTOKEN DEPLOYMENT ===");
         console.log("Network:", config.network);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
-        kRegistry registry = kRegistry(payable(existing.contracts.kRegistry));
+        kRegistry registry = kRegistry(payable(registryAddr));
 
         // Deploy kUSD using config values
         console.log("Deploying kUSD with config:");
@@ -75,10 +85,22 @@ contract DeployTokensScript is Script, DeploymentManager {
         console.log("kBTC deployed at:", kBTCAddress);
         console.log("Admin address:", config.roles.admin);
         console.log("EmergencyAdmin address:", config.roles.emergencyAdmin);
-        console.log("Registry address:", existing.contracts.kRegistry);
+        console.log("Registry address:", registryAddr);
 
-        // Auto-write contract addresses to deployment JSON
-        writeContractAddress("kUSD", kUSDAddress);
-        writeContractAddress("kBTC", kBTCAddress);
+        // Return deployed addresses
+        deployment = TokenDeployment({ kUSD: kUSDAddress, kBTC: kBTCAddress });
+
+        // Write to JSON only if requested
+        if (writeToJson) {
+            writeContractAddress("kUSD", kUSDAddress);
+            writeContractAddress("kBTC", kBTCAddress);
+        }
+
+        return deployment;
+    }
+
+    /// @notice Convenience wrapper for real deployments (writes to JSON, reads dependencies from JSON)
+    function run() public returns (TokenDeployment memory) {
+        return run(true, address(0));
     }
 }

@@ -10,112 +10,167 @@ import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { kToken } from "kam/src/kToken.sol";
 
 contract ConfigureProtocolScript is Script, DeploymentManager {
-    function run() public {
-        // Read network configuration and existing deployments
+    /// @notice Configure protocol (register vaults, adapters, grant roles) - NO NEW DEPLOYS
+    /// @dev This script only configures existing contracts, doesn't deploy anything new
+    /// @param registryAddr Address of kRegistry
+    /// @param minterAddr Address of kMinter
+    /// @param assetRouterAddr Address of kAssetRouter
+    /// @param kUSDAddr Address of kUSD
+    /// @param kBTCAddr Address of kBTC
+    /// @param dnVaultUSDCAddr Address of dnVaultUSDC
+    /// @param dnVaultWBTCAddr Address of dnVaultWBTC
+    /// @param alphaVaultAddr Address of alphaVault
+    /// @param betaVaultAddr Address of betaVault
+    /// @param dnVaultAdapterUSDCAddr Address of dnVaultAdapterUSDC
+    /// @param dnVaultAdapterWBTCAddr Address of dnVaultAdapterWBTC
+    /// @param alphaVaultAdapterAddr Address of alphaVaultAdapter
+    /// @param betaVaultAdapterAddr Address of betaVaultAdapter
+    /// @param minterAdapterUSDCAddr Address of kMinterAdapterUSDC
+    /// @param minterAdapterWBTCAddr Address of kMinterAdapterWBTC
+    function run(
+        address registryAddr,
+        address minterAddr,
+        address assetRouterAddr,
+        address kUSDAddr,
+        address kBTCAddr,
+        address dnVaultUSDCAddr,
+        address dnVaultWBTCAddr,
+        address alphaVaultAddr,
+        address betaVaultAddr,
+        address dnVaultAdapterUSDCAddr,
+        address dnVaultAdapterWBTCAddr,
+        address alphaVaultAdapterAddr,
+        address betaVaultAdapterAddr,
+        address minterAdapterUSDCAddr,
+        address minterAdapterWBTCAddr
+    )
+        public
+    {
+        // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
-        DeploymentOutput memory existing = readDeploymentOutput();
 
-        // Validate critical contracts are deployed
-        validateProtocolDeployments(existing);
+        // If any address is zero, read from JSON (for real deployments)
+        if (
+            registryAddr == address(0) || minterAddr == address(0) || assetRouterAddr == address(0)
+                || kUSDAddr == address(0) || kBTCAddr == address(0) || dnVaultUSDCAddr == address(0)
+                || dnVaultWBTCAddr == address(0) || alphaVaultAddr == address(0) || betaVaultAddr == address(0)
+                || dnVaultAdapterUSDCAddr == address(0) || dnVaultAdapterWBTCAddr == address(0)
+                || alphaVaultAdapterAddr == address(0) || betaVaultAdapterAddr == address(0)
+                || minterAdapterUSDCAddr == address(0) || minterAdapterWBTCAddr == address(0)
+        ) {
+            DeploymentOutput memory existing = readDeploymentOutput();
+            if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
+            if (minterAddr == address(0)) minterAddr = existing.contracts.kMinter;
+            if (assetRouterAddr == address(0)) assetRouterAddr = existing.contracts.kAssetRouter;
+            if (kUSDAddr == address(0)) kUSDAddr = existing.contracts.kUSD;
+            if (kBTCAddr == address(0)) kBTCAddr = existing.contracts.kBTC;
+            if (dnVaultUSDCAddr == address(0)) dnVaultUSDCAddr = existing.contracts.dnVaultUSDC;
+            if (dnVaultWBTCAddr == address(0)) dnVaultWBTCAddr = existing.contracts.dnVaultWBTC;
+            if (alphaVaultAddr == address(0)) alphaVaultAddr = existing.contracts.alphaVault;
+            if (betaVaultAddr == address(0)) betaVaultAddr = existing.contracts.betaVault;
+            if (dnVaultAdapterUSDCAddr == address(0)) dnVaultAdapterUSDCAddr = existing.contracts.dnVaultAdapterUSDC;
+            if (dnVaultAdapterWBTCAddr == address(0)) dnVaultAdapterWBTCAddr = existing.contracts.dnVaultAdapterWBTC;
+            if (alphaVaultAdapterAddr == address(0)) alphaVaultAdapterAddr = existing.contracts.alphaVaultAdapter;
+            if (betaVaultAdapterAddr == address(0)) betaVaultAdapterAddr = existing.contracts.betaVaultAdapter;
+            if (minterAdapterUSDCAddr == address(0)) minterAdapterUSDCAddr = existing.contracts.kMinterAdapterUSDC;
+            if (minterAdapterWBTCAddr == address(0)) minterAdapterWBTCAddr = existing.contracts.kMinterAdapterWBTC;
+        }
+
+        // Validate all required contracts
+        require(registryAddr != address(0), "kRegistry address required");
+        require(minterAddr != address(0), "kMinter address required");
+        require(assetRouterAddr != address(0), "kAssetRouter address required");
+        require(kUSDAddr != address(0), "kUSD address required");
+        require(kBTCAddr != address(0), "kBTC address required");
+        require(dnVaultUSDCAddr != address(0), "dnVaultUSDC address required");
+        require(dnVaultWBTCAddr != address(0), "dnVaultWBTC address required");
+        require(alphaVaultAddr != address(0), "alphaVault address required");
+        require(betaVaultAddr != address(0), "betaVault address required");
+        require(dnVaultAdapterUSDCAddr != address(0), "dnVaultAdapterUSDC address required");
+        require(dnVaultAdapterWBTCAddr != address(0), "dnVaultAdapterWBTC address required");
+        require(alphaVaultAdapterAddr != address(0), "alphaVaultAdapter address required");
+        require(betaVaultAdapterAddr != address(0), "betaVaultAdapter address required");
+        require(minterAdapterUSDCAddr != address(0), "kMinterAdapterUSDC address required");
+        require(minterAdapterWBTCAddr != address(0), "kMinterAdapterWBTC address required");
 
         console.log("=== EXECUTING PROTOCOL CONFIGURATION ===");
         console.log("Network:", config.network);
         console.log("");
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.admin);
 
-        kRegistry registry = kRegistry(payable(existing.contracts.kRegistry));
+        kRegistry registry = kRegistry(payable(registryAddr));
 
         console.log("1. Registering vaults with kRegistry...");
 
         // Register kMinter as MINTER vault type for both assets
-        registry.registerVault(existing.contracts.kMinter, IRegistry.VaultType.MINTER, config.assets.USDC);
+        registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, config.assets.USDC);
         console.log("   - Registered kMinter as MINTER vault for USDC");
-        registry.registerVault(existing.contracts.kMinter, IRegistry.VaultType.MINTER, config.assets.WBTC);
+        registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, config.assets.WBTC);
         console.log("   - Registered kMinter as MINTER vault for WBTC");
 
         // Register DN Vaults
-        registry.registerVault(existing.contracts.dnVaultUSDC, IRegistry.VaultType.DN, config.assets.USDC);
+        registry.registerVault(dnVaultUSDCAddr, IRegistry.VaultType.DN, config.assets.USDC);
         console.log("   - Registered DN Vault USDC as DN vault for USDC");
-        registry.registerVault(existing.contracts.dnVaultWBTC, IRegistry.VaultType.DN, config.assets.WBTC);
+        registry.registerVault(dnVaultWBTCAddr, IRegistry.VaultType.DN, config.assets.WBTC);
         console.log("   - Registered DN Vault WBTC as DN vault for WBTC");
 
         // Register Alpha Vault as ALPHA vault type
-        registry.registerVault(existing.contracts.alphaVault, IRegistry.VaultType.ALPHA, config.assets.USDC);
+        registry.registerVault(alphaVaultAddr, IRegistry.VaultType.ALPHA, config.assets.USDC);
         console.log("   - Registered Alpha Vault as ALPHA vault for USDC");
 
         // Register Beta Vault as BETA vault type
-        registry.registerVault(existing.contracts.betaVault, IRegistry.VaultType.BETA, config.assets.USDC);
+        registry.registerVault(betaVaultAddr, IRegistry.VaultType.BETA, config.assets.USDC);
         console.log("   - Registered Beta Vault as BETA vault for USDC");
 
+        // Set asset batch limits
         registry.setAssetBatchLimits(
-            existing.contracts.dnVaultWBTC, // vault as token
-            config.dnVaultWBTC.maxDepositPerBatch,
-            config.dnVaultWBTC.maxWithdrawPerBatch
+            dnVaultUSDCAddr, config.dnVaultUSDC.maxDepositPerBatch, config.dnVaultUSDC.maxWithdrawPerBatch
         );
-
         registry.setAssetBatchLimits(
-            existing.contracts.dnVaultWBTC, // vault as token
-            config.dnVaultWBTC.maxDepositPerBatch,
-            config.dnVaultWBTC.maxWithdrawPerBatch
+            dnVaultWBTCAddr, config.dnVaultWBTC.maxDepositPerBatch, config.dnVaultWBTC.maxWithdrawPerBatch
         );
-
         registry.setAssetBatchLimits(
-            existing.contracts.alphaVault, // vault as token
-            config.alphaVault.maxDepositPerBatch,
-            config.alphaVault.maxWithdrawPerBatch
+            alphaVaultAddr, config.alphaVault.maxDepositPerBatch, config.alphaVault.maxWithdrawPerBatch
         );
-
         registry.setAssetBatchLimits(
-            existing.contracts.betaVault, // vault as token
-            config.betaVault.maxDepositPerBatch,
-            config.betaVault.maxWithdrawPerBatch
+            betaVaultAddr, config.betaVault.maxDepositPerBatch, config.betaVault.maxWithdrawPerBatch
         );
 
         console.log("");
         console.log("2. Registering adapters with vaults...");
 
         // Register adapters for kMinter
-        registry.registerAdapter(existing.contracts.kMinter, config.assets.USDC, existing.contracts.kMinterAdapterUSDC);
+        registry.registerAdapter(minterAddr, config.assets.USDC, minterAdapterUSDCAddr);
         console.log("   - Registered kMinter USDC Adapter for kMinter");
-        registry.registerAdapter(existing.contracts.kMinter, config.assets.WBTC, existing.contracts.kMinterAdapterWBTC);
+        registry.registerAdapter(minterAddr, config.assets.WBTC, minterAdapterWBTCAddr);
         console.log("   - Registered kMinter WBTC Adapter for kMinter");
 
         // Register adapters for DN vaults
-        registry.registerAdapter(
-            existing.contracts.dnVaultUSDC, config.assets.USDC, existing.contracts.dnVaultAdapterUSDC
-        );
+        registry.registerAdapter(dnVaultUSDCAddr, config.assets.USDC, dnVaultAdapterUSDCAddr);
         console.log("   - Registered DN Vault USDC Adapter for DN Vault USDC");
-        registry.registerAdapter(
-            existing.contracts.dnVaultWBTC, config.assets.WBTC, existing.contracts.dnVaultAdapterWBTC
-        );
+        registry.registerAdapter(dnVaultWBTCAddr, config.assets.WBTC, dnVaultAdapterWBTCAddr);
         console.log("   - Registered DN Vault WBTC Adapter for DN Vault WBTC");
 
         // Register adapters for Alpha and Beta vaults
-        registry.registerAdapter(
-            existing.contracts.alphaVault, config.assets.USDC, existing.contracts.alphaVaultAdapter
-        );
+        registry.registerAdapter(alphaVaultAddr, config.assets.USDC, alphaVaultAdapterAddr);
         console.log("   - Registered Alpha Vault Adapter for Alpha Vault");
-        registry.registerAdapter(existing.contracts.betaVault, config.assets.USDC, existing.contracts.betaVaultAdapter);
+        registry.registerAdapter(betaVaultAddr, config.assets.USDC, betaVaultAdapterAddr);
         console.log("   - Registered Beta Vault Adapter for Beta Vault");
 
         console.log("");
         console.log("3. Granting roles...");
 
-        // Grant MINTER_ROLE to kMinter and kAssetRouter on kTokens (if they exist)
-        if (existing.contracts.kUSD != address(0)) {
-            kToken kUSD = kToken(payable(existing.contracts.kUSD));
-            kUSD.grantMinterRole(existing.contracts.kMinter);
-            kUSD.grantMinterRole(existing.contracts.kAssetRouter);
-            console.log("   - Granted MINTER_ROLE on kUSD to kMinter and kAssetRouter");
-        }
+        // Grant MINTER_ROLE to kMinter and kAssetRouter on kTokens
+        kToken kUSD = kToken(payable(kUSDAddr));
+        kUSD.grantMinterRole(minterAddr);
+        kUSD.grantMinterRole(assetRouterAddr);
+        console.log("   - Granted MINTER_ROLE on kUSD to kMinter and kAssetRouter");
 
-        if (existing.contracts.kBTC != address(0)) {
-            kToken kBTC = kToken(payable(existing.contracts.kBTC));
-            kBTC.grantMinterRole(existing.contracts.kMinter);
-            kBTC.grantMinterRole(existing.contracts.kAssetRouter);
-            console.log("   - Granted MINTER_ROLE on kBTC to kMinter and kAssetRouter");
-        }
+        kToken kBTC = kToken(payable(kBTCAddr));
+        kBTC.grantMinterRole(minterAddr);
+        kBTC.grantMinterRole(assetRouterAddr);
+        console.log("   - Granted MINTER_ROLE on kBTC to kMinter and kAssetRouter");
 
         // Grant INSTITUTION_ROLE to institution address
         registry.grantInstitutionRole(config.roles.institution);
@@ -126,19 +181,29 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         console.log("");
         console.log("=======================================");
         console.log("Protocol configuration complete!");
-        console.log("All vaults registered in kRegistry:");
-        console.log("   - kMinter:", existing.contracts.kMinter);
-        console.log("   - DN Vault USDC:", existing.contracts.dnVaultUSDC);
-        console.log("   - DN Vault WBTC:", existing.contracts.dnVaultWBTC);
-        console.log("   - Alpha Vault:", existing.contracts.alphaVault);
-        console.log("   - Beta Vault:", existing.contracts.betaVault);
-        console.log("");
-        console.log("All adapters registered:");
-        console.log("   - kMinter USDC Adapter:", existing.contracts.kMinterAdapterUSDC);
-        console.log("   - kMinter WBTC Adapter:", existing.contracts.kMinterAdapterWBTC);
-        console.log("   - DN Vault USDC Adapter:", existing.contracts.dnVaultAdapterUSDC);
-        console.log("   - DN Vault WBTC Adapter:", existing.contracts.dnVaultAdapterWBTC);
-        console.log("   - Alpha Vault Adapter:", existing.contracts.alphaVaultAdapter);
-        console.log("   - Beta Vault Adapter:", existing.contracts.betaVaultAdapter);
+        console.log("All vaults registered in kRegistry");
+        console.log("All adapters registered");
+        console.log("All roles granted");
+    }
+
+    /// @notice Convenience wrapper for real deployments (reads all addresses from JSON)
+    function run() public {
+        run(
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0)
+        );
     }
 }

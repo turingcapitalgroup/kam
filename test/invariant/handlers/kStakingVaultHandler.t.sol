@@ -70,6 +70,7 @@ contract kStakingVaultHandler is BaseHandler {
         address _token,
         address _kToken,
         address _relayer,
+        address _admin,
         address[] memory _minterActors,
         address[] memory _vaultActors,
         address _minterHandler
@@ -79,6 +80,11 @@ contract kStakingVaultHandler is BaseHandler {
         for (uint256 i = 0; i < _minterActors.length; i++) {
             kStakingVault_minterActors.add(_minterActors[i]);
         }
+
+        vm.startPrank(_admin);
+        IkStakingVault(_vault).setMaxTotalAssets(type(uint128).max);
+        vm.stopPrank();
+
         kStakingVault_vault = IkStakingVault(_vault);
         kStakingVault_assetRouter = IkAssetRouter(_assetRouter);
         kStakingVault_vaultAdapter = IVaultAdapter(_vaultAdapter);

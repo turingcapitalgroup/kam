@@ -1,5 +1,5 @@
 # OptimizedLibCall
-[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/vendor/solady/utils/OptimizedLibCall.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/vendor/solady/utils/OptimizedLibCall.sol)
 
 **Authors:**
 Solady (https://github.com/vectorized/solady/blob/main/src/utils/LibCall.sol), Modified from ExcessivelySafeCall (https://github.com/nomad-xyz/ExcessivelySafeCall)
@@ -18,13 +18,7 @@ Makes a call to `target`, with `data` and `value`.
 
 
 ```solidity
-function callContract(
-    address target,
-    uint256 value,
-    bytes memory data
-)
-    internal
-    returns (bytes memory result);
+function callContract(address target, uint256 value, bytes memory data) internal returns (bytes memory result);
 ```
 
 ## Errors

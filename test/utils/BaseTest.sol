@@ -3,9 +3,12 @@ pragma solidity 0.8.30;
 
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { Utilities } from "./Utilities.sol";
+import { stdJson } from "forge-std/StdJson.sol";
 import { Test } from "forge-std/Test.sol";
 
 contract BaseTest is Test {
+    using stdJson for string;
+
     Utilities internal utils;
 
     // Test users
@@ -60,33 +63,59 @@ contract BaseTest is Test {
     }
 
     function _createUsers() internal {
+        // Regular test users (random addresses)
         users.alice = utils.createUser("Alice");
         users.bob = utils.createUser("Bob");
         users.charlie = utils.createUser("Charlie");
-        users.admin = utils.createUser("Admin");
-        users.guardian = utils.createUser("Guardian");
-        users.emergencyAdmin = utils.createUser("EmergencyAdmin");
-        users.institution = utils.createUser("Institution");
+
+        string memory configPath = "deployments/config/localhost.json";
+        require(vm.exists(configPath), "Config file not found: deployments/config/localhost.json");
+
+        string memory json = vm.readFile(configPath);
+
+        users.owner = payable(json.readAddress(".roles.owner"));
+        users.admin = payable(json.readAddress(".roles.admin"));
+        users.emergencyAdmin = payable(json.readAddress(".roles.emergencyAdmin"));
+        users.guardian = payable(json.readAddress(".roles.guardian"));
+        users.relayer = payable(json.readAddress(".roles.relayer"));
+        users.institution = payable(json.readAddress(".roles.institution"));
+        users.treasury = payable(json.readAddress(".roles.treasury"));
+
+        // Additional test institutions (random)
         users.institution2 = utils.createUser("Institution2");
         users.institution3 = utils.createUser("Institution3");
         users.institution4 = utils.createUser("Institution4");
-        users.relayer = utils.createUser("relayer");
-        users.treasury = utils.createUser("Treasury");
-        users.owner = utils.createUser("Owner");
     }
 
-    function _setupAssets() internal {
-        // Deploy mock tokens
-        mockUSDC = new MockERC20("Mock USDC", "USDC", 6);
-        mockWBTC = new MockERC20("Mock WBTC", "WBTC", 8);
+    /// @notice Setup assets from deployment script return values
+    function _setupAssets(address usdcAddr, address wbtcAddr) internal {
+        require(usdcAddr != address(0), "USDC address is zero");
+        require(wbtcAddr != address(0), "WBTC address is zero");
 
-        // Set asset addresses to mock tokens
-        tokens.usdc = address(mockUSDC);
-        tokens.wbtc = address(mockWBTC);
+        mockUSDC = MockERC20(usdcAddr);
+        mockWBTC = MockERC20(wbtcAddr);
+        tokens.usdc = usdcAddr;
+        tokens.wbtc = wbtcAddr;
 
-        // Label
         vm.label(tokens.usdc, "USDC");
         vm.label(tokens.wbtc, "WBTC");
+    }
+
+    /// @notice Setup assets from JSON config (fallback for non-deployment tests)
+    function _setupAssets() internal {
+        string memory configPath = "deployments/config/localhost.json";
+        require(vm.exists(configPath), "Config file not found: deployments/config/localhost.json");
+
+        string memory json = vm.readFile(configPath);
+
+        // Read deployed mock assets from config (scripts update this)
+        require(json.keyExists(".assets.USDC"), "USDC address not found in config - run 00_DeployMockAssets.s.sol");
+        require(json.keyExists(".assets.WBTC"), "WBTC address not found in config - run 00_DeployMockAssets.s.sol");
+
+        address usdcAddr = json.readAddress(".assets.USDC");
+        address wbtcAddr = json.readAddress(".assets.WBTC");
+
+        _setupAssets(usdcAddr, wbtcAddr);
     }
 
     function _labelAddresses() internal {

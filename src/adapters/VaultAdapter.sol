@@ -5,17 +5,15 @@ import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import {
-    VAULTADAPTER_ARRAY_MISMATCH,
     VAULTADAPTER_IS_PAUSED,
     VAULTADAPTER_TRANSFER_FAILED,
     VAULTADAPTER_WRONG_ASSET,
     VAULTADAPTER_WRONG_ROLE,
     VAULTADAPTER_ZERO_ADDRESS,
-    VAULTADAPTER_ZERO_AMOUNT,
-    VAULTADAPTER_ZERO_ARRAY
+    VAULTADAPTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
-import { ERC7579Minimal, ModeCode } from "erc7579-minimal/ERC7579Minimal.sol";
+import { ERC7579Minimal } from "erc7579-minimal/ERC7579Minimal.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
@@ -159,7 +157,12 @@ contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
     }
 
     /// @notice Ensures the caller is the kAssetRouter
-    function _checkRouter(VaultAdapterStorage storage $) internal view {
+    function _checkRouter(
+        VaultAdapterStorage storage /* $ */
+    )
+        internal
+        view
+    {
         address _router = IkRegistry(address(_getMinimalAccountStorage().registry)).getContractById(K_ASSET_ROUTER);
         require(msg.sender == _router, VAULTADAPTER_WRONG_ROLE);
     }

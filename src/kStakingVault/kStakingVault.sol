@@ -358,7 +358,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultFees
     function burnFees(uint256 _shares) external {
-        _checkAdmin(msg.sender);
+        _checkRouter(msg.sender);
         _burn(address(this), _shares);
     }
 
@@ -498,7 +498,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultFees
     function notifyManagementFeesCharged(uint64 _timestamp) external {
-        _checkAdmin(msg.sender);
+        _checkRouter(msg.sender);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedManagement($));
         _setLastFeesChargedManagement($, _timestamp);
@@ -508,7 +508,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultFees
     function notifyPerformanceFeesCharged(uint64 _timestamp) external {
-        _checkAdmin(msg.sender);
+        _checkRouter(msg.sender);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedPerformance($));
         _setLastFeesChargedPerformance($, _timestamp);

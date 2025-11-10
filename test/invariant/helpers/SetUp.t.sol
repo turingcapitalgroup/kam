@@ -45,6 +45,7 @@ abstract contract SetUp is StdInvariant, DeploymentBaseTest {
             tokens.usdc,
             address(kUSD),
             users.relayer,
+            users.admin,
             _minterActors,
             _vaultActors,
             useMinter ? address(minterHandler) : address(0)
@@ -66,6 +67,7 @@ abstract contract SetUp is StdInvariant, DeploymentBaseTest {
             tokens.usdc,
             address(kUSD),
             users.relayer,
+            users.admin,
             _minterActors,
             _vaultActors,
             useMinter ? address(minterHandler) : address(0)
@@ -87,6 +89,7 @@ abstract contract SetUp is StdInvariant, DeploymentBaseTest {
             tokens.usdc,
             address(kUSD),
             users.relayer,
+            users.admin,
             _minterActors,
             _vaultActors,
             useMinter ? address(minterHandler) : address(0)
@@ -112,6 +115,10 @@ abstract contract SetUp is StdInvariant, DeploymentBaseTest {
         bytes4[] memory selectors = minterHandler.getEntryPoints();
         targetSelector(FuzzSelector({ addr: address(minterHandler), selectors: selectors }));
         vm.label(address(minterHandler), "kMinterHandler");
+
+        // Set unlimited batch limits for testing
+        vm.prank(users.admin);
+        registry.setAssetBatchLimits(tokens.usdc, type(uint128).max, type(uint128).max);
     }
 
     function _getMinterActors() internal view returns (address[] memory) {
