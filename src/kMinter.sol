@@ -499,8 +499,9 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
     /// @inheritdoc IkMinter
     function rescueReceiverAssets(address _batchReceiver, address _asset, address _to, uint256 _amount) external {
         require(_batchReceiver != address(0) && _asset != address(0) && _to != address(0), KMINTER_ZERO_ADDRESS);
-        kBatchReceiver(_batchReceiver).rescueAssets(_asset);
-        this.rescueAssets(_asset, _to, _amount);
+        require(_isAdmin(msg.sender), KMINTER_WRONG_ROLE);
+        kBatchReceiver(_batchReceiver).rescueAssets(_asset, _to, _amount);
+        // this.rescueAssets(_asset, _to, _amount);
     }
 
     /* //////////////////////////////////////////////////////////////

@@ -10,7 +10,8 @@ import {
     KBATCHRECEIVER_TRANSFER_FAILED,
     KBATCHRECEIVER_WRONG_ASSET,
     KBATCHRECEIVER_ZERO_ADDRESS,
-    KBATCHRECEIVER_ZERO_AMOUNT
+    KBATCHRECEIVER_ZERO_AMOUNT,
+    KBATCHRECEIVER_INSUFFICIENT_BALANCE
 } from "kam/src/errors/Errors.sol";
 
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
@@ -115,28 +116,30 @@ contract kBatchReceiver is IkBatchReceiver {
     }
 
     /// @inheritdoc IkBatchReceiver
-    function rescueAssets(address _asset) external payable {
-        address _sender = msg.sender;
-        _checkMinter(_sender);
+    function rescueAssets(address _asset, address _to, uint256 _amount) external payable {
+        _checkMinter(msg.sender);
+        _checkAddressNotZero(_to);
 
         if (_asset == address(0)) {
             // Rescue ETH
+            _checkAmountNotZero(_amount);
             uint256 _balance = address(this).balance;
-            _checkAmountNotZero(_balance);
+            _checkBalance(_balance, _amount);
 
-            (bool _success,) = _sender.call{ value: _balance }("");
+            (bool _success,) = _to.call{ value: _amount }("");
             require(_success, KBATCHRECEIVER_TRANSFER_FAILED);
 
-            emit RescuedETH(_sender, _balance);
+            emit RescuedETH(_to, _amount);
         } else {
             // Rescue ERC20 tokens
             require(_asset != asset, KBATCHRECEIVER_WRONG_ASSET);
 
+            _checkAmountNotZero(_amount);
             uint256 _balance = _asset.balanceOf(address(this));
-            _checkAmountNotZero(_balance);
-
-            _asset.safeTransfer(_sender, _balance);
-            emit RescuedAssets(_asset, _sender, _balance);
+            _checkBalance(_balance, _amount);
+            
+            _asset.safeTransfer(_to, _amount);
+            emit RescuedAssets(_asset, _to, _amount);
         }
     }
 
@@ -157,5 +160,9 @@ contract kBatchReceiver is IkBatchReceiver {
     /// @dev Checks amount is not zero
     function _checkAmountNotZero(uint256 _amount) private pure {
         require(_amount != 0, KBATCHRECEIVER_ZERO_AMOUNT);
+    }
+
+    function _checkBalance(uint256 _balance, uint256 _amount) private pure {
+        require(_balance <= _amount, KBATCHRECEIVER_INSUFFICIENT_BALANCE);
     }
 }

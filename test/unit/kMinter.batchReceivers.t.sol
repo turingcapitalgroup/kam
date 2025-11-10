@@ -29,16 +29,39 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                            INITIALIZE
+                          CREATE BATCH RECEIVER
     //////////////////////////////////////////////////////////////*/
 
-    function test_BatchReceiver_Require_Not_Initialized() public {
+    function test_CreateBatchReceiver_Success() public {
         bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        vm.prank(router);
+        vm.expectEmit(false, true, false, true);
+        emit IkMinter.BatchReceiverCreated(address(0), _batchId);
+        address _receiver = minter.createBatchReceiver(_batchId);
 
+        IkBatchReceiver batchReceiver = IkBatchReceiver(_receiver);
+        assertTrue(address(minter) == batchReceiver.K_MINTER());
+        assertTrue(address(USDC) == batchReceiver.asset());
+        assertTrue(_batchId == batchReceiver.batchId());
+    }
+
+    function test_CreateBatchReceiver_Require_AssetRouter() public {
+        bytes32 _batchId = minter.getBatchId(USDC);
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.createBatchReceiver(_batchId);
+    
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.createBatchReceiver(_batchId);
+    }
+
+    function test_CreateBatchReceiver_Require_Valid_BatchId() public {
+        bytes32 _batchId = keccak256("Banana");
         vm.prank(router); 
-        vm.expectRevert(bytes(KBATCHRECEIVER_ALREADY_INITIALIZED));
-        kBatchReceiver(_receiver).initialize(_batchId, USDC);
+        vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
+        // reverts on asset being address 0 from the $.batches[_batchId].asset;
+        minter.createBatchReceiver(_batchId);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -62,44 +85,6 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         assertEq(mockWBTC.balanceOf(users.alice), _balanceBefore + _rescueAmount);
     }
 
-    function test_RescueAssets_Require_Only_KMinter() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
-        mockWBTC.mint(_receiver, _1_WBTC);
-        
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
-        kBatchReceiver(_receiver).rescueAssets(WBTC, users.alice, _1_WBTC);
-
-        vm.prank(router);
-        vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
-        kBatchReceiver(_receiver).rescueAssets(WBTC, users.alice, _1_WBTC);
-
-        vm.prank(users.admin);
-        vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
-        kBatchReceiver(_receiver).rescueAssets(WBTC, users.alice, _1_WBTC);
-    }
-
-    function test_RescueAssets_Require_Not_Batch_Asset() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
-        mockUSDC.mint(_receiver, _1_USDC);
-        
-        vm.prank(address(minter));
-        vm.expectRevert(bytes(KBATCHRECEIVER_WRONG_ASSET));
-        kBatchReceiver(_receiver).rescueAssets(USDC, users.alice, _1_USDC);
-    }
-
-    function test_RescueAssets_Require_Non_Zero_Balance() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
-        assertEq(mockWBTC.balanceOf(_receiver), 0);
-        
-        vm.prank(address(minter));
-        vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_AMOUNT));
-        kBatchReceiver(_receiver).rescueAssets(WBTC, users.alice, 0);
-    }
-
     /* //////////////////////////////////////////////////////////////
                           RESCUE ASSETS - ETH
     //////////////////////////////////////////////////////////////*/
@@ -121,17 +106,6 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
 
         assertEq(_receiver.balance, 0);
         assertEq(users.alice.balance, _balanceBefore + _ethAmount);
-    }
-
-    function test_RescueAssets_ETH_Require_Non_Zero_Balance() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
-
-        assertEq(_receiver.balance, 0);
-
-        vm.prank(address(minter));
-        vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_AMOUNT));
-        kBatchReceiver(_receiver).rescueAssets(address(0), users.alice, 0);
     }
 
     /* //////////////////////////////////////////////////////////////

@@ -63,6 +63,7 @@ string constant KBATCHRECEIVER_TRANSFER_FAILED = "B4";
 string constant KBATCHRECEIVER_WRONG_ASSET = "B5";
 string constant KBATCHRECEIVER_ZERO_ADDRESS = "B6";
 string constant KBATCHRECEIVER_ZERO_AMOUNT = "B7";
+string constant KBATCHRECEIVER_INSUFFICIENT_BALANCE = "B8";
 
 // Custodial Adapter Errors
 string constant CUSTODIAL_INVALID_CUSTODIAL_ADDRESS = "C1";

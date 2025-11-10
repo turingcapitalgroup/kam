@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import {
     KMINTER_WRONG_ROLE,
@@ -13,8 +12,6 @@ import {
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 
 contract kMinterBatchesTest is DeploymentBaseTest {
-    uint256 internal constant TEST_AMOUNT = 1000 * _1_USDC;
-    address internal constant ZERO_ADDRESS = address(0);
     address USDC;
     address WBTC;
 
