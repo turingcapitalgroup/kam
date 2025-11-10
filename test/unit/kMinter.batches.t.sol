@@ -35,19 +35,78 @@ contract kMinterBatchesTest is DeploymentBaseTest {
         WBTC = address(mockWBTC);
     }
 
-     function test_CreateNewBatch_Success() public {
-        bytes32 batchId = minter.getBatchId(USDC);
-        uint256 currentNumber = minter.getCurrentBatchNumber(USDC);
+    /* //////////////////////////////////////////////////////////////
+                      CREATE BATCHES
+    //////////////////////////////////////////////////////////////*/
 
-        vm.prank(users.relayer);
-        vm.expectEmit(true, false, false, false);
-        emit IkMinter.BatchCreated(USDC, bytes32(0), 1); 
-        bytes32 newBatchId = minter.createNewBatch(USDC);
-        uint256 newCurrentNumber = minter.getCurrentBatchNumber(USDC);
+    function test_CreateNewBatch_Success() public {
+       bytes32 batchId = minter.getBatchId(USDC);
+       uint256 currentNumber = minter.getCurrentBatchNumber(USDC);
+       
+       vm.prank(users.relayer);
+       vm.expectEmit(true, false, false, false);
+       emit IkMinter.BatchCreated(USDC, bytes32(0), 1); 
+       bytes32 newBatchId = minter.createNewBatch(USDC);
+       uint256 newCurrentNumber = minter.getCurrentBatchNumber(USDC);
+       
+       assertTrue(newBatchId != batchId);
+       assertTrue(newBatchId != bytes32(0));
+       assertTrue(currentNumber + 1 == newCurrentNumber);
+    }
 
-        assertTrue(newBatchId != batchId);
-        assertTrue(newBatchId != bytes32(0));
-        assertTrue(currentNumber + 1 == newCurrentNumber);
-     }
+    function test_CreateNewBatch_Requires_Relayer() public {
+       vm.prank(users.alice);
+       vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+       minter.createNewBatch(USDC);
+       
+       vm.prank(users.alice);
+       vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+       minter.createNewBatch(USDC);
+       
+       vm.prank(users.admin);
+       vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+       minter.createNewBatch(USDC);
+    }
 
+    /* //////////////////////////////////////////////////////////////
+                      CLOSE BATCHES
+    //////////////////////////////////////////////////////////////*/
+
+    function test_CloseBatch_With_No_Batch_Creation_Success() public {
+       bytes32 batchId = minter.getBatchId(USDC);     
+       bool isActive = minter.hasActiveBatch(USDC);
+       assertTrue(isActive == true);
+
+       vm.prank(users.relayer);
+       vm.expectEmit(true, false, false, false);
+       emit IkMinter.BatchClosed(batchId); 
+       minter.closeBatch(batchId, false);
+       
+       isActive = minter.hasActiveBatch(USDC);
+       assertTrue(isActive != true);
+       
+       bytes32 newBatchId = minter.getBatchId(USDC);
+       assertTrue(batchId == newBatchId);
+    }
+
+    function test_CloseBatch_With_Batch_Creation_Success() public {
+       bytes32 batchId = minter.getBatchId(USDC);
+       uint256 currentNumber = minter.getCurrentBatchNumber(USDC);     
+       bool isActive = minter.hasActiveBatch(USDC);
+       assertTrue(isActive == true);
+
+       vm.prank(users.relayer);
+       vm.expectEmit(true, false, false, false);
+       emit IkMinter.BatchClosed(batchId); 
+       minter.closeBatch(batchId, true);
+       
+       bool isClosed = minter.isClosed(batchId);
+       assertTrue(isClosed == true);
+
+       uint256 newCurrentNumber = minter.getCurrentBatchNumber(USDC);
+       assertTrue(currentNumber + 1 == newCurrentNumber);
+
+       bytes32 actualBatchId = minter.getBatchId(USDC);
+       assertTrue(batchId != actualBatchId);
+    }
 }
