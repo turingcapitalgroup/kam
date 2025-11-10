@@ -25,6 +25,10 @@ contract kMinterTest is DeploymentBaseTest {
     uint256 internal constant TEST_AMOUNT = 1000 * _1_USDC;
     address internal constant ZERO_ADDRESS = address(0);
 
+    function setUp() public override {
+        DeploymentBaseTest.setUp();
+    }
+
     /* //////////////////////////////////////////////////////////////
                         INITIALIZATION TESTS
     //////////////////////////////////////////////////////////////*/
