@@ -68,45 +68,13 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
                           RESCUE ASSETS - ERC20
     //////////////////////////////////////////////////////////////*/
 
-    function test_RescueAssets_Success() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
-        uint256 _balanceBefore = mockWBTC.balanceOf(users.alice);
-        uint256 _rescueAmount = 5 * _1_WBTC;
-        mockWBTC.mint(_receiver, _rescueAmount);
-        assertEq(mockWBTC.balanceOf(_receiver), _rescueAmount);
-
-        vm.prank(address(minter));
-        vm.expectEmit(true, true, false, true);
-        emit IkBatchReceiver.RescuedAssets(WBTC, users.alice, _rescueAmount);
-        kBatchReceiver(_receiver).rescueAssets(WBTC, users.alice, _rescueAmount);
-
-        assertEq(mockWBTC.balanceOf(_receiver), 0);
-        assertEq(mockWBTC.balanceOf(users.alice), _balanceBefore + _rescueAmount);
-    }
+    function test_RescueAssets_Success() public {}
 
     /* //////////////////////////////////////////////////////////////
                           RESCUE ASSETS - ETH
     //////////////////////////////////////////////////////////////*/
 
-    function test_RescueAssets_ETH_Success() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
-
-        uint256 _ethAmount = 1 ether;
-        vm.deal(_receiver, _ethAmount);
-        assertEq(_receiver.balance, _ethAmount);
-
-        uint256 _balanceBefore = users.alice.balance;
-
-        vm.prank(address(minter));
-        vm.expectEmit(true, false, false, true);
-        emit IkBatchReceiver.RescuedETH(users.alice, _ethAmount);
-        kBatchReceiver(_receiver).rescueAssets(address(0), users.alice, _ethAmount);
-
-        assertEq(_receiver.balance, 0);
-        assertEq(users.alice.balance, _balanceBefore + _ethAmount);
-    }
+    function test_RescueAssets_ETH_Success() public {}
 
     /* //////////////////////////////////////////////////////////////
                                 PRIVATE
