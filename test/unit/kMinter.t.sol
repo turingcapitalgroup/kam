@@ -1,33 +1,44 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { _1_USDC } from "../utils/Constants.sol";
+import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
+import { MockERC20 } from "../mocks/MockERC20.sol";
 
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import {
+    KBASE_TRANSFER_FAILED,
+    KBASE_WRONG_ASSET,
+    KBASE_WRONG_ROLE,
+    KBASE_ZERO_ADDRESS,
+    KBASE_ZERO_AMOUNT,
     KMINTER_BATCH_MINT_REACHED,
     KMINTER_BATCH_REDEEM_REACHED,
+    KMINTER_BATCH_NOT_SETTLED,
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
     KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
-    KMINTER_ZERO_AMOUNT,
-    KMINTER_BATCH_NOT_SETTLED
+    KMINTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { kMinter } from "kam/src/kMinter.sol";
+import { kBase } from "kam/src/base/kBase.sol";
 
 contract kMinterTest is DeploymentBaseTest {
     uint256 internal constant MINT_AMOUNT = 100000 * _1_USDC;
     uint256 internal constant REQUEST_AMOUNT = 50000 * _1_USDC;
+    uint256 internal constant _1_DAI = 1e18;
     address internal constant ZERO_ADDRESS = address(0);
     address USDC;
     address WBTC;
+    address DAI;
     address _minter;
+    
+    MockERC20 public mockDAI;
 
     function setUp() public override {
         DeploymentBaseTest.setUp();
@@ -35,6 +46,11 @@ contract kMinterTest is DeploymentBaseTest {
         USDC = address(mockUSDC);
         WBTC = address(mockWBTC);
         _minter = address(minter);
+        
+        // Deploy mockDAI for rescue assets test (not a protocol asset)
+        mockDAI = new MockERC20("Mock DAI", "DAI", 18);
+        DAI = address(mockDAI);
+        vm.label(DAI, "DAI");
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -93,6 +109,8 @@ contract kMinterTest is DeploymentBaseTest {
     function test_Mint_Require_Not_Paused() public {
         bool _paused = true;
         vm.prank(users.emergencyAdmin);
+        vm.expectEmit(true, false, false, true);
+        emit kBase.Paused(_paused);
         minter.setPaused(_paused);
 
         vm.prank(users.institution);
@@ -346,6 +364,163 @@ contract kMinterTest is DeploymentBaseTest {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
         minter.upgradeToAndCall(ZERO_ADDRESS, "");
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        RESCUE ASSETS TESTS - ERC20
+    //////////////////////////////////////////////////////////////*/
+
+    function test_RescueAssets_ERC20_Success() public {
+        uint256 _amount = 10 * _1_DAI;
+        mockDAI.mint(_minter, _amount);
+        
+        uint256 _balanceBefore = mockDAI.balanceOf(users.treasury);
+        assertEq(mockDAI.balanceOf(_minter), _amount);
+        
+        vm.prank(users.admin);
+        vm.expectEmit(true, true, false, true);
+        emit kBase.RescuedAssets(DAI, users.treasury, _amount);
+        minter.rescueAssets(DAI, users.treasury, _amount);
+        
+        assertEq(mockDAI.balanceOf(users.treasury), _balanceBefore + _amount);
+        assertEq(mockDAI.balanceOf(_minter), 0);
+    }
+
+    function test_RescueAssets_Require_Only_Admin() public {
+        uint256 _amount = 5 * _1_DAI;
+        mockDAI.mint(_minter, _amount);
+        
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KBASE_WRONG_ROLE));
+        minter.rescueAssets(DAI, users.treasury, _amount);
+
+        vm.prank(users.emergencyAdmin);
+        vm.expectRevert(bytes(KBASE_WRONG_ROLE));
+        minter.rescueAssets(DAI, users.treasury, _amount);
+
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KBASE_WRONG_ROLE));
+        minter.rescueAssets(DAI, users.treasury, _amount);
+        
+        assertEq(mockDAI.balanceOf(_minter), _amount);
+    }
+
+    function test_RescueAssets_Require_To_Address_Not_Zero() public {
+        uint256 _amount = 5 * _1_DAI;
+        mockDAI.mint(_minter, _amount);
+        
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KBASE_ZERO_ADDRESS));
+        minter.rescueAssets(DAI, ZERO_ADDRESS, _amount);
+        
+        assertEq(mockDAI.balanceOf(_minter), _amount);
+    }
+
+    function test_RescueAssets_Require_Amount_Not_Zero() public {
+        uint256 _amount = 5 * _1_DAI;
+        mockDAI.mint(_minter, _amount);
+        
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KBASE_ZERO_AMOUNT));
+        minter.rescueAssets(DAI, users.treasury, 0);
+        
+        assertEq(mockDAI.balanceOf(_minter), _amount);
+    }
+
+    function test_RescueAssets_Require_Amount_Below_Balance() public {
+        uint256 _mintAmount = 5 * _1_DAI;
+        uint256 _rescueAmount = 10 * _1_DAI;
+        mockDAI.mint(_minter, _mintAmount);
+        
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KBASE_ZERO_AMOUNT));
+        minter.rescueAssets(DAI, users.treasury, _rescueAmount);
+        
+        assertEq(mockDAI.balanceOf(_minter), _mintAmount);
+    }
+
+    function test_RescueAssets_Require_Not_Protocol_Asset() public {
+        uint256 _amount = 1000 * _1_USDC;
+        mockUSDC.mint(_minter, _amount);
+        
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KBASE_WRONG_ASSET));
+        minter.rescueAssets(USDC, users.treasury, _amount);
+        
+        assertEq(mockUSDC.balanceOf(_minter), _amount);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        RESCUE ASSETS TESTS - ETH
+    //////////////////////////////////////////////////////////////*/
+
+    function test_RescueAssets_ETH_Success() public {
+        uint256 _amount = 1 ether;
+        vm.deal(_minter, _amount);
+        assertEq(_minter.balance, _amount);
+        
+        uint256 _balanceBefore = users.treasury.balance;
+        
+        vm.prank(users.admin);
+        vm.expectEmit(true, false, false, true);
+        emit kBase.RescuedETH(users.treasury, _amount);
+        minter.rescueAssets(ZERO_ADDRESS, users.treasury, _amount);
+        
+        assertEq(users.treasury.balance, _balanceBefore + _amount);
+        assertEq(_minter.balance, 0);
+    }
+
+    function test_RescueAssets_ETH_Require_Only_Admin() public {
+        uint256 _amount = 1 ether;
+        vm.deal(_minter, _amount);
+        
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KBASE_WRONG_ROLE));
+        minter.rescueAssets(ZERO_ADDRESS, users.treasury, _amount);
+
+        vm.prank(users.emergencyAdmin);
+        vm.expectRevert(bytes(KBASE_WRONG_ROLE));
+        minter.rescueAssets(ZERO_ADDRESS, users.treasury, _amount);
+
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KBASE_WRONG_ROLE));
+        minter.rescueAssets(ZERO_ADDRESS, users.treasury, _amount);
+        
+        assertEq(_minter.balance, _amount);
+    }
+
+    function test_RescueAssets_ETH_Require_To_Address_Not_Zero() public {
+        uint256 _amount = 1 ether;
+        vm.deal(_minter, _amount);
+        
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KBASE_ZERO_ADDRESS));
+        minter.rescueAssets(ZERO_ADDRESS, ZERO_ADDRESS, _amount);
+        
+        assertEq(_minter.balance, _amount);
+    }
+
+    function test_RescueAssets_ETH_Require_Amount_Not_Zero() public {
+        uint256 _amount = 1 ether;
+        vm.deal(_minter, _amount);
+        
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KBASE_ZERO_AMOUNT));
+        minter.rescueAssets(ZERO_ADDRESS, users.treasury, 0);
+        
+        assertEq(_minter.balance, _amount);
+    }
+
+    function test_RescueAssets_ETH_Require_Amount_Below_Balance() public {
+        uint256 _mintAmount = 1 ether;
+        uint256 _rescueAmount = 2 ether;
+        vm.deal(_minter, _mintAmount);
+        
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KBASE_ZERO_AMOUNT));
+        minter.rescueAssets(ZERO_ADDRESS, users.treasury, _rescueAmount);
+        
+        assertEq(_minter.balance, _mintAmount);
     }
 
     /* //////////////////////////////////////////////////////////////
