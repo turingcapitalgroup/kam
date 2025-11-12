@@ -14,19 +14,17 @@ import {
     KMINTER_BATCH_CLOSED,
     KMINTER_BATCH_MINT_REACHED,
     KMINTER_BATCH_NOT_CLOSED,
-    KMINTER_BATCH_NOT_SET,
     KMINTER_BATCH_REDEEM_REACHED,
     KMINTER_BATCH_SETTLED,
     KMINTER_INSUFFICIENT_BALANCE,
     KMINTER_IS_PAUSED,
-    KMINTER_REQUEST_NOT_ELIGIBLE,
     KMINTER_REQUEST_NOT_FOUND,
-    KMINTER_REQUEST_PROCESSED,
     KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
     KMINTER_ZERO_AMOUNT,
-    KMINTER_BATCH_NOT_VALID
+    KMINTER_BATCH_NOT_VALID,
+    KMINTER_BATCH_NOT_SETTLED
 } from "kam/src/errors/Errors.sol";
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
@@ -171,7 +169,6 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
         _checkValidAsset(_asset);
         _checkAmountNotZero(_amount);
         _checkAddressNotZero(_to);
-        _checkBatchId(_asset);
 
         address _kToken = _getKTokenForAsset(_asset);
         require(_kToken.balanceOf(msg.sender) >= _amount, KMINTER_INSUFFICIENT_BALANCE);
@@ -212,7 +209,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
         // Register redemption request with router for batch processing and settlement
         IkAssetRouter(_getKAssetRouter()).kAssetRequestPull(_asset, _amount, _batchId);
 
-        emit BurnRequestCreated(_requestId, _to, _kToken, _amount, _to, _batchId);
+        emit BurnRequestCreated(_requestId, _to, _kToken, _amount, _batchId);
 
         _unlockReentrant();
         return _requestId;
@@ -230,15 +227,12 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
         uint256 _amount = _burnRequest.amount;
         address _asset = _burnRequest.asset;
         address _recipient = _burnRequest.recipient;
-        bytes32 _batchId = _burnRequest.batchId;
-        RequestStatus _status = _burnRequest.status;
+        bytes32 _batchId = _burnRequest.batchId; 
 
         // Validate request exists and belongs to the user
-        // Some redudant but we let them for security bananas
         require($.userRequests[_burnRequest.user].remove(_requestId), KMINTER_REQUEST_NOT_FOUND);
-        require(_status == RequestStatus.PENDING, KMINTER_REQUEST_NOT_ELIGIBLE);
-        require(_status != RequestStatus.REDEEMED, KMINTER_REQUEST_PROCESSED);
-
+        require($.batches[_batchId].isSettled, KMINTER_BATCH_NOT_SETTLED);
+        
         address _batchReceiver = $.batches[_batchId].batchReceiver;
         require(_batchReceiver != address(0), KMINTER_ZERO_ADDRESS);
 
@@ -383,12 +377,6 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
         return $.currentBatchIds[_asset];
     }
 
-    /// @notice Checks if a batch exists for a specific asset
-    /// @param _asset The asset to check
-    function _checkBatchId(address _asset) internal view {
-        require(_currentBatchId(_asset) != bytes32(0), KMINTER_BATCH_NOT_SET);
-    }
-
     /// @inheritdoc IkMinter
     function getCurrentBatchNumber(address _asset) external view returns (uint256) {
         kMinterStorage storage $ = _getkMinterStorage();
@@ -498,10 +486,9 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
 
     /// @inheritdoc IkMinter
     function rescueReceiverAssets(address _batchReceiver, address _asset, address _to, uint256 _amount) external {
-        require(_batchReceiver != address(0) && _asset != address(0) && _to != address(0), KMINTER_ZERO_ADDRESS);
+        require(_batchReceiver != address(0), KMINTER_ZERO_ADDRESS);
         require(_isAdmin(msg.sender), KMINTER_WRONG_ROLE);
         kBatchReceiver(_batchReceiver).rescueAssets(_asset, _to, _amount);
-        // this.rescueAssets(_asset, _to, _amount);
     }
 
     /* //////////////////////////////////////////////////////////////

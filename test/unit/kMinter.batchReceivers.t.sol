@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
+import { _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import {
     KMINTER_WRONG_ROLE,
-    KBATCHRECEIVER_ZERO_ADDRESS,
-    KBATCHRECEIVER_ONLY_KMINTER,
-    KBATCHRECEIVER_ALREADY_INITIALIZED,
-    KBATCHRECEIVER_WRONG_ASSET,
-    KBATCHRECEIVER_ZERO_AMOUNT
+    KMINTER_ZERO_ADDRESS,
+    KBATCHRECEIVER_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
-import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 
 contract kMinterBatchReceiversTest is DeploymentBaseTest {
     address USDC;
@@ -65,16 +61,65 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                          RESCUE ASSETS - ERC20
+                            RESCUE ASSETS
     //////////////////////////////////////////////////////////////*/
 
-    function test_RescueAssets_Success() public {}
+    function test_RescueReceiverAssets_Success() public {
+        bytes32 _batchId = minter.getBatchId(USDC);
+        address _receiver = _createBatchReceiver(_batchId);
+        uint256 _balanceBefore = mockWBTC.balanceOf(users.alice);
+        uint256 _rescueAmount = 5 * _1_WBTC;
+        mockWBTC.mint(_receiver, _rescueAmount);
 
-    /* //////////////////////////////////////////////////////////////
-                          RESCUE ASSETS - ETH
-    //////////////////////////////////////////////////////////////*/
+        vm.prank(users.admin);
+        minter.rescueReceiverAssets(_receiver, WBTC, users.alice, _rescueAmount);
 
-    function test_RescueAssets_ETH_Success() public {}
+        assertEq(mockWBTC.balanceOf(users.alice), _balanceBefore + _rescueAmount);
+    }
+
+    function test_RescueReceiverAssets_ETH_Success() public {
+        bytes32 _batchId = minter.getBatchId(USDC);
+        address _receiver = _createBatchReceiver(_batchId);
+        uint256 _balanceBefore = users.alice.balance;
+        uint256 _rescueAmount = 1 ether;
+        vm.deal(_receiver, _rescueAmount);
+
+        vm.prank(users.admin);
+        minter.rescueReceiverAssets(_receiver, address(0), users.alice, _rescueAmount);
+
+        assertEq(users.alice.balance, _balanceBefore + _rescueAmount);
+    }
+
+    function test_RescueReceiverAssets_Require_BatchReceiver_Not_Zero_Address() public {
+        address _receiver = address(0);
+        uint256 _balanceBefore = users.alice.balance;
+        uint256 _rescueAmount = 1 ether;
+        vm.deal(_receiver, _rescueAmount);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
+        minter.rescueReceiverAssets(_receiver, address(0), users.alice, _rescueAmount);
+
+        assertEq(users.alice.balance, _balanceBefore);
+    }
+
+    function test_RescueReceiverAssets_Require_Only_Admin() public {
+        bytes32 _batchId = minter.getBatchId(USDC);
+        address _receiver = _createBatchReceiver(_batchId);
+        uint256 _balanceBefore = users.alice.balance;
+        uint256 _rescueAmount = 1 ether;
+        vm.deal(_receiver, _rescueAmount);
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.rescueReceiverAssets(_receiver, address(0), users.alice, _rescueAmount);
+
+        assertEq(users.alice.balance, _balanceBefore);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.rescueReceiverAssets(_receiver, address(0), users.alice, _rescueAmount);
+    }
 
     /* //////////////////////////////////////////////////////////////
                                 PRIVATE

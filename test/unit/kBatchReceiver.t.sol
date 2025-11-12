@@ -4,7 +4,6 @@ pragma solidity 0.8.30;
 import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import {
-    KMINTER_WRONG_ROLE,
     KBATCHRECEIVER_ZERO_ADDRESS,
     KBATCHRECEIVER_ONLY_KMINTER,
     KBATCHRECEIVER_ALREADY_INITIALIZED,
@@ -13,11 +12,10 @@ import {
     KBATCHRECEIVER_INSUFFICIENT_BALANCE,
     KBATCHRECEIVER_INVALID_BATCH_ID
 } from "kam/src/errors/Errors.sol";
-import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 
-contract kMinterBatchReceiversTest is DeploymentBaseTest {
+contract kBatchReceiverTest is DeploymentBaseTest {
     address USDC;
     address WBTC;
     address router;

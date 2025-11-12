@@ -1,14 +1,12 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
 import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
-import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import {
-    KBASE_WRONG_ROLE,
     KMINTER_BATCH_MINT_REACHED,
     KMINTER_BATCH_REDEEM_REACHED,
     KMINTER_IS_PAUSED,
@@ -16,24 +14,34 @@ import {
     KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
-    KMINTER_ZERO_AMOUNT
+    KMINTER_ZERO_AMOUNT,
+    KMINTER_BATCH_NOT_SETTLED
 } from "kam/src/errors/Errors.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
+import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { kMinter } from "kam/src/kMinter.sol";
 
 contract kMinterTest is DeploymentBaseTest {
-    uint256 internal constant TEST_AMOUNT = 1000 * _1_USDC;
+    uint256 internal constant MINT_AMOUNT = 100000 * _1_USDC;
+    uint256 internal constant REQUEST_AMOUNT = 50000 * _1_USDC;
     address internal constant ZERO_ADDRESS = address(0);
+    address USDC;
+    address WBTC;
+    address _minter;
 
     function setUp() public override {
         DeploymentBaseTest.setUp();
+
+        USDC = address(mockUSDC);
+        WBTC = address(mockWBTC);
+        _minter = address(minter);
     }
 
     /* //////////////////////////////////////////////////////////////
                         INITIALIZATION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_InitialState() public view {
+    function test_Initialize_Success() public view {
         assertEq(minter.contractName(), "kMinter", "Contract name incorrect");
         assertEq(minter.contractVersion(), "1.0.0", "Contract version incorrect");
         assertFalse(minter.isPaused(), "Should be unpaused initially");
@@ -41,19 +49,7 @@ contract kMinterTest is DeploymentBaseTest {
         assertEq(minter.getRequestCounter(), 0, "Request counter should be zero initially");
     }
 
-    function test_Initialize_Success() public {
-        kMinter newMinterImpl = new kMinter();
-
-        bytes memory initData = abi.encodeWithSelector(kMinter.initialize.selector, address(registry));
-
-        ERC1967Factory factory = new ERC1967Factory();
-        address newProxy = factory.deployAndCall(address(newMinterImpl), users.admin, initData);
-
-        kMinter newMinter = kMinter(payable(newProxy));
-        assertFalse(newMinter.isPaused(), "Should be unpaused");
-    }
-
-    function test_Initialize_RevertZeroRegistry() public {
+    function test_Initialize_Require_Registry_Not_Zero_Address() public {
         kMinter newMinterImpl = new kMinter();
 
         bytes memory initData = abi.encodeWithSelector(kMinter.initialize.selector, address(0));
@@ -63,232 +59,259 @@ contract kMinterTest is DeploymentBaseTest {
         factory.deployAndCall(address(newMinterImpl), users.admin, initData);
     }
 
-    function test_Initialize_RevertDoubleInit() public {
+    function test_Initialize_Require_Not_Initialized() public {
         vm.expectRevert();
         minter.initialize(address(registry));
     }
 
     /* //////////////////////////////////////////////////////////////
-                        MINTING TESTS
+                                MINT
     //////////////////////////////////////////////////////////////*/
 
     function test_Mint_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        address recipient = users.alice;
-
-        mockUSDC.mint(users.institution, amount);
-
-        vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), amount);
-
-        uint256 initialKTokenBalance = kUSD.balanceOf(recipient);
-        uint256 initialUSDCBalance = IERC20(tokens.usdc).balanceOf(users.institution);
+        bytes32 _batchId = minter.getBatchId(USDC);
+        uint256 _balanceBefore = kUSD.balanceOf(users.institution);
+        mockUSDC.mint(users.institution, MINT_AMOUNT);
 
         vm.prank(users.institution);
-        vm.expectEmit(true, false, false, false);
-        emit IkMinter.Minted(recipient, amount, 0);
+        mockUSDC.approve(_minter, MINT_AMOUNT);
 
-        minter.mint(tokens.usdc, recipient, amount);
+        vm.prank(users.institution);
+        vm.expectEmit(true, true, true, true);
+        emit IkMinter.Minted(users.institution, MINT_AMOUNT, _batchId);
+        minter.mint(USDC, users.institution, MINT_AMOUNT);
+        assertEq(kUSD.balanceOf(users.institution), _balanceBefore + MINT_AMOUNT);
 
-        assertEq(kUSD.balanceOf(recipient) - initialKTokenBalance, amount, "kToken balance should increase by amount");
-        assertEq(
-            initialUSDCBalance - IERC20(tokens.usdc).balanceOf(users.institution),
-            amount,
-            "USDC balance should decrease by amount"
-        );
+        assertEq(minter.getTotalLockedAssets(USDC), MINT_AMOUNT);
+
+        (uint256 _deposit,) = assetRouter.getBatchIdBalances(_minter, _batchId);
+        assertEq(_deposit, MINT_AMOUNT);
+
+        assertEq(mockUSDC.balanceOf(address(minterAdapterUSDC)), MINT_AMOUNT);
     }
 
-    function test_Mint_LimitExceeded() public {
-        uint256 amount = TEST_AMOUNT;
-        vm.prank(users.admin);
-        registry.setAssetBatchLimits(tokens.usdc, 0, 0);
+    function test_Mint_Require_Not_Paused() public {
+        bool _paused = true;
+        vm.prank(users.emergencyAdmin);
+        minter.setPaused(_paused);
 
         vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), amount);
+        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
+        minter.mint(USDC, users.institution, MINT_AMOUNT);
+    }
+
+    function test_Mint_Require_Only_Institution() public {
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.mint(USDC, users.alice, MINT_AMOUNT);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.mint(USDC, users.admin, MINT_AMOUNT);
+    }
+
+    function test_Mint_Require_Valid_Asset() public {
+        address invalidAsset = address(0x347474);
+
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_WRONG_ASSET));
+        minter.mint(invalidAsset, users.institution, MINT_AMOUNT);
+    }
+
+    function test_Mint_Require_Amount_Not_Zero() public {
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_ZERO_AMOUNT));
+        minter.mint(USDC, users.institution, 0);
+    }
+
+    function test_Mint_Require_To_Address_Not_Zero() public {
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
+        minter.mint(USDC, ZERO_ADDRESS, MINT_AMOUNT);
+    }
+
+    function test_Mint_Require_Amount_Below_Batch_Max_Mint() public {
+        vm.prank(users.admin);
+        registry.setAssetBatchLimits(USDC, MINT_AMOUNT - 1, MINT_AMOUNT);
 
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_BATCH_MINT_REACHED));
-        minter.mint(tokens.usdc, users.alice, amount);
-    }
-
-    function test_Mint_WrongRole() public {
-        uint256 amount = TEST_AMOUNT;
-
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
-        minter.mint(tokens.usdc, users.alice, amount);
-    }
-
-    function test_Mint_RevertZeroAmount() public {
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_ZERO_AMOUNT));
-        minter.mint(tokens.usdc, users.alice, 0);
-    }
-
-    function test_Mint_RevertZeroRecipient() public {
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
-        minter.mint(tokens.usdc, ZERO_ADDRESS, TEST_AMOUNT);
-    }
-
-    function test_Mint_RevertInvalidAsset() public {
-        address invalidAsset = address(0x1234567890123456789012345678901234567890);
-
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_WRONG_ASSET));
-        minter.mint(invalidAsset, users.alice, TEST_AMOUNT);
-    }
-
-    function test_Mint_RevertWhenPaused() public {
-        vm.prank(users.emergencyAdmin);
-        minter.setPaused(true);
-
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
-        minter.mint(tokens.usdc, users.alice, TEST_AMOUNT);
+        minter.mint(USDC, users.alice, MINT_AMOUNT);
     }
 
     /* //////////////////////////////////////////////////////////////
-                    REDEMPTION REQUEST TESTS
+                            REQUEST BURN
     //////////////////////////////////////////////////////////////*/
 
     function test_RequestBurn_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        address recipient = users.institution;
-
-        mockUSDC.mint(users.institution, amount);
-        vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), amount);
-        vm.prank(users.institution);
-        minter.mint(tokens.usdc, recipient, amount);
+        _mint(USDC, users.institution, MINT_AMOUNT);
+        bytes32 _batchId = minter.getBatchId(USDC);
 
         vm.prank(users.institution);
-        kUSD.approve(address(minter), amount);
+        kUSD.approve(_minter, MINT_AMOUNT);
+
+        assertEq(minter.isPaused(), false);
 
         vm.prank(users.institution);
-        vm.expectRevert();
-        minter.requestBurn(tokens.usdc, recipient, amount);
+        vm.expectEmit(false, true, false, false);
+        emit IkMinter.BurnRequestCreated(bytes32(0), users.institution, address(kUSD), REQUEST_AMOUNT, _batchId);
+        bytes32 _requestId = minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+        assertEq(minter.getBurnRequest(_requestId).user, users.institution);
+        assertEq(minter.getBurnRequest(_requestId).asset, USDC);
+        assertEq(minter.getBurnRequest(_requestId).amount, REQUEST_AMOUNT);
+        
+        assertEq(minter.getTotalLockedAssets(USDC), MINT_AMOUNT); // Only changes on Burn.
+
+        (, uint256 _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
+        assertEq(_requested, REQUEST_AMOUNT);
+
+        assertEq(kUSD.balanceOf(_minter), REQUEST_AMOUNT);
+
+        assertEq(minter.getRequestCounter(), 1);
     }
 
-    function test_RequestBurn_WrongRole() public {
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
-        minter.requestBurn(tokens.usdc, users.alice, TEST_AMOUNT);
-    }
-
-    function test_RequestBurn_RevertZeroAmount() public {
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_ZERO_AMOUNT));
-        minter.requestBurn(tokens.usdc, users.institution, 0);
-    }
-
-    function test_RequestBurn_RevertZeroRecipient() public {
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
-        minter.requestBurn(tokens.usdc, ZERO_ADDRESS, TEST_AMOUNT);
-    }
-
-    function test_RequestBurn_RevertBatchLimitReached() public {
-        uint256 amount = TEST_AMOUNT;
-        address recipient = users.institution;
-
-        mockUSDC.mint(users.institution, amount);
-        vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), amount);
-        vm.prank(users.institution);
-        minter.mint(tokens.usdc, recipient, amount);
-
-        vm.prank(users.admin);
-        registry.setAssetBatchLimits(tokens.usdc, 0, 0);
-
-        vm.prank(users.institution);
-        kUSD.approve(address(minter), amount);
-
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_BATCH_REDEEM_REACHED));
-        minter.requestBurn(tokens.usdc, recipient, amount);
-    }
-
-    function test_RequestBurn_RevertInvalidAsset() public {
-        address invalidAsset = address(0x1234567890123456789012345678901234567890);
-
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_WRONG_ASSET));
-        minter.requestBurn(invalidAsset, users.institution, TEST_AMOUNT);
-    }
-
-    function test_RequestBurn_RevertWhenPaused() public {
+    function test_RequestBurn_Require_Not_Paused() public {
+        bool _paused = true;
         vm.prank(users.emergencyAdmin);
-        minter.setPaused(true);
+        minter.setPaused(_paused);
 
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_IS_PAUSED));
-        minter.requestBurn(tokens.usdc, users.institution, TEST_AMOUNT);
+        minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+    }
+
+    function test_RequestBurn_Require_Only_Institution() public {
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.requestBurn(USDC, users.alice, REQUEST_AMOUNT);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.requestBurn(USDC, users.admin, REQUEST_AMOUNT);
+    }
+
+    function test_RequestBurn_Require_Valid_Asset() public {
+        address invalidAsset = address(0x347474);
+
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_WRONG_ASSET));
+        minter.requestBurn(invalidAsset, users.institution, REQUEST_AMOUNT);
+    }
+
+    function test_RequestBurn_Require_Amount_Not_Zero() public {
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_ZERO_AMOUNT));
+        minter.requestBurn(USDC, users.institution, 0);
+    }
+
+    function test_RequestBurn_Require_To_Address_Not_Zero() public {
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
+        minter.requestBurn(USDC, ZERO_ADDRESS, REQUEST_AMOUNT);
+    }
+
+    function test_RequestBurn_Require_Amount_Below_Batch_Max_Redeem() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+
+        vm.prank(users.admin);
+        registry.setAssetBatchLimits(USDC, MINT_AMOUNT, REQUEST_AMOUNT - 1);
+        
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_BATCH_REDEEM_REACHED));
+        minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
     }
 
     /* //////////////////////////////////////////////////////////////
-                        REDEMPTION TESTS
+                            BURN
     //////////////////////////////////////////////////////////////*/
 
-    function test_Burn_RevertRequestNotFound() public {
-        bytes32 invalidRequestId = keccak256("invalid");
+    function test_Burn_Success() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+        uint256 _aBalanceAfterMint = mockUSDC.balanceOf(users.institution);
+        _requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+        
+        bytes32[] memory _requestIds = minter.getUserRequests(users.institution);
+        vm.prank(users.institution);
+        vm.expectEmit(false, false, true, false);
+        emit IkMinter.Burned(bytes32(0), address(0), address(kUSD), users.institution, REQUEST_AMOUNT, bytes32(0));
+        minter.burn(_requestIds[0]);
+
+        assertEq(kUSD.balanceOf(users.institution), REQUEST_AMOUNT); // TEST_AMOUNT = 2x REQUEST_AMOUNT, 1 was withdrawn
+        assertEq(mockUSDC.balanceOf(users.institution), _aBalanceAfterMint + REQUEST_AMOUNT);
+    
+        assertEq(minter.getTotalLockedAssets(USDC), REQUEST_AMOUNT); // half burned
+
+        assertEq(mockUSDC.balanceOf(_minter), 0);
+    }
+
+    function test_Burn_Require_Not_Paused() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+        _requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        vm.prank(users.emergencyAdmin);
+        minter.setPaused(true);
+
+        bytes32[] memory _requestIds = minter.getUserRequests(users.institution);
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
+        minter.burn(_requestIds[0]);
+    }
+
+    function test_Burn_Require_Only_Institution() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+        _requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        bytes32[] memory _requestIds = minter.getUserRequests(users.institution);
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.burn(_requestIds[0]);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.burn(_requestIds[0]);
+        
+        vm.prank(users.institution2);
+        minter.burn(_requestIds[0]);
+    }
+
+    function test_Burn_Require_Valid_RequestId() public {
+        bytes32 invalidRequestId = keccak256("Banana");
 
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_REQUEST_NOT_FOUND));
         minter.burn(invalidRequestId);
     }
 
-    function test_Burn_WrongRole() public {
-        bytes32 requestId = keccak256("test");
+    function test_Burn_Require_Status_Pending() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+        _requestBurn(USDC, users.institution, REQUEST_AMOUNT);
 
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
-        minter.burn(requestId);
-    }
-
-    function test_Burn_RevertWhenPaused() public {
-        vm.prank(users.emergencyAdmin);
-        minter.setPaused(true);
-
-        bytes32 requestId = keccak256("test");
+        bytes32[] memory _requestIds = minter.getUserRequests(users.institution);
+        vm.prank(users.institution);
+        minter.burn(_requestIds[0]);
 
         vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
-        minter.burn(requestId);
+        vm.expectRevert(bytes(KMINTER_REQUEST_NOT_FOUND));
+        minter.burn(_requestIds[0]);
     }
 
-    /* //////////////////////////////////////////////////////////////
-                        PAUSE FUNCTIONALITY TESTS
-    //////////////////////////////////////////////////////////////*/
+    function test_Burn_Require_BatchId_Settled() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+        
+        address _kToken = registry.assetToKToken(USDC);
+        vm.prank(users.institution);
+        IkToken(_kToken).approve(_minter, REQUEST_AMOUNT);
+        
+        vm.prank(users.institution);
+        bytes32 _requestId = minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
 
-    function test_SetPaused_Success() public {
-        assertFalse(minter.isPaused(), "Should be unpaused initially");
+        bytes32 _batchId = minter.getBatchId(USDC);
+        address _batchReceiver = minter.getBatchReceiver(_batchId);
+        mockUSDC.mint(_batchReceiver, REQUEST_AMOUNT);
 
-        vm.prank(users.emergencyAdmin);
-        minter.setPaused(true);
-        assertTrue(minter.isPaused(), "Should be paused");
-
-        vm.prank(users.emergencyAdmin);
-        minter.setPaused(false);
-        assertFalse(minter.isPaused(), "Should be unpaused");
-    }
-
-    function test_SetPaused_OnlyEmergencyAdmin() public {
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KBASE_WRONG_ROLE));
-        minter.setPaused(true);
-    }
-
-    function test_IsPaused() public {
-        assertFalse(minter.isPaused(), "Should be unpaused initially");
-
-        vm.prank(users.emergencyAdmin);
-        minter.setPaused(true);
-        assertTrue(minter.isPaused(), "Should return true when paused");
-
-        vm.prank(users.emergencyAdmin);
-        minter.setPaused(false);
-        assertFalse(minter.isPaused(), "Should return false when unpaused");
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_BATCH_NOT_SETTLED));
+        minter.burn(_requestId);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -300,28 +323,18 @@ contract kMinterTest is DeploymentBaseTest {
         assertEq(minter.contractVersion(), "1.0.0", "Contract version incorrect");
     }
 
-    function test_GetBurnRequest_NonExistent() public view {
-        bytes32 invalidRequestId = keccak256("invalid");
-
-        IkMinter.BurnRequest memory request = minter.getBurnRequest(invalidRequestId);
-        assertEq(request.user, address(0), "User should be zero");
-        assertEq(request.amount, 0, "Amount should be zero");
-    }
-
-    function test_GetUserRequests_Empty() public view {
-        bytes32[] memory requests = minter.getUserRequests(users.alice);
-        assertEq(requests.length, 0, "Should return empty array");
-    }
-
-    function test_GetRequestCounter_Initial() public view {
-        assertEq(minter.getRequestCounter(), 0, "Request counter should start at zero");
-    }
-
     /* //////////////////////////////////////////////////////////////
                         UPGRADE TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_AuthorizeUpgrade_OnlyAdmin() public {
+    function test_AuthorizeUpgrade_Sucess() public {
+        address newImpl = address(new kMinter());
+
+        vm.prank(users.admin);
+        minter.upgradeToAndCall(newImpl, "");
+    }
+    
+    function test_AuthorizeUpgrade_Require_Only_Admin() public {
         address newImpl = address(new kMinter());
 
         vm.prank(users.alice);
@@ -329,130 +342,56 @@ contract kMinterTest is DeploymentBaseTest {
         minter.upgradeToAndCall(newImpl, "");
     }
 
-    function test_AuthorizeUpgrade_RevertZeroAddress() public {
+    function test_AuthorizeUpgrade_Require_Implementation_Not_Zero_Address() public {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
         minter.upgradeToAndCall(ZERO_ADDRESS, "");
     }
 
     /* //////////////////////////////////////////////////////////////
-                    TOTAL LOCKED ASSETS TESTS
+                                INTERNAL
     //////////////////////////////////////////////////////////////*/
+    
+    // Since the protocol is async, in order for the requests to happen we will have to have the 1st deposits settled
+    function _mint(address _asset, address _to, uint256 _amount) internal {
+        mockUSDC.mint(users.institution, _amount);
 
-    function test_GetTotalLockedAssets_SingleAsset() public {
-        assertEq(minter.getTotalLockedAssets(tokens.usdc), 0, "Should start with zero locked assets");
-
-        uint256 amount = TEST_AMOUNT;
-        mockUSDC.mint(users.institution, amount);
         vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), amount);
-        vm.prank(users.institution);
-        minter.mint(tokens.usdc, users.institution, amount);
+        mockUSDC.approve(_minter, _amount);
 
-        assertEq(minter.getTotalLockedAssets(tokens.usdc), amount, "Locked assets should equal minted amount");
+        vm.prank(users.institution);
+        minter.mint(_asset, _to, _amount);
+
+        bytes32 _batchId = minter.getBatchId(USDC);
+        vm.prank(users.relayer);
+        minter.closeBatch(_batchId, true);
+
+        vm.prank(users.admin);
+        assetRouter.setSettlementCooldown(0);
+        
+        vm.prank(users.relayer);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, 0, 0, 0);
+        assetRouter.executeSettleBatch(_proposalId);
     }
 
-    function test_GetTotalLockedAssets_MultipleMints() public {
-        uint256 amount1 = TEST_AMOUNT;
-        uint256 amount2 = 500 * _1_USDC;
-        uint256 totalAmount = amount1 + amount2;
-
-        mockUSDC.mint(users.institution, amount1);
+    function _requestBurn(address _asset, address _to, uint256 _amount) internal {
+        address _kToken = registry.assetToKToken(_asset);
         vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), amount1);
+        IkToken(_kToken).approve(_minter, _amount);
+        
         vm.prank(users.institution);
-        minter.mint(tokens.usdc, users.institution, amount1);
+        minter.requestBurn(_asset, _to, _amount);
 
-        assertEq(minter.getTotalLockedAssets(tokens.usdc), amount1, "Should track first mint");
+        bytes32 _batchId = minter.getBatchId(USDC);
+        vm.prank(users.relayer);
+        minter.closeBatch(_batchId, true);
 
-        mockUSDC.mint(users.institution, amount2);
-        vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), amount2);
-        vm.prank(users.institution);
-        minter.mint(tokens.usdc, users.alice, amount2);
-
-        assertEq(minter.getTotalLockedAssets(tokens.usdc), totalAmount, "Should track cumulative mints");
-    }
-
-    function test_GetTotalLockedAssets_UnsupportedAsset() public view {
-        address unsupportedAsset = address(0x1234567890123456789012345678901234567890);
-        assertEq(minter.getTotalLockedAssets(unsupportedAsset), 0, "Unsupported asset should return zero");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                    BATCH INTEGRATION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_Mint_InteractsWithDNVault() public {
-        uint256 amount = TEST_AMOUNT;
-
-        mockUSDC.mint(users.institution, amount);
-        vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), amount);
-
-        vm.prank(users.institution);
-        minter.mint(tokens.usdc, users.institution, amount);
-
-        assertEq(kUSD.balanceOf(users.institution), amount, "kTokens should be minted");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        EDGE CASE TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_Mint_MaxAmount() public {
-        uint256 maxAmount = type(uint128).max;
-
-        mockUSDC.mint(users.institution, maxAmount);
-        vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), maxAmount);
-
-        vm.prank(users.institution);
-        minter.mint(tokens.usdc, users.institution, maxAmount);
-
-        assertEq(kUSD.balanceOf(users.institution), maxAmount, "Should mint max amount");
-        assertEq(minter.getTotalLockedAssets(tokens.usdc), maxAmount, "Should track max amount");
-    }
-
-    function test_RequestBurn_Concurrent() public {
-        uint256 totalAmount = 3000 * _1_USDC;
-        mockUSDC.mint(users.institution, totalAmount);
-        vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), totalAmount);
-        vm.prank(users.institution);
-        minter.mint(tokens.usdc, users.institution, totalAmount);
-
-        vm.prank(users.institution);
-        kUSD.approve(address(minter), totalAmount);
-
-        uint256 requestAmount = 1000 * _1_USDC;
-
-        for (uint256 i = 0; i < 3; i++) {
-            vm.prank(users.institution);
-            vm.expectRevert();
-            minter.requestBurn(tokens.usdc, users.institution, requestAmount);
-        }
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        INTEGRATION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_MintWorkflow() public {
-        uint256 amount = TEST_AMOUNT;
-        address recipient = users.institution;
-
-        mockUSDC.mint(users.institution, amount);
-        vm.prank(users.institution);
-        IERC20(tokens.usdc).approve(address(minter), amount);
-        vm.prank(users.institution);
-        minter.mint(tokens.usdc, recipient, amount);
-
-        assertEq(kUSD.balanceOf(recipient), amount, "Should have minted kTokens");
-
-        assertEq(minter.getRequestCounter(), 0, "Request counter should remain zero");
-
-        bytes32[] memory userRequests = minter.getUserRequests(recipient);
-        assertEq(userRequests.length, 0, "Should have no user requests");
+        vm.prank(users.admin);
+        assetRouter.setSettlementCooldown(0);
+        
+        uint256 _totalAssets = IkToken(_kToken).totalSupply();
+        vm.prank(users.relayer);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, _totalAssets, 0, 0);
+        assetRouter.executeSettleBatch(_proposalId);
     }
 }
