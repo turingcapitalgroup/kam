@@ -278,7 +278,8 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         address _asset,
         bytes32 _id,
         uint256 _maxMintPerBatch,
-        uint256 _maxBurnPerBatch
+        uint256 _maxBurnPerBatch,
+        address _emergencyAdmin
     )
         external
         payable
@@ -286,6 +287,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     {
         _checkAdmin(msg.sender);
         _checkAddressNotZero(_asset);
+        _checkAddressNotZero(_emergencyAdmin);
         require(_id != bytes32(0), KREGISTRY_ZERO_ADDRESS);
 
         kRegistryStorage storage $ = _getkRegistryStorage();
@@ -313,7 +315,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
             new kToken(
                 owner(),
                 msg.sender, // admin gets initial control
-                msg.sender, // emergency admin for safety
+                _emergencyAdmin, // emergency admin for safety
                 _minter, // kMinter gets minting rights
                 _name,
                 _symbol,

@@ -127,7 +127,8 @@ interface IRegistry is IVersioned {
         address asset,
         bytes32 id,
         uint256 maxMintPerBatch,
-        uint256 maxBurnPerBatch
+        uint256 maxBurnPerBatch,
+        address emergencyAdmin
     )
         external
         payable

@@ -5,157 +5,159 @@ import { ADMIN_ROLE, EMERGENCY_ADMIN_ROLE, MINTER_ROLE, _1_USDC } from "../utils
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-import { KTOKEN_IS_PAUSED, KTOKEN_ZERO_ADDRESS, KTOKEN_ZERO_AMOUNT } from "kam/src/errors/Errors.sol";
+import { KTOKEN_IS_PAUSED, KTOKEN_ZERO_ADDRESS, KTOKEN_ZERO_AMOUNT, KTOKEN_WRONG_ROLE } from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
+import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
+import { ERC20 } from "kam/src/vendor/solady/tokens/ERC20.sol";
+
 contract kTokenTest is DeploymentBaseTest {
-    // Test constants
-    uint256 internal constant TEST_AMOUNT = 1000 * _1_USDC;
-    address internal constant TEST_ZERO_ADDRESS = address(0);
+    uint256 internal constant MINT_AMOUNT = 100000 * _1_USDC;
+    uint256 internal constant BURN_AMOUNT = 50000 * _1_USDC;
+    address internal constant ZERO_ADDRESS = address(0);
+    address USDC;
+    address WBTC;
+    address _minter;
+
+    function setUp() public override {
+        DeploymentBaseTest.setUp();
+
+        USDC = address(mockUSDC);
+        WBTC = address(mockWBTC);
+        _minter = address(minter);
+    }
 
     /* //////////////////////////////////////////////////////////////
                         INITIALIZATION TESTS
     //////////////////////////////////////////////////////////////*/
 
     function test_InitialState() public view {
-        assertEq(kUSD.name(), KUSD_NAME, "Name incorrect");
-        assertEq(kUSD.symbol(), KUSD_SYMBOL, "Symbol incorrect");
-        assertEq(kUSD.decimals(), 6, "Decimals incorrect");
+        assertEq(kUSD.name(), KUSD_NAME);
+        assertEq(kUSD.symbol(), KUSD_SYMBOL);
+        assertEq(kUSD.decimals(), 6);
 
-        assertEq(kUSD.owner(), users.owner, "Owner not set correctly");
-        assertTrue(kUSD.hasAnyRole(users.admin, ADMIN_ROLE), "Admin role not granted");
-        assertTrue(kUSD.hasAnyRole(users.emergencyAdmin, EMERGENCY_ADMIN_ROLE), "Emergency admin role not granted");
-        assertTrue(kUSD.hasAnyRole(address(minter), MINTER_ROLE), "Minter role not granted");
+        assertEq(kUSD.owner(), users.owner);
+        assertTrue(kUSD.hasAnyRole(users.admin, ADMIN_ROLE));
+        assertTrue(kUSD.hasAnyRole(users.emergencyAdmin, EMERGENCY_ADMIN_ROLE));
+        assertTrue(kUSD.hasAnyRole(_minter, MINTER_ROLE));
 
-        assertFalse(kUSD.isPaused(), "Should be unpaused initially");
-        assertEq(kUSD.totalSupply(), 0, "Total supply should be zero initially");
+        assertFalse(kUSD.isPaused());
+        assertEq(kUSD.totalSupply(), 0);
     }
 
     /* //////////////////////////////////////////////////////////////
-                        MINTING TESTS
+                                MINT
     //////////////////////////////////////////////////////////////*/
 
     function test_Mint_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        address recipient = users.alice;
+        uint256 _amount = MINT_AMOUNT;
 
-        vm.prank(address(minter));
-        // Note: kToken.mint() no longer emits Minted event - high-level events are emitted by calling contracts
-        kUSD.mint(recipient, amount);
+        vm.prank(_minter);
+        kUSD.mint(users.alice, _amount);
 
-        assertEq(kUSD.balanceOf(recipient), amount, "Balance should equal minted amount");
-        assertEq(kUSD.totalSupply(), amount, "Total supply should equal minted amount");
+        assertEq(kUSD.balanceOf(users.alice), _amount);
+        assertEq(kUSD.totalSupply(), _amount);
     }
 
-    function test_Mint_OnlyMinter() public {
+    function test_Mint_Require_Only_Minter() public {
         vm.prank(users.alice);
-        vm.expectRevert();
-        kUSD.mint(users.alice, TEST_AMOUNT);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
+        kUSD.mint(users.alice, MINT_AMOUNT);
     }
 
-    function test_Mint_RevertWhenPaused() public {
-        // Pause token
+    function test_Mint_Require_Not_Paused() public {
         vm.prank(users.emergencyAdmin);
         kUSD.setPaused(true);
 
-        vm.prank(address(minter));
+        vm.prank(_minter);
         vm.expectRevert(bytes(KTOKEN_IS_PAUSED));
-        kUSD.mint(users.alice, TEST_AMOUNT);
+        kUSD.mint(users.alice, MINT_AMOUNT);
     }
 
-    function test_Mint_ZeroAddress_Allowed() public {
-        uint256 amount = TEST_AMOUNT;
+    function test_Mint_Allows_Zero_Address() public {
+        uint256 _amount = MINT_AMOUNT;
 
-        vm.prank(address(minter));
-        // Note: kToken.mint() no longer emits Minted event - high-level events are emitted by calling contracts
-        kUSD.mint(TEST_ZERO_ADDRESS, amount);
+        vm.prank(_minter);
+        kUSD.mint(ZERO_ADDRESS, _amount);
 
-        assertEq(kUSD.balanceOf(TEST_ZERO_ADDRESS), amount, "Zero address should have balance");
-        assertEq(kUSD.totalSupply(), amount, "Total supply should include zero address mint");
+        assertEq(kUSD.balanceOf(ZERO_ADDRESS), _amount);
+        assertEq(kUSD.totalSupply(), _amount);
     }
 
     /* //////////////////////////////////////////////////////////////
-                        BURNING TESTS
+                                BURN
     //////////////////////////////////////////////////////////////*/
 
     function test_Burn_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        address account = users.alice;
+        uint256 _amount = MINT_AMOUNT;
 
-        // First mint some tokens
-        vm.prank(address(minter));
-        kUSD.mint(account, amount);
+        vm.prank(_minter);
+        kUSD.mint(users.alice, _amount);
 
-        // Then burn them
-        vm.prank(address(minter));
-        // Note: kToken.burn() no longer emits Burned event - high-level events are emitted by calling contracts
-        kUSD.burn(account, amount);
+        vm.prank(_minter);
+        kUSD.burn(users.alice, _amount);
 
-        assertEq(kUSD.balanceOf(account), 0, "Balance should be zero after burn");
-        assertEq(kUSD.totalSupply(), 0, "Total supply should be zero after burn");
+        assertEq(kUSD.balanceOf(users.alice), 0);
+        assertEq(kUSD.totalSupply(), 0);
     }
 
-    function test_Burn_OnlyMinter() public {
+    function test_Burn_Require_Only_Minter() public {
         vm.prank(users.alice);
-        vm.expectRevert();
-        kUSD.burn(users.alice, TEST_AMOUNT);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
+        kUSD.burn(users.alice, BURN_AMOUNT);
     }
 
-    function test_Burn_RevertWhenPaused() public {
-        // Pause token
+    function test_Burn_Require_Not_Paused() public {
         vm.prank(users.emergencyAdmin);
         kUSD.setPaused(true);
 
-        vm.prank(address(minter));
+        vm.prank(_minter);
         vm.expectRevert(bytes(KTOKEN_IS_PAUSED));
-        kUSD.burn(users.alice, TEST_AMOUNT);
+        kUSD.burn(users.alice, BURN_AMOUNT);
     }
 
-    function test_Burn_RevertInsufficientBalance() public {
-        vm.prank(address(minter));
-        vm.expectRevert();
-        kUSD.burn(users.alice, TEST_AMOUNT);
+    function test_Burn_Requires_Sufficient_Balance() public {
+        vm.prank(_minter);
+        vm.expectRevert(ERC20.InsufficientBalance.selector);
+        kUSD.burn(users.alice, BURN_AMOUNT);
     }
 
     /* //////////////////////////////////////////////////////////////
-                        BURN FROM TESTS
+                                BURNFROM
     //////////////////////////////////////////////////////////////*/
 
     function test_BurnFrom_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        address account = users.alice;
+        uint256 _amount = MINT_AMOUNT;
 
-        vm.prank(address(minter));
-        kUSD.mint(account, amount);
+        vm.prank(_minter);
+        kUSD.mint(users.alice, _amount);
 
-        vm.prank(account);
-        kUSD.approve(address(minter), amount);
-
-        vm.prank(address(minter));
-        // Note: kToken.burnFrom() no longer emits Burned event - high-level events are emitted by calling contracts
-        kUSD.burnFrom(account, amount);
-
-        assertEq(kUSD.balanceOf(account), 0, "Balance should be zero after burn");
-        assertEq(kUSD.allowance(account, address(minter)), 0, "Allowance should be consumed");
-        assertEq(kUSD.totalSupply(), 0, "Total supply should be zero after burn");
-    }
-
-    function test_BurnFrom_OnlyMinter() public {
         vm.prank(users.alice);
-        vm.expectRevert();
-        kUSD.burnFrom(users.bob, TEST_AMOUNT);
+        kUSD.approve(_minter, _amount);
+
+        vm.prank(_minter);
+        kUSD.burnFrom(users.alice, _amount);
+
+        assertEq(kUSD.balanceOf(users.alice), 0);
+        assertEq(kUSD.allowance(users.alice, _minter), 0);
+        assertEq(kUSD.totalSupply(), 0);
     }
 
-    function test_BurnFrom_RevertInsufficientAllowance() public {
-        uint256 amount = TEST_AMOUNT;
-        address account = users.alice;
+    function test_BurnFrom_Require_Only_Minter() public {
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
+        kUSD.burnFrom(users.alice, BURN_AMOUNT);
+    }
 
-        vm.prank(address(minter));
-        kUSD.mint(account, amount);
+    function test_BurnFrom_Requires_Sufficient_Allowance() public {
+        uint256 _amount = BURN_AMOUNT;
 
-        vm.prank(address(minter));
-        vm.expectRevert();
-        kUSD.burnFrom(account, amount);
+        vm.prank(_minter);
+        kUSD.mint(users.alice, _amount);
+
+        vm.prank(_minter);
+        vm.expectRevert(ERC20.InsufficientAllowance.selector);
+        kUSD.burnFrom(users.alice, BURN_AMOUNT);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -167,65 +169,61 @@ contract kTokenTest is DeploymentBaseTest {
 
         vm.prank(users.owner);
         kUSD.grantAdminRole(newAdmin);
-        assertTrue(kUSD.hasAnyRole(newAdmin, ADMIN_ROLE), "Admin role should be granted");
+        assertTrue(kUSD.hasAnyRole(newAdmin, ADMIN_ROLE));
 
         vm.prank(users.owner);
         kUSD.revokeAdminRole(newAdmin);
-        assertFalse(kUSD.hasAnyRole(newAdmin, ADMIN_ROLE), "Admin role should be revoked");
+        assertFalse(kUSD.hasAnyRole(newAdmin, ADMIN_ROLE));
     }
 
-    function test_AdminRole_OnlyOwner() public {
-        vm.prank(users.alice);
-        vm.expectRevert();
+    function test_AdminRole_Require_Only_Owner() public {
+        vm.prank(users.bob);
+        vm.expectRevert(Ownable.Unauthorized.selector);
         kUSD.grantAdminRole(users.bob);
 
-        vm.prank(users.alice);
-        vm.expectRevert();
+        vm.prank(users.admin);
+        vm.expectRevert(Ownable.Unauthorized.selector);
         kUSD.revokeAdminRole(users.admin);
     }
 
     function test_EmergencyRole_Management() public {
-        address newEmergency = users.bob;
+        vm.prank(users.admin);
+        kUSD.grantEmergencyRole(users.bob);
+        assertTrue(kUSD.hasAnyRole(users.bob, EMERGENCY_ADMIN_ROLE));
 
         vm.prank(users.admin);
-        kUSD.grantEmergencyRole(newEmergency);
-        assertTrue(kUSD.hasAnyRole(newEmergency, EMERGENCY_ADMIN_ROLE), "Emergency role should be granted");
-
-        vm.prank(users.admin);
-        kUSD.revokeEmergencyRole(newEmergency);
-        assertFalse(kUSD.hasAnyRole(newEmergency, EMERGENCY_ADMIN_ROLE), "Emergency role should be revoked");
+        kUSD.revokeEmergencyRole(users.bob);
+        assertFalse(kUSD.hasAnyRole(users.bob, EMERGENCY_ADMIN_ROLE));
     }
 
-    function test_EmergencyRole_OnlyAdmin() public {
+    function test_EmergencyRole_Require_Only_Admin() public {
         vm.prank(users.alice);
-        vm.expectRevert();
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
         kUSD.grantEmergencyRole(users.bob);
 
-        vm.prank(users.alice);
-        vm.expectRevert();
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
         kUSD.revokeEmergencyRole(users.emergencyAdmin);
     }
 
     function test_MinterRole_Management() public {
-        address newMinter = users.bob;
+        vm.prank(users.admin);
+        kUSD.grantMinterRole(users.alice);
+        assertTrue(kUSD.hasAnyRole(users.alice, MINTER_ROLE));
 
         vm.prank(users.admin);
-        kUSD.grantMinterRole(newMinter);
-        assertTrue(kUSD.hasAnyRole(newMinter, MINTER_ROLE), "Minter role should be granted");
-
-        vm.prank(users.admin);
-        kUSD.revokeMinterRole(newMinter);
-        assertFalse(kUSD.hasAnyRole(newMinter, MINTER_ROLE), "Minter role should be revoked");
+        kUSD.revokeMinterRole(users.alice);
+        assertFalse(kUSD.hasAnyRole(users.alice, MINTER_ROLE));
     }
 
-    function test_MinterRole_OnlyAdmin() public {
+    function test_MinterRole_Require_Only_Admin() public {
         vm.prank(users.alice);
-        vm.expectRevert();
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
         kUSD.grantMinterRole(users.bob);
 
-        vm.prank(users.alice);
-        vm.expectRevert();
-        kUSD.revokeMinterRole(address(minter));
+        vm.prank(_minter);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
+        kUSD.revokeMinterRole(_minter);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -233,32 +231,39 @@ contract kTokenTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_SetPaused_Success() public {
-        assertFalse(kUSD.isPaused(), "Should be unpaused initially");
+        assertFalse(kUSD.isPaused());
 
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(false, false, false, true);
         emit IkToken.PauseState(true);
-
         kUSD.setPaused(true);
-        assertTrue(kUSD.isPaused(), "Should be paused");
+        assertTrue(kUSD.isPaused());
 
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(false, false, false, true);
         emit IkToken.PauseState(false);
 
         kUSD.setPaused(false);
-        assertFalse(kUSD.isPaused(), "Should be unpaused");
+        assertFalse(kUSD.isPaused());
     }
 
-    function test_SetPaused_OnlyEmergencyAdmin() public {
+    function test_SetPaused_Revert_Only_EmergencyAdmin() public {
         vm.prank(users.alice);
-        vm.expectRevert();
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
+        kUSD.setPaused(true);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
+        kUSD.setPaused(true);
+
+        vm.prank(_minter);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
         kUSD.setPaused(true);
     }
 
     function test_Transfer_RevertWhenPaused() public {
-        vm.prank(address(minter));
-        kUSD.mint(users.alice, TEST_AMOUNT);
+        vm.prank(_minter);
+        kUSD.mint(users.alice, MINT_AMOUNT);
 
         vm.prank(users.emergencyAdmin);
         kUSD.setPaused(true);
@@ -266,7 +271,7 @@ contract kTokenTest is DeploymentBaseTest {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KTOKEN_IS_PAUSED));
         // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        kUSD.transfer(users.bob, TEST_AMOUNT);
+        kUSD.transfer(users.bob, MINT_AMOUNT);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -274,151 +279,107 @@ contract kTokenTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
     /// @dev Test emergency withdrawal of ETH
     function test_EmergencyWithdraw_ETH_Success() public {
-        uint256 amount = 1 ether;
-
-        vm.deal(address(kUSD), amount);
-
-        vm.prank(users.emergencyAdmin);
-        kUSD.setPaused(true);
-
-        uint256 recipientBalanceBefore = users.treasury.balance;
-
+        uint256 _amount = 1 ether;
+        vm.deal(address(kUSD), _amount);
+        
+        uint256 _balanceBefore = users.treasury.balance;
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(true, true, true, true);
-        emit IkToken.EmergencyWithdrawal(TEST_ZERO_ADDRESS, users.treasury, amount, users.emergencyAdmin);
+        emit IkToken.EmergencyWithdrawal(ZERO_ADDRESS, users.treasury, _amount, users.emergencyAdmin);
 
-        kUSD.emergencyWithdraw(TEST_ZERO_ADDRESS, users.treasury, amount);
+        kUSD.emergencyWithdraw(ZERO_ADDRESS, users.treasury, _amount);
 
-        assertEq(users.treasury.balance - recipientBalanceBefore, amount, "ETH not withdrawn correctly");
-        assertEq(address(kUSD).balance, 0, "Contract should have no ETH");
+        assertEq(users.treasury.balance, _balanceBefore + _amount);
+        assertEq(address(kUSD).balance, 0);
     }
 
     function test_EmergencyWithdraw_Token_Success() public {
-        uint256 amount = TEST_AMOUNT;
+        uint256 _amount = MINT_AMOUNT;
+        mockUSDC.mint(address(kUSD), _amount);
 
-        mockUSDC.mint(address(kUSD), amount);
-
-        vm.prank(users.emergencyAdmin);
-        kUSD.setPaused(true);
-
-        uint256 recipientBalanceBefore = IERC20(tokens.usdc).balanceOf(users.treasury);
-
+        uint256 _balanceBefore = IERC20(USDC).balanceOf(users.treasury);
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(true, true, true, true);
-        emit IkToken.EmergencyWithdrawal(tokens.usdc, users.treasury, amount, users.emergencyAdmin);
+        emit IkToken.EmergencyWithdrawal(USDC, users.treasury, _amount, users.emergencyAdmin);
 
-        kUSD.emergencyWithdraw(tokens.usdc, users.treasury, amount);
+        kUSD.emergencyWithdraw(USDC, users.treasury, _amount);
 
         assertEq(
-            IERC20(tokens.usdc).balanceOf(users.treasury) - recipientBalanceBefore,
-            amount,
-            "Tokens not withdrawn correctly"
+            IERC20(tokens.usdc).balanceOf(users.treasury), 
+            _balanceBefore + _amount
         );
-        assertEq(IERC20(tokens.usdc).balanceOf(address(kUSD)), 0, "Contract should have no tokens");
+        assertEq(IERC20(tokens.usdc).balanceOf(address(kUSD)), 0);
     }
 
-    function test_EmergencyWithdraw_OnlyEmergencyAdmin() public {
+    function test_EmergencyWithdraw_Require_Only_EmergencyAdmin() public {
         vm.prank(users.alice);
-        vm.expectRevert();
-        kUSD.emergencyWithdraw(TEST_ZERO_ADDRESS, users.treasury, 1 ether);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
+        kUSD.emergencyWithdraw(ZERO_ADDRESS, users.treasury, 1 ether);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
+        kUSD.emergencyWithdraw(ZERO_ADDRESS, users.treasury, 1 ether);
+
+        vm.prank(_minter);
+        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
+        kUSD.emergencyWithdraw(ZERO_ADDRESS, users.treasury, 1 ether);
     }
 
-    function test_EmergencyWithdraw_RevertZeroAddress() public {
-        vm.prank(users.emergencyAdmin);
-        kUSD.setPaused(true);
-
+    function test_EmergencyWithdraw_Require_To_Not_Zero_Address() public {
         vm.prank(users.emergencyAdmin);
         vm.expectRevert(bytes(KTOKEN_ZERO_ADDRESS));
-        kUSD.emergencyWithdraw(TEST_ZERO_ADDRESS, TEST_ZERO_ADDRESS, 1 ether);
+        kUSD.emergencyWithdraw(ZERO_ADDRESS, ZERO_ADDRESS, 1 ether);
     }
 
     function test_EmergencyWithdraw_RevertZeroAmount() public {
         vm.prank(users.emergencyAdmin);
-        kUSD.setPaused(true);
-
-        vm.prank(users.emergencyAdmin);
         vm.expectRevert(bytes(KTOKEN_ZERO_AMOUNT));
-        kUSD.emergencyWithdraw(TEST_ZERO_ADDRESS, users.treasury, 0);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        VIEW FUNCTION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev Test isPaused view function
-    function test_IsPaused() public {
-        assertFalse(kUSD.isPaused(), "Should be unpaused initially");
-
-        vm.prank(users.emergencyAdmin);
-        kUSD.setPaused(true);
-
-        assertTrue(kUSD.isPaused(), "Should return true when paused");
+        kUSD.emergencyWithdraw(ZERO_ADDRESS, users.treasury, 0);
     }
 
     /* //////////////////////////////////////////////////////////////
                         ERC20 STANDARD TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_Transfer_Success() public {
-        uint256 amount = TEST_AMOUNT;
-
-        vm.prank(address(minter));
-        kUSD.mint(users.alice, amount);
+    function test_Approve_Success() public {
+        uint256 _amount = MINT_AMOUNT;
 
         vm.prank(users.alice);
-        bool success = kUSD.transfer(users.bob, amount);
+        bool success = kUSD.approve(users.bob, _amount);
 
-        assertTrue(success, "Transfer should succeed");
-        assertEq(kUSD.balanceOf(users.alice), 0, "Sender balance incorrect");
-        assertEq(kUSD.balanceOf(users.bob), amount, "Recipient balance incorrect");
+        assertTrue(success);
+        assertEq(kUSD.allowance(users.alice, users.bob), _amount);
+    }
+
+    function test_Transfer_Success() public {
+        uint256 _amount = MINT_AMOUNT;
+
+        vm.prank(_minter);
+        kUSD.mint(users.alice, _amount);
+
+        vm.prank(users.alice);
+        bool success = kUSD.transfer(users.bob, _amount);
+
+        assertTrue(success);
+        assertEq(kUSD.balanceOf(users.alice), 0);
+        assertEq(kUSD.balanceOf(users.bob), _amount);
     }
 
     function test_TransferFrom_Success() public {
-        uint256 amount = TEST_AMOUNT;
+        uint256 _amount = MINT_AMOUNT;
 
-        vm.prank(address(minter));
-        kUSD.mint(users.alice, amount);
+        vm.prank(_minter);
+        kUSD.mint(users.alice, _amount);
 
         vm.prank(users.alice);
-        kUSD.approve(users.bob, amount);
+        kUSD.approve(users.bob, _amount);
 
         vm.prank(users.bob);
-        bool success = kUSD.transferFrom(users.alice, users.charlie, amount);
+        bool success = kUSD.transferFrom(users.alice, users.charlie, _amount);
 
-        assertTrue(success, "TransferFrom should succeed");
-        assertEq(kUSD.balanceOf(users.alice), 0, "Sender balance incorrect");
-        assertEq(kUSD.balanceOf(users.charlie), amount, "Recipient balance incorrect");
-        assertEq(kUSD.allowance(users.alice, users.bob), 0, "Allowance should be consumed");
-    }
-
-    function test_Approve_Success() public {
-        uint256 amount = TEST_AMOUNT;
-
-        vm.prank(users.alice);
-        bool success = kUSD.approve(users.bob, amount);
-
-        assertTrue(success, "Approve should succeed");
-        assertEq(kUSD.allowance(users.alice, users.bob), amount, "Allowance incorrect");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        RECEIVE FUNCTION TEST
-    //////////////////////////////////////////////////////////////*/
-
-    function test_ContractCanHoldETH() public {
-        uint256 amount = 1 ether;
-
-        vm.deal(address(kUSD), amount);
-
-        assertEq(address(kUSD).balance, amount, "Contract should hold ETH");
-
-        // Verify it can be withdrawn via emergencyWithdraw
-        vm.prank(users.emergencyAdmin);
-        kUSD.setPaused(true);
-
-        vm.prank(users.emergencyAdmin);
-        kUSD.emergencyWithdraw(TEST_ZERO_ADDRESS, users.treasury, amount);
-
-        assertEq(address(kUSD).balance, 0, "ETH should be withdrawn");
+        assertTrue(success);
+        assertEq(kUSD.balanceOf(users.alice), 0);
+        assertEq(kUSD.balanceOf(users.charlie), _amount);
+        assertEq(kUSD.allowance(users.alice, users.bob), 0);
     }
 }

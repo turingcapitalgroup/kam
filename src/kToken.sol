@@ -11,7 +11,8 @@ import {
     KTOKEN_IS_PAUSED,
     KTOKEN_TRANSFER_FAILED,
     KTOKEN_ZERO_ADDRESS,
-    KTOKEN_ZERO_AMOUNT
+    KTOKEN_ZERO_AMOUNT,
+    KTOKEN_WRONG_ROLE
 } from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
@@ -112,7 +113,8 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// @param _to The address that will receive the newly minted kTokens
     /// @param _amount The quantity of kTokens to create (matches asset amount for deposits, yield amount for
     /// distributions)
-    function mint(address _to, uint256 _amount) external onlyRoles(MINTER_ROLE) {
+    function mint(address _to, uint256 _amount) external {
+        _checkMinter(msg.sender);
         _checkPaused();
         _mint(_to, _amount);
     }
@@ -126,7 +128,8 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// High-level business events are emitted by the calling contracts (kMinter, kAssetRouter) for better context.
     /// @param _from The address from which kTokens will be permanently destroyed
     /// @param _amount The quantity of kTokens to burn (matches redeemed assets or loss amounts)
-    function burn(address _from, uint256 _amount) external onlyRoles(MINTER_ROLE) {
+    function burn(address _from, uint256 _amount) external {
+        _checkMinter(msg.sender);
         _checkPaused();
         _burn(_from, _amount);
     }
@@ -140,10 +143,45 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// High-level business events are emitted by the calling contracts for better context.
     /// @param _from The address from which kTokens will be burned (must have approved the burn amount)
     /// @param _amount The quantity of kTokens to burn using the allowance mechanism
-    function burnFrom(address _from, uint256 _amount) external onlyRoles(MINTER_ROLE) {
+    function burnFrom(address _from, uint256 _amount) external {
+        _checkMinter(msg.sender);
         _checkPaused();
         _spendAllowance(_from, msg.sender, _amount);
         _burn(_from, _amount);
+    }
+
+    /// @notice Sets approval for another address to spend tokens on behalf of the caller
+    /// @param _spender The address that is approved to spend the tokens
+    /// @param _amount The amount of tokens the spender is approved to spend
+    /// @return success True if the approval succeeded
+    function approve(address _spender, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool) {
+        return ERC20.approve(_spender, _amount);
+    }
+
+    /// @notice Transfers tokens from the caller to another address
+    /// @param _to The address to transfer tokens to
+    /// @param _amount The amount of tokens to transfer
+    /// @return success True if the transfer succeeded
+    function transfer(address _to, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool) {
+        return ERC20.transfer(_to, _amount);
+    }
+
+    /// @notice Transfers tokens from one address to another using allowance mechanism
+    /// @param _from The address to transfer tokens from
+    /// @param _to The address to transfer tokens to
+    /// @param _amount The amount of tokens to transfer
+    /// @return success True if the transfer succeeded
+    function transferFrom(
+        address _from,
+        address _to,
+        uint256 _amount
+    )
+        public
+        virtual
+        override(ERC20, IkToken)
+        returns (bool)
+    {
+        return ERC20.transferFrom(_from, _to, _amount);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -191,14 +229,6 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
         return ERC20.balanceOf(_account);
     }
 
-    /// @notice Transfers tokens from the caller to another address
-    /// @param _to The address to transfer tokens to
-    /// @param _amount The amount of tokens to transfer
-    /// @return success True if the transfer succeeded
-    function transfer(address _to, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool) {
-        return ERC20.transfer(_to, _amount);
-    }
-
     /// @notice Returns the amount of tokens that spender is allowed to spend on behalf of owner
     /// @param _owner The address that owns the tokens
     /// @param _spender The address that is approved to spend the tokens
@@ -211,32 +241,6 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
         returns (uint256)
     {
         return ERC20.allowance(_owner, _spender);
-    }
-
-    /// @notice Sets approval for another address to spend tokens on behalf of the caller
-    /// @param _spender The address that is approved to spend the tokens
-    /// @param _amount The amount of tokens the spender is approved to spend
-    /// @return success True if the approval succeeded
-    function approve(address _spender, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool) {
-        return ERC20.approve(_spender, _amount);
-    }
-
-    /// @notice Transfers tokens from one address to another using allowance mechanism
-    /// @param _from The address to transfer tokens from
-    /// @param _to The address to transfer tokens to
-    /// @param _amount The amount of tokens to transfer
-    /// @return success True if the transfer succeeded
-    function transferFrom(
-        address _from,
-        address _to,
-        uint256 _amount
-    )
-        public
-        virtual
-        override(ERC20, IkToken)
-        returns (bool)
-    {
-        return ERC20.transferFrom(_from, _to, _amount);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -264,7 +268,8 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// This role is critical for protocol security and should only be granted to trusted addresses with
     /// operational procedures in place. Only existing admins can grant emergency roles.
     /// @param _emergency The address to receive emergency administrative privileges
-    function grantEmergencyRole(address _emergency) external onlyRoles(ADMIN_ROLE) {
+    function grantEmergencyRole(address _emergency) external {
+        _checkAdmin(msg.sender);
         _grantRoles(_emergency, EMERGENCY_ADMIN_ROLE);
     }
 
@@ -272,21 +277,24 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// @dev Removes the ability to pause contracts and execute emergency operations. This should be done
     /// carefully as it reduces the protocol's ability to respond to emergencies.
     /// @param _emergency The address to lose emergency administrative privileges
-    function revokeEmergencyRole(address _emergency) external onlyRoles(ADMIN_ROLE) {
+    function revokeEmergencyRole(address _emergency) external {
+        _checkAdmin(msg.sender);
         _removeRoles(_emergency, EMERGENCY_ADMIN_ROLE);
     }
 
     /// @notice Assigns minter role privileges to the specified address
     /// @dev Calls internal _grantRoles function to assign MINTER_ROLE
     /// @param _minter The address that will receive minter role privileges
-    function grantMinterRole(address _minter) external onlyRoles(ADMIN_ROLE) {
+    function grantMinterRole(address _minter) external {
+        _checkAdmin(msg.sender);
         _grantRoles(_minter, MINTER_ROLE);
     }
 
     /// @notice Removes minter role privileges from the specified address
     /// @dev Calls internal _removeRoles function to remove MINTER_ROLE
     /// @param _minter The address that will lose minter role privileges
-    function revokeMinterRole(address _minter) external onlyRoles(ADMIN_ROLE) {
+    function revokeMinterRole(address _minter) external {
+        _checkAdmin(msg.sender);
         _removeRoles(_minter, MINTER_ROLE);
     }
 
@@ -295,7 +303,8 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// during security incidents or system maintenance. Only emergency admins can trigger pause/unpause to ensure
     /// rapid response capability. The pause state affects all token operations through the _beforeTokenTransfer hook.
     /// @param _paused True to pause all operations, false to resume normal operations
-    function setPaused(bool _paused) external onlyRoles(EMERGENCY_ADMIN_ROLE) {
+    function setPaused(bool _paused) external {
+        _checkEmergencyAdmin(msg.sender);
         _isPaused = _paused;
         emit PauseState(_isPaused);
     }
@@ -309,7 +318,8 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// @param _token The token contract address to withdraw (use address(0) for native ETH)
     /// @param _to The destination address to receive the recovered assets
     /// @param _amount The quantity of tokens or ETH to recover
-    function emergencyWithdraw(address _token, address _to, uint256 _amount) external onlyRoles(EMERGENCY_ADMIN_ROLE) {
+    function emergencyWithdraw(address _token, address _to, uint256 _amount) external {
+        _checkEmergencyAdmin(msg.sender);
         require(_to != address(0), KTOKEN_ZERO_ADDRESS);
         require(_amount != 0, KTOKEN_ZERO_AMOUNT);
 
@@ -336,6 +346,24 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// Reverts with KTOKEN_IS_PAUSED if the contract is paused, effectively halting all token activity.
     function _checkPaused() private view {
         require(!_isPaused, KTOKEN_IS_PAUSED);
+    }
+
+    /// @notice Check if caller has Admin role
+    /// @param _user Address to check
+    function _checkAdmin(address _user) internal view {
+        require(hasAnyRole(_user, ADMIN_ROLE), KTOKEN_WRONG_ROLE);
+    }
+
+    /// @notice Check if caller has Emergency Admin role
+    /// @param _user Address to check
+    function _checkEmergencyAdmin(address _user) internal view {
+        require(hasAnyRole(_user, EMERGENCY_ADMIN_ROLE), KTOKEN_WRONG_ROLE);
+    }
+
+    /// @notice Check if caller has a minter role
+    /// @param _user Address to check
+    function _checkMinter(address _user) internal view {
+        require(hasAnyRole(_user, MINTER_ROLE), KTOKEN_WRONG_ROLE);
     }
 
     /// @notice Internal hook that executes before any token transfer, mint, or burn operation
