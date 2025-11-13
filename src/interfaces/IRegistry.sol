@@ -181,6 +181,12 @@ interface IRegistry is IVersioned {
     /// @param manager_ The address to grant manager privileges
     function grantManagerRole(address manager_) external payable;
 
+    /// @notice Revokes the specific role of a given user
+    /// @dev Only callable by ADMIN_ROLE. 
+    /// @param user the address to revoke acess to
+    /// @param role the role of the address that we want to revoke
+    function revokeGivenRoles(address user, uint256 role) external payable;
+
     /// @notice Retrieves a singleton contract address by identifier
     /// @dev Reverts if contract not registered. Used for protocol contract discovery.
     /// @param id Contract identifier (e.g., K_MINTER, K_ASSET_ROUTER)

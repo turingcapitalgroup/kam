@@ -30,6 +30,7 @@ uint256 constant MINTER_ROLE = 4; // _ROLE_2
 uint256 constant RELAYER_ROLE = 8; // _ROLE_3
 uint256 constant INSTITUTION_ROLE = 16; // _ROLE_4
 uint256 constant VENDOR_ROLE = 32; // _ROLE_5
+uint256 constant MANAGER_ROLE = 64; // _ROLE_6
 
 // Time constants
 uint256 constant SETTLEMENT_INTERVAL = 8 hours;

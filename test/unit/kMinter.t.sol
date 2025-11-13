@@ -58,11 +58,11 @@ contract kMinterTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_Initialize_Success() public view {
-        assertEq(minter.contractName(), "kMinter", "Contract name incorrect");
-        assertEq(minter.contractVersion(), "1.0.0", "Contract version incorrect");
-        assertFalse(minter.isPaused(), "Should be unpaused initially");
-        assertEq(address(minter.registry()), address(registry), "Registry not set correctly");
-        assertEq(minter.getRequestCounter(), 0, "Request counter should be zero initially");
+        assertEq(minter.contractName(), "kMinter");
+        assertEq(minter.contractVersion(), "1.0.0");
+        assertFalse(minter.isPaused());
+        assertEq(address(minter.registry()), address(registry));
+        assertEq(minter.getRequestCounter(), 0);
     }
 
     function test_Initialize_Require_Registry_Not_Zero_Address() public {
@@ -330,15 +330,6 @@ contract kMinterTest is DeploymentBaseTest {
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_BATCH_NOT_SETTLED));
         minter.burn(_requestId);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        VIEW FUNCTION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_ContractInfo() public view {
-        assertEq(minter.contractName(), "kMinter", "Contract name incorrect");
-        assertEq(minter.contractVersion(), "1.0.0", "Contract version incorrect");
     }
 
     /* //////////////////////////////////////////////////////////////

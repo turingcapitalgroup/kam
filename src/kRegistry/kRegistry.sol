@@ -211,6 +211,12 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     }
 
     /// @inheritdoc IRegistry
+    function revokeGivenRoles(address _user, uint256 _role) external payable {
+        _checkAdmin(msg.sender);
+        _removeRoles(_user, _role);
+    }
+
+    /// @inheritdoc IRegistry
     function setTreasury(address _treasury) external payable {
         _checkAdmin(msg.sender);
         kRegistryStorage storage $ = _getkRegistryStorage();
