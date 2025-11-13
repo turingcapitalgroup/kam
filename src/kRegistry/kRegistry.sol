@@ -610,6 +610,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         return _assetToToken;
     }
 
+    /* //////////////////////////////////////////////////////////////
+                                INTERNAL
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Validates that an asset is not already registered in the protocol
     /// @dev Reverts with KREGISTRY_ALREADY_REGISTERED if the asset exists in supportedAssets set.
     /// Used to prevent duplicate registrations and maintain protocol integrity.

@@ -9,13 +9,14 @@ import {
     KREGISTRY_INVALID_ADAPTER,
     KREGISTRY_ZERO_ADDRESS,
     KREGISTRY_WRONG_ASSET,
+    KREGISTRY_ADAPTER_ALREADY_SET,
     KROLESBASE_ZERO_ADDRESS,
     KROLESBASE_WRONG_ROLE
 } from "kam/src/errors/Errors.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 
-contract kRegistryTest is DeploymentBaseTest {
+contract kRegistryRegisterTest is DeploymentBaseTest {
     address internal TEST_ASSET;
     address internal TEST_VAULT = makeAddr("TEST_VAULT");
     address internal TEST_ADAPTER = makeAddr("TEST_ADAPTER");
@@ -147,8 +148,7 @@ contract kRegistryTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_RegisterVault_Success() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        _registerAsset();
 
         vm.prank(users.admin);
         vm.expectEmit(true, true, true, true);
@@ -169,15 +169,14 @@ contract kRegistryTest is DeploymentBaseTest {
     }
 
     function test_RegisterVault_Require_Only_Admin() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        _registerAsset();
 
         vm.prank(users.alice);
-        vm.expectRevert();
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
 
         vm.prank(users.emergencyAdmin);
-        vm.expectRevert();
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
     }
 
@@ -200,11 +199,10 @@ contract kRegistryTest is DeploymentBaseTest {
     }
 
     function test_RegisterVault_Required_Not_Registered_Vault() public {
-        vm.startPrank(users.admin);
+        _registerAsset();
+        _registerVault();
 
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-        
-        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
+        vm.startPrank(users.admin);
         
         vm.expectRevert(bytes(KREGISTRY_ALREADY_REGISTERED));
         registry.registerVault(TEST_VAULT, IRegistry.VaultType.BETA, TEST_ASSET);
@@ -244,69 +242,128 @@ contract kRegistryTest is DeploymentBaseTest {
         registry.getVaultAssets(_minter);
     }
 
+    function test_RemoveVault_Require_Only_Admin() public {
+        address _dnVault = address(dnVault);
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.removeVault(_dnVault);
+
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.removeVault(_dnVault);
+    }
+
+    function test_RemoveVault_Required_Registered_Vault() public {
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.BETA, TEST_ASSET);
+    }
+
     /* //////////////////////////////////////////////////////////////
                         ADAPTER MANAGEMENT
     //////////////////////////////////////////////////////////////*/
 
-    function test_RegisterAdapter_OnlyAdmin() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+    function test_RegisterAdapter_Sucess() public {
+        _registerAsset();
+        _registerVault();
 
-        vm.prank(users.admin);
-        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
+        vm.startPrank(users.admin);
+
+        vm.expectEmit(true, true, true, true);
+        emit IRegistry.AdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+
+        assertTrue(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER));
+        assertEq(registry.getAdapter(TEST_VAULT, TEST_ASSET), TEST_ADAPTER);
+        vm.stopPrank();    
+    }
+
+    function test_RegisterAdapter_Require_Only_Admin() public {
+        _registerAsset();
+        _registerVault();
 
         vm.prank(users.alice);
-        vm.expectRevert();
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
     }
 
-    function test_RegisterAdapter_RevertZeroAddress() public {
+    function test_RegisterAdapter_Require_Address_Not_Zero() public {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_INVALID_ADAPTER));
         registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(0));
     }
 
-    function test_RemoveAdapter_OnlyAdmin() public {
-        vm.prank(users.alice);
-        vm.expectRevert();
-        registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+    function test_RegisterAdapter_Require_Registered_Vault() public {
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
     }
 
-    function test_GetAdapter_RevertZeroAddress() public {
+    function test_RegisterAdapter_Require_Adapter_Not_Set() public {
+        _registerAsset();
+        _registerVault();
+
         vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+        
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_ADAPTER_ALREADY_SET));
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+    }
+
+    function test_RemoveAdapter_Sucess() public {
+        _registerAsset();
+        _registerVault();
+
+        vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+
+        vm.prank(users.admin);
+        vm.expectEmit(true, true, true, true);
+        emit IRegistry.AdapterRemoved(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+        registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+
+        assertFalse(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER));
+        
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
         registry.getAdapter(TEST_VAULT, TEST_ASSET);
     }
 
-    function test_IsAdapterRegistered_NonExistent() public view {
-        assertFalse(
-            registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER),
-            "Should return false for non-existent adapter"
-        );
+    function test_RemoveAdapter_Require_Only_Admin() public {
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+    }
+
+    function test_RemoveAdapter_Require_Valid_Adapter() public {
+        _registerAsset();
+        _registerVault();
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_INVALID_ADAPTER));
+        registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
     }
 
     /* //////////////////////////////////////////////////////////////
-                            EDGE CASES
+                            INTERNAL
     //////////////////////////////////////////////////////////////*/
 
-    function test_ReceiveETH() public {
-        uint256 amount = 1 ether;
-
-        vm.deal(users.alice, amount);
-        vm.prank(users.alice);
-        (bool success,) = address(registry).call{ value: amount }("");
-
-        assertTrue(success, "ETH transfer should succeed");
-        assertEq(address(registry).balance, amount, "Registry should receive ETH");
+    function _registerAsset() internal {
+        vm.prank(users.admin);
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
     }
 
-    function test_AuthorizeUpgrade_OnlyOwner() public {
-        address newImpl = address(new kRegistry());
-
-        vm.prank(address(assetRouter));
-        vm.expectRevert();
-        registry.upgradeToAndCall(newImpl, "");
-
-        assertTrue(true, "Authorization test completed");
+    function _registerVault() internal {
+        vm.prank(users.admin);
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
     }
 }
