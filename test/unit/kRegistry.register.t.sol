@@ -14,7 +14,6 @@ import {
     KROLESBASE_WRONG_ROLE
 } from "kam/src/errors/Errors.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
-import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 
 contract kRegistryRegisterTest is DeploymentBaseTest {
     address internal TEST_ASSET;

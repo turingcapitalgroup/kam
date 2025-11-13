@@ -26,6 +26,7 @@ import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 
 import { Initializable } from "kam/src/vendor/solady/utils/Initializable.sol";
+import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
 
 contract kRegistryTest is DeploymentBaseTest {
     string internal constant TEST_NAME = "TEST_TOKEN";
@@ -41,7 +42,7 @@ contract kRegistryTest is DeploymentBaseTest {
     address internal TEST_CONTRACT = makeAddr("TEST_CONTRACT");
 
     uint256 constant MAX_BPS = 10_000;
-    uint16 constant TEST_HURDLE_RATE = 500; //5%
+    uint16 constant TEST_HURDLE_RATE = 500;
     address USDC;
     address WBTC;
     address DAI;
@@ -59,7 +60,6 @@ contract kRegistryTest is DeploymentBaseTest {
         WBTC = address(mockWBTC);
         _registry = address(registry);
 
-        // Deploy mockDAI for rescue assets test (not a protocol asset)
         mockDAI = new MockERC20("Mock DAI", "DAI", 18);
         DAI = address(mockDAI);
         vm.label(DAI, "DAI");
@@ -136,10 +136,6 @@ contract kRegistryTest is DeploymentBaseTest {
         registry.setSingletonContract(TEST_CONTRACT_ID, address(0x347474));
     }
 
-    function test_GetContractById_Require_Valid_Id() public {
-        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
-        registry.getContractById(keccak256("Banana"));
-    }
 
     /* //////////////////////////////////////////////////////////////
                                 ROLES
@@ -500,55 +496,43 @@ contract kRegistryTest is DeploymentBaseTest {
                             VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function test_GetCoreContracts() public view {
-        (address kMinter, address kAssetRouter) = registry.getCoreContracts();
-
-        assertEq(kMinter, address(minter), "kMinter address incorrect");
-        assertEq(kAssetRouter, address(assetRouter), "kAssetRouter address incorrect");
-    }
-
-    function test_IsRelayer() public view {
-        assertTrue(registry.isRelayer(users.relayer), "relayer should be relayer");
-        assertFalse(registry.isRelayer(users.alice), "Alice should not be relayer");
-    }
-
     function test_GetAllAssets_ExistingAssets() public view {
-        address[] memory assets = registry.getAllAssets();
+        address[] memory _assets = registry.getAllAssets();
 
-        assertEq(assets.length, 2, "Should have 2 assets from deployment");
+        assertEq(_assets.length, 2);
 
-        bool hasUSDC = false;
-        bool hasWBTC = false;
-        for (uint256 i = 0; i < assets.length; i++) {
-            if (assets[i] == tokens.usdc) hasUSDC = true;
-            if (assets[i] == tokens.wbtc) hasWBTC = true;
+        bool _hasUSDC;
+        bool _hasWBTC;
+        for (uint256 _i; _i < _assets.length; _i++) {
+            if (_assets[_i] == USDC) _hasUSDC = true;
+            if (_assets[_i] == WBTC) _hasWBTC = true;
         }
 
-        assertTrue(hasUSDC, "USDC should be in assets array");
-        assertTrue(hasWBTC, "WBTC should be in assets array");
+        assertTrue(_hasUSDC);
+        assertTrue(_hasWBTC);
     }
 
     function test_GetVaultsByAsset_DeployedVaults() public view {
-        address[] memory usdcVaults = registry.getVaultsByAsset(tokens.usdc);
+        address[] memory _usdcVaults = registry.getVaultsByAsset(USDC);
 
-        assertEq(usdcVaults.length, 4, "Should have 4 USDC vaults from deployment");
+        assertEq(_usdcVaults.length, 4);
 
-        bool hasDN = false;
-        bool hasAlpha = false;
-        bool hasBeta = false;
-        bool hasMinter = false;
+        bool _hasDN;
+        bool _hasAlpha;
+        bool _hasBeta;
+        bool _hasMinter;
 
-        for (uint256 i = 0; i < usdcVaults.length; i++) {
-            if (usdcVaults[i] == address(dnVault)) hasDN = true;
-            if (usdcVaults[i] == address(alphaVault)) hasAlpha = true;
-            if (usdcVaults[i] == address(betaVault)) hasBeta = true;
-            if (usdcVaults[i] == address(minter)) hasMinter = true;
+        for (uint256 _i; _i < _usdcVaults.length; _i++) {
+            if (_usdcVaults[_i] == address(dnVault)) _hasDN = true;
+            if (_usdcVaults[_i] == address(alphaVault)) _hasAlpha = true;
+            if (_usdcVaults[_i] == address(betaVault)) _hasBeta = true;
+            if (_usdcVaults[_i] == address(minter)) _hasMinter = true;
         }
 
-        assertTrue(hasDN, "DN vault should be in USDC vaults");
-        assertTrue(hasAlpha, "Alpha vault should be in USDC vaults");
-        assertTrue(hasBeta, "Beta vault should be in USDC vaults");
-        assertTrue(hasMinter, "Minter vault should be in USDC vaults");
+        assertTrue(_hasDN);
+        assertTrue(_hasAlpha);
+        assertTrue(_hasBeta);
+        assertTrue(_hasMinter);
     }
 
     function test_GetVaultsByAsset_ZeroAddress() public {
@@ -556,26 +540,207 @@ contract kRegistryTest is DeploymentBaseTest {
         registry.getVaultsByAsset(TEST_ASSET);
     }
 
+    function test_GetHurdleRate() public {
+        uint16 _hurdleRate = registry.getHurdleRate(USDC);
+        assertEq(_hurdleRate, 0);
+
+        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
+        registry.getHurdleRate(TEST_ASSET);
+    }
+
+    function test_GetContractById() public {
+        address _kMinterAddr = registry.getContractById(registry.K_MINTER());
+        assertEq(_kMinterAddr, address(minter));
+
+        bytes32 _invalidId = keccak256("Banana");
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.getContractById(_invalidId);
+    }
+
+    function test_GetAllVaults() public view {
+        address[] memory _vaults = registry.getAllVaults();
+        assertTrue(_vaults.length > 0);
+    }
+
+    function test_GetVaultByAssetAndType() public {
+        address _dnVaultAddr = registry.getVaultByAssetAndType(USDC, uint8(IRegistry.VaultType.DN));
+        assertEq(_dnVaultAddr, address(dnVault));
+
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.getVaultByAssetAndType(TEST_ASSET, uint8(IRegistry.VaultType.ALPHA));
+    }
+
+    function test_GetAdapter() public {
+        address _adapter = registry.getAdapter(address(dnVault), USDC);
+        assertEq(_adapter, address(DNVaultAdapterUSDC));
+
+        address _alphaAdapter = registry.getAdapter(address(alphaVault), USDC);
+        assertEq(_alphaAdapter, address(ALPHAVaultAdapterUSDC));
+
+        address _unregisteredVault = makeAddr("Banana");
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.getAdapter(_unregisteredVault, USDC);
+    }
+
+    function test_GetVaultAssets() public {
+        address[] memory _assets = registry.getVaultAssets(address(dnVault));
+        assertTrue(_assets.length > 0);
+        assertEq(_assets[0], USDC);
+
+        address _unregisteredVault = makeAddr("Banana");
+        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
+        registry.getVaultAssets(_unregisteredVault);
+    }
+
+    function test_AssetToKToken() public {
+        address _kToken = registry.assetToKToken(USDC);
+        assertTrue(_kToken != address(0));
+
+        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
+        registry.assetToKToken(TEST_ASSET);
+    }
+
+    function test_GetMaxMintPerBatch() public view {
+        uint256 _maxMint = registry.getMaxMintPerBatch(USDC);
+        assertTrue(_maxMint > 0);
+    }
+
+    function test_GetMaxBurnPerBatch() public view {
+        uint256 _maxBurn = registry.getMaxBurnPerBatch(USDC);
+        assertTrue(_maxBurn > 0);
+    }
+
+    function test_GetTreasury() public view {
+        address _treasury = registry.getTreasury();
+        assertEq(_treasury, users.treasury);
+    }
+
+    function test_GetVaultType() public {
+        uint8 _vaultType = registry.getVaultType(address(dnVault));
+        assertEq(_vaultType, uint8(IRegistry.VaultType.DN));
+
+        uint8 _unregisteredType = registry.getVaultType(makeAddr("Banana"));
+        assertEq(_unregisteredType, 0);
+    }
+
+    function test_IsAsset() public view {
+        assertTrue(registry.isAsset(USDC));
+        
+        assertFalse(registry.isAsset(TEST_ASSET));
+    }
+
+    function test_IsVault() public {
+        assertTrue(registry.isVault(address(dnVault)));
+
+        assertFalse(registry.isVault(makeAddr("Banana")));
+    }
+
+    function test_IsAdapterRegistered() public {
+        assertTrue(registry.isAdapterRegistered(address(betaVault), USDC, address(BETHAVaultAdapterUSDC)));
+
+        assertTrue(registry.isAdapterRegistered(address(minter), USDC, address(minterAdapterUSDC)));
+
+        assertFalse(registry.isAdapterRegistered(address(betaVault), USDC, makeAddr("Banana")));
+        
+        assertFalse(registry.isAdapterRegistered(makeAddr("Banana"), USDC, address(BETHAVaultAdapterUSDC)));
+    }
+
     /* //////////////////////////////////////////////////////////////
                         RECEIVE && UPGRADES
     //////////////////////////////////////////////////////////////*/
 
     function test_ReceiveETH() public {
-        uint256 amount = 1 ether;
+        uint256 _amount = 1 ether;
 
-        vm.deal(users.alice, amount);
+        vm.deal(users.alice, _amount);
         vm.prank(users.alice);
-        (bool success,) = address(registry).call{ value: amount }("");
+        (bool _success,) = address(registry).call{ value: _amount }("");
 
-        assertTrue(success);
-        assertEq(address(registry).balance, amount);
+        assertTrue(_success);
+        assertEq(address(registry).balance, _amount);
     }
 
-    function test_AuthorizeUpgrade_OnlyOwner() public {
-        address newImpl = address(new kRegistry());
+    function test_AuthorizeUpgrade_Success() public {
+        address _newImpl = address(new kRegistry());
+
+        vm.prank(users.owner);
+        registry.upgradeToAndCall(_newImpl, "");
+
+        assertEq(registry.owner(), users.owner);
+        assertEq(registry.contractName(), "kRegistry");
+    }
+
+    function test_AuthorizeUpgrade_Require_Only_Owner() public {
+        address _newImpl = address(new kRegistry());
 
         vm.prank(address(assetRouter));
-        vm.expectRevert();
-        registry.upgradeToAndCall(newImpl, "");
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.upgradeToAndCall(_newImpl, "");
+
+        vm.prank(users.admin);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.upgradeToAndCall(_newImpl, "");
+    }
+
+    function test_AuthorizeModifyFunctions_AddFunctions_Success() public {
+        bytes4[] memory _testSelectors = new bytes4[](2);
+        _testSelectors[0] = bytes4(keccak256("testFunction1()"));
+        _testSelectors[1] = bytes4(keccak256("testFunction2()"));
+        address _testImpl = makeAddr("TEST_IMPL");
+
+        vm.prank(users.owner);
+        registry.addFunctions(_testSelectors, _testImpl, false);
+    }
+
+    function test_AuthorizeModifyFunctions_AddFunction_Require_Only_Owner() public {
+        bytes4 _testSelector = bytes4(keccak256("testFunction()"));
+        address _testImpl = makeAddr("TEST_IMPL");
+
+        vm.prank(users.admin);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.addFunction(_testSelector, _testImpl, false);
+
+        vm.prank(users.alice);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.addFunction(_testSelector, _testImpl, false);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.addFunction(_testSelector, _testImpl, false);
+    }
+
+    function test_AuthorizeModifyFunctions_RemoveFunctions_Success() public {
+        bytes4[] memory _testSelectors = new bytes4[](2);
+        _testSelectors[0] = bytes4(keccak256("testFunction1()"));
+        _testSelectors[1] = bytes4(keccak256("testFunction2()"));
+        address _testImpl = makeAddr("TEST_IMPL");
+
+        vm.prank(users.owner);
+        registry.addFunctions(_testSelectors, _testImpl, false);
+
+        vm.prank(users.owner);
+        registry.removeFunctions(_testSelectors);
+    }
+
+    function test_AuthorizeModifyFunctions_RemoveFunctions_Require_Only_Owner() public {
+        bytes4[] memory _testSelectors = new bytes4[](2);
+        _testSelectors[0] = bytes4(keccak256("testFunction1()"));
+        _testSelectors[1] = bytes4(keccak256("testFunction2()"));
+        address _testImpl = makeAddr("TEST_IMPL");
+
+        vm.prank(users.owner);
+        registry.addFunctions(_testSelectors, _testImpl, false);
+
+        vm.prank(users.admin);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.removeFunctions(_testSelectors);
+
+        vm.prank(users.alice);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.removeFunctions(_testSelectors);
+
+        vm.prank(users.guardian);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.removeFunctions(_testSelectors);
     }
 }

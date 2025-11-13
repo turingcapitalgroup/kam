@@ -90,7 +90,7 @@ contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
 
         if (_asset == address(0)) {
             // Rescue ETH
-            require(_amount > 0 && _amount <= address(this).balance, VAULTADAPTER_ZERO_AMOUNT);
+            require(_amount != 0 && _amount <= address(this).balance, VAULTADAPTER_ZERO_AMOUNT);
 
             (bool _success,) = _to.call{ value: _amount }("");
             require(_success, VAULTADAPTER_TRANSFER_FAILED);
@@ -98,7 +98,7 @@ contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
             emit RescuedETH(_to, _amount);
         } else {
             // Rescue ERC20 tokens
-            _checkAsset(_asset);
+            _checkAssetNotRegistered(_asset);
             require(_amount > 0 && _amount <= _asset.balanceOf(address(this)), VAULTADAPTER_ZERO_AMOUNT);
 
             _asset.safeTransfer(_to, _amount);
@@ -186,10 +186,10 @@ contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
         require(_addr != address(0), VAULTADAPTER_ZERO_ADDRESS);
     }
 
-    /// @notice Reverts if the asset is not supported by the protocol
+    /// @notice Reverts if the asset is a registered protocol asset
     /// @param _asset Asset address to check
-    function _checkAsset(address _asset) private view {
-        require(IkRegistry(address(_getMinimalAccountStorage().registry)).isAsset(_asset), VAULTADAPTER_WRONG_ASSET);
+    function _checkAssetNotRegistered(address _asset) private view {
+        require(!IkRegistry(address(_getMinimalAccountStorage().registry)).isAsset(_asset), VAULTADAPTER_WRONG_ASSET);
     }
 
     /* //////////////////////////////////////////////////////////////

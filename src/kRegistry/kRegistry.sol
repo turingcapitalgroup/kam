@@ -260,7 +260,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         } else {
             // Rescue ERC20 tokens
             _checkAssetNotRegistered(_asset);
-            require(_amount != 0 && _amount <= _asset.balanceOf(address(this)), KREGISTRY_ZERO_AMOUNT);
+            require(_amount > 0 && _amount <= _asset.balanceOf(address(this)), KREGISTRY_ZERO_AMOUNT);
 
             _asset.safeTransfer(_to, _amount);
             emit RescuedAssets(_asset, _to, _amount);
