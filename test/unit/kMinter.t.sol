@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
+import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import {
-    KBASE_TRANSFER_FAILED,
     KBASE_WRONG_ASSET,
     KBASE_WRONG_ROLE,
     KBASE_ZERO_ADDRESS,

@@ -25,6 +25,12 @@ interface IRegistry is IVersioned {
 
     /// @notice Emitted when an asset and its kToken are registered
     /// @param asset The underlying asset address
+    /// @param maxMintPerBatch the max mint amount per batch
+    /// @param maxBurnPerBatch the max burn amount per batch
+    event AssetBatchLimitsUpdated(address indexed asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch);
+
+    /// @notice Emitted when an asset and its kToken are registered
+    /// @param asset The underlying asset address
     /// @param kToken The corresponding kToken address
     event AssetRegistered(address indexed asset, address indexed kToken);
 

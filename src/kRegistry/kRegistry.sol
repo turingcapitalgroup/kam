@@ -15,7 +15,8 @@ import {
     KREGISTRY_TRANSFER_FAILED,
     KREGISTRY_WRONG_ASSET,
     KREGISTRY_ZERO_ADDRESS,
-    KREGISTRY_ZERO_AMOUNT
+    KREGISTRY_ZERO_AMOUNT,
+    KREGISTRY_KTOKEN_ALREADY_SET
 } from "kam/src/errors/Errors.sol";
 
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
@@ -216,6 +217,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         _removeRoles(_user, _role);
     }
 
+    /* //////////////////////////////////////////////////////////////
+                    TREASURY && HURDLE RATE && RESCUE
+    //////////////////////////////////////////////////////////////*/
+
     /// @inheritdoc IRegistry
     function setTreasury(address _treasury) external payable {
         _checkAdmin(msg.sender);
@@ -227,7 +232,6 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
     /// @inheritdoc IRegistry
     function setHurdleRate(address _asset, uint16 _hurdleRate) external payable {
-        // Only relayer can set hurdle rates (performance thresholds)
         _checkRelayer(msg.sender);
         // Ensure hurdle rate doesn't exceed 100% (10,000 basis points)
         require(_hurdleRate <= MAX_BPS, KREGISTRY_FEE_EXCEEDS_MAXIMUM);
@@ -236,7 +240,6 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         // Asset must be registered before setting hurdle rate
         _checkAssetRegistered(_asset);
 
-        // Set minimum performance threshold for yield distribution
         $.assetHurdleRate[_asset] = _hurdleRate;
         emit HurdleRateSet(_asset, _hurdleRate);
     }
@@ -275,6 +278,8 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         kRegistryStorage storage $ = _getkRegistryStorage();
         $.maxMintPerBatch[_asset] = _maxMintPerBatch;
         $.maxBurnPerBatch[_asset] = _maxBurnPerBatch;
+        
+        emit AssetBatchLimitsUpdated(_asset, _maxMintPerBatch, _maxBurnPerBatch);
     }
 
     /// @inheritdoc IRegistry
@@ -282,7 +287,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         string memory _name,
         string memory _symbol,
         address _asset,
-        bytes32 _id,
+        bytes32 _id, // TODO: WHY this Banana is here :)
         uint256 _maxMintPerBatch,
         uint256 _maxBurnPerBatch,
         address _emergencyAdmin
@@ -314,7 +319,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
         // Ensure no kToken exists for this asset yet
         address _kToken = $.assetToKToken[_asset];
-        _checkAssetNotRegistered(_kToken);
+        require(_kToken == address(0), KREGISTRY_KTOKEN_ALREADY_SET);
 
         // Deploy new kToken with matching decimals and grant minter privileges
         _kToken = address(
@@ -390,9 +395,24 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// @inheritdoc IRegistry
     function removeVault(address _vault) external payable {
         _checkAdmin(msg.sender);
-        kRegistryStorage storage $ = _getkRegistryStorage();
         _checkVaultRegistered(_vault);
+
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        
+        address[] memory _assets = $.vaultAsset[_vault].values();
+        uint8 _vaultTypeValue = $.vaultType[_vault];
+        
+        // Remove vault from all asset mappings
+        for (uint256 i; i < _assets.length; i++) {
+            address _asset = _assets[i];
+            delete $.assetToVault[_asset][_vaultTypeValue];
+            $.vaultsByAsset[_asset].remove(_vault);
+            $.vaultAsset[_vault].remove(_asset);
+        }
+        
+        delete $.vaultType[_vault];
         $.allVaults.remove(_vault);
+        
         emit VaultRemoved(_vault);
     }
 

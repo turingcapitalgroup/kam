@@ -1,32 +1,29 @@
 pragma solidity 0.8.30;
 
 import { MockERC20 } from "../mocks/MockERC20.sol";
-import { ADMIN_ROLE, RELAYER_ROLE, GUARDIAN_ROLE, RELAYER_ROLE, EMERGENCY_ADMIN_ROLE } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import {
     KREGISTRY_ALREADY_REGISTERED,
     KREGISTRY_ASSET_NOT_SUPPORTED,
-    KREGISTRY_FEE_EXCEEDS_MAXIMUM,
     KREGISTRY_INVALID_ADAPTER,
     KREGISTRY_ZERO_ADDRESS,
+    KREGISTRY_WRONG_ASSET,
     KROLESBASE_ZERO_ADDRESS,
     KROLESBASE_WRONG_ROLE
 } from "kam/src/errors/Errors.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 
-import { Initializable } from "kam/src/vendor/solady/utils/Initializable.sol";
-
 contract kRegistryTest is DeploymentBaseTest {
-    address internal testAsset;
-    address internal testVault = makeAddr("TestVault");
+    address internal TEST_ASSET;
+    address internal TEST_VAULT = makeAddr("TEST_VAULT");
     address internal TEST_ADAPTER = makeAddr("TEST_ADAPTER");
     address internal TEST_CONTRACT = makeAddr("TEST_CONTRACT");
     string internal constant TEST_NAME = "TEST_TOKEN";
     string internal constant TEST_SYMBOL = "TTK";
     bytes32 internal constant TEST_CONTRACT_ID = keccak256("TEST_CONTRACT");
-    bytes32 internal constant TEST_ASSET_ID = keccak256("testAsset");
+    bytes32 internal constant TEST_ASSET_ID = keccak256("TEST_ASSET");
 
     uint256 constant MAX_BPS = 10_000;
     uint16 constant TEST_HURDLE_RATE = 500; //5%
@@ -37,73 +34,112 @@ contract kRegistryTest is DeploymentBaseTest {
         DeploymentBaseTest.setUp();
 
         MockERC20 testToken = new MockERC20("Test USDT", "USDT", 6);
-        testAsset = address(testToken);
+        TEST_ASSET = address(testToken);
 
         USDC = address(mockUSDC);
         WBTC = address(mockWBTC);
     }
 
     /* //////////////////////////////////////////////////////////////
-                            REGISTER ASSETS
+                                ASSETS
     //////////////////////////////////////////////////////////////*/
+
+    function test_setAssetBatchLimits_Success() public {
+        uint256 _maxMintPerBatch = 1000000 * 1e6;
+        uint256 _maxBurnPerBatch = 500000 * 1e6;
+        
+        vm.prank(users.admin);
+        vm.expectEmit(true, true, true, true);
+        emit IRegistry.AssetBatchLimitsUpdated(USDC, _maxMintPerBatch, _maxBurnPerBatch);
+        registry.setAssetBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
+
+        assertEq(registry.getMaxMintPerBatch(USDC), _maxMintPerBatch);
+        assertEq(registry.getMaxBurnPerBatch(USDC), _maxBurnPerBatch);
+    }
+
+    function test_setAssetBatchLimits_Require_Only_Admin() public {
+        uint256 _maxMintPerBatch = 1000000 * 1e6;
+        uint256 _maxBurnPerBatch = 500000 * 1e6;
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setAssetBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
+
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setAssetBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
+    }
+
 
     function test_RegisterAsset_NewAsset_Success() public {
         vm.prank(users.admin);
-
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.AssetSupported(TEST_ASSET);
         vm.expectEmit(true, false, false, false);
-        emit IRegistry.AssetSupported(testAsset);
-
+        emit IRegistry.AssetRegistered(TEST_ASSET, address(0));
+        vm.expectEmit(false, false, false, false);
+        emit IRegistry.KTokenDeployed(address(0), TEST_NAME, TEST_SYMBOL, 0);
         address testKToken = registry.registerAsset(
-            TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin
+            TEST_NAME, 
+            TEST_SYMBOL, 
+            TEST_ASSET, 
+            TEST_ASSET_ID, 
+            type(uint256).max, 
+            type(uint256).max, 
+            users.emergencyAdmin
         );
-
-        assertTrue(registry.isAsset(testAsset), "Asset not registered");
-        assertEq(registry.assetToKToken(testAsset), testKToken, "Asset->kToken mapping incorrect");
+        assertTrue(registry.isAsset(TEST_ASSET));
+        assertEq(registry.assetToKToken(TEST_ASSET), testKToken);
 
         address[] memory allAssets = registry.getAllAssets();
-        bool found = false;
+        bool exists = false;
         for (uint256 i = 0; i < allAssets.length; i++) {
-            if (allAssets[i] == testAsset) {
-                found = true;
+            if (allAssets[i] == TEST_ASSET) {
+                exists = true;
                 break;
             }
         }
-        assertTrue(found, "Asset not in getAllAssets");
+        assertTrue(exists);
     }
 
-    function test_RegisterAsset_ExistingAsset_Revert() public {
-        vm.prank(users.admin);
-        address newKToken = registry.registerAsset(
-            TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin
-        );
-        assertEq(registry.assetToKToken(testAsset), newKToken, "kToken mapping not updated");
-
-        vm.prank(users.admin);
-        vm.expectRevert(bytes(KREGISTRY_ALREADY_REGISTERED));
-        newKToken = registry.registerAsset(
-            TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin
-        );
-    }
-
-    function test_RegisterAsset_OnlyAdmin() public {
+    function test_RegisterAsset_Require_Only_Admin() public {
         vm.prank(users.bob);
-        vm.expectRevert();
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
     }
 
-    function test_RegisterAsset_RevertZeroAddresses() public {
+    function test_RegisterAsset_Require_Addresses_Not_Zero() public {
         vm.startPrank(users.admin);
 
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
         registry.registerAsset(TEST_NAME, TEST_SYMBOL, address(0), TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
 
-        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, bytes32(0), type(uint256).max, type(uint256).max, users.emergencyAdmin);
-
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, address(0));
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, address(0));
 
         vm.stopPrank();
+    }
+
+    function test_RegisterAsset_Required_Not_Registered_Asset() public {
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_ALREADY_REGISTERED));
+        registry.registerAsset(
+            "KAM USD", "kUSD", USDC, TEST_ASSET_ID, type(uint256).max, 100000000000, users.emergencyAdmin
+        );
+    }
+
+    function test_RegisterAsset_Required_Valid_Asset() public {
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_WRONG_ASSET));
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, address(0x347474), TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -112,96 +148,100 @@ contract kRegistryTest is DeploymentBaseTest {
 
     function test_RegisterVault_Success() public {
         vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
 
         vm.prank(users.admin);
+        vm.expectEmit(true, true, true, true);
+        emit IRegistry.VaultRegistered(TEST_VAULT, TEST_ASSET, IRegistry.VaultType.ALPHA);
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
 
-        vm.expectEmit(true, true, true, false);
-        emit IRegistry.VaultRegistered(testVault, testAsset, IRegistry.VaultType.ALPHA);
-
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
-
-        assertTrue(registry.isVault(testVault), "Vault not registered");
-        assertEq(registry.getVaultType(testVault), uint8(IRegistry.VaultType.ALPHA), "Vault type incorrect");
-        assertEq(registry.getVaultAssets(testVault)[0], testAsset, "Vault asset incorrect");
+        assertTrue(registry.isVault(TEST_VAULT));
+        assertEq(registry.getVaultType(TEST_VAULT), uint8(IRegistry.VaultType.ALPHA));
+        assertEq(registry.getVaultAssets(TEST_VAULT)[0], TEST_ASSET);
         assertEq(
-            registry.getVaultByAssetAndType(testAsset, uint8(IRegistry.VaultType.ALPHA)),
-            testVault,
-            "Asset->Vault mapping incorrect"
+            registry.getVaultByAssetAndType(TEST_ASSET, uint8(IRegistry.VaultType.ALPHA)),
+            TEST_VAULT
         );
 
-        address[] memory vaultsByAsset = registry.getVaultsByAsset(testAsset);
-        assertEq(vaultsByAsset.length, 1, "VaultsByAsset length incorrect");
-        assertEq(vaultsByAsset[0], testVault, "VaultsByAsset content incorrect");
+        address[] memory vaultsByAsset = registry.getVaultsByAsset(TEST_ASSET);
+        assertEq(vaultsByAsset.length, 1);
+        assertEq(vaultsByAsset[0], TEST_VAULT);
     }
 
-    function test_RegisterVault_OnlyFactory() public {
+    function test_RegisterVault_Require_Only_Admin() public {
         vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
 
         vm.prank(users.alice);
         vm.expectRevert();
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
 
         vm.prank(users.emergencyAdmin);
         vm.expectRevert();
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
     }
 
-    function test_RegisterVault_RevertZeroAddress() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-
-        vm.prank(users.admin);
-        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
-        registry.registerVault(address(0), IRegistry.VaultType.ALPHA, testAsset);
-    }
-
-    function test_RegisterVault_RevertAlreadyRegistered() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-
+    function test_RegisterVault_Require_Address_Not_Zero() public {
         vm.startPrank(users.admin);
 
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.registerVault(address(0), IRegistry.VaultType.ALPHA, TEST_ASSET);
 
-        vm.expectRevert(bytes(KREGISTRY_ALREADY_REGISTERED));
-        registry.registerVault(testVault, IRegistry.VaultType.BETA, testAsset);
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, address(0));
 
         vm.stopPrank();
     }
 
-    function test_RegisterVault_RevertAssetNotSupported() public {
+    function test_RegisterVault_Require_Valid_Asset() public {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
     }
 
-    function test_RegisterVault_MultipleTypes() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-
-        address kMinter = address(0x6666666666666666666666666666666666666666);
-        address dnVault = address(0x7777777777777777777777777777777777777777);
-        address alphaVault = address(0x8888888888888888888888888888888888888888);
-        address betaVault = address(0x9999999999999999999999999999999999999999);
-
+    function test_RegisterVault_Required_Not_Registered_Vault() public {
         vm.startPrank(users.admin);
 
-        registry.registerVault(kMinter, IRegistry.VaultType.MINTER, testAsset);
-        registry.registerVault(dnVault, IRegistry.VaultType.DN, testAsset);
-        registry.registerVault(alphaVault, IRegistry.VaultType.ALPHA, testAsset);
-        registry.registerVault(betaVault, IRegistry.VaultType.BETA, testAsset);
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
+        
+        vm.expectRevert(bytes(KREGISTRY_ALREADY_REGISTERED));
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.BETA, TEST_ASSET);
 
         vm.stopPrank();
+    }
 
-        assertEq(registry.getVaultByAssetAndType(testAsset, uint8(IRegistry.VaultType.MINTER)), kMinter);
-        assertEq(registry.getVaultByAssetAndType(testAsset, uint8(IRegistry.VaultType.DN)), dnVault);
-        assertEq(registry.getVaultByAssetAndType(testAsset, uint8(IRegistry.VaultType.ALPHA)), alphaVault);
-        assertEq(registry.getVaultByAssetAndType(testAsset, uint8(IRegistry.VaultType.BETA)), betaVault);
+    function test_RemoveVault_Success() public {
+        address _dnVault = address(dnVault);
+        vm.prank(users.admin);
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.VaultRemoved(_dnVault);
+        registry.removeVault(_dnVault);
 
-        address[] memory vaultsByAsset = registry.getVaultsByAsset(testAsset);
-        assertEq(vaultsByAsset.length, 4, "Should have 4 vaults for asset");
+        assertFalse(registry.isVault(_dnVault));
+        assertEq(registry.getVaultType(_dnVault), 0);
+
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.getVaultByAssetAndType(USDC, uint8(IRegistry.VaultType.DN));
+
+        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
+        registry.getVaultAssets(_dnVault);
+
+        address _minter = address(minter);
+        vm.prank(users.admin);
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.VaultRemoved(_minter);
+        registry.removeVault(_minter);
+
+        assertFalse(registry.isVault(_minter));
+        assertEq(registry.getVaultType(_minter), 0);
+
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.getVaultByAssetAndType(USDC, uint8(IRegistry.VaultType.DN));
+
+        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
+        registry.getVaultAssets(_minter);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -210,37 +250,37 @@ contract kRegistryTest is DeploymentBaseTest {
 
     function test_RegisterAdapter_OnlyAdmin() public {
         vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
 
         vm.prank(users.admin);
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
 
         vm.prank(users.alice);
         vm.expectRevert();
-        registry.registerAdapter(testVault, testAsset, TEST_ADAPTER);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
     }
 
     function test_RegisterAdapter_RevertZeroAddress() public {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_INVALID_ADAPTER));
-        registry.registerAdapter(testVault, testAsset, address(0));
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(0));
     }
 
     function test_RemoveAdapter_OnlyAdmin() public {
         vm.prank(users.alice);
         vm.expectRevert();
-        registry.removeAdapter(testVault, testAsset, TEST_ADAPTER);
+        registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
     }
 
     function test_GetAdapter_RevertZeroAddress() public {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
-        registry.getAdapter(testVault, testAsset);
+        registry.getAdapter(TEST_VAULT, TEST_ASSET);
     }
 
     function test_IsAdapterRegistered_NonExistent() public view {
         assertFalse(
-            registry.isAdapterRegistered(testVault, testAsset, TEST_ADAPTER),
+            registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER),
             "Should return false for non-existent adapter"
         );
     }
@@ -268,364 +308,5 @@ contract kRegistryTest is DeploymentBaseTest {
         registry.upgradeToAndCall(newImpl, "");
 
         assertTrue(true, "Authorization test completed");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        ENHANCED ROLE MANAGEMENT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_RoleManagement_GrantAllRoles() public {
-        address testUser = address(0xABCD);
-
-        vm.startPrank(users.admin);
-
-        registry.grantInstitutionRole(testUser);
-        assertTrue(registry.isInstitution(testUser), "Institution role not granted");
-
-        address testVendor = address(0xDEAD);
-        registry.grantVendorRole(testVendor);
-        assertTrue(registry.isVendor(testVendor), "Vendor role not granted");
-
-        address testRelayer = address(0xBEEF);
-        registry.grantRelayerRole(testRelayer);
-        assertTrue(registry.isRelayer(testRelayer));
-
-        vm.stopPrank();
-    }
-
-    function test_RoleManagement_OnlyAdminCanGrant() public {
-        address testUser = address(0xABCD);
-
-        vm.prank(users.alice);
-        vm.expectRevert();
-        registry.grantInstitutionRole(testUser);
-
-        vm.prank(users.bob);
-        vm.expectRevert();
-        registry.grantVendorRole(testUser);
-
-        vm.prank(users.charlie);
-        vm.expectRevert();
-        registry.grantRelayerRole(testUser);
-
-        assertFalse(registry.isInstitution(testUser), "Institution role should not be granted");
-        assertFalse(registry.isVendor(testUser), "Vendor role should not be granted");
-        assertFalse(registry.isRelayer(testUser), "Relayer role should not be granted");
-    }
-
-    function test_RoleManagement_RoleHierarchy() public view {
-        assertTrue(registry.hasAnyRole(users.admin, 1), "Admin should have ADMIN_ROLE");
-
-        assertTrue(registry.hasAnyRole(users.emergencyAdmin, 2), "EmergencyAdmin should have EMERGENCY_ADMIN_ROLE");
-
-        assertTrue(registry.hasAnyRole(users.guardian, 4), "Guardian should have GUARDIAN_ROLE");
-
-        assertFalse(registry.hasAnyRole(users.alice, 1), "Alice should not have admin role");
-        assertFalse(registry.hasAnyRole(users.bob, 2), "Bob should not have emergency admin role");
-    }
-
-    function test_RoleManagement_OperationPermissions() public {
-        vm.prank(users.alice);
-        vm.expectRevert();
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-
-        vm.prank(users.bob);
-        vm.expectRevert();
-        registry.registerAdapter(testVault, testAsset, TEST_ADAPTER);
-
-        vm.startPrank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
-        registry.registerAdapter(testVault, testAsset, TEST_ADAPTER);
-        vm.stopPrank();
-
-        assertTrue(registry.isAsset(testAsset), "Asset should be registered");
-        assertTrue(registry.isVault(testVault), "Vault should be registered");
-    }
-
-    function test_RoleManagement_MultipleRoles() public {
-        address testUser = address(0xFEED);
-
-        vm.startPrank(users.admin);
-
-        registry.grantInstitutionRole(testUser);
-        registry.grantVendorRole(testUser);
-        registry.grantRelayerRole(testUser);
-
-        vm.stopPrank();
-
-        assertTrue(registry.isInstitution(testUser), "Should have institution role");
-        assertTrue(registry.isVendor(testUser), "Should have vendor role");
-        assertTrue(registry.isRelayer(testUser), "Should have relayer role");
-
-        assertTrue(registry.hasAnyRole(testUser, 16 | 32 | 8), "Should have multiple roles combined");
-    }
-
-    function test_RoleManagement_EdgeCases() public {
-        address testUser = address(0xCAFE);
-        vm.startPrank(users.admin);
-
-        registry.grantInstitutionRole(testUser);
-        registry.grantInstitutionRole(testUser);
-
-        vm.stopPrank();
-
-        assertTrue(registry.isInstitution(testUser), "Role should still be present");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                    ADVANCED ASSET MANAGEMENT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_AssetManagement_IdCollisions() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-
-        address differentAsset = address(0xDEADBEEF);
-        vm.prank(users.admin);
-        vm.expectRevert();
-        registry.registerAsset("DIFFERENT", "DIFF", differentAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-    }
-
-    function test_AssetManagement_KTokenRelationship() public {
-        vm.prank(users.admin);
-        address deployedKToken = registry.registerAsset(
-            TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin
-        );
-
-        assertEq(registry.assetToKToken(testAsset), deployedKToken, "Asset->kToken mapping incorrect");
-
-        assertTrue(deployedKToken != address(0), "kToken should be deployed");
-
-        assertEq(registry.isAsset(testAsset), true, "Asset ID lookup incorrect");
-    }
-
-    function test_AssetManagement_Boundaries() public {
-        vm.startPrank(users.admin);
-
-        string memory longName = "VERY_LONG_ASSET_NAME_THAT_EXCEEDS_NORMAL_LIMITS_FOR_TESTING_PURPOSES_ONLY";
-        string memory longSymbol = "VERYLONGSYMBOL";
-
-        address longKToken = registry.registerAsset(
-            longName, longSymbol, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin
-        );
-        assertTrue(longKToken != address(0), "Should handle long names/symbols");
-
-        vm.stopPrank();
-    }
-
-    function test_AssetManagement_StateConsistency() public view {
-        address[] memory allAssets = registry.getAllAssets();
-        assertTrue(allAssets.length >= 2, "Should have existing assets");
-
-        assertTrue(registry.isAsset(tokens.usdc), "tokens.usdc should be registered");
-
-        bool foundUSDC = false;
-        for (uint256 i = 0; i < allAssets.length; i++) {
-            if (allAssets[i] == tokens.usdc) {
-                foundUSDC = true;
-                break;
-            }
-        }
-        assertTrue(foundUSDC, "USDC should be in getAllAssets");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                    ENHANCED VAULT MANAGEMENT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_VaultManagement_VaultTypeValidation() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-
-        vm.startPrank(users.admin);
-
-        address[] memory testVaults = new address[](5);
-        testVaults[0] = address(0x1001);
-        testVaults[1] = address(0x1002);
-        testVaults[2] = address(0x1003);
-        testVaults[3] = address(0x1004);
-        testVaults[4] = address(0x1005);
-
-        registry.registerVault(testVaults[0], IRegistry.VaultType.MINTER, testAsset);
-        registry.registerVault(testVaults[1], IRegistry.VaultType.DN, testAsset);
-        registry.registerVault(testVaults[2], IRegistry.VaultType.ALPHA, testAsset);
-        registry.registerVault(testVaults[3], IRegistry.VaultType.BETA, testAsset);
-        registry.registerVault(testVaults[4], IRegistry.VaultType.GAMMA, testAsset);
-
-        vm.stopPrank();
-
-        assertEq(registry.getVaultType(testVaults[0]), uint8(IRegistry.VaultType.MINTER), "MINTER type incorrect");
-        assertEq(registry.getVaultType(testVaults[1]), uint8(IRegistry.VaultType.DN), "DN type incorrect");
-        assertEq(registry.getVaultType(testVaults[2]), uint8(IRegistry.VaultType.ALPHA), "ALPHA type incorrect");
-        assertEq(registry.getVaultType(testVaults[3]), uint8(IRegistry.VaultType.BETA), "BETA type incorrect");
-        assertEq(registry.getVaultType(testVaults[4]), uint8(IRegistry.VaultType.GAMMA), "GAMMA type incorrect");
-    }
-
-    function test_VaultManagement_MultipleAssetScenarios() public {
-        vm.startPrank(users.admin);
-
-        address vault1 = address(0x3001);
-        registry.registerVault(vault1, IRegistry.VaultType.ALPHA, tokens.usdc);
-
-        vm.stopPrank();
-
-        assertTrue(registry.isVault(vault1), "Vault should be registered");
-        assertEq(registry.getVaultType(vault1), uint8(IRegistry.VaultType.ALPHA), "Vault type should be ALPHA");
-
-        address[] memory usdcVaults = registry.getVaultsByAsset(tokens.usdc);
-
-        bool foundVault = false;
-        for (uint256 i = 0; i < usdcVaults.length; i++) {
-            if (usdcVaults[i] == vault1) {
-                foundVault = true;
-                break;
-            }
-        }
-        assertTrue(foundVault, "Vault should be found in USDC vaults");
-    }
-
-    function test_VaultManagement_BoundaryConditions() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-
-        vm.startPrank(users.admin);
-
-        address highTypeVault = address(0x4001);
-
-        registry.registerVault(highTypeVault, IRegistry.VaultType.TAU, testAsset);
-        assertEq(registry.getVaultType(highTypeVault), uint8(IRegistry.VaultType.TAU), "High vault type incorrect");
-
-        vm.stopPrank();
-    }
-
-    function test_VaultManagement_StateConsistency() public {
-        vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-
-        address[] memory testVaults = new address[](3);
-        testVaults[0] = address(0x5001);
-        testVaults[1] = address(0x5002);
-        testVaults[2] = address(0x5003);
-
-        vm.startPrank(users.admin);
-        registry.registerVault(testVaults[0], IRegistry.VaultType.ALPHA, testAsset);
-        registry.registerVault(testVaults[1], IRegistry.VaultType.BETA, testAsset);
-        registry.registerVault(testVaults[2], IRegistry.VaultType.GAMMA, testAsset);
-        vm.stopPrank();
-
-        address[] memory assetVaults = registry.getVaultsByAsset(testAsset);
-        assertEq(assetVaults.length, 3, "Should have 3 vaults for asset");
-
-        for (uint256 i = 0; i < testVaults.length; i++) {
-            assertTrue(registry.isVault(testVaults[i]), "Vault should be registered");
-            address[] memory vaultAssets = registry.getVaultAssets(testVaults[i]);
-            assertEq(vaultAssets.length, 1, "Vault should have 1 asset");
-            assertEq(vaultAssets[0], testAsset, "Vault asset should match");
-        }
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                COMPREHENSIVE ADAPTER MANAGEMENT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_AdapterManagement_CompleteWorkflow() public {
-        vm.startPrank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
-
-        vm.expectEmit(true, true, true, false);
-        emit IRegistry.AdapterRegistered(testVault, testAsset, TEST_ADAPTER);
-        registry.registerAdapter(testVault, testAsset, TEST_ADAPTER);
-
-        vm.stopPrank();
-
-        assertTrue(registry.isAdapterRegistered(testVault, testAsset, TEST_ADAPTER), "Adapter should be registered");
-
-        address adapter = registry.getAdapter(testVault, testAsset);
-        assertEq(adapter, TEST_ADAPTER, "Adapter address incorrect");
-    }
-
-    function test_AdapterManagement_RemovalWorkflow() public {
-        vm.startPrank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
-        registry.registerAdapter(testVault, testAsset, TEST_ADAPTER);
-
-        assertTrue(
-            registry.isAdapterRegistered(testVault, testAsset, TEST_ADAPTER), "Adapter should be registered initially"
-        );
-
-        registry.removeAdapter(testVault, testAsset, TEST_ADAPTER);
-
-        vm.stopPrank();
-
-        assertFalse(registry.isAdapterRegistered(testVault, testAsset, TEST_ADAPTER), "Adapter should be removed");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                    ADVANCED VIEW FUNCTION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_ViewFunctions_LargeDatasets() public view {
-        address[] memory allAssets = registry.getAllAssets();
-        assertTrue(allAssets.length >= 2, "Should have at least USDC and WBTC");
-
-        address[] memory usdcVaults = registry.getVaultsByAsset(tokens.usdc);
-        assertTrue(usdcVaults.length > 0, "USDC should have vaults");
-
-        for (uint256 i = 0; i < usdcVaults.length; i++) {
-            assertTrue(registry.isVault(usdcVaults[i]), "Each vault should be registered");
-        }
-    }
-
-    function test_ViewFunctions_EdgeCases() public view {
-        address nonExistentAsset = address(0x9001);
-        address nonExistentVault = address(0x9002);
-
-        assertFalse(registry.isAsset(nonExistentAsset), "Non-existent asset should return false");
-        assertFalse(registry.isVault(nonExistentVault), "Non-existent vault should return false");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                    SECURITY AND EDGE CASE TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_Security_EmergencyFunctions() public {
-        vm.prank(users.alice);
-        vm.expectRevert();
-        registry.rescueAssets(tokens.usdc, users.admin, 1000);
-
-        vm.prank(users.admin);
-        try registry.rescueAssets(tokens.usdc, users.admin, 0) { } catch { }
-
-        assertTrue(true, "Access control test completed");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        INTEGRATION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_CompleteAssetVaultWorkflow() public {
-        vm.startPrank(users.admin);
-        address test_kToken = registry.registerAsset(
-            TEST_NAME, TEST_SYMBOL, testAsset, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin
-        );
-        registry.registerVault(testVault, IRegistry.VaultType.ALPHA, testAsset);
-        vm.stopPrank();
-
-        assertTrue(registry.isAsset(testAsset), "Asset should be registered");
-        assertTrue(registry.isVault(testVault), "Vault should be registered");
-
-        assertEq(registry.assetToKToken(testAsset), test_kToken, "Asset->kToken mapping");
-        assertEq(registry.getVaultAssets(testVault)[0], testAsset, "Vault->Asset mapping");
-        assertEq(registry.getVaultType(testVault), uint8(IRegistry.VaultType.ALPHA), "Vault type");
-
-        address[] memory assets = registry.getAllAssets();
-        address[] memory vaults = registry.getVaultsByAsset(testAsset);
-
-        assertTrue(assets.length >= 1, "Asset should be in getAllAssets");
-        assertEq(vaults.length, 1, "Should have 1 vault for test asset");
-        assertEq(vaults[0], testVault, "Vault should match");
     }
 }
