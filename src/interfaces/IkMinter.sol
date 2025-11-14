@@ -80,11 +80,7 @@ interface IkMinter is IVersioned {
     /// @param amount The amount of kTokens being burned
     /// @param batchId The batch identifier this request is associated with
     event BurnRequestCreated(
-        bytes32 indexed requestId,
-        address indexed user,
-        address indexed kToken,
-        uint256 amount,
-        bytes32 batchId
+        bytes32 indexed requestId, address indexed user, address indexed kToken, uint256 amount, bytes32 batchId
     );
 
     /// @notice Emitted when a redemption request is successfully executed after batch settlement

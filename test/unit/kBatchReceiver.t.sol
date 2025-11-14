@@ -4,13 +4,13 @@ pragma solidity 0.8.30;
 import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import {
-    KBATCHRECEIVER_ZERO_ADDRESS,
-    KBATCHRECEIVER_ONLY_KMINTER,
     KBATCHRECEIVER_ALREADY_INITIALIZED,
-    KBATCHRECEIVER_WRONG_ASSET,
-    KBATCHRECEIVER_ZERO_AMOUNT,
     KBATCHRECEIVER_INSUFFICIENT_BALANCE,
-    KBATCHRECEIVER_INVALID_BATCH_ID
+    KBATCHRECEIVER_INVALID_BATCH_ID,
+    KBATCHRECEIVER_ONLY_KMINTER,
+    KBATCHRECEIVER_WRONG_ASSET,
+    KBATCHRECEIVER_ZERO_ADDRESS,
+    KBATCHRECEIVER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
@@ -36,7 +36,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         bytes32 _batchId = minter.getBatchId(USDC);
         address _receiver = _createBatchReceiver(_batchId);
 
-        vm.prank(router); 
+        vm.prank(router);
         vm.expectRevert(bytes(KBATCHRECEIVER_ALREADY_INITIALIZED));
         kBatchReceiver(_receiver).initialize(_batchId, USDC);
     }
@@ -52,7 +52,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
-    
+
         vm.prank(address(minter));
         vm.expectEmit(true, true, true, true);
         emit IkBatchReceiver.PulledAssets(users.alice, USDC, _amount);
@@ -68,7 +68,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
-    
+
         vm.prank(users.alice);
         vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
         kBatchReceiver(_receiver).pullAssets(users.alice, _amount, _batchId);
@@ -86,7 +86,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
-    
+
         vm.prank(address(minter));
         _batchId = keccak256("Banana");
         vm.expectRevert(bytes(KBATCHRECEIVER_INVALID_BATCH_ID));
@@ -101,7 +101,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
-    
+
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_AMOUNT));
         kBatchReceiver(_receiver).pullAssets(users.alice, 0, _batchId);
@@ -115,7 +115,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
-    
+
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
         kBatchReceiver(_receiver).pullAssets(address(0), _amount, _batchId);
@@ -148,7 +148,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         bytes32 _batchId = minter.getBatchId(USDC);
         address _receiver = _createBatchReceiver(_batchId);
         mockWBTC.mint(_receiver, _1_WBTC);
-        
+
         vm.prank(users.alice);
         vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
         kBatchReceiver(_receiver).rescueAssets(WBTC, users.alice, _1_WBTC);
@@ -166,7 +166,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         bytes32 _batchId = minter.getBatchId(USDC);
         address _receiver = _createBatchReceiver(_batchId);
         mockWBTC.mint(_receiver, _1_WBTC);
-        
+
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
         kBatchReceiver(_receiver).rescueAssets(WBTC, address(0), _1_WBTC);
@@ -176,7 +176,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         bytes32 _batchId = minter.getBatchId(USDC);
         address _receiver = _createBatchReceiver(_batchId);
         assertEq(mockWBTC.balanceOf(_receiver), 0);
-        
+
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_AMOUNT));
         kBatchReceiver(_receiver).rescueAssets(WBTC, users.alice, 0);
@@ -186,7 +186,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         bytes32 _batchId = minter.getBatchId(USDC);
         address _receiver = _createBatchReceiver(_batchId);
         mockUSDC.mint(_receiver, _1_USDC);
-        
+
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_WRONG_ASSET));
         kBatchReceiver(_receiver).rescueAssets(USDC, users.alice, _1_USDC);

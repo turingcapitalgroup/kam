@@ -10,9 +10,9 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import {
     KTOKEN_IS_PAUSED,
     KTOKEN_TRANSFER_FAILED,
+    KTOKEN_WRONG_ROLE,
     KTOKEN_ZERO_ADDRESS,
-    KTOKEN_ZERO_AMOUNT,
-    KTOKEN_WRONG_ROLE
+    KTOKEN_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 

@@ -5,13 +5,13 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import {
     KBATCHRECEIVER_ALREADY_INITIALIZED,
+    KBATCHRECEIVER_INSUFFICIENT_BALANCE,
     KBATCHRECEIVER_INVALID_BATCH_ID,
     KBATCHRECEIVER_ONLY_KMINTER,
     KBATCHRECEIVER_TRANSFER_FAILED,
     KBATCHRECEIVER_WRONG_ASSET,
     KBATCHRECEIVER_ZERO_ADDRESS,
-    KBATCHRECEIVER_ZERO_AMOUNT,
-    KBATCHRECEIVER_INSUFFICIENT_BALANCE
+    KBATCHRECEIVER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
@@ -122,7 +122,7 @@ contract kBatchReceiver is IkBatchReceiver {
         _checkAmountNotZero(_amount);
 
         if (_asset == address(0)) {
-            // Rescue ETH    
+            // Rescue ETH
             uint256 _balance = address(this).balance;
             _checkBalance(_balance, _amount);
 
@@ -133,10 +133,10 @@ contract kBatchReceiver is IkBatchReceiver {
         } else {
             // Rescue ERC20 tokens
             require(_asset != asset, KBATCHRECEIVER_WRONG_ASSET);
-            
+
             uint256 _balance = _asset.balanceOf(address(this));
             _checkBalance(_balance, _amount);
-            
+
             _asset.safeTransfer(_to, _amount);
             emit RescuedAssets(_asset, _to, _amount);
         }

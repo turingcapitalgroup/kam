@@ -21,6 +21,7 @@ import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import {
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
+    KSTAKINGVAULT_BATCH_NOT_VALID,
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
     KSTAKINGVAULT_IS_PAUSED,
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
@@ -332,6 +333,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     function closeBatch(bytes32 _batchId, bool _create) external {
         _checkRelayer(msg.sender);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
+        BaseVaultTypes.BatchInfo storage _batch = $.batches[_batchId];
+        require(_batch.batchId != bytes32(0), KSTAKINGVAULT_BATCH_NOT_VALID);
         require(!$.batches[_batchId].isClosed, VAULTBATCHES_VAULT_CLOSED);
         $.batches[_batchId].isClosed = true;
 

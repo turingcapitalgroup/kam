@@ -12,11 +12,11 @@ import {
     KREGISTRY_ASSET_NOT_SUPPORTED,
     KREGISTRY_FEE_EXCEEDS_MAXIMUM,
     KREGISTRY_INVALID_ADAPTER,
+    KREGISTRY_KTOKEN_ALREADY_SET,
     KREGISTRY_TRANSFER_FAILED,
     KREGISTRY_WRONG_ASSET,
     KREGISTRY_ZERO_ADDRESS,
-    KREGISTRY_ZERO_AMOUNT,
-    KREGISTRY_KTOKEN_ALREADY_SET
+    KREGISTRY_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
@@ -278,7 +278,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         kRegistryStorage storage $ = _getkRegistryStorage();
         $.maxMintPerBatch[_asset] = _maxMintPerBatch;
         $.maxBurnPerBatch[_asset] = _maxBurnPerBatch;
-        
+
         emit AssetBatchLimitsUpdated(_asset, _maxMintPerBatch, _maxBurnPerBatch);
     }
 
@@ -398,10 +398,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         _checkVaultRegistered(_vault);
 
         kRegistryStorage storage $ = _getkRegistryStorage();
-        
+
         address[] memory _assets = $.vaultAsset[_vault].values();
         uint8 _vaultTypeValue = $.vaultType[_vault];
-        
+
         // Remove vault from all asset mappings
         for (uint256 i; i < _assets.length; i++) {
             address _asset = _assets[i];
@@ -409,10 +409,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
             $.vaultsByAsset[_asset].remove(_vault);
             $.vaultAsset[_vault].remove(_asset);
         }
-        
+
         delete $.vaultType[_vault];
         $.allVaults.remove(_vault);
-        
+
         emit VaultRemoved(_vault);
     }
 

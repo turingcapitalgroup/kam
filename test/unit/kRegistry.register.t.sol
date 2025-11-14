@@ -4,14 +4,14 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import {
+    KREGISTRY_ADAPTER_ALREADY_SET,
     KREGISTRY_ALREADY_REGISTERED,
     KREGISTRY_ASSET_NOT_SUPPORTED,
     KREGISTRY_INVALID_ADAPTER,
-    KREGISTRY_ZERO_ADDRESS,
     KREGISTRY_WRONG_ASSET,
-    KREGISTRY_ADAPTER_ALREADY_SET,
-    KROLESBASE_ZERO_ADDRESS,
-    KROLESBASE_WRONG_ROLE
+    KREGISTRY_ZERO_ADDRESS,
+    KROLESBASE_WRONG_ROLE,
+    KROLESBASE_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 
@@ -45,9 +45,9 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_setAssetBatchLimits_Success() public {
-        uint256 _maxMintPerBatch = 1000000 * 1e6;
-        uint256 _maxBurnPerBatch = 500000 * 1e6;
-        
+        uint256 _maxMintPerBatch = 1_000_000 * 1e6;
+        uint256 _maxBurnPerBatch = 500_000 * 1e6;
+
         vm.prank(users.admin);
         vm.expectEmit(true, true, true, true);
         emit IRegistry.AssetBatchLimitsUpdated(USDC, _maxMintPerBatch, _maxBurnPerBatch);
@@ -58,8 +58,8 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
     }
 
     function test_setAssetBatchLimits_Require_Only_Admin() public {
-        uint256 _maxMintPerBatch = 1000000 * 1e6;
-        uint256 _maxBurnPerBatch = 500000 * 1e6;
+        uint256 _maxMintPerBatch = 1_000_000 * 1e6;
+        uint256 _maxBurnPerBatch = 500_000 * 1e6;
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
@@ -70,7 +70,6 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         registry.setAssetBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
     }
 
-
     function test_RegisterAsset_NewAsset_Success() public {
         vm.prank(users.admin);
         vm.expectEmit(true, false, false, true);
@@ -80,12 +79,12 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         vm.expectEmit(false, false, false, false);
         emit IRegistry.KTokenDeployed(address(0), TEST_NAME, TEST_SYMBOL, 0);
         address testKToken = registry.registerAsset(
-            TEST_NAME, 
-            TEST_SYMBOL, 
-            TEST_ASSET, 
-            TEST_ASSET_ID, 
-            type(uint256).max, 
-            type(uint256).max, 
+            TEST_NAME,
+            TEST_SYMBOL,
+            TEST_ASSET,
+            TEST_ASSET_ID,
+            type(uint256).max,
+            type(uint256).max,
             users.emergencyAdmin
         );
         assertTrue(registry.isAsset(TEST_ASSET));
@@ -105,25 +104,59 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
     function test_RegisterAsset_Require_Only_Admin() public {
         vm.prank(users.bob);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        registry.registerAsset(
+            TEST_NAME,
+            TEST_SYMBOL,
+            TEST_ASSET,
+            TEST_ASSET_ID,
+            type(uint256).max,
+            type(uint256).max,
+            users.emergencyAdmin
+        );
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
-        
+        registry.registerAsset(
+            TEST_NAME,
+            TEST_SYMBOL,
+            TEST_ASSET,
+            TEST_ASSET_ID,
+            type(uint256).max,
+            type(uint256).max,
+            users.emergencyAdmin
+        );
+
         vm.prank(users.owner);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        registry.registerAsset(
+            TEST_NAME,
+            TEST_SYMBOL,
+            TEST_ASSET,
+            TEST_ASSET_ID,
+            type(uint256).max,
+            type(uint256).max,
+            users.emergencyAdmin
+        );
     }
 
     function test_RegisterAsset_Require_Addresses_Not_Zero() public {
         vm.startPrank(users.admin);
 
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, address(0), TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        registry.registerAsset(
+            TEST_NAME,
+            TEST_SYMBOL,
+            address(0),
+            TEST_ASSET_ID,
+            type(uint256).max,
+            type(uint256).max,
+            users.emergencyAdmin
+        );
 
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, address(0));
+        registry.registerAsset(
+            TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, address(0)
+        );
 
         vm.stopPrank();
     }
@@ -132,14 +165,22 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_ALREADY_REGISTERED));
         registry.registerAsset(
-            "KAM USD", "kUSD", USDC, TEST_ASSET_ID, type(uint256).max, 100000000000, users.emergencyAdmin
+            "KAM USD", "kUSD", USDC, TEST_ASSET_ID, type(uint256).max, 100_000_000_000, users.emergencyAdmin
         );
     }
 
     function test_RegisterAsset_Required_Valid_Asset() public {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_WRONG_ASSET));
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, address(0x347474), TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        registry.registerAsset(
+            TEST_NAME,
+            TEST_SYMBOL,
+            address(0x347474),
+            TEST_ASSET_ID,
+            type(uint256).max,
+            type(uint256).max,
+            users.emergencyAdmin
+        );
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -157,10 +198,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         assertTrue(registry.isVault(TEST_VAULT));
         assertEq(registry.getVaultType(TEST_VAULT), uint8(IRegistry.VaultType.ALPHA));
         assertEq(registry.getVaultAssets(TEST_VAULT)[0], TEST_ASSET);
-        assertEq(
-            registry.getVaultByAssetAndType(TEST_ASSET, uint8(IRegistry.VaultType.ALPHA)),
-            TEST_VAULT
-        );
+        assertEq(registry.getVaultByAssetAndType(TEST_ASSET, uint8(IRegistry.VaultType.ALPHA)), TEST_VAULT);
 
         address[] memory vaultsByAsset = registry.getVaultsByAsset(TEST_ASSET);
         assertEq(vaultsByAsset.length, 1);
@@ -202,7 +240,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         _registerVault();
 
         vm.startPrank(users.admin);
-        
+
         vm.expectRevert(bytes(KREGISTRY_ALREADY_REGISTERED));
         registry.registerVault(TEST_VAULT, IRegistry.VaultType.BETA, TEST_ASSET);
 
@@ -275,7 +313,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
 
         assertTrue(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER));
         assertEq(registry.getAdapter(TEST_VAULT, TEST_ASSET), TEST_ADAPTER);
-        vm.stopPrank();    
+        vm.stopPrank();
     }
 
     function test_RegisterAdapter_Require_Only_Admin() public {
@@ -309,7 +347,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
 
         vm.prank(users.admin);
         registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
-        
+
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_ADAPTER_ALREADY_SET));
         registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
@@ -328,7 +366,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
 
         assertFalse(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER));
-        
+
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
         registry.getAdapter(TEST_VAULT, TEST_ASSET);
     }
@@ -358,7 +396,15 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
 
     function _registerAsset() internal {
         vm.prank(users.admin);
-        registry.registerAsset(TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+        registry.registerAsset(
+            TEST_NAME,
+            TEST_SYMBOL,
+            TEST_ASSET,
+            TEST_ASSET_ID,
+            type(uint256).max,
+            type(uint256).max,
+            users.emergencyAdmin
+        );
     }
 
     function _registerVault() internal {

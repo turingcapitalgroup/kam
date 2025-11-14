@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import { MockERC20 } from "../mocks/MockERC20.sol";
 import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
-
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 
 import { kBase } from "kam/src/base/kBase.sol";
@@ -13,6 +13,7 @@ import {
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_INVALID_COOLDOWN,
     KASSETROUTER_IS_PAUSED,
+    KASSETROUTER_NEGATIVE_SHARES,
     KASSETROUTER_ONLY_KMINTER,
     KASSETROUTER_ONLY_KSTAKING_VAULT,
     KASSETROUTER_PROPOSAL_NOT_FOUND,
@@ -20,11 +21,14 @@ import {
     KASSETROUTER_ZERO_ADDRESS,
     KASSETROUTER_ZERO_AMOUNT,
     KBASE_INVALID_REGISTRY,
-    KBASE_WRONG_ROLE
+    KBASE_WRONG_ROLE,
+    KROLESBASE_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
+import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { kAssetRouter } from "kam/src/kAssetRouter.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { Initializable } from "solady/utils/Initializable.sol";
 
 contract kAssetRouterTest is DeploymentBaseTest {
     bytes32 internal constant TEST_BATCH_ID = bytes32(uint256(1));
@@ -32,20 +36,29 @@ contract kAssetRouterTest is DeploymentBaseTest {
     uint256 internal constant TEST_PROFIT = 100 * _1_USDC;
     uint256 internal constant TEST_LOSS = 50 * _1_USDC;
     uint256 internal constant TEST_TOTAL_ASSETS = 10_000 * _1_USDC;
-    // casting to 'int256' is safe because 500 * _1_USDC fits in int256
-    // forge-lint: disable-next-line(unsafe-typecast)
     int256 internal constant TEST_NETTED = int256(500 * _1_USDC);
 
     address internal mockBatchReceiver = makeAddr("mockBatchReceiver");
 
     bytes32 internal testProposalId;
+    address USDC;
+    address WBTC;
+    address DAI;
+
+    MockERC20 public mockDAI;
 
     function setUp() public override {
-        super.setUp();
+        DeploymentBaseTest.setUp();
 
-        // Set cooldown to 0 for testing
+        USDC = address(mockUSDC);
+        WBTC = address(mockWBTC);
+
+        mockDAI = new MockERC20("Mock DAI", "DAI", 18);
+        DAI = address(mockDAI);
+        vm.label(DAI, "DAI");
+
         vm.prank(users.admin);
-        assetRouter.setSettlementCooldown(1); // Set to 1 second (minimum non-zero)
+        assetRouter.setSettlementCooldown(1);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -53,15 +66,14 @@ contract kAssetRouterTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_InitialState() public view {
-        assertEq(assetRouter.contractName(), "kAssetRouter", "Contract name incorrect");
-        assertEq(assetRouter.contractVersion(), "1.0.0", "Contract version incorrect");
-        assertFalse(assetRouter.isPaused(), "Should be unpaused initially");
-        assertEq(address(assetRouter.registry()), address(registry), "Registry not set correctly");
-        assertEq(assetRouter.getSettlementCooldown(), 1, "Settlement cooldown not set correctly");
+        assertEq(assetRouter.contractName(), "kAssetRouter");
+        assertEq(assetRouter.contractVersion(), "1.0.0");
+        assertFalse(assetRouter.isPaused());
+        assertEq(address(assetRouter.registry()), address(registry));
+        assertEq(assetRouter.getSettlementCooldown(), 1);
     }
 
     function test_Initialize_Success() public {
-        // Deploy fresh implementation for testing
         kAssetRouter newAssetRouterImpl = new kAssetRouter();
 
         bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, address(registry));
@@ -70,13 +82,17 @@ contract kAssetRouterTest is DeploymentBaseTest {
         address newProxy = factory.deployAndCall(address(newAssetRouterImpl), users.admin, initData);
 
         kAssetRouter newRouter = kAssetRouter(payable(newProxy));
-        assertFalse(newRouter.isPaused(), "Should be unpaused");
-
-        // Check default cooldown is set
-        assertEq(newRouter.getSettlementCooldown(), 1 hours, "Default cooldown should be 1 hour");
+        assertFalse(newRouter.isPaused());
+        assertEq(newRouter.registry(), address(registry));
+        assertEq(newRouter.getSettlementCooldown(), 1 hours);
     }
 
-    function test_Initialize_RevertZeroRegistry() public {
+    function test_Initialize_Require_Not_Initialized() public {
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        assetRouter.initialize(address(registry));
+    }
+
+    function test_Initialize_Require_Registry_Not_Zero_Address() public {
         kAssetRouter newAssetRouterImpl = new kAssetRouter();
 
         bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, address(0));
@@ -86,178 +102,323 @@ contract kAssetRouterTest is DeploymentBaseTest {
         factory.deployAndCall(address(newAssetRouterImpl), users.admin, initData);
     }
 
-    function test_Initialize_RevertDoubleInit() public {
-        vm.expectRevert();
-        assetRouter.initialize(address(registry));
-    }
-
     /* //////////////////////////////////////////////////////////////
-                        KMINTER INTEGRATION TESTS
+                            kAssetPush
     //////////////////////////////////////////////////////////////*/
 
     function test_KAssetPush_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        bytes32 batchId = TEST_BATCH_ID;
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
 
-        // Fund minter with USDC
-        mockUSDC.mint(address(minter), amount);
+        mockUSDC.mint(address(minter), _amount);
 
-        // Approve asset router to spend
         vm.prank(address(minter));
-        // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        IERC20(tokens.usdc).transfer(address(assetRouter), amount);
+        IERC20(USDC).transfer(address(assetRouter), _amount);
 
-        // Test asset push
         vm.prank(address(minter));
         vm.expectEmit(true, false, false, true);
-        emit IkAssetRouter.AssetsPushed(address(minter), amount);
+        emit IkAssetRouter.AssetsPushed(address(minter), _amount);
 
-        assetRouter.kAssetPush(tokens.usdc, amount, batchId);
+        assetRouter.kAssetPush(USDC, _amount, _batchId);
 
-        // Verify batch balance storage
-        (uint256 deposited, uint256 requested) = assetRouter.getBatchIdBalances(address(minter), batchId);
-        assertEq(deposited, amount, "Deposited amount incorrect");
-        assertEq(requested, 0, "Requested should be zero");
+        (uint256 _deposited, uint256 _requested) = assetRouter.getBatchIdBalances(address(minter), _batchId);
+        assertEq(_deposited, _amount);
+        assertEq(_requested, 0);
+
+        IVaultAdapter _adapter = IVaultAdapter(registry.getAdapter(address(minter), USDC));
+        assertEq(mockUSDC.balanceOf(address(_adapter)), _amount);
     }
 
-    function test_KAssetPush_RevertZeroAmount() public {
-        vm.prank(address(minter));
-        vm.expectRevert(bytes(KASSETROUTER_ZERO_AMOUNT));
-        assetRouter.kAssetPush(tokens.usdc, 0, TEST_BATCH_ID);
-    }
-
-    function test_KAssetPush_RevertWhenPaused() public {
-        // Pause contract
+    function test_KAssetPush_Require_Not_Paused() public {
         vm.prank(users.emergencyAdmin);
         assetRouter.setPaused(true);
 
         vm.prank(address(minter));
         vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
-        assetRouter.kAssetPush(tokens.usdc, TEST_AMOUNT, TEST_BATCH_ID);
+        assetRouter.kAssetPush(USDC, TEST_AMOUNT, TEST_BATCH_ID);
     }
 
-    function test_KAssetPush_OnlyKMinter() public {
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KASSETROUTER_ONLY_KMINTER));
-        assetRouter.kAssetPush(tokens.usdc, TEST_AMOUNT, TEST_BATCH_ID);
-    }
-
-    function test_KAssetRequestPull_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        bytes32 batchId = TEST_BATCH_ID;
-
-        vm.prank(address(minter));
-        vm.expectRevert();
-        assetRouter.kAssetRequestPull(tokens.usdc, amount, batchId);
-    }
-
-    function test_KAssetRequestPull_RevertZeroAmount() public {
+    function test_KAssetPush_Require_Amount_Not_Zero() public {
         vm.prank(address(minter));
         vm.expectRevert(bytes(KASSETROUTER_ZERO_AMOUNT));
-        assetRouter.kAssetRequestPull(tokens.usdc, 0, TEST_BATCH_ID);
+        assetRouter.kAssetPush(USDC, 0, TEST_BATCH_ID);
     }
 
-    function test_KAssetRequestPull_OnlyKMinter() public {
+    function test_KAssetPush_Require_Only_KMinter() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KASSETROUTER_ONLY_KMINTER));
-        assetRouter.kAssetRequestPull(tokens.usdc, TEST_AMOUNT, TEST_BATCH_ID);
+        assetRouter.kAssetPush(USDC, TEST_AMOUNT, TEST_BATCH_ID);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_KMINTER));
+        assetRouter.kAssetPush(USDC, TEST_AMOUNT, TEST_BATCH_ID);
     }
 
     /* //////////////////////////////////////////////////////////////
-                    STAKING VAULT INTEGRATION TESTS
+                        kAssetRequestPull
+    //////////////////////////////////////////////////////////////*/
+
+    function test_KAssetRequestPull_Success() public {
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
+
+        IVaultAdapter _adapter = IVaultAdapter(registry.getAdapter(address(minter), USDC));
+        vm.prank(address(assetRouter));
+        _adapter.setTotalAssets(_amount);
+
+        vm.prank(address(minter));
+        vm.expectEmit(true, true, true, true);
+        emit IkAssetRouter.AssetsRequestPulled(address(minter), USDC, _amount);
+        assetRouter.kAssetRequestPull(USDC, _amount, _batchId);
+
+        (uint256 _deposited, uint256 _requested) = assetRouter.getBatchIdBalances(address(minter), _batchId);
+        assertEq(_requested, _amount);
+        assertEq(_deposited, 0);
+    }
+
+    function test_KAssetRequestPull_Require_Not_Paused() public {
+        vm.prank(users.emergencyAdmin);
+        assetRouter.setPaused(true);
+
+        vm.prank(address(minter));
+        vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
+        assetRouter.kAssetRequestPull(USDC, TEST_AMOUNT, TEST_BATCH_ID);
+    }
+
+    function test_KAssetRequestPull_Require_Amount_Not_Zero() public {
+        vm.prank(address(minter));
+        vm.expectRevert(bytes(KASSETROUTER_ZERO_AMOUNT));
+        assetRouter.kAssetRequestPull(USDC, 0, TEST_BATCH_ID);
+    }
+
+    function test_KAssetRequestPull_Require_Only_KMinter() public {
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_KMINTER));
+        assetRouter.kAssetRequestPull(USDC, TEST_AMOUNT, TEST_BATCH_ID);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_KMINTER));
+        assetRouter.kAssetRequestPull(USDC, TEST_AMOUNT, TEST_BATCH_ID);
+    }
+
+    function test_KAssetRequestPull_Require_Virtual_Balance() public {
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
+
+        vm.prank(address(minter));
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        assetRouter.kAssetRequestPull(DAI, _amount, _batchId);
+
+        vm.prank(address(minter));
+        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
+        assetRouter.kAssetRequestPull(USDC, _amount, _batchId);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                            kAssetTransfer
     //////////////////////////////////////////////////////////////*/
 
     function test_KAssetTransfer_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        bytes32 batchId = TEST_BATCH_ID;
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
+
+        IVaultAdapter _sourceAdapter = IVaultAdapter(registry.getAdapter(address(alphaVault), USDC));
+        vm.prank(address(assetRouter));
+        _sourceAdapter.setTotalAssets(_amount);
 
         vm.prank(address(alphaVault));
-        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
-        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), tokens.usdc, amount, batchId);
+        vm.expectEmit(true, true, true, true);
+        emit IkAssetRouter.AssetsTransfered(address(alphaVault), address(betaVault), USDC, _amount);
+
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
+
+        (uint256 _alphaDeposited, uint256 _alphaRequested) =
+            assetRouter.getBatchIdBalances(address(alphaVault), _batchId);
+        (uint256 _betaDeposited, uint256 _betaRequested) = assetRouter.getBatchIdBalances(address(betaVault), _batchId);
+
+        assertEq(_alphaRequested, _amount);
+        assertEq(_alphaDeposited, 0);
+        assertEq(_betaDeposited, _amount);
+        assertEq(_betaRequested, 0);
     }
 
-    function test_KAssetTransfer_RevertInsufficientBalance() public {
-        // No virtual balance setup - should revert
+    function test_KAssetTransfer_Require_Not_Paused() public {
+        vm.prank(users.emergencyAdmin);
+        assetRouter.setPaused(true);
+
         vm.prank(address(alphaVault));
-        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
-        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), tokens.usdc, TEST_AMOUNT, TEST_BATCH_ID);
+        vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, TEST_AMOUNT, TEST_BATCH_ID);
     }
 
-    function test_KAssetTransfer_RevertZeroAmount() public {
+    function test_KAssetTransfer_Require_Amount_Not_Zero() public {
         vm.prank(address(alphaVault));
         vm.expectRevert(bytes(KASSETROUTER_ZERO_AMOUNT));
-        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), tokens.usdc, 0, TEST_BATCH_ID);
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, 0, TEST_BATCH_ID);
     }
 
-    function test_KAssetTransfer_OnlyStakingVault() public {
+    function test_KAssetTransfer_Require_Only_KStaking_Vault() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
-        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), tokens.usdc, TEST_AMOUNT, TEST_BATCH_ID);
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, TEST_AMOUNT, TEST_BATCH_ID);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, TEST_AMOUNT, TEST_BATCH_ID);
+
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, TEST_AMOUNT, TEST_BATCH_ID);
     }
+
+    function test_KAssetTransfer_Require_Virtual_Balance() public {
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
+
+        vm.prank(address(alphaVault));
+        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
+
+        IVaultAdapter _sourceAdapter = IVaultAdapter(registry.getAdapter(address(alphaVault), USDC));
+        vm.prank(address(assetRouter));
+        _sourceAdapter.setTotalAssets(_amount - 1);
+
+        vm.prank(address(alphaVault));
+        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
+    }
+
+    function test_KAssetTransfer_Require_Virtual_Balance_Cumulative() public {
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
+
+        IVaultAdapter _sourceAdapter = IVaultAdapter(registry.getAdapter(address(alphaVault), USDC));
+        vm.prank(address(assetRouter));
+        _sourceAdapter.setTotalAssets(_amount);
+
+        vm.prank(address(alphaVault));
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
+
+        vm.prank(address(alphaVault));
+        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
+        assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, 1, _batchId);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                            kSharesRequestPush
+    //////////////////////////////////////////////////////////////*/
 
     function test_KSharesRequestPush_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        bytes32 batchId = TEST_BATCH_ID;
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
 
-        // Only staking vault can call this function
         vm.prank(address(alphaVault));
         vm.expectEmit(true, true, false, true);
-        emit IkAssetRouter.SharesRequestedPushed(address(alphaVault), batchId, amount);
+        emit IkAssetRouter.SharesRequestedPushed(address(alphaVault), _batchId, _amount);
+        assetRouter.kSharesRequestPush(address(alphaVault), _amount, _batchId);
 
-        assetRouter.kSharesRequestPush(address(alphaVault), amount, batchId);
-
-        // Verify shares are tracked correctly
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), amount, "Requested shares incorrect");
+        assertEq(assetRouter.getRequestedShares(address(alphaVault), _batchId), _amount);
     }
 
-    function test_KSharesRequestPush_RevertZeroAmount() public {
+    function test_KSharesRequestPush_Require_Not_Paused() public {
+        vm.prank(users.emergencyAdmin);
+        assetRouter.setPaused(true);
+
+        vm.prank(address(alphaVault));
+        vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
+        assetRouter.kSharesRequestPush(address(alphaVault), TEST_AMOUNT, TEST_BATCH_ID);
+    }
+
+    function test_KSharesRequestPush_Require_Amount_Not_Zero() public {
         vm.prank(address(alphaVault));
         vm.expectRevert(bytes(KASSETROUTER_ZERO_AMOUNT));
         assetRouter.kSharesRequestPush(address(alphaVault), 0, TEST_BATCH_ID);
     }
 
-    function test_KSharesRequestPush_OnlyStakingVault() public {
+    function test_KSharesRequestPush_Require_Only_KStaking_Vault() public {
         vm.prank(users.alice);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
+        assetRouter.kSharesRequestPush(address(alphaVault), TEST_AMOUNT, TEST_BATCH_ID);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
+        assetRouter.kSharesRequestPush(address(alphaVault), TEST_AMOUNT, TEST_BATCH_ID);
+
+        vm.prank(users.owner);
         vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
         assetRouter.kSharesRequestPush(address(alphaVault), TEST_AMOUNT, TEST_BATCH_ID);
     }
 
+    /* //////////////////////////////////////////////////////////////
+                            kSharesRequestPull
+    //////////////////////////////////////////////////////////////*/
+
     function test_KSharesRequestPull_Success() public {
-        uint256 amount = TEST_AMOUNT;
-        bytes32 batchId = TEST_BATCH_ID;
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
 
-        // First push some shares
         vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPush(address(alphaVault), amount, batchId);
+        assetRouter.kSharesRequestPush(address(alphaVault), _amount, _batchId);
 
-        // Then pull them back
         vm.prank(address(alphaVault));
         vm.expectEmit(true, true, false, true);
-        emit IkAssetRouter.SharesRequestedPulled(address(alphaVault), batchId, amount);
+        emit IkAssetRouter.SharesRequestedPulled(address(alphaVault), _batchId, _amount);
+        assetRouter.kSharesRequestPull(address(alphaVault), _amount, _batchId);
 
-        assetRouter.kSharesRequestPull(address(alphaVault), amount, batchId);
-
-        // Verify shares are back to zero
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), 0, "Requested shares should be zero");
+        assertEq(assetRouter.getRequestedShares(address(alphaVault), _batchId), 0);
     }
 
-    function test_KSharesRequestPull_RevertZeroAmount() public {
+    function test_KSharesRequestPull_Require_Not_Paused() public {
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
+
+        vm.prank(address(alphaVault));
+        assetRouter.kSharesRequestPush(address(alphaVault), _amount, _batchId);
+
+        vm.prank(users.emergencyAdmin);
+        assetRouter.setPaused(true);
+
+        vm.prank(address(alphaVault));
+        vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
+        assetRouter.kSharesRequestPull(address(alphaVault), _amount, _batchId);
+    }
+
+    function test_KSharesRequestPull_Require_Amount_Not_Zero() public {
         vm.prank(address(alphaVault));
         vm.expectRevert(bytes(KASSETROUTER_ZERO_AMOUNT));
         assetRouter.kSharesRequestPull(address(alphaVault), 0, TEST_BATCH_ID);
     }
 
-    function test_KSharesRequestPull_OnlyStakingVault() public {
+    function test_KSharesRequestPull_Require_Only_KStaking_Vault() public {
         vm.prank(users.alice);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
+        assetRouter.kSharesRequestPull(address(alphaVault), TEST_AMOUNT, TEST_BATCH_ID);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
+        assetRouter.kSharesRequestPull(address(alphaVault), TEST_AMOUNT, TEST_BATCH_ID);
+
+        vm.prank(users.admin);
         vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
         assetRouter.kSharesRequestPull(address(alphaVault), TEST_AMOUNT, TEST_BATCH_ID);
     }
 
-    function test_KSharesRequestPull_RevertInsufficientBalance() public {
-        // Try to pull without pushing first
+    function test_KSharesRequestPull_Require_Sufficient_Balance() public {
         vm.prank(address(alphaVault));
         vm.expectRevert();
         assetRouter.kSharesRequestPull(address(alphaVault), TEST_AMOUNT, TEST_BATCH_ID);
+    }
+
+    function test_KSharesRequestPull_Require_Sufficient_Balance_ExceedsRequested() public {
+        uint256 _amount = TEST_AMOUNT;
+        bytes32 _batchId = TEST_BATCH_ID;
+
+        vm.prank(address(alphaVault));
+        assetRouter.kSharesRequestPush(address(alphaVault), _amount, _batchId);
+
+        vm.prank(address(alphaVault));
+        vm.expectRevert(bytes(KASSETROUTER_NEGATIVE_SHARES));
+        assetRouter.kSharesRequestPull(address(alphaVault), _amount + 1, _batchId);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -265,68 +426,53 @@ contract kAssetRouterTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_ProposeSettleBatch_Success() public {
-        bytes32 batchId = TEST_BATCH_ID;
+        bytes32 _batchId = dnVault.getBatchId();
 
         vm.prank(users.relayer);
-        dnVault.closeBatch(batchId, true);
+        dnVault.closeBatch(_batchId, true);
 
-        // Propose settlement
         vm.prank(users.relayer);
         vm.expectEmit(false, true, true, false);
         emit IkAssetRouter.SettlementProposed(
-            bytes32(0), // We don't know the exact proposalId yet
-            address(dnVault),
-            batchId,
-            TEST_TOTAL_ASSETS,
-            0,
-            0,
-            block.timestamp + 1, // executeAfter with 1 second cooldown,
-            0,
-            0
+            bytes32(0), address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0, block.timestamp + 1, 0, 0
         );
 
-        testProposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Verify proposal was stored correctly
-        IkAssetRouter.VaultSettlementProposal memory proposal = assetRouter.getSettlementProposal(testProposalId);
-        assertEq(proposal.asset, tokens.usdc, "Asset incorrect");
-        assertEq(proposal.vault, address(dnVault), "Vault incorrect");
-        assertEq(proposal.batchId, batchId, "BatchId incorrect");
-        assertEq(proposal.totalAssets, TEST_TOTAL_ASSETS, "Total assets incorrect");
-        assertEq(proposal.netted, 0, "Netted amount incorrect");
-        assertEq(uint256(proposal.yield), TEST_TOTAL_ASSETS, "Yield incorrect");
-        assertEq(proposal.executeAfter, block.timestamp + 1, "ExecuteAfter incorrect");
+        IkAssetRouter.VaultSettlementProposal memory _proposal = assetRouter.getSettlementProposal(testProposalId);
+        assertEq(_proposal.asset, USDC);
+        assertEq(_proposal.vault, address(dnVault));
+        assertEq(_proposal.batchId, _batchId);
+        assertEq(_proposal.totalAssets, TEST_TOTAL_ASSETS);
+        assertEq(_proposal.netted, 0);
+        assertEq(uint256(_proposal.yield), TEST_TOTAL_ASSETS);
+        assertEq(_proposal.executeAfter, block.timestamp + 1);
     }
 
     function test_ProposeSettleBatch_OnlyRelayer() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KASSETROUTER_WRONG_ROLE));
-        assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
+        assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
     }
 
     function test_ProposeSettleBatch_RevertWhenPaused() public {
-        // Pause contract
         vm.prank(users.emergencyAdmin);
         assetRouter.setPaused(true);
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
-        assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
+        assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
     }
 
     function test_ExecuteSettleBatch_AfterCooldown() public {
         vm.prank(users.relayer);
         dnVault.closeBatch(TEST_BATCH_ID, true);
 
-        // Create a proposal
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Wait for cooldown (1 second in our setup)
         vm.warp(block.timestamp + 2);
 
-        // Anyone should be able to execute after cooldown
         vm.prank(users.alice);
         assetRouter.executeSettleBatch(testProposalId);
     }
@@ -335,12 +481,9 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         dnVault.closeBatch(TEST_BATCH_ID, true);
 
-        // Create a proposal
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Try to execute immediately (should fail due to cooldown)
         vm.prank(users.alice);
         vm.expectRevert(bytes(KASSETROUTER_COOLDOOWN_IS_UP));
         assetRouter.executeSettleBatch(testProposalId);
@@ -359,50 +502,40 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         dnVault.closeBatch(TEST_BATCH_ID, true);
 
-        // Create a proposal
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Wait for cooldown
         vm.warp(block.timestamp + 2);
 
-        // Pause contract
         vm.prank(users.emergencyAdmin);
         assetRouter.setPaused(true);
 
-        // Try to execute
         vm.prank(users.alice);
         vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
         assetRouter.executeSettleBatch(testProposalId);
     }
 
     function test_CanExecuteProposal() public {
-        // Test non-existent proposal
         bytes32 fakeProposalId = keccak256("fake");
         (bool canExecute, string memory reason) = assetRouter.canExecuteProposal(fakeProposalId);
-        assertFalse(canExecute, "Should not be able to execute non-existent proposal");
-        assertEq(reason, "Proposal not found", "Reason incorrect");
+        assertFalse(canExecute);
+        assertEq(reason, "Proposal not found");
 
         vm.prank(users.relayer);
         dnVault.closeBatch(TEST_BATCH_ID, true);
 
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Test before cooldown
         (canExecute, reason) = assetRouter.canExecuteProposal(testProposalId);
-        assertFalse(canExecute, "Should not be able to execute before cooldown");
-        assertEq(reason, "Cooldown not passed", "Reason incorrect");
+        assertFalse(canExecute);
+        assertEq(reason, "Cooldown not passed");
 
-        // Wait for cooldown
         vm.warp(block.timestamp + 2);
 
-        // Test after cooldown
         (canExecute, reason) = assetRouter.canExecuteProposal(testProposalId);
-        assertTrue(canExecute, "Should be able to execute after cooldown");
-        assertEq(reason, "", "Reason should be empty");
+        assertTrue(canExecute);
+        assertEq(reason, "");
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -418,7 +551,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         assetRouter.setSettlementCooldown(newCooldown);
 
-        assertEq(assetRouter.getSettlementCooldown(), newCooldown, "Cooldown not updated");
+        assertEq(assetRouter.getSettlementCooldown(), newCooldown);
     }
 
     function test_SetSettlementCooldown_OnlyAdmin() public {
@@ -432,7 +565,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_SetPaused_Success() public {
-        assertFalse(assetRouter.isPaused(), "Should be unpaused initially");
+        assertFalse(assetRouter.isPaused());
 
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(false, false, false, true);
@@ -440,13 +573,12 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         assetRouter.setPaused(true);
 
-        assertTrue(assetRouter.isPaused(), "Should be paused");
+        assertTrue(assetRouter.isPaused());
 
-        // Test unpause
         vm.prank(users.emergencyAdmin);
         assetRouter.setPaused(false);
 
-        assertFalse(assetRouter.isPaused(), "Should be unpaused");
+        assertFalse(assetRouter.isPaused());
     }
 
     function test_SetPaused_OnlyEmergencyAdmin() public {
@@ -462,57 +594,45 @@ contract kAssetRouterTest is DeploymentBaseTest {
     function test_GetBatchIdBalances() public view {
         bytes32 batchId = TEST_BATCH_ID;
 
-        // Initially zero for any vault/batch combination
         (uint256 dep, uint256 req) = assetRouter.getBatchIdBalances(address(alphaVault), batchId);
-        assertEq(dep, 0, "Deposited should be zero initially");
-        assertEq(req, 0, "Requested should be zero initially");
+        assertEq(dep, 0);
+        assertEq(req, 0);
 
-        // Test with different vault
         (dep, req) = assetRouter.getBatchIdBalances(address(dnVault), batchId);
-        assertEq(dep, 0, "DN vault deposited should be zero initially");
-        assertEq(req, 0, "DN vault requested should be zero initially");
+        assertEq(dep, 0);
+        assertEq(req, 0);
     }
 
     function test_GetBatchIdBalances_WithData() public {
         bytes32 batchId = TEST_BATCH_ID;
         uint256 depositAmount = TEST_AMOUNT;
 
-        // Deposit via kMinter
         mockUSDC.mint(address(minter), depositAmount);
         vm.prank(address(minter));
-        // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        IERC20(tokens.usdc).transfer(address(assetRouter), depositAmount);
+        IERC20(USDC).transfer(address(assetRouter), depositAmount);
         vm.prank(address(minter));
-        assetRouter.kAssetPush(tokens.usdc, depositAmount, batchId);
+        assetRouter.kAssetPush(USDC, depositAmount, batchId);
 
-        // Verify deposit balance
         (uint256 dep, uint256 req) = assetRouter.getBatchIdBalances(address(minter), batchId);
-        assertEq(dep, depositAmount, "Deposited amount incorrect");
-        assertEq(req, 0, "Requested should be zero without request");
+        assertEq(dep, depositAmount);
+        assertEq(req, 0);
     }
 
     function test_GetRequestedShares() public {
         uint256 amount = TEST_AMOUNT;
         bytes32 batchId = TEST_BATCH_ID;
 
-        // Initially zero
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), 0, "Should be zero initially");
+        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), 0);
 
-        // Push shares first
         vm.prank(address(alphaVault));
         assetRouter.kSharesRequestPush(address(alphaVault), amount, batchId);
 
-        assertEq(
-            assetRouter.getRequestedShares(address(alphaVault), batchId),
-            amount,
-            "Should return correct requested shares after push"
-        );
+        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), amount);
 
-        // Pull shares back
         vm.prank(address(alphaVault));
         assetRouter.kSharesRequestPull(address(alphaVault), amount, batchId);
 
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), 0, "Should be zero after pull");
+        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), 0);
     }
 
     function test_GetRequestedShares_MultipleBatches() public {
@@ -521,66 +641,58 @@ contract kAssetRouterTest is DeploymentBaseTest {
         bytes32 batchId1 = TEST_BATCH_ID;
         bytes32 batchId2 = bytes32(uint256(TEST_BATCH_ID) + 1);
 
-        // Push shares for different batches
         vm.prank(address(alphaVault));
         assetRouter.kSharesRequestPush(address(alphaVault), amount1, batchId1);
 
         vm.prank(address(alphaVault));
         assetRouter.kSharesRequestPush(address(alphaVault), amount2, batchId2);
 
-        // Verify each batch tracks separately
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId1), amount1, "Batch 1 shares incorrect");
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId2), amount2, "Batch 2 shares incorrect");
+        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId1), amount1);
+        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId2), amount2);
     }
 
     function test_GetSettlementProposal() public {
-        // Test non-existent proposal
         bytes32 fakeProposalId = keccak256("fake");
         IkAssetRouter.VaultSettlementProposal memory proposal = assetRouter.getSettlementProposal(fakeProposalId);
-        assertEq(proposal.executeAfter, 0, "Non-existent proposal should have zero executeAfter");
+        assertEq(proposal.executeAfter, 0);
 
         vm.prank(users.relayer);
         dnVault.closeBatch(TEST_BATCH_ID, true);
 
-        // Create a proposal
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Get and verify proposal
         proposal = assetRouter.getSettlementProposal(testProposalId);
-        assertEq(proposal.asset, tokens.usdc, "Asset incorrect");
-        assertEq(proposal.vault, address(dnVault), "Vault incorrect");
-        assertEq(proposal.batchId, TEST_BATCH_ID, "BatchId incorrect");
-        assertEq(proposal.totalAssets, TEST_TOTAL_ASSETS, "Total assets incorrect");
-        assertEq(proposal.netted, 0, "Netted incorrect");
-        assertEq(uint256(proposal.yield), TEST_TOTAL_ASSETS, "Yield incorrect");
-        assertGt(proposal.executeAfter, 0, "executeAfter should be set");
+        assertEq(proposal.asset, USDC);
+        assertEq(proposal.vault, address(dnVault));
+        assertEq(proposal.batchId, TEST_BATCH_ID);
+        assertEq(proposal.totalAssets, TEST_TOTAL_ASSETS);
+        assertEq(proposal.netted, 0);
+        assertEq(uint256(proposal.yield), TEST_TOTAL_ASSETS);
+        assertGt(proposal.executeAfter, 0);
     }
 
     function test_GetSettlementCooldown() public {
-        // Initially set to 1 second in setUp
-        assertEq(assetRouter.getSettlementCooldown(), 1, "Initial cooldown incorrect");
+        assertEq(assetRouter.getSettlementCooldown(), 1);
 
-        // Change cooldown
         uint256 newCooldown = 5 hours;
         vm.prank(users.admin);
         assetRouter.setSettlementCooldown(newCooldown);
 
-        assertEq(assetRouter.getSettlementCooldown(), newCooldown, "Updated cooldown incorrect");
+        assertEq(assetRouter.getSettlementCooldown(), newCooldown);
     }
 
     function test_GetRegistry() public view {
-        assertEq(address(assetRouter.registry()), address(registry), "Registry address incorrect");
+        assertEq(address(assetRouter.registry()), address(registry));
     }
 
     function test_IsPaused() public {
-        assertFalse(assetRouter.isPaused(), "Should be unpaused initially");
+        assertFalse(assetRouter.isPaused());
 
         vm.prank(users.emergencyAdmin);
         assetRouter.setPaused(true);
 
-        assertTrue(assetRouter.isPaused(), "Should be paused after setPaused");
+        assertTrue(assetRouter.isPaused());
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -588,20 +700,19 @@ contract kAssetRouterTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_ContractInfo() public view {
-        assertEq(assetRouter.contractName(), "kAssetRouter", "Contract name incorrect");
-        assertEq(assetRouter.contractVersion(), "1.0.0", "Contract version incorrect");
+        assertEq(assetRouter.contractName(), "kAssetRouter");
+        assertEq(assetRouter.contractVersion(), "1.0.0");
     }
 
     function test_ReceiveETH() public {
         uint256 amount = 1 ether;
 
-        // Send ETH to contract
         vm.deal(users.alice, amount);
         vm.prank(users.alice);
         (bool success,) = address(assetRouter).call{ value: amount }("");
 
-        assertTrue(success, "ETH transfer should succeed");
-        assertEq(address(assetRouter).balance, amount, "Contract should receive ETH");
+        assertTrue(success);
+        assertEq(address(assetRouter).balance, amount);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -611,17 +722,14 @@ contract kAssetRouterTest is DeploymentBaseTest {
     function test_AuthorizeUpgrade_OnlyAdmin() public {
         address newImpl = address(new kAssetRouter());
 
-        // Non-admin should fail
         vm.prank(users.alice);
         vm.expectRevert(bytes(KASSETROUTER_WRONG_ROLE));
         assetRouter.upgradeToAndCall(newImpl, "");
 
-        // Test authorization check passes for admin
-        assertTrue(true, "Authorization test completed");
+        assertTrue(true);
     }
 
     function test_AuthorizeUpgrade_RevertZeroAddress() public {
-        // Should revert when trying to upgrade to zero address
         vm.prank(users.admin);
         vm.expectRevert(bytes(KASSETROUTER_ZERO_ADDRESS));
         assetRouter.upgradeToAndCall(address(0), "");
@@ -632,19 +740,17 @@ contract kAssetRouterTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_MaximumAmounts() public {
-        uint256 maxAmount = type(uint128).max; // Large amount within limits
+        uint256 maxAmount = type(uint128).max;
         bytes32 batchId = TEST_BATCH_ID;
 
-        // Test with maximum amount in asset push
         mockUSDC.mint(address(minter), maxAmount);
         vm.prank(address(minter));
-        // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        IERC20(tokens.usdc).transfer(address(assetRouter), maxAmount);
+        IERC20(USDC).transfer(address(assetRouter), maxAmount);
         vm.prank(address(minter));
-        assetRouter.kAssetPush(tokens.usdc, maxAmount, batchId);
+        assetRouter.kAssetPush(USDC, maxAmount, batchId);
 
         (uint256 deposited,) = assetRouter.getBatchIdBalances(address(minter), batchId);
-        assertEq(deposited, maxAmount, "Max amount deposit failed");
+        assertEq(deposited, maxAmount);
     }
 
     function test_MultiAssetSupport() public {
@@ -652,28 +758,23 @@ contract kAssetRouterTest is DeploymentBaseTest {
         bytes32 batchId2 = bytes32(uint256(TEST_BATCH_ID) + 1);
         uint256 amount = TEST_AMOUNT;
 
-        // Test USDC
         mockUSDC.mint(address(minter), amount);
         vm.prank(address(minter));
-        // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        IERC20(tokens.usdc).transfer(address(assetRouter), amount);
+        IERC20(USDC).transfer(address(assetRouter), amount);
         vm.prank(address(minter));
-        assetRouter.kAssetPush(tokens.usdc, amount, batchId1);
+        assetRouter.kAssetPush(USDC, amount, batchId1);
 
-        // Test WBTC
         mockWBTC.mint(address(minter), amount);
         vm.prank(address(minter));
-        // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        IERC20(tokens.wbtc).transfer(address(assetRouter), amount);
+        IERC20(WBTC).transfer(address(assetRouter), amount);
         vm.prank(address(minter));
-        assetRouter.kAssetPush(tokens.wbtc, amount, batchId2);
+        assetRouter.kAssetPush(WBTC, amount, batchId2);
 
-        // Verify both assets are handled separately
         (uint256 usdcDep,) = assetRouter.getBatchIdBalances(address(minter), batchId1);
         (uint256 wbtcDep,) = assetRouter.getBatchIdBalances(address(minter), batchId2);
 
-        assertEq(usdcDep, amount, "tokens.usdc deposit failed");
-        assertEq(wbtcDep, amount, "WBTC deposit failed");
+        assertEq(usdcDep, amount);
+        assertEq(wbtcDep, amount);
     }
 
     function test_BatchIdCollisionResistance() public {
@@ -681,27 +782,24 @@ contract kAssetRouterTest is DeploymentBaseTest {
         bytes32 batchId2 = keccak256(abi.encode("batch2"));
         uint256 amount = TEST_AMOUNT;
 
-        // Same vault, different batch IDs should be independent
         vm.prank(address(alphaVault));
         assetRouter.kSharesRequestPush(address(alphaVault), amount, batchId1);
 
         vm.prank(address(alphaVault));
         assetRouter.kSharesRequestPush(address(alphaVault), amount * 2, batchId2);
 
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId1), amount, "Batch 1 collision");
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId2), amount * 2, "Batch 2 collision");
+        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId1), amount);
+        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId2), amount * 2);
     }
 
     function test_ReentrancyProtection() public {
         vm.prank(users.relayer);
         dnVault.closeBatch(TEST_BATCH_ID, true);
 
-        // Create a proposal first
         vm.prank(users.relayer);
         bytes32 proposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
+            assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Wait for cooldown
         vm.warp(block.timestamp + 2);
 
         vm.prank(users.alice);
@@ -709,36 +807,31 @@ contract kAssetRouterTest is DeploymentBaseTest {
     }
 
     function test_ExtremeCooldownValues() public {
-        // Test setting maximum allowed cooldown (1 day)
         uint256 maxCooldown = 1 days;
         vm.prank(users.admin);
         assetRouter.setSettlementCooldown(maxCooldown);
-        assertEq(assetRouter.getSettlementCooldown(), maxCooldown, "Max cooldown failed");
+        assertEq(assetRouter.getSettlementCooldown(), maxCooldown);
 
-        // Test setting back to small value
         vm.prank(users.admin);
         assetRouter.setSettlementCooldown(1);
-        assertEq(assetRouter.getSettlementCooldown(), 1, "Small cooldown failed");
+        assertEq(assetRouter.getSettlementCooldown(), 1);
 
-        // Test that exceeding max cooldown reverts
         vm.prank(users.admin);
         vm.expectRevert(bytes(KASSETROUTER_INVALID_COOLDOWN));
         assetRouter.setSettlementCooldown(2 days);
     }
 
     function test_PausedStateCoverage() public {
-        // Pause contract
         vm.prank(users.emergencyAdmin);
         assetRouter.setPaused(true);
 
-        // All critical functions should revert when paused
         vm.prank(address(minter));
         vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
-        assetRouter.kAssetPush(tokens.usdc, TEST_AMOUNT, TEST_BATCH_ID);
+        assetRouter.kAssetPush(USDC, TEST_AMOUNT, TEST_BATCH_ID);
 
         vm.prank(address(minter));
         vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
-        assetRouter.kAssetRequestPull(tokens.usdc, TEST_AMOUNT, TEST_BATCH_ID);
+        assetRouter.kAssetRequestPull(USDC, TEST_AMOUNT, TEST_BATCH_ID);
 
         vm.prank(address(alphaVault));
         vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
@@ -746,28 +839,24 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
-        assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
+        assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
 
-        // View functions should still work
-        assertEq(assetRouter.getSettlementCooldown(), 1, "View functions should work when paused");
+        assertEq(assetRouter.getSettlementCooldown(), 1);
     }
 
     function test_EventEmissions() public {
         uint256 amount = TEST_AMOUNT;
         bytes32 batchId = TEST_BATCH_ID;
 
-        // Test all events are properly emitted
         mockUSDC.mint(address(minter), amount);
         vm.prank(address(minter));
-        // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        IERC20(tokens.usdc).transfer(address(assetRouter), amount);
+        IERC20(USDC).transfer(address(assetRouter), amount);
 
         vm.prank(address(minter));
         vm.expectEmit(true, false, false, true);
         emit IkAssetRouter.AssetsPushed(address(minter), amount);
-        assetRouter.kAssetPush(tokens.usdc, amount, batchId);
+        assetRouter.kAssetPush(USDC, amount, batchId);
 
-        // Test share events
         vm.prank(address(alphaVault));
         vm.expectEmit(true, true, false, true);
         emit IkAssetRouter.SharesRequestedPushed(address(alphaVault), batchId, amount);
@@ -776,43 +865,20 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         dnVault.closeBatch(batchId, true);
 
-        // Test settlement proposal event
         vm.prank(users.relayer);
-        vm.expectEmit(false, true, true, false); // Don't check first indexed (proposalId)
+        vm.expectEmit(false, true, true, false);
         emit IkAssetRouter.SettlementProposed(
-            bytes32(0), // proposalId - we don't know it yet
+            bytes32(0),
             address(dnVault),
             batchId,
             TEST_TOTAL_ASSETS,
             TEST_NETTED,
-            // casting to 'int256' is safe because TEST_PROFIT fits in int256
-            // forge-lint: disable-next-line(unsafe-typecast)
             int256(TEST_PROFIT),
             block.timestamp + 1,
             0,
             0
         );
-        assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
-    }
-
-    function test_GasOptimization() public {
-        // Test multiple operations in single batch
-        bytes32 batchId = TEST_BATCH_ID;
-        uint256 amount = TEST_AMOUNT;
-
-        // Multiple shares requests should be gas efficient
-        uint256 gasStart = gasleft();
-
-        vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPush(address(alphaVault), amount, batchId);
-
-        vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPush(address(alphaVault), amount, batchId);
-
-        uint256 gasUsed = gasStart - gasleft();
-
-        // Verify operations complete successfully
-        assertTrue(gasUsed > 0, "Operations should consume gas");
+        assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -827,21 +893,20 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         // Step 1: Propose settlement
         vm.prank(users.relayer);
-        bytes32 proposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         // Step 2: Check cannot execute before cooldown
         (bool canExecute, string memory reason) = assetRouter.canExecuteProposal(proposalId);
-        assertFalse(canExecute, "Should not be able to execute immediately");
-        assertEq(reason, "Cooldown not passed", "Should indicate cooldown not passed");
+        assertFalse(canExecute);
+        assertEq(reason, "Cooldown not passed");
 
         // Step 3: Wait for cooldown
         vm.warp(block.timestamp + 2); // Wait 2 seconds (cooldown is 1 second)
 
         // Step 4: Verify can execute now
         (canExecute, reason) = assetRouter.canExecuteProposal(proposalId);
-        assertTrue(canExecute, "Should be able to execute after cooldown");
-        assertEq(reason, "", "No reason should be given when executable");
+        assertTrue(canExecute);
+        assertEq(reason, "");
     }
 
     function test_CancelProposal_Success() public {
@@ -850,18 +915,14 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         dnVault.closeBatch(batchId, true);
 
-        // Create proposal
         vm.prank(users.relayer);
-        bytes32 proposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Cancel proposal
         vm.prank(users.guardian);
         vm.expectEmit(true, true, true, false);
         emit IkAssetRouter.SettlementCancelled(proposalId, address(dnVault), batchId);
         assetRouter.cancelProposal(proposalId);
 
-        // Cannot execute cancelled proposal
         vm.prank(users.relayer);
         vm.warp(block.timestamp + 2);
         vm.expectRevert(bytes(KASSETROUTER_PROPOSAL_NOT_FOUND));
@@ -874,15 +935,12 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         dnVault.closeBatch(batchId, true);
 
-        // Create and cancel proposal
         vm.prank(users.relayer);
-        bytes32 proposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.prank(users.guardian);
         assetRouter.cancelProposal(proposalId);
 
-        // Try to cancel again
         vm.prank(users.guardian);
         vm.expectRevert(bytes(KASSETROUTER_PROPOSAL_NOT_FOUND));
         assetRouter.cancelProposal(proposalId);
@@ -894,17 +952,13 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         dnVault.closeBatch(batchId, true);
 
-        // Create first proposal
         vm.prank(users.relayer);
-        bytes32 proposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Create second proposal for same batch (different timestamp makes different ID)
         vm.warp(block.timestamp + 1);
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_BATCH_ID_PROPOSED));
-        proposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), batchId, TEST_TOTAL_ASSETS + 1000, 0, 0);
+        proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS + 1000, 0, 0);
     }
 
     function test_CooldownEdgeCases() public {
@@ -916,21 +970,16 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         dnVault.closeBatch(batchId, true);
 
-        // Create proposal
         vm.prank(users.relayer);
-        bytes32 proposalId =
-            assetRouter.proposeSettleBatch(tokens.usdc, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
-        // Test exactly at cooldown boundary (1 second)
         vm.warp(block.timestamp + 1);
 
-        // Should still not be executable (need to pass cooldown, not just reach it)
         vm.expectRevert(bytes(KASSETROUTER_COOLDOOWN_IS_UP));
         assetRouter.executeSettleBatch(proposalId);
 
-        // One more second should make it executable
         vm.warp(block.timestamp + 3);
         (bool canExecute,) = assetRouter.canExecuteProposal(proposalId);
-        assertTrue(canExecute, "Should be executable after cooldown");
+        assertTrue(canExecute);
     }
 }

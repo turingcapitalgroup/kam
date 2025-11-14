@@ -3,13 +3,9 @@ pragma solidity 0.8.30;
 
 import { _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
-import {
-    KMINTER_WRONG_ROLE,
-    KMINTER_ZERO_ADDRESS,
-    KBATCHRECEIVER_ZERO_ADDRESS
-} from "kam/src/errors/Errors.sol";
-import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
+import { KBATCHRECEIVER_ZERO_ADDRESS, KMINTER_WRONG_ROLE, KMINTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
+import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 
 contract kMinterBatchReceiversTest is DeploymentBaseTest {
     address USDC;
@@ -46,7 +42,7 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
         minter.createBatchReceiver(_batchId);
-    
+
         vm.prank(users.admin);
         vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
         minter.createBatchReceiver(_batchId);
@@ -54,7 +50,7 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
 
     function test_CreateBatchReceiver_Require_Valid_BatchId() public {
         bytes32 _batchId = keccak256("Banana");
-        vm.prank(router); 
+        vm.prank(router);
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
         // reverts on asset being address 0 from the $.batches[_batchId].asset;
         minter.createBatchReceiver(_batchId);
@@ -129,5 +125,4 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         vm.prank(router);
         _receiver = minter.createBatchReceiver(_batchId);
     }
-    
 }

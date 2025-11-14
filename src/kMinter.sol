@@ -14,6 +14,8 @@ import {
     KMINTER_BATCH_CLOSED,
     KMINTER_BATCH_MINT_REACHED,
     KMINTER_BATCH_NOT_CLOSED,
+    KMINTER_BATCH_NOT_SETTLED,
+    KMINTER_BATCH_NOT_VALID,
     KMINTER_BATCH_REDEEM_REACHED,
     KMINTER_BATCH_SETTLED,
     KMINTER_INSUFFICIENT_BALANCE,
@@ -22,9 +24,7 @@ import {
     KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
-    KMINTER_ZERO_AMOUNT,
-    KMINTER_BATCH_NOT_VALID,
-    KMINTER_BATCH_NOT_SETTLED
+    KMINTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
@@ -227,12 +227,12 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
         uint256 _amount = _burnRequest.amount;
         address _asset = _burnRequest.asset;
         address _recipient = _burnRequest.recipient;
-        bytes32 _batchId = _burnRequest.batchId; 
+        bytes32 _batchId = _burnRequest.batchId;
 
         // Validate request exists and belongs to the user
         require($.userRequests[_burnRequest.user].remove(_requestId), KMINTER_REQUEST_NOT_FOUND);
         require($.batches[_batchId].isSettled, KMINTER_BATCH_NOT_SETTLED);
-        
+
         address _batchReceiver = $.batches[_batchId].batchReceiver;
         require(_batchReceiver != address(0), KMINTER_ZERO_ADDRESS);
 
@@ -270,10 +270,10 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
         _checkRelayer(msg.sender);
         kMinterStorage storage $ = _getkMinterStorage();
         BatchInfo storage _batch = $.batches[_batchId];
-        require(_batch.asset != address(0), KMINTER_BATCH_NOT_VALID); 
+        address _batchAsset = _batch.asset;
+        require(_batchAsset != address(0), KMINTER_BATCH_NOT_VALID);
         require(!_batch.isClosed, KMINTER_BATCH_CLOSED);
 
-        address _batchAsset = _batch.asset;
         _batch.isClosed = true;
 
         bytes32 _newBatchId = _batchId;

@@ -38,6 +38,7 @@ string constant KASSETROUTER_ZERO_AMOUNT = "A18";
 string constant KASSETROUTER_INVALID_MAX_DELTA = "A19";
 string constant KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME = "A20";
 string constant KASSETROUTER_NOT_BATCH_CLOSED = "A21";
+string constant KASSETROUTER_NEGATIVE_SHARES = "A22";
 
 // Base Adapter Errors
 string constant ADAPTER_ALREADY_INITIALIZED = "BA1";
@@ -103,7 +104,6 @@ string constant KMINTER_BATCH_NOT_CLOSED = "M12";
 string constant KMINTER_BATCH_NOT_VALID = "M13";
 string constant KMINTER_BATCH_NOT_SETTLED = "M14";
 
-
 // kRegistry Errors
 string constant KREGISTRY_ADAPTER_ALREADY_SET = "R1";
 string constant KREGISTRY_ALREADY_REGISTERED = "R2";
@@ -146,6 +146,7 @@ string constant KSTAKINGVAULT_ZERO_ADDRESS = "SV8";
 string constant KSTAKINGVAULT_ZERO_AMOUNT = "SV9";
 string constant KSTAKINGVAULT_BATCH_LIMIT_REACHED = "SV10";
 string constant KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED = "SV11";
+string constant KSTAKINGVAULT_BATCH_NOT_VALID = "SV12";
 
 // kToken Errors
 string constant KTOKEN_IS_PAUSED = "T1";

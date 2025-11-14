@@ -16,6 +16,7 @@ import {
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_INVALID_COOLDOWN,
     KASSETROUTER_IS_PAUSED,
+    KASSETROUTER_NEGATIVE_SHARES,
     KASSETROUTER_NOT_BATCH_CLOSED,
     KASSETROUTER_NO_PROPOSAL,
     KASSETROUTER_ONLY_KMINTER,
@@ -246,8 +247,12 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
 
-        // Update batch tracking for settlement
-        $.vaultRequestedShares[_sourceVault][_batchId] -= _amount;
+        uint256 _requestedShares = $.vaultRequestedShares[_sourceVault][_batchId];
+        require(_requestedShares >= _amount, KASSETROUTER_NEGATIVE_SHARES);
+
+        unchecked {
+            $.vaultRequestedShares[_sourceVault][_batchId] = _requestedShares - _amount;
+        }
 
         emit SharesRequestedPulled(_sourceVault, _batchId, _amount);
         _unlockReentrant();
@@ -608,8 +613,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     /// @param _vault The vault address to calculate virtual balance for
     /// @return _balance The total virtual asset balance across all vault adapters
     function _virtualBalance(address _vault, address _asset) private view returns (uint256 _balance) {
-        _isVault(_vault);
-        _isAsset(_asset);
         IVaultAdapter _adapter = IVaultAdapter(_registry().getAdapter(_vault, _asset));
         _balance += _adapter.totalAssets();
     }

@@ -5,15 +5,20 @@ import { ADMIN_ROLE, EMERGENCY_ADMIN_ROLE, MINTER_ROLE, _1_USDC } from "../utils
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-import { KTOKEN_IS_PAUSED, KTOKEN_ZERO_ADDRESS, KTOKEN_ZERO_AMOUNT, KTOKEN_WRONG_ROLE } from "kam/src/errors/Errors.sol";
+import {
+    KTOKEN_IS_PAUSED,
+    KTOKEN_WRONG_ROLE,
+    KTOKEN_ZERO_ADDRESS,
+    KTOKEN_ZERO_AMOUNT
+} from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
 import { ERC20 } from "kam/src/vendor/solady/tokens/ERC20.sol";
 
 contract kTokenTest is DeploymentBaseTest {
-    uint256 internal constant MINT_AMOUNT = 100000 * _1_USDC;
-    uint256 internal constant BURN_AMOUNT = 50000 * _1_USDC;
+    uint256 internal constant MINT_AMOUNT = 100_000 * _1_USDC;
+    uint256 internal constant BURN_AMOUNT = 50_000 * _1_USDC;
     address internal constant ZERO_ADDRESS = address(0);
     address USDC;
     address WBTC;
@@ -281,7 +286,7 @@ contract kTokenTest is DeploymentBaseTest {
     function test_EmergencyWithdraw_ETH_Success() public {
         uint256 _amount = 1 ether;
         vm.deal(address(kUSD), _amount);
-        
+
         uint256 _balanceBefore = users.treasury.balance;
         vm.prank(users.emergencyAdmin);
         vm.expectEmit(true, true, true, true);
@@ -304,10 +309,7 @@ contract kTokenTest is DeploymentBaseTest {
 
         kUSD.emergencyWithdraw(USDC, users.treasury, _amount);
 
-        assertEq(
-            IERC20(tokens.usdc).balanceOf(users.treasury), 
-            _balanceBefore + _amount
-        );
+        assertEq(IERC20(tokens.usdc).balanceOf(users.treasury), _balanceBefore + _amount);
         assertEq(IERC20(tokens.usdc).balanceOf(address(kUSD)), 0);
     }
 

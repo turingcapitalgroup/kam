@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { 
-    ADMIN_ROLE, 
-    RELAYER_ROLE, 
-    VENDOR_ROLE,
-    MANAGER_ROLE
-} from "../utils/Constants.sol";
+import { ADMIN_ROLE, MANAGER_ROLE, RELAYER_ROLE, VENDOR_ROLE } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
@@ -77,7 +72,7 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
         vm.prank(users.owner);
         registry.grantRoles(users.bob, VENDOR_ROLE);
         assertTrue(registry.hasAnyRole(users.bob, VENDOR_ROLE));
-        
+
         vm.prank(users.owner);
         registry.revokeRoles(users.bob, VENDOR_ROLE);
         assertFalse(registry.hasAnyRole(users.bob, VENDOR_ROLE));
@@ -86,7 +81,7 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
     function test_RevokeRoles_Require_Only_Owner() public {
         vm.prank(users.owner);
         registry.grantRoles(users.bob, VENDOR_ROLE);
-        
+
         vm.prank(users.admin);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.revokeRoles(users.bob, VENDOR_ROLE);
@@ -94,7 +89,7 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
         vm.prank(users.alice);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.revokeRoles(users.bob, VENDOR_ROLE);
-        
+
         assertTrue(registry.hasAnyRole(users.bob, VENDOR_ROLE));
     }
 
@@ -106,7 +101,7 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
         vm.prank(users.admin);
         registry.grantVendorRole(users.bob);
         assertTrue(registry.hasAnyRole(users.bob, VENDOR_ROLE));
-        
+
         vm.prank(users.bob);
         registry.renounceRoles(VENDOR_ROLE);
         assertFalse(registry.hasAnyRole(users.bob, VENDOR_ROLE));
@@ -119,24 +114,24 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
     function test_TransferOwnership_Success() public {
         address _newOwner = users.bob;
         assertEq(registry.owner(), users.owner);
-        
+
         vm.prank(users.owner);
         registry.transferOwnership(_newOwner);
-        
+
         assertEq(registry.owner(), _newOwner);
     }
 
     function test_TransferOwnership_Require_Only_Owner() public {
         address _newOwner = users.bob;
-        
+
         vm.prank(users.admin);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.transferOwnership(_newOwner);
-        
+
         vm.prank(users.alice);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.transferOwnership(_newOwner);
-        
+
         assertEq(registry.owner(), users.owner);
     }
 
@@ -146,10 +141,10 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
 
     function test_RenounceOwnership_Success() public {
         assertEq(registry.owner(), users.owner);
-        
+
         vm.prank(users.owner);
         registry.renounceOwnership();
-        
+
         assertEq(registry.owner(), ZERO_ADDRESS);
     }
 
@@ -157,11 +152,11 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
         vm.prank(users.admin);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.renounceOwnership();
-        
+
         vm.prank(users.alice);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.renounceOwnership();
-        
+
         assertEq(registry.owner(), users.owner);
     }
 
@@ -177,21 +172,21 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
     function test_CompleteOwnershipHandover_Success() public {
         vm.prank(users.bob);
         registry.requestOwnershipHandover();
-        
+
         vm.prank(users.owner);
         registry.completeOwnershipHandover(users.bob);
-        
+
         assertEq(registry.owner(), users.bob);
     }
 
     function test_CompleteOwnershipHandover_Require_Only_Owner() public {
         vm.prank(users.bob);
         registry.requestOwnershipHandover();
-        
+
         vm.prank(users.admin);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.completeOwnershipHandover(users.bob);
-        
+
         assertEq(registry.owner(), users.owner);
     }
 
@@ -204,10 +199,10 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
     function test_CancelOwnershipHandover_Success() public {
         vm.prank(users.bob);
         registry.requestOwnershipHandover();
-        
+
         vm.prank(users.bob);
         registry.cancelOwnershipHandover();
-        
+
         vm.prank(users.owner);
         vm.expectRevert(Ownable.NoHandoverRequest.selector);
         registry.completeOwnershipHandover(users.bob);

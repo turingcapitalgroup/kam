@@ -25,10 +25,10 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
 
     function setUp() public override {
         DeploymentBaseTest.setUp();
-        
+
         // Cast registry to IAdapterGuardian to access module functions
         guardianModule = IAdapterGuardian(address(registry));
-        
+
         testAdapter = makeAddr("TestAdapter");
         testTarget = makeAddr("TestTarget");
         testParametersChecker = makeAddr("TestParametersChecker");
@@ -44,7 +44,7 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
         vm.expectEmit(true, true, true, true);
         emit IAdapterGuardian.SelectorAllowed(testAdapter, testTarget, testSelector, true);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         assertTrue(guardianModule.isAdapterSelectorAllowed(testAdapter, testTarget, testSelector));
         assertEq(guardianModule.getTargetType(testTarget), TEST_TARGET_TYPE);
     }
@@ -53,12 +53,12 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
         assertTrue(guardianModule.isAdapterSelectorAllowed(testAdapter, testTarget, testSelector));
-        
+
         vm.prank(users.admin);
         vm.expectEmit(true, true, true, true);
         emit IAdapterGuardian.SelectorAllowed(testAdapter, testTarget, testSelector, false);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, false);
-        
+
         assertFalse(guardianModule.isAdapterSelectorAllowed(testAdapter, testTarget, testSelector));
     }
 
@@ -95,7 +95,7 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
     function test_SetAdapterAllowedSelector_Require_Not_Already_Set() public {
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         vm.prank(users.admin);
         vm.expectRevert(bytes(GUARDIANMODULE_SELECTOR_ALREADY_SET));
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
@@ -108,22 +108,21 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
     function test_SetAdapterParametersChecker_Success() public {
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         vm.prank(users.admin);
         vm.expectEmit(true, true, true, true);
         emit IAdapterGuardian.ParametersCheckerSet(testAdapter, testTarget, testSelector, testParametersChecker);
         guardianModule.setAdapterParametersChecker(testAdapter, testTarget, testSelector, testParametersChecker);
-        
+
         assertEq(
-            guardianModule.getAdapterParametersChecker(testAdapter, testTarget, testSelector),
-            testParametersChecker
+            guardianModule.getAdapterParametersChecker(testAdapter, testTarget, testSelector), testParametersChecker
         );
     }
 
     function test_SetAdapterParametersChecker_Require_Only_Admin() public {
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         vm.prank(users.alice);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         guardianModule.setAdapterParametersChecker(testAdapter, testTarget, testSelector, testParametersChecker);
@@ -156,7 +155,7 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
     function test_AuthorizeAdapterCall_Success() public {
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         vm.prank(testAdapter);
         guardianModule.authorizeAdapterCall(testTarget, testSelector, "");
     }
@@ -173,35 +172,34 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
 
     function test_IsAdapterSelectorAllowed() public {
         assertFalse(guardianModule.isAdapterSelectorAllowed(testAdapter, testTarget, testSelector));
-        
+
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         assertTrue(guardianModule.isAdapterSelectorAllowed(testAdapter, testTarget, testSelector));
     }
 
     function test_GetAdapterParametersChecker() public {
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         assertEq(guardianModule.getAdapterParametersChecker(testAdapter, testTarget, testSelector), ZERO_ADDRESS);
-        
+
         vm.prank(users.admin);
         guardianModule.setAdapterParametersChecker(testAdapter, testTarget, testSelector, testParametersChecker);
-        
+
         assertEq(
-            guardianModule.getAdapterParametersChecker(testAdapter, testTarget, testSelector),
-            testParametersChecker
+            guardianModule.getAdapterParametersChecker(testAdapter, testTarget, testSelector), testParametersChecker
         );
     }
 
     function test_GetAdapterTargets() public {
         address[] memory _targets = guardianModule.getAdapterTargets(testAdapter);
         assertEq(_targets.length, 0);
-        
+
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         _targets = guardianModule.getAdapterTargets(testAdapter);
         assertEq(_targets.length, 1);
         assertEq(_targets[0], testTarget);
@@ -209,33 +207,33 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
 
     function test_GetTargetType() public {
         assertEq(guardianModule.getTargetType(testTarget), 0);
-        
+
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         assertEq(guardianModule.getTargetType(testTarget), TEST_TARGET_TYPE);
     }
 
     function test_GetAdapterTargets_Multiple() public {
         address _target2 = makeAddr("TestTarget2");
         bytes4 _selector2 = bytes4(keccak256("testFunction2()"));
-        
+
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-        
+
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, _target2, TEST_TARGET_TYPE, _selector2, true);
-        
+
         address[] memory _targets = guardianModule.getAdapterTargets(testAdapter);
         assertEq(_targets.length, 2);
-        
+
         bool _hasTarget1;
         bool _hasTarget2;
         for (uint256 _i; _i < _targets.length; _i++) {
             if (_targets[_i] == testTarget) _hasTarget1 = true;
             if (_targets[_i] == _target2) _hasTarget2 = true;
         }
-        
+
         assertTrue(_hasTarget1);
         assertTrue(_hasTarget2);
     }
