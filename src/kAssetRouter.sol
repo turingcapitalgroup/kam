@@ -501,8 +501,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
             // If there were withdrawals we take fees on them
             if (_totalRequestedShares != 0) {
                 // Discount protocol fees
-                uint256 _netRequestedShares = _totalRequestedShares * IkStakingVault(_vault).netSharePrice()
-                    / IkStakingVault(_vault).sharePrice();
+                uint256 _netRequestedShares =
+                    _totalRequestedShares * IkStakingVault(_vault).netSharePrice() / IkStakingVault(_vault).sharePrice();
                 uint256 _feeShares = _totalRequestedShares - _netRequestedShares;
                 uint256 _feeAssets = IkStakingVault(_vault).convertToAssets(_feeShares);
 
@@ -677,10 +677,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     }
 
     /// @inheritdoc IkAssetRouter
-    function getBatchIdBalances(
-        address _vault,
-        bytes32 _batchId
-    )
+    function getBatchIdBalances(address _vault, bytes32 _batchId)
         external
         view
         returns (uint256 _deposited, uint256 _requested)

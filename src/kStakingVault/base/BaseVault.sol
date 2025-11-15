@@ -319,10 +319,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// @param _shares The quantity of stkTokens to convert to underlying asset terms
     /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
     /// @return _assets The equivalent value in underlying assets based on current vault performance
-    function _convertToAssetsWithTotals(
-        uint256 _shares,
-        uint256 _totalAssetsValue
-    )
+    function _convertToAssetsWithTotals(uint256 _shares, uint256 _totalAssetsValue)
         internal
         view
         returns (uint256 _assets)
@@ -342,10 +339,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// @param _assets The underlying asset amount to convert to share terms
     /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
     /// @return _shares The equivalent stkToken amount based on current share price
-    function _convertToSharesWithTotals(
-        uint256 _assets,
-        uint256 _totalAssetsValue
-    )
+    function _convertToSharesWithTotals(uint256 _assets, uint256 _totalAssetsValue)
         internal
         view
         returns (uint256 _shares)

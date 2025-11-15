@@ -218,12 +218,7 @@ library SafeTransferLib {
     /// @dev Sends `amount` of ERC20 `token` from `from` to `to`.
     ///
     /// The `from` account must have at least `amount` approved for the current contract to manage.
-    function trySafeTransferFrom(
-        address token,
-        address from,
-        address to,
-        uint256 amount
-    )
+    function trySafeTransferFrom(address token, address from, address to, uint256 amount)
         internal
         returns (bool success)
     {
