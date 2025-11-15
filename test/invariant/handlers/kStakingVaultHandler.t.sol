@@ -183,7 +183,8 @@ contract kStakingVaultHandler is BaseHandler {
     }
 
     function kStakingVault_lose(uint256 amount) public {
-        int256 maxLoss = int256(kStakingVault_expectedAdapterTotalAssets)
+        int256 maxLoss =
+            int256(kStakingVault_expectedAdapterTotalAssets)
             + kStakingVault_totalYieldInBatch[kStakingVault_vault.getBatchId()]
             - int256(kStakingVault_chargedPerformanceInBatch[kStakingVault_vault.getBatchId()])
             - int256(kStakingVault_chargedManagementInBatch[kStakingVault_vault.getBatchId()]);
