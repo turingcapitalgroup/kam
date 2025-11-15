@@ -702,7 +702,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// @notice Fallback function to receive ETH transfers
     /// @dev Allows the contract to receive ETH for gas refunds, donations, or accidental transfers.
     /// Received ETH can be rescued using the rescueAssets function with address(0).
-    receive() external payable override { }
+    receive() external payable { }
 
     /* //////////////////////////////////////////////////////////////
                         CONTRACT INFO

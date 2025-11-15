@@ -9,6 +9,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentrancyGuardTransient.sol";
 
+import { ERC2771Context } from "kam/src/base/ERC2771Context.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
@@ -33,7 +34,7 @@ import {
 /// Mathematical operations use the OptimizedFixedPointMathLib for precision and overflow protection in share
 /// calculations. All inheriting vault implementations leverage these utilities to maintain protocol integrity
 /// while reducing code duplication and ensuring consistent behavior across the vault network.
-abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
+abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771Context {
     using OptimizedFixedPointMathLib for uint256;
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
     using SafeTransferLib for address;
