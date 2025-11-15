@@ -208,12 +208,12 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         alphaVault = IkStakingVault(payable(vaultsDeploy.alphaVault));
         betaVault = IkStakingVault(payable(vaultsDeploy.betaVault));
 
-        vaultAdapterImpl = VaultAdapter(adaptersDeploy.vaultAdapterImpl);
-        minterAdapterUSDC = VaultAdapter(adaptersDeploy.kMinterAdapterUSDC);
-        minterAdapterWBTC = VaultAdapter(adaptersDeploy.kMinterAdapterWBTC);
-        DNVaultAdapterUSDC = VaultAdapter(adaptersDeploy.dnVaultAdapterUSDC);
-        ALPHAVaultAdapterUSDC = VaultAdapter(adaptersDeploy.alphaVaultAdapter);
-        BETHAVaultAdapterUSDC = VaultAdapter(adaptersDeploy.betaVaultAdapter);
+        vaultAdapterImpl = VaultAdapter(payable(adaptersDeploy.vaultAdapterImpl));
+        minterAdapterUSDC = VaultAdapter(payable(adaptersDeploy.kMinterAdapterUSDC));
+        minterAdapterWBTC = VaultAdapter(payable(adaptersDeploy.kMinterAdapterWBTC));
+        DNVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.dnVaultAdapterUSDC));
+        ALPHAVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.alphaVaultAdapter));
+        BETHAVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.betaVaultAdapter));
 
         _labelContracts();
 

@@ -9,6 +9,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentrancyGuardTransient.sol";
 
+import { ERC2771Context } from "kam/src/base/ERC2771Context.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
@@ -33,7 +34,7 @@ import {
 /// Mathematical operations use the OptimizedFixedPointMathLib for precision and overflow protection in share
 /// calculations. All inheriting vault implementations leverage these utilities to maintain protocol integrity
 /// while reducing code duplication and ensuring consistent behavior across the vault network.
-abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
+abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771Context {
     using OptimizedFixedPointMathLib for uint256;
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
     using SafeTransferLib for address;
@@ -319,10 +320,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// @param _shares The quantity of stkTokens to convert to underlying asset terms
     /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
     /// @return _assets The equivalent value in underlying assets based on current vault performance
-    function _convertToAssetsWithTotals(
-        uint256 _shares,
-        uint256 _totalAssetsValue
-    )
+    function _convertToAssetsWithTotals(uint256 _shares, uint256 _totalAssetsValue)
         internal
         view
         returns (uint256 _assets)
@@ -342,10 +340,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient {
     /// @param _assets The underlying asset amount to convert to share terms
     /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
     /// @return _shares The equivalent stkToken amount based on current share price
-    function _convertToSharesWithTotals(
-        uint256 _assets,
-        uint256 _totalAssetsValue
-    )
+    function _convertToSharesWithTotals(uint256 _assets, uint256 _totalAssetsValue)
         internal
         view
         returns (uint256 _shares)

@@ -171,11 +171,7 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// @param _to The address to transfer tokens to
     /// @param _amount The amount of tokens to transfer
     /// @return success True if the transfer succeeded
-    function transferFrom(
-        address _from,
-        address _to,
-        uint256 _amount
-    )
+    function transferFrom(address _from, address _to, uint256 _amount)
         public
         virtual
         override(ERC20, IkToken)
