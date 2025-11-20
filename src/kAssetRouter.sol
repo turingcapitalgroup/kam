@@ -16,7 +16,6 @@ import {
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_INVALID_COOLDOWN,
     KASSETROUTER_IS_PAUSED,
-    KASSETROUTER_NEGATIVE_SHARES,
     KASSETROUTER_NOT_BATCH_CLOSED,
     KASSETROUTER_NO_PROPOSAL,
     KASSETROUTER_ONLY_KMINTER,
@@ -247,12 +246,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
 
-        uint256 _requestedShares = $.vaultRequestedShares[_sourceVault][_batchId];
-        require(_requestedShares >= _amount, KASSETROUTER_NEGATIVE_SHARES);
-
-        unchecked {
-            $.vaultRequestedShares[_sourceVault][_batchId] = _requestedShares - _amount;
-        }
+        $.vaultRequestedShares[_sourceVault][_batchId] -= _amount;
 
         emit SharesRequestedPulled(_sourceVault, _batchId, _amount);
         _unlockReentrant();

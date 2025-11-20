@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
+import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
 import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
 import { OptimizedLibClone } from "solady/utils/OptimizedLibClone.sol";
@@ -240,7 +241,10 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
         _burnRequest.status = RequestStatus.REDEEMED;
 
         // Clean up request tracking and update accounting
-        $.totalLockedAssets[_asset] -= _amount;
+        // This will be 0 wen the last withdrawals amount are the yield generated on the kStakingVaults
+        // since its not accounted into totalLocaledAssets. - if not minted here, wont count.
+        // kToken.totalSupply() = totalLockedAssets + sum(generated yield on kTokens for same asset kStakingVaults)
+        $.totalLockedAssets[_asset] = OptimizedFixedPointMathLib.zeroFloorSub($.totalLockedAssets[_asset], _amount);
 
         // Permanently burn the escrowed kTokens to reduce total supply
         address _kToken = _getKTokenForAsset(_asset);
