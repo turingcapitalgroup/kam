@@ -94,5 +94,4 @@ library OptimizedFixedPointMathLib {
             z := mul(gt(x, y), sub(x, y))
         }
     }
-
 }

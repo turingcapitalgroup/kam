@@ -52,7 +52,11 @@ contract MockERC7540 is IERC7540, ERC20 {
         return super.allowance(owner, spender);
     }
 
-    function transferFrom(address owner, address spender, uint256 amount)
+    function transferFrom(
+        address owner,
+        address spender,
+        uint256 amount
+    )
         public
         override(ERC20, IERC7540)
         returns (bool)
@@ -92,7 +96,11 @@ contract MockERC7540 is IERC7540, ERC20 {
         return _operators[controller][operator];
     }
 
-    function requestDeposit(uint256 assets, address controller, address owner)
+    function requestDeposit(
+        uint256 assets,
+        address controller,
+        address owner
+    )
         external
         override
         returns (uint256 requestId)
@@ -126,7 +134,11 @@ contract MockERC7540 is IERC7540, ERC20 {
         _mint(to, shares);
     }
 
-    function requestRedeem(uint256 shares, address controller, address owner)
+    function requestRedeem(
+        uint256 shares,
+        address controller,
+        address owner
+    )
         external
         override
         returns (uint256 requestId)

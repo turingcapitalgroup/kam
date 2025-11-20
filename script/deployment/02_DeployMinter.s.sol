@@ -19,7 +19,11 @@ contract DeployMinterScript is Script, DeploymentManager {
     /// @param factoryAddr Address of ERC1967Factory (if zero, reads from JSON)
     /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
     /// @return deployment Struct containing deployed addresses
-    function run(bool writeToJson, address factoryAddr, address registryAddr)
+    function run(
+        bool writeToJson,
+        address factoryAddr,
+        address registryAddr
+    )
         public
         returns (MinterDeployment memory deployment)
     {
