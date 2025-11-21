@@ -60,7 +60,7 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         // Deploy DN Vault USDC Adapter
         bytes memory adapterInitDataUSDC = abi.encodeWithSelector(
             MinimalSmartAccount.initialize.selector,
-            address(0), // owner (zero address = no specific owner, inherits from registry)
+            config.roles.owner, // owner (zero address = no specific owner, inherits from registry)
             registryAddr,
             "kam.dnVault.usdc"
         );
@@ -68,25 +68,25 @@ contract DeployAdaptersScript is Script, DeploymentManager {
 
         // Deploy DN Vault WBTC Adapter
         bytes memory adapterInitDataWBTC = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector, address(0), registryAddr, "kam.dnVault.wbtc"
+            MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.dnVault.wbtc"
         );
         address dnVaultAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataWBTC);
 
         // Deploy Alpha Vault Adapter
         bytes memory adapterInitDataAlpha = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector, address(0), registryAddr, "kam.alphaVault.usdc"
+            MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.alphaVault.usdc"
         );
         address alphaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataAlpha);
 
         // Deploy Beta Vault Adapter
         bytes memory adapterInitDataBeta = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector, address(0), registryAddr, "kam.betaVault.usdc"
+            MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.betaVault.usdc"
         );
         address betaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataBeta);
 
         // Deploy kMinter USDC Adapter
         bytes memory adapterInitDataMinterUSDC = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector, address(0), registryAddr, "kam.minter.usdc"
+            MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.minter.usdc"
         );
         address kMinterAdapterUSDC =
             factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataMinterUSDC);

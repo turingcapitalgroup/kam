@@ -7,8 +7,12 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { IVaultBatch } from "kam/src/interfaces/IVaultBatch.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
+import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
+import { ModeLib } from "minimal-smart-account/libraries/ModeLib.sol";
 
-contract ProtocolTest is DeploymentBaseTest {
+import { console } from "forge-std/console.sol";
+
+contract KamIntegrationTest is DeploymentBaseTest {
     bytes32 internal constant TEST_BATCH_ID = bytes32(uint256(1));
     uint256 internal constant TEST_AMOUNT = 1000 * _1_USDC;
     uint256 internal constant TEST_PROFIT = 100 * _1_USDC;
@@ -18,7 +22,7 @@ contract ProtocolTest is DeploymentBaseTest {
 
     address internal mockBatchReceiver = makeAddr("mockBatchReceiver");
 
-    bytes32 internal testProposalId;
+    bytes32 internal proposalId;
     address USDC;
     address WBTC;
     address DAI;
@@ -39,7 +43,7 @@ contract ProtocolTest is DeploymentBaseTest {
         assetRouter.setSettlementCooldown(1);
     }
 
-    function test_Protocol_Success() public {
+    function test_KAM_Integration_Success() public {
         address _minter = address(minter);
         address _dnVault = address(dnVault);
         address _alphaVault = address(alphaVault);
@@ -52,6 +56,9 @@ contract ProtocolTest is DeploymentBaseTest {
         registry.grantInstitutionRole(users.institution);
         assetRouter.setSettlementCooldown(0); // I set the cooldown to 0 so we can run it all at once.
         vm.stopPrank();
+
+        vm.prank(users.owner);
+        minterAdapterUSDC.grantRoles(users.relayer, 2);
 
         mockUSDC.mint(users.institution, _mintAmount);
         assertEq(mockUSDC.balanceOf(users.institution), _startBalanceInstitution + _mintAmount);
@@ -67,11 +74,30 @@ contract ProtocolTest is DeploymentBaseTest {
         (uint256 _deposited, uint256 _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         assertEq(_deposited, _mintAmount);
 
+        // bytes memory _depositCallData = abi.encodeWithSignature(
+        //     "deposit(uint256,address,address)", 
+        //     _mintAmount,
+        //     _minter,
+        //     _minter
+        // );
+        
+        // Execution[] memory _executions = new Execution[](1);
+        // _executions[0] = Execution({
+        //     target: _minter,
+        //     value: 0,
+        //     callData: _depositCallData
+        // });
+        
+        // bytes memory _executionCalldata = abi.encode(_executions);
+        
+        // vm.prank(users.relayer);
+        // minterAdapterUSDC.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
+
         _closeBatch(_minter, _batchId);
 
         vm.prank(users.relayer);
-        testProposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0, 0, 0);
-        assetRouter.executeSettleBatch(testProposalId);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0, 0, 0);
+        assetRouter.executeSettleBatch(proposalId);
         assertEq(mockUSDC.balanceOf(address(minterAdapterUSDC)), _mintAmount);
         assertEq(minterAdapterUSDC.totalAssets(), _mintAmount);
 
@@ -99,8 +125,8 @@ contract ProtocolTest is DeploymentBaseTest {
         _closeBatch(_minter, _batchId);
 
         vm.prank(users.relayer);
-        testProposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, _mintAmount, 0, 0);
-        assetRouter.executeSettleBatch(testProposalId);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, _mintAmount, 0, 0);
+        assetRouter.executeSettleBatch(proposalId);
         (_deposited, _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         assertEq(minterAdapterUSDC.totalAssets(), kUSD.totalSupply());
         assertEq(_deposited, 0);
@@ -109,8 +135,8 @@ contract ProtocolTest is DeploymentBaseTest {
         _batchId = dnVault.getBatchId();
         _closeBatch(_dnVault, _batchId);
         vm.prank(users.relayer);
-        testProposalId = assetRouter.proposeSettleBatch(USDC, _dnVault, _batchId, 0, 0, 0);
-        assetRouter.executeSettleBatch(testProposalId);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _dnVault, _batchId, 0, 0, 0);
+        assetRouter.executeSettleBatch(proposalId);
         assertEq(DNVaultAdapterUSDC.totalAssets(), _amount);
         (_deposited,) = assetRouter.getBatchIdBalances(_dnVault, _batchId);
         assertEq(_deposited, _amount);
@@ -118,8 +144,8 @@ contract ProtocolTest is DeploymentBaseTest {
         _batchId = alphaVault.getBatchId();
         _closeBatch(_alphaVault, _batchId);
         vm.prank(users.relayer);
-        testProposalId = assetRouter.proposeSettleBatch(USDC, _alphaVault, _batchId, 0, 0, 0);
-        assetRouter.executeSettleBatch(testProposalId);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _alphaVault, _batchId, 0, 0, 0);
+        assetRouter.executeSettleBatch(proposalId);
         assertEq(ALPHAVaultAdapterUSDC.totalAssets(), _amount);
         (_deposited,) = assetRouter.getBatchIdBalances(_alphaVault, _batchId);
         assertEq(_deposited, _amount);
@@ -144,8 +170,8 @@ contract ProtocolTest is DeploymentBaseTest {
         _batchId = dnVault.getBatchId();
         _closeBatch(_dnVault, _batchId);
         vm.prank(users.relayer);
-        testProposalId = assetRouter.proposeSettleBatch(USDC, _dnVault, _batchId, _amount + _1_USDC, 0, 0);
-        assetRouter.executeSettleBatch(testProposalId);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _dnVault, _batchId, _amount + _1_USDC, 0, 0);
+        assetRouter.executeSettleBatch(proposalId);
         assertEq(DNVaultAdapterUSDC.totalAssets(), ((_amount * 2) + _1_USDC));
         (_deposited,) = assetRouter.getBatchIdBalances(_dnVault, _batchId);
         assertEq(_deposited, _amount);
@@ -153,11 +179,14 @@ contract ProtocolTest is DeploymentBaseTest {
         _batchId = alphaVault.getBatchId();
         _closeBatch(_alphaVault, _batchId);
         vm.prank(users.relayer);
-        testProposalId = assetRouter.proposeSettleBatch(USDC, _alphaVault, _batchId, _amount + _1_USDC, 0, 0);
-        assetRouter.executeSettleBatch(testProposalId);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _alphaVault, _batchId, _amount + _1_USDC, 0, 0);
+        assetRouter.executeSettleBatch(proposalId);
         assertEq(ALPHAVaultAdapterUSDC.totalAssets(), ((_amount + _1_USDC) / 2));
         uint256 _sharesRequested = assetRouter.getRequestedShares(_alphaVault, _batchId);
         assertEq(_sharesRequested, alphaVault.convertToShares((_amount + _1_USDC) / 2)); // Shares are valued after settlement
+
+        vm.prank(users.bob);
+        dnVault.claimStakedShares(_requestIdDn);
 
         uint256 _balanceBeforeBob = IkToken(address(kUSD)).balanceOf(users.bob);
         vm.prank(users.bob);
@@ -170,7 +199,7 @@ contract ProtocolTest is DeploymentBaseTest {
         vm.prank(users.institution);
         kUSD.approve(_minter, _amount);
         vm.prank(users.institution);
-        minter.requestBurn(USDC, users.institution, _amount);
+        bytes32 _firstRequestId = minter.requestBurn(USDC, users.institution, _amount);
 
         _batchId = minter.getBatchId(USDC);
         vm.prank(users.institution);
@@ -182,17 +211,91 @@ contract ProtocolTest is DeploymentBaseTest {
         uint256 _totalAssets = kUSD.totalSupply();
         (_deposited, _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         vm.prank(users.relayer);
-        testProposalId =
+        proposalId =
             assetRouter.proposeSettleBatch(USDC, _minter, _batchId, _totalAssets - ((_amount + _1_USDC) * 2), 0, 0); // 2 requestStake
-        assetRouter.executeSettleBatch(testProposalId);
+        assetRouter.executeSettleBatch(proposalId);
+        
+        vm.prank(users.institution);
+        minter.burn(_firstRequestId);
+        
         assertEq(minterAdapterUSDC.totalAssets(), _mintAmount - (_amount * 3));
         // 2 * _1_USDC = yield generated. GetTotalLockedAsssets is only for deposited amount from the kMinter.
         assertEq(kUSD.totalSupply(), minter.getTotalLockedAssets(USDC) + (2 * _1_USDC));
         // ADD sub0 math solady TOTALLOCKEDASSETS to 0.
 
-        // vm.prank(users.relayer);
-        // testProposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, _lastTotalAssets, 0, 0);
-        // assetRouter.executeSettleBatch(testProposalId);
+        uint256 _stkTokenAmount = dnVault.balanceOf(users.alice);
+        vm.prank(users.alice);
+        bytes32 _aliceReq = dnVault.requestUnstake(users.alice, _stkTokenAmount);
+
+        _stkTokenAmount = dnVault.balanceOf(users.bob);
+        vm.prank(users.bob);
+        bytes32 _bobReq = dnVault.requestUnstake(users.bob, _stkTokenAmount);
+
+        _batchId = dnVault.getBatchId();
+        _closeBatch(_dnVault, _batchId);
+
+        vm.prank(users.relayer);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _dnVault, _batchId, ((2 * _amount) + (10000 * _1_USDC) + (2 * _1_USDC)), 0, 0);
+        assetRouter.executeSettleBatch(proposalId);
+
+        vm.prank(users.alice);
+        dnVault.claimUnstakedAssets(_aliceReq);
+
+        vm.prank(users.bob);
+        dnVault.claimUnstakedAssets(_bobReq);
+
+        uint256 _kTokenAmount = kUSD.balanceOf(users.alice);
+        vm.prank(users.alice);
+        kUSD.transfer(users.institution, _kTokenAmount);
+
+        _stkTokenAmount = alphaVault.balanceOf(users.bob);
+        vm.prank(users.bob);
+        _bobReq = alphaVault.requestUnstake(users.bob, _stkTokenAmount);
+
+        _batchId = alphaVault.getBatchId();
+        _closeBatch(_alphaVault, _batchId);
+
+        vm.prank(users.relayer);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _alphaVault, _batchId, (_amount + (10000 * _1_USDC)), 0, 0);
+        assetRouter.executeSettleBatch(proposalId);
+
+        vm.prank(users.bob);
+        alphaVault.claimUnstakedAssets(_bobReq);
+        
+        _kTokenAmount = kUSD.balanceOf(users.bob);
+        vm.prank(users.bob);
+        kUSD.transfer(users.institution, _kTokenAmount);
+
+        _kTokenAmount = kUSD.balanceOf(users.institution);
+        vm.prank(users.institution);
+        kUSD.approve(_minter, _kTokenAmount);
+
+        vm.prank(users.admin);
+        uint256 _max = 1_000_000 * _1_USDC;
+        registry.setAssetBatchLimits(USDC, _max, _max);
+
+        vm.prank(users.institution);
+        _requestId = minter.requestBurn(USDC, users.institution, _kTokenAmount);
+        
+        _batchId = minter.getBatchId(USDC);
+        _closeBatch(_minter, _batchId);
+        
+        vm.prank(users.relayer);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, (_mintAmount - _amount + (20002 * _1_USDC)), 0, 0);
+        assetRouter.executeSettleBatch(proposalId);
+
+        vm.prank(users.institution);
+        minter.burn(_requestId);
+
+        console.log("BALANCE_OF::::::", mockUSDC.balanceOf(users.institution));
+        console.log("kBALANCE_OF_INSTITUTION::::::", kUSD.balanceOf(users.institution));
+        console.log("kBALANCE_OF_ALICE::::::", kUSD.balanceOf(users.alice));
+        console.log("kBALANCE_OF_BOB::::::", kUSD.balanceOf(users.bob));
+        console.log("kBALANCE_OF_ALPHA::::::", kUSD.balanceOf(_alphaVault));
+        console.log("kBALANCE_OF_DN::::::", kUSD.balanceOf(_dnVault));
+        console.log("kBALANCE_OF_MINTER::::::", kUSD.balanceOf(_minter));
+        console.log("BALANCE_OF::::::", _startBalanceInstitution + _mintAmount);
+        console.log("TOTAL_SUPPLY::::::", kUSD.totalSupply());
     }
 
     /* //////////////////////////////////////////////////////////////
