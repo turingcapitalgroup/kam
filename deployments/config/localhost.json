@@ -89,10 +89,14 @@
     },
     "allowedReceivers": {
       "USDC": [
-        "walletUSDC"
+        "walletUSDC",
+        "dnVaultAdapterUSDC",
+        "alphaVaultAdapter",
+        "betaVaultAdapter"
       ],
       "WBTC": [
-        "walletUSDC"
+        "walletUSDC",
+        "dnVaultAdapterWBTC"
       ],
       "ERC7540USDC": [
         "kMinterAdapterUSDC",
@@ -104,6 +108,18 @@
       ]
     },
     "allowedSources": {
+      "USDC": [
+        "kMinterAdapterUSDC",
+        "dnVaultAdapterUSDC",
+        "alphaVaultAdapter",
+        "betaVaultAdapter",
+        "treasury"
+      ],
+      "WBTC": [
+        "kMinterAdapterWBTC",
+        "dnVaultAdapterWBTC",
+        "treasury"
+      ],
       "ERC7540USDC": [
         "kMinterAdapterUSDC",
         "dnVaultAdapterUSDC",
@@ -117,10 +133,14 @@
     },
     "allowedSpenders": {
       "USDC": [
-        "ERC7540USDC"
+        "ERC7540USDC",
+        "dnVaultAdapterUSDC",
+        "alphaVaultAdapter",
+        "betaVaultAdapter"
       ],
       "WBTC": [
-        "ERC7540WBTC"
+        "ERC7540WBTC",
+        "dnVaultAdapterWBTC"
       ]
     }
   },

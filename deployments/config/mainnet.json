@@ -93,18 +93,20 @@
       "ERC7540WBTC": "3000000000"
     },
     "allowedReceivers": {
-      "USDC": ["walletUSDC"],
-      "WBTC": ["walletUSDC"],
+      "USDC": ["walletUSDC", "dnVaultAdapterUSDC", "alphaVaultAdapter", "betaVaultAdapter"],
+      "WBTC": ["walletUSDC", "dnVaultAdapterWBTC"],
       "ERC7540USDC": ["kMinterAdapterUSDC", "dnVaultAdapterUSDC"],
       "ERC7540WBTC": ["kMinterAdapterWBTC", "dnVaultAdapterWBTC"]
     },
     "allowedSources": {
+      "USDC": ["kMinterAdapterUSDC", "dnVaultAdapterUSDC", "alphaVaultAdapter", "betaVaultAdapter", "treasury"],
+      "WBTC": ["kMinterAdapterWBTC", "dnVaultAdapterWBTC", "treasury"],
       "ERC7540USDC": ["kMinterAdapterUSDC", "dnVaultAdapterUSDC", "treasury"],
       "ERC7540WBTC": ["kMinterAdapterWBTC", "dnVaultAdapterWBTC", "treasury"]
     },
     "allowedSpenders": {
-      "USDC": ["ERC7540USDC"],
-      "WBTC": ["ERC7540WBTC"]
+      "USDC": ["ERC7540USDC", "dnVaultAdapterUSDC", "alphaVaultAdapter", "betaVaultAdapter"],
+      "WBTC": ["ERC7540WBTC", "dnVaultAdapterWBTC"]
     }
   },
   "mockAssets": {

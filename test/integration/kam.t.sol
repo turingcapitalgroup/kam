@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import { MockERC20 } from "../mocks/MockERC20.sol";
+
 import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
@@ -47,9 +48,11 @@ contract KamIntegrationTest is DeploymentBaseTest {
         address _minter = address(minter);
         address _dnVault = address(dnVault);
         address _alphaVault = address(alphaVault);
+        address _minterAdapterUSDC = address(minterAdapterUSDC);
         uint256 _amount = 100_000 * _1_USDC;
         uint256 _mintAmount = _amount * 5;
         uint256 _startBalanceInstitution = mockUSDC.balanceOf(users.institution);
+        uint256 _startBalanceMetavault = mockUSDC.balanceOf(address(erc7540USDC));
 
         vm.startPrank(users.admin);
         registry.grantVendorRole(users.admin);
@@ -74,31 +77,55 @@ contract KamIntegrationTest is DeploymentBaseTest {
         (uint256 _deposited, uint256 _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         assertEq(_deposited, _mintAmount);
 
-        // bytes memory _depositCallData = abi.encodeWithSignature(
-        //     "deposit(uint256,address,address)", 
-        //     _mintAmount,
-        //     _minter,
-        //     _minter
-        // );
+        bytes memory _approveCallData = abi.encodeWithSignature(
+            "approve(address,uint256)", 
+            address(erc7540USDC),
+            _mintAmount
+        );
         
-        // Execution[] memory _executions = new Execution[](1);
-        // _executions[0] = Execution({
-        //     target: _minter,
-        //     value: 0,
-        //     callData: _depositCallData
-        // });
+        bytes memory _requestDepositCallData = abi.encodeWithSignature(
+            "requestDeposit(uint256,address,address)", 
+            _mintAmount,
+            address(minterAdapterUSDC),
+            address(minterAdapterUSDC)
+        );
+
+        bytes memory _depositCallData = abi.encodeWithSignature(
+            "deposit(uint256,address,address)", 
+            _mintAmount,
+            address(minterAdapterUSDC),
+            address(minterAdapterUSDC)
+        );
         
-        // bytes memory _executionCalldata = abi.encode(_executions);
+        Execution[] memory _executions = new Execution[](3);
+        _executions[0] = Execution({
+            target: address(mockUSDC),
+            value: 0,
+            callData: _approveCallData
+        });
+        _executions[1] = Execution({
+            target: address(erc7540USDC),
+            value: 0,
+            callData: _requestDepositCallData
+        });
+        _executions[2] = Execution({
+            target: address(erc7540USDC),
+            value: 0,
+            callData: _depositCallData
+        });
         
-        // vm.prank(users.relayer);
-        // minterAdapterUSDC.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
+        bytes memory _executionCalldata = abi.encode(_executions);
+        
+        vm.prank(users.relayer);
+        minterAdapterUSDC.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
 
         _closeBatch(_minter, _batchId);
 
+        uint256 _minterTotalAssets = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
-        proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0, 0, 0);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, _minterTotalAssets, 0, 0);
         assetRouter.executeSettleBatch(proposalId);
-        assertEq(mockUSDC.balanceOf(address(minterAdapterUSDC)), _mintAmount);
+        assertEq(mockUSDC.balanceOf(address(erc7540USDC)) - _startBalanceMetavault, _mintAmount);
         assertEq(minterAdapterUSDC.totalAssets(), _mintAmount);
 
         // This is what we need to do, for all the kStakingVaults and RequestBurn (kMinter) start working.
@@ -124,8 +151,27 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _batchId = minter.getBatchId(USDC);
         _closeBatch(_minter, _batchId);
 
+        bytes memory _transferCallData = abi.encodeWithSignature(
+            "transfer(address,uint256)", 
+            address(DNVaultAdapterUSDC),
+            _amount
+        );
+        
+        _executions = new Execution[](1);
+        _executions[0] = Execution({
+            target: address(erc7540USDC),
+            value: 0,
+            callData: _transferCallData
+        });
+        
+        _executionCalldata = abi.encode(_executions);
+        
         vm.prank(users.relayer);
-        proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, _mintAmount, 0, 0);
+        minterAdapterUSDC.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
+
+        _minterTotalAssets = minterAdapterUSDC.totalAssets();
+        vm.prank(users.relayer);
+        proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, _minterTotalAssets, 0, 0);
         assetRouter.executeSettleBatch(proposalId);
         (_deposited, _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         assertEq(minterAdapterUSDC.totalAssets(), kUSD.totalSupply());
@@ -149,6 +195,42 @@ contract KamIntegrationTest is DeploymentBaseTest {
         assertEq(ALPHAVaultAdapterUSDC.totalAssets(), _amount);
         (_deposited,) = assetRouter.getBatchIdBalances(_alphaVault, _batchId);
         assertEq(_deposited, _amount);
+
+        uint256 _convertedAmount = erc7540USDC.convertToShares(_amount);
+        bytes memory _requestRedeemCallData = abi.encodeWithSignature(
+            "requestRedeem(uint256,address,address)", 
+            _convertedAmount,
+            _minterAdapterUSDC,
+            _minterAdapterUSDC
+        );
+        
+        _executions = new Execution[](1);
+        _executions[0] = Execution({
+            target: address(erc7540USDC),
+            value: 0,
+            callData: _requestRedeemCallData
+        });
+        
+        _executionCalldata = abi.encode(_executions);
+
+        bytes memory _redeemCallData = abi.encodeWithSignature(
+            "redeem(uint256,address,address)", 
+            _convertedAmount,
+            _minterAdapterUSDC,
+            _minterAdapterUSDC
+        );
+        
+        _executions = new Execution[](1);
+        _executions[0] = Execution({
+            target: address(erc7540USDC),
+            value: 0,
+            callData: _redeemCallData
+        });
+        
+        _executionCalldata = abi.encode(_executions);
+        
+        vm.prank(users.relayer);
+        minterAdapterUSDC.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
 
         // After the kStakingVaults settlement (dn and alpha) we can do claims and requestUnstake.
         vm.prank(users.alice);

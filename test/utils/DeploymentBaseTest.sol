@@ -42,6 +42,8 @@ import { RegisterModulesScript } from "kam/script/deployment/11_RegisterVaultMod
 
 // Deployment manager for reading addresses
 import { DeploymentManager } from "kam/script/utils/DeploymentManager.sol";
+import { MockERC7540 } from "kam/test/mocks/MockERC7540.sol";
+import { MockWallet } from "kam/test/mocks/MockWallet.sol";
 
 contract DeploymentBaseTest is BaseTest, DeploymentManager {
     // Core protocol contracts (proxied)
@@ -67,6 +69,11 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
     VaultAdapter public BETHAVaultAdapterUSDC;
     VaultAdapter public vaultAdapter6;
     VaultAdapter public vaultAdapterImpl;
+
+    MockERC7540 public erc7540USDC;
+    MockERC7540 public erc7540WBTC;
+
+    MockWallet public wallet;
 
     // Implementation contracts (for upgrades)
     kRegistry public registryImpl;
@@ -214,6 +221,11 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         DNVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.dnVaultAdapterUSDC));
         ALPHAVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.alphaVaultAdapter));
         BETHAVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.betaVaultAdapter));
+
+        erc7540USDC = MockERC7540(mocks.ERC7540USDC);
+        erc7540WBTC = MockERC7540(mocks.ERC7540WBTC);
+
+        wallet = MockWallet(payable(mocks.WalletUSDC));
 
         _labelContracts();
 
