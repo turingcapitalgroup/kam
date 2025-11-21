@@ -10,6 +10,7 @@ import { IVaultBatch } from "kam/src/interfaces/IVaultBatch.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
 import { ModeLib } from "minimal-smart-account/libraries/ModeLib.sol";
+import { ExecutionLib } from "minimal-smart-account/libraries/ExecutionLib.sol";
 
 import { console } from "forge-std/console.sol";
 
@@ -114,7 +115,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
             callData: _depositCallData
         });
         
-        bytes memory _executionCalldata = abi.encode(_executions);
+        bytes memory _executionCalldata = ExecutionLib.encodeBatch(_executions);
         
         vm.prank(users.relayer);
         minterAdapterUSDC.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
@@ -164,7 +165,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
             callData: _transferCallData
         });
         
-        _executionCalldata = abi.encode(_executions);
+        _executionCalldata = ExecutionLib.encodeBatch(_executions);
         
         vm.prank(users.relayer);
         minterAdapterUSDC.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
@@ -204,15 +205,13 @@ contract KamIntegrationTest is DeploymentBaseTest {
             _minterAdapterUSDC
         );
         
-        _executions = new Execution[](1);
+        _executions = new Execution[](2);
         _executions[0] = Execution({
             target: address(erc7540USDC),
             value: 0,
             callData: _requestRedeemCallData
         });
         
-        _executionCalldata = abi.encode(_executions);
-
         bytes memory _redeemCallData = abi.encodeWithSignature(
             "redeem(uint256,address,address)", 
             _convertedAmount,
@@ -220,14 +219,13 @@ contract KamIntegrationTest is DeploymentBaseTest {
             _minterAdapterUSDC
         );
         
-        _executions = new Execution[](1);
-        _executions[0] = Execution({
+        _executions[1] = Execution({
             target: address(erc7540USDC),
             value: 0,
             callData: _redeemCallData
         });
         
-        _executionCalldata = abi.encode(_executions);
+        _executionCalldata = ExecutionLib.encodeBatch(_executions);
         
         vm.prank(users.relayer);
         minterAdapterUSDC.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
