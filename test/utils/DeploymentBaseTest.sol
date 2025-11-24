@@ -260,6 +260,7 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         vm.label(address(ALPHAVaultAdapterUSDC), "ALPHAVaultAdapterUSDC");
         vm.label(address(BETHAVaultAdapterUSDC), "BETHAVaultAdapterUSDC");
         vm.label(address(vaultAdapterImpl), "VaultAdapterImpl");
+        vm.label(address(wallet), "Wallet");
     }
 
     /// @dev Set up additional roles for testing (scripts handle main roles)

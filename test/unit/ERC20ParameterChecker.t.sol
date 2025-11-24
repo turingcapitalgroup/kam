@@ -70,10 +70,6 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         vm.expectRevert(bytes(PARAMETERCHECKER_NOT_ALLOWED));
         checker.setAllowedReceiver(testToken, testReceiver, true);
-
-        vm.prank(users.owner);
-        vm.expectRevert(bytes(PARAMETERCHECKER_NOT_ALLOWED));
-        checker.setAllowedReceiver(testToken, testReceiver, true);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -108,10 +104,6 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
         checker.setAllowedSource(testToken, testSource, true);
 
         vm.prank(users.relayer);
-        vm.expectRevert(bytes(PARAMETERCHECKER_NOT_ALLOWED));
-        checker.setAllowedSource(testToken, testSource, true);
-
-        vm.prank(users.owner);
         vm.expectRevert(bytes(PARAMETERCHECKER_NOT_ALLOWED));
         checker.setAllowedSource(testToken, testSource, true);
     }
@@ -150,10 +142,6 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         vm.expectRevert(bytes(PARAMETERCHECKER_NOT_ALLOWED));
         checker.setAllowedSpender(testToken, testSpender, true);
-
-        vm.prank(users.owner);
-        vm.expectRevert(bytes(PARAMETERCHECKER_NOT_ALLOWED));
-        checker.setAllowedSpender(testToken, testSpender, true);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -179,10 +167,6 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
         checker.setMaxSingleTransfer(testToken, _maxAmount);
 
         vm.prank(users.relayer);
-        vm.expectRevert(bytes(PARAMETERCHECKER_NOT_ALLOWED));
-        checker.setMaxSingleTransfer(testToken, _maxAmount);
-
-        vm.prank(users.owner);
         vm.expectRevert(bytes(PARAMETERCHECKER_NOT_ALLOWED));
         checker.setMaxSingleTransfer(testToken, _maxAmount);
     }

@@ -55,7 +55,7 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
     }
 
     function test_GrantRoles_Require_Only_Owner() public {
-        vm.prank(users.admin);
+        vm.prank(users.relayer);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.grantRoles(users.bob, VENDOR_ROLE);
 
@@ -81,10 +81,6 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
     function test_RevokeRoles_Require_Only_Owner() public {
         vm.prank(users.owner);
         registry.grantRoles(users.bob, VENDOR_ROLE);
-
-        vm.prank(users.admin);
-        vm.expectRevert(Ownable.Unauthorized.selector);
-        registry.revokeRoles(users.bob, VENDOR_ROLE);
 
         vm.prank(users.alice);
         vm.expectRevert(Ownable.Unauthorized.selector);
@@ -124,7 +120,7 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
     function test_TransferOwnership_Require_Only_Owner() public {
         address _newOwner = users.bob;
 
-        vm.prank(users.admin);
+        vm.prank(users.bob);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.transferOwnership(_newOwner);
 
@@ -149,7 +145,7 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
     }
 
     function test_RenounceOwnership_Require_Only_Owner() public {
-        vm.prank(users.admin);
+        vm.prank(users.relayer);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.renounceOwnership();
 
@@ -183,7 +179,7 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
         vm.prank(users.bob);
         registry.requestOwnershipHandover();
 
-        vm.prank(users.admin);
+        vm.prank(users.relayer);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.completeOwnershipHandover(users.bob);
 

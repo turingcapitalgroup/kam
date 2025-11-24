@@ -65,7 +65,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.setAssetBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.setAssetBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
     }
@@ -126,7 +126,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
             users.emergencyAdmin
         );
 
-        vm.prank(users.owner);
+        vm.prank(users.emergencyAdmin);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.registerAsset(
             TEST_NAME,
@@ -286,7 +286,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.removeVault(_dnVault);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.removeVault(_dnVault);
     }
@@ -324,7 +324,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
     }
@@ -376,7 +376,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
     }

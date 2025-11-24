@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import { IERC7540 } from "kam/src/interfaces/IERC7540.sol";
 import { ERC20 } from "solady/tokens/ERC20.sol";
+import { OptimizedFixedPointMathLib as Math } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 /// @title MockERC7540
@@ -52,7 +53,11 @@ contract MockERC7540 is IERC7540, ERC20 {
         return super.allowance(owner, spender);
     }
 
-    function transferFrom(address owner, address spender, uint256 amount)
+    function transferFrom(
+        address owner,
+        address spender,
+        uint256 amount
+    )
         public
         override(ERC20, IERC7540)
         returns (bool)
@@ -76,12 +81,14 @@ contract MockERC7540 is IERC7540, ERC20 {
         return _asset.balanceOf(address(this));
     }
 
-    function convertToAssets(uint256 shares) external pure override returns (uint256) {
-        return shares; // 1:1 for simplicity in mock
+    function convertToAssets(uint256 shares) public view override returns (uint256) {
+        uint256 supply = totalSupply();
+        return supply == 0 ? shares : Math.fullMulDiv(shares, _asset.balanceOf(address(this)), supply);
     }
 
-    function convertToShares(uint256 assets) external pure override returns (uint256) {
-        return assets; // 1:1 for simplicity in mock
+    function convertToShares(uint256 assets) public view override returns (uint256) {
+        uint256 supply = totalSupply();
+        return supply == 0 ? assets : Math.fullMulDiv(assets, supply, _asset.balanceOf(address(this)));
     }
 
     function setOperator(address operator, bool approved) external override {
@@ -92,7 +99,11 @@ contract MockERC7540 is IERC7540, ERC20 {
         return _operators[controller][operator];
     }
 
-    function requestDeposit(uint256 assets, address controller, address owner)
+    function requestDeposit(
+        uint256 assets,
+        address controller,
+        address owner
+    )
         external
         override
         returns (uint256 requestId)
@@ -122,11 +133,15 @@ contract MockERC7540 is IERC7540, ERC20 {
         _claimableDepositRequests[controller] -= assets;
         _pendingDepositRequests[controller] -= assets;
 
-        shares = assets; // 1:1 conversion
+        shares = convertToShares(assets);
         _mint(to, shares);
     }
 
-    function requestRedeem(uint256 shares, address controller, address owner)
+    function requestRedeem(
+        uint256 shares,
+        address controller,
+        address owner
+    )
         external
         override
         returns (uint256 requestId)
@@ -135,7 +150,7 @@ contract MockERC7540 is IERC7540, ERC20 {
         require(balanceOf(owner) >= shares, "Insufficient balance");
 
         // Transfer shares from owner to vault (burn them)
-        _burn(owner, shares);
+        _transfer(owner, address(this), shares);
 
         _pendingRedeemRequests[controller] += shares;
         _claimableRedeemRequests[controller] += shares; // Auto-approve in mock
@@ -148,8 +163,9 @@ contract MockERC7540 is IERC7540, ERC20 {
 
         _claimableRedeemRequests[controller] -= shares;
         _pendingRedeemRequests[controller] -= shares;
+        assets = convertToAssets(shares);
 
-        assets = shares; // 1:1 conversion
+        _burn(address(this), shares);
         _asset.safeTransfer(receiver, assets);
     }
 

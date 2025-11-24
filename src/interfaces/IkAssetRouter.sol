@@ -272,7 +272,13 @@ interface IkAssetRouter is IVersioned {
     /// @param _asset The underlying asset address being transferred between vaults
     /// @param amount The quantity of assets to transfer for rebalancing
     /// @param batchId The batch identifier for coordinating this transfer with settlement
-    function kAssetTransfer(address sourceVault, address targetVault, address _asset, uint256 amount, bytes32 batchId)
+    function kAssetTransfer(
+        address sourceVault,
+        address targetVault,
+        address _asset,
+        uint256 amount,
+        bytes32 batchId
+    )
         external
         payable;
 
@@ -398,7 +404,10 @@ interface IkAssetRouter is IVersioned {
     /// @param batchId The batch identifier to retrieve balance information
     /// @return deposited Total amount of assets deposited into this batch
     /// @return requested Total amount of assets requested for redemption from this batch
-    function getBatchIdBalances(address vault, bytes32 batchId)
+    function getBatchIdBalances(
+        address vault,
+        bytes32 batchId
+    )
         external
         view
         returns (uint256 deposited, uint256 requested);

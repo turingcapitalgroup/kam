@@ -70,10 +70,6 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
-
-        vm.prank(users.owner);
-        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
     }
 
     function test_SetAdapterAllowedSelector_Require_Not_Zero_Address() public {

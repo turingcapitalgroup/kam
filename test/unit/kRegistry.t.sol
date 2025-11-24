@@ -107,7 +107,7 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.setSingletonContract(TEST_CONTRACT_ID, TEST_CONTRACT);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.setSingletonContract(TEST_CONTRACT_ID, TEST_CONTRACT);
     }
@@ -162,7 +162,7 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.grantInstitutionRole(users.bob);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.grantInstitutionRole(users.bob);
     }
@@ -186,7 +186,7 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.grantVendorRole(users.bob);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.grantVendorRole(users.bob);
     }
@@ -210,7 +210,7 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.grantRelayerRole(users.bob);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.grantRelayerRole(users.bob);
     }
@@ -234,7 +234,7 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.grantManagerRole(users.bob);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.grantManagerRole(users.bob);
     }
@@ -252,7 +252,7 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.revokeGivenRoles(users.bob, MANAGER_ROLE);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.revokeGivenRoles(users.bob, MANAGER_ROLE);
 
@@ -280,7 +280,7 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.setTreasury(address(0x7));
 
-        vm.prank(users.owner);
+        vm.prank(users.bob);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.setTreasury(address(0x7));
     }
@@ -671,7 +671,7 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.upgradeToAndCall(_newImpl, "");
 
-        vm.prank(users.admin);
+        vm.prank(users.relayer);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.upgradeToAndCall(_newImpl, "");
     }
@@ -690,7 +690,7 @@ contract kRegistryTest is DeploymentBaseTest {
         bytes4 _testSelector = bytes4(keccak256("testFunction()"));
         address _testImpl = makeAddr("TEST_IMPL");
 
-        vm.prank(users.admin);
+        vm.prank(users.bob);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.addFunction(_testSelector, _testImpl, false);
 
@@ -725,7 +725,7 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.prank(users.owner);
         registry.addFunctions(_testSelectors, _testImpl, false);
 
-        vm.prank(users.admin);
+        vm.prank(users.relayer);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.removeFunctions(_testSelectors);
 

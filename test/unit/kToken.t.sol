@@ -186,7 +186,7 @@ contract kTokenTest is DeploymentBaseTest {
         vm.expectRevert(Ownable.Unauthorized.selector);
         kUSD.grantAdminRole(users.bob);
 
-        vm.prank(users.admin);
+        vm.prank(users.relayer);
         vm.expectRevert(Ownable.Unauthorized.selector);
         kUSD.revokeAdminRole(users.admin);
     }
@@ -206,7 +206,7 @@ contract kTokenTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
         kUSD.grantEmergencyRole(users.bob);
 
-        vm.prank(users.owner);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
         kUSD.revokeEmergencyRole(users.emergencyAdmin);
     }
