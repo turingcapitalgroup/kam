@@ -67,7 +67,11 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         console.log("Network:", config.network);
         console.log("Chain ID:", config.chainId);
 
+<<<<<<< HEAD
         vm.startBroadcast(config.roles.owner);
+=======
+        vm.startBroadcast(config.roles.admin);
+>>>>>>> development
 
         MockERC20 mockUSDC = new MockERC20("Mock USDC", "USDC", 6);
         MockERC20 mockWBTC = new MockERC20("Mock WBTC", "WBTC", 8);
@@ -170,10 +174,19 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         console.log("Updated config file with mock asset addresses");
     }
 
+<<<<<<< HEAD
     function _mintTokensForTesting(MockERC20 mockUSDC, MockERC20 mockWBTC, NetworkConfig memory config) internal {
         console.log("=== MINTING TOKENS FOR TESTING (from config) ===");
 
         vm.startBroadcast(config.roles.owner);
+=======
+    // ... (rest of the helper functions remain the same)
+
+    function _mintTokensForTesting(MockERC20 mockUSDC, MockERC20 mockWBTC, NetworkConfig memory config) internal {
+        console.log("=== MINTING TOKENS FOR TESTING (from config) ===");
+
+        vm.startBroadcast(config.roles.admin);
+>>>>>>> development
 
         // Use mint amounts from config
         uint256 usdcMintAmount = config.mockAssets.mintAmounts.USDC;
@@ -236,7 +249,11 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
     {
         console.log("=== MINTING TOKENS TO MOCK TARGETS (from config) ===");
 
+<<<<<<< HEAD
         vm.startBroadcast(config.roles.owner);
+=======
+        vm.startBroadcast(config.roles.admin);
+>>>>>>> development
 
         // Use mock target amounts from config
         uint256 usdcAmount = config.mockAssets.mockTargetAmounts.USDC;

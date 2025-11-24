@@ -59,14 +59,20 @@ contract DeployAdaptersScript is Script, DeploymentManager {
 
         // Deploy DN Vault USDC Adapter
         bytes memory adapterInitDataUSDC = abi.encodeWithSelector(
+<<<<<<< HEAD
             MinimalSmartAccount.initialize.selector,
             config.roles.owner, // owner (zero address = no specific owner, inherits from registry)
+=======
+            ERC7579Minimal.initialize.selector,
+            address(0), // owner (zero address = no specific owner, inherits from registry)
+>>>>>>> development
             registryAddr,
             "kam.dnVault.usdc"
         );
         address dnVaultAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataUSDC);
 
         // Deploy DN Vault WBTC Adapter
+<<<<<<< HEAD
         bytes memory adapterInitDataWBTC = abi.encodeWithSelector(
             MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.dnVault.wbtc"
         );
@@ -88,13 +94,37 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         bytes memory adapterInitDataMinterUSDC = abi.encodeWithSelector(
             MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.minter.usdc"
         );
+=======
+        bytes memory adapterInitDataWBTC =
+            abi.encodeWithSelector(ERC7579Minimal.initialize.selector, address(0), registryAddr, "kam.dnVault.wbtc");
+        address dnVaultAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataWBTC);
+
+        // Deploy Alpha Vault Adapter
+        bytes memory adapterInitDataAlpha =
+            abi.encodeWithSelector(ERC7579Minimal.initialize.selector, address(0), registryAddr, "kam.alphaVault.usdc");
+        address alphaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataAlpha);
+
+        // Deploy Beta Vault Adapter
+        bytes memory adapterInitDataBeta =
+            abi.encodeWithSelector(ERC7579Minimal.initialize.selector, address(0), registryAddr, "kam.betaVault.usdc");
+        address betaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataBeta);
+
+        // Deploy kMinter USDC Adapter
+        bytes memory adapterInitDataMinterUSDC =
+            abi.encodeWithSelector(ERC7579Minimal.initialize.selector, address(0), registryAddr, "kam.minter.usdc");
+>>>>>>> development
         address kMinterAdapterUSDC =
             factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataMinterUSDC);
 
         // Deploy kMinter WBTC Adapter
+<<<<<<< HEAD
         bytes memory adapterInitDataMinterWBTC = abi.encodeWithSelector(
             MinimalSmartAccount.initialize.selector, address(0), registryAddr, "kam.minter.wbtc"
         );
+=======
+        bytes memory adapterInitDataMinterWBTC =
+            abi.encodeWithSelector(ERC7579Minimal.initialize.selector, address(0), registryAddr, "kam.minter.wbtc");
+>>>>>>> development
         address kMinterAdapterWBTC =
             factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataMinterWBTC);
 
