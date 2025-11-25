@@ -287,7 +287,6 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         string memory _name,
         string memory _symbol,
         address _asset,
-        bytes32 _id, // TODO: WHY this Banana is here :)
         uint256 _maxMintPerBatch,
         uint256 _maxBurnPerBatch,
         address _emergencyAdmin
@@ -299,7 +298,6 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         _checkAdmin(msg.sender);
         _checkAddressNotZero(_asset);
         _checkAddressNotZero(_emergencyAdmin);
-        require(_id != bytes32(0), KREGISTRY_ZERO_ADDRESS);
 
         kRegistryStorage storage $ = _getkRegistryStorage();
         // Ensure asset isn't already in the protocol

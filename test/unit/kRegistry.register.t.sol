@@ -23,7 +23,6 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
     string internal constant TEST_NAME = "TEST_TOKEN";
     string internal constant TEST_SYMBOL = "TTK";
     bytes32 internal constant TEST_CONTRACT_ID = keccak256("TEST_CONTRACT");
-    bytes32 internal constant TEST_ASSET_ID = keccak256("TEST_ASSET");
 
     uint256 constant MAX_BPS = 10_000;
     uint16 constant TEST_HURDLE_RATE = 500; //5%
@@ -82,7 +81,6 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
             TEST_NAME,
             TEST_SYMBOL,
             TEST_ASSET,
-            TEST_ASSET_ID,
             type(uint256).max,
             type(uint256).max,
             users.emergencyAdmin
@@ -108,7 +106,6 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
             TEST_NAME,
             TEST_SYMBOL,
             TEST_ASSET,
-            TEST_ASSET_ID,
             type(uint256).max,
             type(uint256).max,
             users.emergencyAdmin
@@ -120,7 +117,6 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
             TEST_NAME,
             TEST_SYMBOL,
             TEST_ASSET,
-            TEST_ASSET_ID,
             type(uint256).max,
             type(uint256).max,
             users.emergencyAdmin
@@ -132,7 +128,6 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
             TEST_NAME,
             TEST_SYMBOL,
             TEST_ASSET,
-            TEST_ASSET_ID,
             type(uint256).max,
             type(uint256).max,
             users.emergencyAdmin
@@ -147,7 +142,6 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
             TEST_NAME,
             TEST_SYMBOL,
             address(0),
-            TEST_ASSET_ID,
             type(uint256).max,
             type(uint256).max,
             users.emergencyAdmin
@@ -155,7 +149,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
 
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
         registry.registerAsset(
-            TEST_NAME, TEST_SYMBOL, TEST_ASSET, TEST_ASSET_ID, type(uint256).max, type(uint256).max, address(0)
+            TEST_NAME, TEST_SYMBOL, TEST_ASSET, type(uint256).max, type(uint256).max, address(0)
         );
 
         vm.stopPrank();
@@ -165,7 +159,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_ALREADY_REGISTERED));
         registry.registerAsset(
-            "KAM USD", "kUSD", USDC, TEST_ASSET_ID, type(uint256).max, 100_000_000_000, users.emergencyAdmin
+            "KAM USD", "kUSD", USDC, type(uint256).max, 100_000_000_000, users.emergencyAdmin
         );
     }
 
@@ -176,7 +170,6 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
             TEST_NAME,
             TEST_SYMBOL,
             address(0x347474),
-            TEST_ASSET_ID,
             type(uint256).max,
             type(uint256).max,
             users.emergencyAdmin
@@ -400,7 +393,6 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
             TEST_NAME,
             TEST_SYMBOL,
             TEST_ASSET,
-            TEST_ASSET_ID,
             type(uint256).max,
             type(uint256).max,
             users.emergencyAdmin

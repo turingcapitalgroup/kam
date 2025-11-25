@@ -49,7 +49,6 @@ contract DeployTokensScript is Script, DeploymentManager {
             config.kUSD.name,
             config.kUSD.symbol,
             config.assets.USDC,
-            registry.USDC(),
             config.kUSD.maxMintPerBatch,
             config.kUSD.maxRedeemPerBatch,
             config.roles.emergencyAdmin
@@ -67,7 +66,6 @@ contract DeployTokensScript is Script, DeploymentManager {
             config.kBTC.name,
             config.kBTC.symbol,
             config.assets.WBTC,
-            registry.WBTC(),
             config.kBTC.maxMintPerBatch,
             config.kBTC.maxRedeemPerBatch,
             config.roles.emergencyAdmin
