@@ -13,8 +13,10 @@ import {
 } from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
+import { EIP3009 } from "kam/src/vendor/EIP/EIP3009.sol";
 import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
 import { ERC20 } from "kam/src/vendor/solady/tokens/ERC20.sol";
+import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
 
 contract kTokenTest is DeploymentBaseTest {
     uint256 internal constant MINT_AMOUNT = 100_000 * _1_USDC;
@@ -383,5 +385,149 @@ contract kTokenTest is DeploymentBaseTest {
         assertEq(kUSD.balanceOf(users.alice), 0);
         assertEq(kUSD.balanceOf(users.charlie), _amount);
         assertEq(kUSD.allowance(users.alice, users.bob), 0);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        EIP3009 TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Helper function to generate EIP-712 signature for transferWithAuthorization
+    /// @param privateKey The private key to sign with (must correspond to signer address)
+    function _signTransferWithAuthorization(
+        uint256 privateKey,
+        address signer,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce
+    )
+        internal
+        view
+        returns (uint8 v, bytes32 r, bytes32 s)
+    {
+        bytes32 typeHash = EIP3009(address(kUSD)).TRANSFER_WITH_AUTHORIZATION_TYPEHASH();
+        bytes32 structHash = OptimizedEfficientHashLib.hash(
+            uint256(typeHash),
+            uint256(uint160(signer)),
+            uint256(uint160(to)),
+            value,
+            validAfter,
+            validBefore,
+            uint256(nonce)
+        );
+        bytes32 domainSeparator = kUSD.DOMAIN_SEPARATOR();
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+
+        (v, r, s) = vm.sign(privateKey, digest);
+    }
+
+    /// @dev Helper function to generate EIP-712 signature for receiveWithAuthorization
+    /// @param privateKey The private key to sign with (must correspond to signer address)
+    function _signReceiveWithAuthorization(
+        uint256 privateKey,
+        address signer,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce
+    )
+        internal
+        view
+        returns (uint8 v, bytes32 r, bytes32 s)
+    {
+        bytes32 typeHash = EIP3009(address(kUSD)).RECEIVE_WITH_AUTHORIZATION_TYPEHASH();
+        bytes32 structHash = OptimizedEfficientHashLib.hash(
+            uint256(typeHash),
+            uint256(uint160(signer)),
+            uint256(uint160(to)),
+            value,
+            validAfter,
+            validBefore,
+            uint256(nonce)
+        );
+        bytes32 domainSeparator = kUSD.DOMAIN_SEPARATOR();
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+
+        (v, r, s) = vm.sign(privateKey, digest);
+    }
+
+    function test_TransferWithAuthorization_Success() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-1");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signTransferWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        assertEq(kUSD.balanceOf(signer), value);
+        assertEq(kUSD.balanceOf(to), 0);
+        assertFalse(kUSD.authorizationState(signer, nonce));
+
+        vm.expectEmit(true, true, false, true);
+        emit EIP3009.AuthorizationUsed(signer, nonce);
+        kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+
+        assertEq(kUSD.balanceOf(signer), 0);
+        assertEq(kUSD.balanceOf(to), value);
+        assertTrue(kUSD.authorizationState(signer, nonce));
+    }
+
+    function test_ReceiveWithAuthorization_Success() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob; // Bob will be the caller (payee)
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-2");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signReceiveWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        assertEq(kUSD.balanceOf(signer), value);
+        assertEq(kUSD.balanceOf(to), 0);
+        assertFalse(kUSD.authorizationState(signer, nonce));
+
+        vm.prank(to);
+        vm.expectEmit(true, true, false, true);
+        emit EIP3009.AuthorizationUsed(signer, nonce);
+        kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+
+        assertEq(kUSD.balanceOf(signer), 0);
+        assertEq(kUSD.balanceOf(to), value);
+        assertTrue(kUSD.authorizationState(signer, nonce));
+    }
+
+    function test_AuthorizationState_Success() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-3");
+
+        assertFalse(kUSD.authorizationState(signer, nonce));
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signTransferWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+        kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+
+        assertTrue(kUSD.authorizationState(signer, nonce));
     }
 }
