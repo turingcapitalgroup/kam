@@ -772,12 +772,8 @@ Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume ass
 
 
 ```solidity
-<<<<<<< HEAD
 function setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
-=======
-<<<<<<< HEAD
-function setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
-=======
+
 function setAssetBatchLimits(
     address asset,
     uint256 maxMintPerBatch_,

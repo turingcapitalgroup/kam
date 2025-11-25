@@ -2,11 +2,7 @@ forge-std/=dependencies/forge-std-1.9.7/src/
 kam/script/=script/
 kam/src/=src/
 kam/test/=test/
-<<<<<<< HEAD
 minimal-smart-account/=dependencies/minimal-smart-account-1.0/src/
-=======
-kam/script/=script/
->>>>>>> development
 openzeppelin/=src/vendor/openzeppelin/
 solady/=src/vendor/solady/
 src/=src/

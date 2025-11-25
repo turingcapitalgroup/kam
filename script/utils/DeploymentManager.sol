@@ -215,57 +215,6 @@ abstract contract DeploymentManager is Script {
         config.ERC7540s.USDC = json.readAddress(".ERC7540s.USDC");
         config.ERC7540s.WBTC = json.readAddress(".ERC7540s.WBTC");
     }
-<<<<<<< HEAD
-=======
-
-    function _readCustodialTargets(string memory json, NetworkConfig memory config) private pure {
-        // Parse custodial wallet addresses (for CEFFU mock / real custody)
-        // Read from mockAssets.WalletUSDC for now (will migrate to custodialTargets later)
-        config.custodialTargets.walletUSDC = json.readAddress(".mockAssets.WalletUSDC");
-        // WBTC wallet can be same or different - add to config if needed
-        config.custodialTargets.walletWBTC = config.custodialTargets.walletUSDC; // Using same wallet for now
-    }
-
-    function _readTokensAndVaults(string memory json, NetworkConfig memory config) private pure {
-        // Parse kToken configs
-        config.kUSD = _readKTokenConfig(json, ".kTokens.kUSD");
-        config.kBTC = _readKTokenConfig(json, ".kTokens.kBTC");
-
-        // Parse vault configs
-        config.dnVaultUSDC = _readVaultConfig(json, ".vaults.dnVaultUSDC");
-        config.dnVaultWBTC = _readVaultConfig(json, ".vaults.dnVaultWBTC");
-        config.alphaVault = _readVaultConfig(json, ".vaults.alphaVault");
-        config.betaVault = _readVaultConfig(json, ".vaults.betaVault");
-    }
-
-    function _readRouterAndMocks(string memory json, NetworkConfig memory config) private pure {
-        // Parse asset router config
-        config.assetRouter.settlementCooldown = json.readUint(".assetRouter.settlementCooldown");
-        config.assetRouter.maxAllowedDelta = json.readUint(".assetRouter.maxAllowedDelta");
-
-        // Parse parameter checker config
-        config.parameterChecker = _readParameterCheckerConfig(json);
-
-        // Parse mock assets config
-        config.mockAssets.enabled = json.readBool(".mockAssets.enabled");
-        config.mockAssets.mintAmounts.USDC = json.readUint(".mockAssets.mintAmounts.USDC");
-        config.mockAssets.mintAmounts.WBTC = json.readUint(".mockAssets.mintAmounts.WBTC");
-        config.mockAssets.mockTargetAmounts.USDC = json.readUint(".mockAssets.mockTargetAmounts.USDC");
-        config.mockAssets.mockTargetAmounts.WBTC = json.readUint(".mockAssets.mockTargetAmounts.WBTC");
-    }
-
-    function _readKTokenConfig(string memory json, string memory path) private pure returns (KTokenConfig memory) {
-        KTokenConfig memory config;
-        config.name = json.readString(string.concat(path, ".name"));
-        config.symbol = json.readString(string.concat(path, ".symbol"));
-        config.decimals = uint8(json.readUint(string.concat(path, ".decimals")));
-
-        string memory maxMintStr = json.readString(string.concat(path, ".maxMintPerBatch"));
-        config.maxMintPerBatch = _parseUintString(maxMintStr);
-
-        string memory maxRedeemStr = json.readString(string.concat(path, ".maxRedeemPerBatch"));
-        config.maxRedeemPerBatch = _parseUintString(maxRedeemStr);
->>>>>>> development
 
     function _readCustodialTargets(string memory json, NetworkConfig memory config) private pure {
         // Parse custodial wallet addresses (for CEFFU mock / real custody)
