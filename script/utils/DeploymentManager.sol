@@ -252,6 +252,21 @@ abstract contract DeploymentManager is Script {
         config.mockAssets.mockTargetAmounts.WBTC = json.readUint(".mockAssets.mockTargetAmounts.WBTC");
     }
 
+    function _readKTokenConfig(string memory json, string memory path) private pure returns (KTokenConfig memory) {
+        KTokenConfig memory config;
+        config.name = json.readString(string.concat(path, ".name"));
+        config.symbol = json.readString(string.concat(path, ".symbol"));
+        config.decimals = uint8(json.readUint(string.concat(path, ".decimals")));
+
+        string memory maxMintStr = json.readString(string.concat(path, ".maxMintPerBatch"));
+        config.maxMintPerBatch = _parseUintString(maxMintStr);
+
+        string memory maxRedeemStr = json.readString(string.concat(path, ".maxRedeemPerBatch"));
+        config.maxRedeemPerBatch = _parseUintString(maxRedeemStr);
+
+        return config;
+    }
+
     function _readVaultConfig(string memory json, string memory path) private pure returns (VaultConfig memory) {
         VaultConfig memory config;
         config.name = json.readString(string.concat(path, ".name"));
