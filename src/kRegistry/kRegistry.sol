@@ -12,6 +12,7 @@ import {
     KREGISTRY_ASSET_NOT_SUPPORTED,
     KREGISTRY_FEE_EXCEEDS_MAXIMUM,
     KREGISTRY_INVALID_ADAPTER,
+    KREGISTRY_KTOKEN_ALREADY_SET,
     KREGISTRY_TRANSFER_FAILED,
     KREGISTRY_WRONG_ASSET,
     KREGISTRY_ZERO_ADDRESS,
@@ -211,6 +212,16 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     }
 
     /// @inheritdoc IRegistry
+    function revokeGivenRoles(address _user, uint256 _role) external payable {
+        _checkAdmin(msg.sender);
+        _removeRoles(_user, _role);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                    TREASURY && HURDLE RATE && RESCUE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IRegistry
     function setTreasury(address _treasury) external payable {
         _checkAdmin(msg.sender);
         kRegistryStorage storage $ = _getkRegistryStorage();
@@ -221,7 +232,6 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
     /// @inheritdoc IRegistry
     function setHurdleRate(address _asset, uint16 _hurdleRate) external payable {
-        // Only relayer can set hurdle rates (performance thresholds)
         _checkRelayer(msg.sender);
         // Ensure hurdle rate doesn't exceed 100% (10,000 basis points)
         require(_hurdleRate <= MAX_BPS, KREGISTRY_FEE_EXCEEDS_MAXIMUM);
@@ -230,7 +240,6 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         // Asset must be registered before setting hurdle rate
         _checkAssetRegistered(_asset);
 
-        // Set minimum performance threshold for yield distribution
         $.assetHurdleRate[_asset] = _hurdleRate;
         emit HurdleRateSet(_asset, _hurdleRate);
     }
@@ -251,7 +260,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         } else {
             // Rescue ERC20 tokens
             _checkAssetNotRegistered(_asset);
-            require(_amount != 0 && _amount <= _asset.balanceOf(address(this)), KREGISTRY_ZERO_AMOUNT);
+            require(_amount > 0 && _amount <= _asset.balanceOf(address(this)), KREGISTRY_ZERO_AMOUNT);
 
             _asset.safeTransfer(_to, _amount);
             emit RescuedAssets(_asset, _to, _amount);
@@ -269,6 +278,8 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         kRegistryStorage storage $ = _getkRegistryStorage();
         $.maxMintPerBatch[_asset] = _maxMintPerBatch;
         $.maxBurnPerBatch[_asset] = _maxBurnPerBatch;
+
+        emit AssetBatchLimitsUpdated(_asset, _maxMintPerBatch, _maxBurnPerBatch);
     }
 
     /// @inheritdoc IRegistry
@@ -276,9 +287,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         string memory _name,
         string memory _symbol,
         address _asset,
-        bytes32 _id,
+        bytes32 _id, // TODO: WHY this Banana is here :)
         uint256 _maxMintPerBatch,
-        uint256 _maxBurnPerBatch
+        uint256 _maxBurnPerBatch,
+        address _emergencyAdmin
     )
         external
         payable
@@ -286,6 +298,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     {
         _checkAdmin(msg.sender);
         _checkAddressNotZero(_asset);
+        _checkAddressNotZero(_emergencyAdmin);
         require(_id != bytes32(0), KREGISTRY_ZERO_ADDRESS);
 
         kRegistryStorage storage $ = _getkRegistryStorage();
@@ -306,14 +319,14 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
         // Ensure no kToken exists for this asset yet
         address _kToken = $.assetToKToken[_asset];
-        _checkAssetNotRegistered(_kToken);
+        require(_kToken == address(0), KREGISTRY_KTOKEN_ALREADY_SET);
 
         // Deploy new kToken with matching decimals and grant minter privileges
         _kToken = address(
             new kToken(
                 owner(),
                 msg.sender, // admin gets initial control
-                msg.sender, // emergency admin for safety
+                _emergencyAdmin, // emergency admin for safety
                 _minter, // kMinter gets minting rights
                 _name,
                 _symbol,
@@ -382,9 +395,24 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// @inheritdoc IRegistry
     function removeVault(address _vault) external payable {
         _checkAdmin(msg.sender);
-        kRegistryStorage storage $ = _getkRegistryStorage();
         _checkVaultRegistered(_vault);
+
+        kRegistryStorage storage $ = _getkRegistryStorage();
+
+        address[] memory _assets = $.vaultAsset[_vault].values();
+        uint8 _vaultTypeValue = $.vaultType[_vault];
+
+        // Remove vault from all asset mappings
+        for (uint256 i; i < _assets.length; i++) {
+            address _asset = _assets[i];
+            delete $.assetToVault[_asset][_vaultTypeValue];
+            $.vaultsByAsset[_asset].remove(_vault);
+            $.vaultAsset[_vault].remove(_asset);
+        }
+
+        delete $.vaultType[_vault];
         $.allVaults.remove(_vault);
+
         emit VaultRemoved(_vault);
     }
 
@@ -582,6 +610,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         return _assetToToken;
     }
 
+    /* //////////////////////////////////////////////////////////////
+                                INTERNAL
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Validates that an asset is not already registered in the protocol
     /// @dev Reverts with KREGISTRY_ALREADY_REGISTERED if the asset exists in supportedAssets set.
     /// Used to prevent duplicate registrations and maintain protocol integrity.
@@ -670,7 +702,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// @notice Fallback function to receive ETH transfers
     /// @dev Allows the contract to receive ETH for gas refunds, donations, or accidental transfers.
     /// Received ETH can be rescued using the rescueAssets function with address(0).
-    receive() external payable override { }
+    receive() external payable { }
 
     /* //////////////////////////////////////////////////////////////
                         CONTRACT INFO

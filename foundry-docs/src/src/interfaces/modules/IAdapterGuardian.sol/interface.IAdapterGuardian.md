@@ -80,14 +80,7 @@ Check if a selector is allowed for an adapter
 
 
 ```solidity
-function isAdapterSelectorAllowed(
-    address adapter,
-    address target,
-    bytes4 selector
-)
-    external
-    view
-    returns (bool);
+function isAdapterSelectorAllowed(address adapter, address target, bytes4 selector) external view returns (bool);
 ```
 **Parameters**
 

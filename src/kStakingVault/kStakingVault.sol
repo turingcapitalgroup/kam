@@ -21,6 +21,7 @@ import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import {
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
+    KSTAKINGVAULT_BATCH_NOT_VALID,
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
     KSTAKINGVAULT_IS_PAUSED,
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
@@ -137,7 +138,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Cache frequently used values
         IkToken _kToken = IkToken($.kToken);
-        require(_kToken.balanceOf(msg.sender) >= _amount, KSTAKINGVAULT_INSUFFICIENT_BALANCE);
+        require(_kToken.balanceOf(_msgSender()) >= _amount, KSTAKINGVAULT_INSUFFICIENT_BALANCE);
 
         bytes32 _batchId = $.currentBatchId;
         uint128 _amount128 = _amount.toUint128();
@@ -152,7 +153,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(_totalAssets() + _amount128 <= $.maxTotalAssets, KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED);
 
         // Generate request ID
-        _requestId = _createStakeRequestId(msg.sender, _amount, block.timestamp);
+        _requestId = _createStakeRequestId(_msgSender(), _amount, block.timestamp);
 
         // Notify the router to move underlying assets from DN strategy
         // To the strategy of this vault
@@ -161,17 +162,17 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             .kAssetTransfer(_getKMinter(), address(this), $.underlyingAsset, _amount, _batchId);
 
         // Deposit ktokens
-        $.kToken.safeTransferFrom(msg.sender, address(this), _amount);
+        $.kToken.safeTransferFrom(_msgSender(), address(this), _amount);
 
         // Increase pending stakt
         $.totalPendingStake += _amount.toUint128();
 
         // Add to user requests tracking
-        $.userRequests[msg.sender].add(_requestId);
+        $.userRequests[_msgSender()].add(_requestId);
 
         // Create staking request
         $.stakeRequests[_requestId] = BaseVaultTypes.StakeRequest({
-            user: msg.sender,
+            user: _msgSender(),
             kTokenAmount: _amount128,
             recipient: _to,
             requestTimestamp: block.timestamp.toUint64(),
@@ -179,7 +180,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             batchId: _batchId
         });
 
-        emit StakeRequestCreated(bytes32(_requestId), msg.sender, $.kToken, _amount, _to, _batchId);
+        emit StakeRequestCreated(bytes32(_requestId), _msgSender(), $.kToken, _amount, _to, _batchId);
 
         // Close `nonReentrant`
         _unlockReentrant();
@@ -195,7 +196,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _checkPaused($);
         _checkAmountNotZero(_stkTokenAmount);
-        require(balanceOf(msg.sender) >= _stkTokenAmount, KSTAKINGVAULT_INSUFFICIENT_BALANCE);
+        require(balanceOf(_msgSender()) >= _stkTokenAmount, KSTAKINGVAULT_INSUFFICIENT_BALANCE);
 
         bytes32 _batchId = $.currentBatchId;
         uint128 _withdrawn = _convertToAssetsWithTotals(_stkTokenAmount, _totalNetAssets()).toUint128();
@@ -207,11 +208,11 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         );
 
         // Generate request ID
-        _requestId = _createStakeRequestId(msg.sender, _stkTokenAmount, block.timestamp);
+        _requestId = _createStakeRequestId(_msgSender(), _stkTokenAmount, block.timestamp);
 
         // Create unstaking request
         $.unstakeRequests[_requestId] = BaseVaultTypes.UnstakeRequest({
-            user: msg.sender,
+            user: _msgSender(),
             stkTokenAmount: _stkTokenAmount.toUint128(),
             recipient: _to,
             requestTimestamp: uint64(block.timestamp),
@@ -220,15 +221,15 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         });
 
         // Add to user requests tracking
-        $.userRequests[msg.sender].add(_requestId);
+        $.userRequests[_msgSender()].add(_requestId);
 
         // Transfer stkTokens to contract to keep share price stable
         // It will only be burned when the assets are claimed later
-        _transfer(msg.sender, address(this), _stkTokenAmount);
+        _transfer(_msgSender(), address(this), _stkTokenAmount);
 
         IkAssetRouter(_getKAssetRouter()).kSharesRequestPush(address(this), _stkTokenAmount, _batchId);
 
-        emit UnstakeRequestCreated(_requestId, msg.sender, _stkTokenAmount, _to, _batchId);
+        emit UnstakeRequestCreated(_requestId, _msgSender(), _stkTokenAmount, _to, _batchId);
 
         // Close `nonReentrant`
         _unlockReentrant();
@@ -251,8 +252,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         BaseVaultTypes.StakeRequest storage _request = $.stakeRequests[_requestId];
         require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
-        require(msg.sender == _request.user, VAULTCLAIMS_NOT_BENEFICIARY);
-        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
+        require(_msgSender() == _request.user, VAULTCLAIMS_NOT_BENEFICIARY);
+        require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
 
@@ -292,7 +293,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         require(batch.isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
         require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
-        require(msg.sender == user, VAULTCLAIMS_NOT_BENEFICIARY);
+        require(_msgSender() == user, VAULTCLAIMS_NOT_BENEFICIARY);
 
         uint256 sharePrice = batch.sharePrice;
         uint256 netSharePrice = batch.netSharePrice;
@@ -304,7 +305,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         uint256 totalKTokensNet = ((uint256(stkTokenAmount)) * netSharePrice) / (10 ** decimals);
         uint256 netSharesToBurn = ((uint256(stkTokenAmount)) * netSharePrice) / sharePrice;
 
-        require($.userRequests[msg.sender].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
+        require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
         _burn(address(this), netSharesToBurn);
@@ -324,14 +325,16 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultBatch
     function createNewBatch() external returns (bytes32) {
-        _checkRelayer(msg.sender);
+        _checkRelayer(_msgSender());
         return _createNewBatch();
     }
 
     /// @inheritdoc IVaultBatch
     function closeBatch(bytes32 _batchId, bool _create) external {
-        _checkRelayer(msg.sender);
+        _checkRelayer(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
+        BaseVaultTypes.BatchInfo storage _batch = $.batches[_batchId];
+        require(_batch.batchId != bytes32(0), KSTAKINGVAULT_BATCH_NOT_VALID);
         require(!$.batches[_batchId].isClosed, VAULTBATCHES_VAULT_CLOSED);
         $.batches[_batchId].isClosed = true;
 
@@ -343,7 +346,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultBatch
     function settleBatch(bytes32 _batchId) external {
-        _checkRouter(msg.sender);
+        _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require($.batches[_batchId].isClosed, VAULTBATCHES_NOT_CLOSED);
         require(!$.batches[_batchId].isSettled, VAULTBATCHES_VAULT_SETTLED);
@@ -358,7 +361,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultFees
     function burnFees(uint256 _shares) external {
-        _checkRouter(msg.sender);
+        _checkRouter(_msgSender());
         _burn(address(this), _shares);
     }
 
@@ -470,7 +473,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultFees
     function setHardHurdleRate(bool _isHard) external {
-        _checkAdmin(msg.sender);
+        _checkAdmin(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _setIsHardHurdleRate($, _isHard);
         emit HardHurdleRateSet(_isHard);
@@ -478,7 +481,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultFees
     function setManagementFee(uint16 _managementFee) external {
-        _checkAdmin(msg.sender);
+        _checkAdmin(_msgSender());
         _checkValidBPS(_managementFee);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint16 oldFee = _getManagementFee($);
@@ -488,7 +491,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultFees
     function setPerformanceFee(uint16 _performanceFee) external {
-        _checkAdmin(msg.sender);
+        _checkAdmin(_msgSender());
         _checkValidBPS(_performanceFee);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint16 oldFee = _getPerformanceFee($);
@@ -498,7 +501,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultFees
     function notifyManagementFeesCharged(uint64 _timestamp) external {
-        _checkRouter(msg.sender);
+        _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedManagement($));
         _setLastFeesChargedManagement($, _timestamp);
@@ -508,7 +511,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultFees
     function notifyPerformanceFeesCharged(uint64 _timestamp) external {
-        _checkRouter(msg.sender);
+        _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedPerformance($));
         _setLastFeesChargedPerformance($, _timestamp);
@@ -552,7 +555,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVault
     function setMaxTotalAssets(uint128 _maxTotalAssets) external {
-        _checkAdmin(msg.sender);
+        _checkAdmin(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint128 _oldMaxTotalAssets = $.maxTotalAssets;
         $.maxTotalAssets = _maxTotalAssets;
@@ -561,14 +564,14 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVault
     function setPaused(bool _paused) external {
-        require(_isEmergencyAdmin(msg.sender), KSTAKINGVAULT_WRONG_ROLE);
+        require(_isEmergencyAdmin(_msgSender()), KSTAKINGVAULT_WRONG_ROLE);
         _setPaused(_paused);
     }
 
     /// @notice Authorize upgrade (only owner can upgrade)
     /// @dev This allows upgrading the main contract while keeping modules separate
     function _authorizeUpgrade(address _newImplementation) internal view override {
-        _checkAdmin(msg.sender);
+        _checkAdmin(_msgSender());
         require(_newImplementation != address(0), KSTAKINGVAULT_ZERO_ADDRESS);
     }
 
@@ -584,7 +587,17 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _checkOwner();
     }
 
+    /// @dev Override to use {ERC2771Context}
+    function _implementation() internal view virtual override returns (address) {
+        bytes calldata msgData = _msgData();
+        bytes4 _selector = bytes4(msgData);
+        MultiFacetProxyStorage storage $ = _getMultiFacetProxyStorage();
+        address _impl = $.selectorToImplementation[_selector];
+        if (_impl == address(0)) revert();
+        return _impl;
+    }
+
     /// @notice Receive ether function
     /// @dev Allows the contract to receive ether directly
-    receive() external payable override { }
+    receive() external payable { }
 }

@@ -5,7 +5,6 @@ import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
 
 import {
     KROLESBASE_ALREADY_INITIALIZED,
-    KROLESBASE_NOT_INITIALIZED,
     KROLESBASE_WRONG_ROLE,
     KROLESBASE_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
@@ -39,17 +38,6 @@ contract kBaseRoles is OptimizedOwnableRoles {
     uint256 internal constant MANAGER_ROLE = _ROLE_6;
 
     /* //////////////////////////////////////////////////////////////
-                              EVENTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Emitted when the emergency pause state is toggled for protocol-wide risk mitigation
-    /// @dev This event signals a critical protocol state change that affects all inheriting contracts.
-    /// When paused=true, protocol operations are halted to prevent potential exploits or manage emergencies.
-    /// Only emergency admins can trigger this, providing rapid response capability during security incidents.
-    /// @param paused_ The new pause state (true = operations halted, false = normal operation)
-    event Paused(bool paused_);
-
-    /* //////////////////////////////////////////////////////////////
                         STORAGE LAYOUT
     //////////////////////////////////////////////////////////////*/
 
@@ -61,8 +49,6 @@ contract kBaseRoles is OptimizedOwnableRoles {
     struct kBaseRolesStorage {
         /// @dev Initialization flag preventing multiple initialization calls (reentrancy protection)
         bool initialized;
-        /// @dev Emergency pause state affecting all protocol operations in inheriting contracts
-        bool paused;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.kBaseRoles")) - 1)) & ~bytes32(uint256(0xff))
@@ -104,7 +90,6 @@ contract kBaseRoles is OptimizedOwnableRoles {
 
         require(!$.initialized, KROLESBASE_ALREADY_INITIALIZED);
 
-        $.paused = false;
         $.initialized = true;
 
         _initializeOwner(_owner);
@@ -114,27 +99,6 @@ contract kBaseRoles is OptimizedOwnableRoles {
         _grantRoles(_guardian, GUARDIAN_ROLE);
         _grantRoles(_relayer, RELAYER_ROLE);
         _grantRoles(_relayer, MANAGER_ROLE);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                                MANAGEMENT
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Toggles the emergency pause state affecting all protocol operations in this contract
-    /// @dev This function provides critical risk management capability by allowing emergency admins to halt
-    /// contract operations during security incidents or market anomalies. The pause mechanism: (1) Affects all
-    /// state-changing operations in inheriting contracts that check _isPaused(), (2) Does not affect view/pure
-    /// functions ensuring protocol state remains readable, (3) Enables rapid response to potential exploits by
-    /// halting operations protocol-wide, (4) Requires emergency admin role ensuring only authorized governance
-    /// can trigger pauses. Inheriting contracts should check _isPaused() modifier in critical functions to
-    /// respect the pause state. The external visibility with role check prevents unauthorized pause manipulation.
-    /// @param _paused The desired pause state (true = halt operations, false = resume normal operation)
-    function setPaused(bool _paused) external {
-        _checkEmergencyAdmin(msg.sender);
-        kBaseRolesStorage storage $ = _getkBaseRolesStorage();
-        require($.initialized, KROLESBASE_NOT_INITIALIZED);
-        $.paused = _paused;
-        emit Paused(_paused);
     }
 
     /* //////////////////////////////////////////////////////////////

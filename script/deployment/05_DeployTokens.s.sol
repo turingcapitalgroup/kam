@@ -6,7 +6,6 @@ import { console2 as console } from "forge-std/console2.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
-import { kToken } from "kam/src/kToken.sol";
 
 contract DeployTokensScript is Script, DeploymentManager {
     struct TokenDeployment {
@@ -52,11 +51,9 @@ contract DeployTokensScript is Script, DeploymentManager {
             config.assets.USDC,
             registry.USDC(),
             config.kUSD.maxMintPerBatch,
-            config.kUSD.maxRedeemPerBatch
+            config.kUSD.maxRedeemPerBatch,
+            config.roles.emergencyAdmin
         );
-
-        // Grant emergency role to kUSD
-        kToken(payable(kUSDAddress)).grantEmergencyRole(config.roles.emergencyAdmin);
 
         // Deploy kBTC using config values
         console.log("Deploying kBTC with config:");
@@ -72,11 +69,9 @@ contract DeployTokensScript is Script, DeploymentManager {
             config.assets.WBTC,
             registry.WBTC(),
             config.kBTC.maxMintPerBatch,
-            config.kBTC.maxRedeemPerBatch
+            config.kBTC.maxRedeemPerBatch,
+            config.roles.emergencyAdmin
         );
-
-        // Grant emergency role to kBTC
-        kToken(payable(kBTCAddress)).grantEmergencyRole(config.roles.emergencyAdmin);
 
         vm.stopBroadcast();
 

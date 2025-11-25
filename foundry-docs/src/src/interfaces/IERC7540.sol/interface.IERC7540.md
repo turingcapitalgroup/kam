@@ -86,13 +86,7 @@ function isOperator(address, address) external view returns (bool);
 
 
 ```solidity
-function requestDeposit(
-    uint256 assets,
-    address controller,
-    address owner
-)
-    external
-    returns (uint256 requestId);
+function requestDeposit(uint256 assets, address controller, address owner) external returns (uint256 requestId);
 ```
 
 ### deposit
@@ -113,13 +107,7 @@ function deposit(uint256 assets, address to, address controller) external return
 
 
 ```solidity
-function requestRedeem(
-    uint256 shares,
-    address controller,
-    address owner
-)
-    external
-    returns (uint256 requestId);
+function requestRedeem(uint256 shares, address controller, address owner) external returns (uint256 requestId);
 ```
 
 ### redeem

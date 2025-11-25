@@ -38,8 +38,8 @@ contract BaseTest is Test {
     Tokens internal tokens;
 
     // Mock tokens
-    MockERC20 internal mockUSDC;
-    MockERC20 internal mockWBTC;
+    MockERC20 public mockUSDC;
+    MockERC20 public mockWBTC;
 
     function setUp() public virtual {
         utils = new Utilities();

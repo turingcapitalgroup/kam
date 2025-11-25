@@ -87,4 +87,11 @@ library OptimizedFixedPointMathLib {
             z = (uint256(x) + uint256(x >> 255)) ^ uint256(x >> 255);
         }
     }
+
+    function zeroFloorSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            z := mul(gt(x, y), sub(x, y))
+        }
+    }
 }

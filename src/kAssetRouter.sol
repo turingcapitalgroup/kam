@@ -246,7 +246,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
 
-        // Update batch tracking for settlement
         $.vaultRequestedShares[_sourceVault][_batchId] -= _amount;
 
         emit SharesRequestedPulled(_sourceVault, _batchId, _amount);
@@ -608,8 +607,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     /// @param _vault The vault address to calculate virtual balance for
     /// @return _balance The total virtual asset balance across all vault adapters
     function _virtualBalance(address _vault, address _asset) private view returns (uint256 _balance) {
-        _isVault(_vault);
-        _isAsset(_asset);
         IVaultAdapter _adapter = IVaultAdapter(_registry().getAdapter(_vault, _asset));
         _balance += _adapter.totalAssets();
     }

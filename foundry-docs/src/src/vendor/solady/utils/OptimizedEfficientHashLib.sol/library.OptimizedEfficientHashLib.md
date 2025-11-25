@@ -27,15 +27,6 @@ Returns `keccak256(abi.encode(v0, .., v4))`.
 
 
 ```solidity
-function hash(
-    uint256 v0,
-    uint256 v1,
-    uint256 v2,
-    uint256 v3,
-    uint256 v4
-)
-    internal
-    pure
-    returns (bytes32 result);
+function hash(uint256 v0, uint256 v1, uint256 v2, uint256 v3, uint256 v4) internal pure returns (bytes32 result);
 ```
 
