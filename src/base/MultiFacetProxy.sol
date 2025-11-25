@@ -99,15 +99,11 @@ abstract contract MultiFacetProxy is Proxy {
     /// @notice Returns the implementation address for a function selector
     /// @dev Required override from OpenZeppelin Proxy contract
     /// @return The implementation contract address
-    function _implementation() internal view override returns (address) {
+    function _implementation() internal view virtual override returns (address) {
         bytes4 _selector = msg.sig;
         MultiFacetProxyStorage storage $ = _getMultiFacetProxyStorage();
         address _impl = $.selectorToImplementation[_selector];
         if (_impl == address(0)) revert();
         return _impl;
     }
-
-    /// @notice Receive ether function
-    /// @dev Allows the contract to receive ether directly
-    receive() external payable virtual { }
 }

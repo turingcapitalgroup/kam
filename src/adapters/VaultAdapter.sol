@@ -5,23 +5,21 @@ import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import {
-    VAULTADAPTER_ARRAY_MISMATCH,
     VAULTADAPTER_IS_PAUSED,
     VAULTADAPTER_TRANSFER_FAILED,
     VAULTADAPTER_WRONG_ASSET,
     VAULTADAPTER_WRONG_ROLE,
     VAULTADAPTER_ZERO_ADDRESS,
-    VAULTADAPTER_ZERO_AMOUNT,
-    VAULTADAPTER_ZERO_ARRAY
+    VAULTADAPTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
-import { ERC7579Minimal, ModeCode } from "erc7579-minimal/ERC7579Minimal.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
+import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
 
 /// @title VaultAdapter
-contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
+contract VaultAdapter is MinimalSmartAccount, IVaultAdapter {
     using SafeTransferLib for address;
     using OptimizedAddressEnumerableSetLib for OptimizedAddressEnumerableSetLib.AddressSet;
 
@@ -92,7 +90,7 @@ contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
 
         if (_asset == address(0)) {
             // Rescue ETH
-            require(_amount > 0 && _amount <= address(this).balance, VAULTADAPTER_ZERO_AMOUNT);
+            require(_amount != 0 && _amount <= address(this).balance, VAULTADAPTER_ZERO_AMOUNT);
 
             (bool _success,) = _to.call{ value: _amount }("");
             require(_success, VAULTADAPTER_TRANSFER_FAILED);
@@ -100,7 +98,7 @@ contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
             emit RescuedETH(_to, _amount);
         } else {
             // Rescue ERC20 tokens
-            _checkAsset(_asset);
+            _checkAssetNotRegistered(_asset);
             require(_amount > 0 && _amount <= _asset.balanceOf(address(this)), VAULTADAPTER_ZERO_AMOUNT);
 
             _asset.safeTransfer(_to, _amount);
@@ -159,7 +157,12 @@ contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
     }
 
     /// @notice Ensures the caller is the kAssetRouter
-    function _checkRouter(VaultAdapterStorage storage $) internal view {
+    function _checkRouter(
+        VaultAdapterStorage storage /* $ */
+    )
+        internal
+        view
+    {
         address _router = IkRegistry(address(_getMinimalAccountStorage().registry)).getContractById(K_ASSET_ROUTER);
         require(msg.sender == _router, VAULTADAPTER_WRONG_ROLE);
     }
@@ -183,10 +186,10 @@ contract VaultAdapter is ERC7579Minimal, IVaultAdapter {
         require(_addr != address(0), VAULTADAPTER_ZERO_ADDRESS);
     }
 
-    /// @notice Reverts if the asset is not supported by the protocol
+    /// @notice Reverts if the asset is a registered protocol asset
     /// @param _asset Asset address to check
-    function _checkAsset(address _asset) private view {
-        require(IkRegistry(address(_getMinimalAccountStorage().registry)).isAsset(_asset), VAULTADAPTER_WRONG_ASSET);
+    function _checkAssetNotRegistered(address _asset) private view {
+        require(!IkRegistry(address(_getMinimalAccountStorage().registry)).isAsset(_asset), VAULTADAPTER_WRONG_ASSET);
     }
 
     /* //////////////////////////////////////////////////////////////

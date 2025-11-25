@@ -1,5 +1,5 @@
 # IVaultAdapter
-[Git Source](https://github.com/VerisLabs/KAM/blob/2a21b33e9cec23b511a8ed73ae31a71d95a7da16/src/interfaces/IVaultAdapter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/interfaces/IVaultAdapter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -54,7 +54,6 @@ function rescueAssets(address asset_, address to_, uint256 amount_) external pay
 |`to_`|`address`|The recipient address that will receive the rescued assets (cannot be zero address)|
 |`amount_`|`uint256`|The quantity to rescue (must not exceed available balance)|
 
-
 ### execute
 
 Allows the relayer to execute arbitrary calls on behalf of the protocol
@@ -91,6 +90,8 @@ function execute(
 |`result`|`bytes[]`|The combined return data from all calls|
 
 
+>>>>>>> main
+>>>>>>> development
 ### setTotalAssets
 
 Sets the last recorded total assets for vault accounting and performance tracking
@@ -218,48 +219,31 @@ event RescuedETH(address indexed to_, uint256 amount_);
 |`to_`|`address`|The recipient address receiving the rescued ETH (cannot be zero address)|
 |`amount_`|`uint256`|The quantity of ETH rescued in wei (must not exceed contract balance)|
 
+
+### TotalAssetsUpdated
+Emitted when total assets are updated
+=======
 ### Executed
 Emitted when the relayer executes an arbitrary call on behalf of the protocol
 
 This event provides transparency into all external interactions initiated by the relayer.
 It logs the caller, target contract, function data, value sent, and the resulting returndata.
 This is critical for auditing and monitoring protocol actions executed via the relayer role.
+>>>>>>> main
 
 
 ```solidity
-event Executed(address indexed caller, address indexed target, bytes data, uint256 value, bytes result);
+event TotalAssetsUpdated(uint256 oldTotalAssets, uint256 newTotalAssets);
 ```
 
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`caller`|`address`|The relayer address that initiated the call|
-|`target`|`address`|The target contract address that was called|
-|`data`|`bytes`|The calldata sent to the target contract|
-|`value`|`uint256`|The amount of assets sent with the call|
-|`result`|`bytes`|The returndata returned from the call|
+|`oldTotalAssets`|`uint256`|The previous total assets value|
+|`newTotalAssets`|`uint256`|The new total assets value|
 
-### TransferExecuted
-Emmited when the relayer executes a transfer of assets on behalf of the protocol
-
-This event provides transparency into all asset transfers initiated by the relayer.
-It logs the caller, asset, recipient, and amount transferred. This is critical for auditing
-and monitoring protocol asset movements executed via the relayer role.
-
-
-```solidity
-event TransferExecuted(address indexed asset, address indexed to, uint256 amount);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`asset`|`address`|The asset address that was transferred (address(0) for native ETH)|
-|`to`|`address`|The recipient address that received the assets|
-|`amount`|`uint256`|The quantity of assets transferred|
-
+>>>>>>> development
 ### TotalAssetsUpdated
 Emitted when total assets are updated
 

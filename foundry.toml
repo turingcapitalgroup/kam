@@ -27,7 +27,8 @@ exclude_lints = [
     "pascal-case-struct", 
     "mixed-case-variable",
     "unsafe-cheatcode",
-    "unsafe-typecast"
+    "unsafe-typecast",
+    "erc20-unchecked-transfer"
 ]
                     
 [fuzz]
@@ -73,7 +74,7 @@ ignore = [
 
 [dependencies]
 forge-std = "1.9.7"
-erc7579-minimal = { version = "1.0", git = "https://github.com/turingcapitalgroup/erc7579-minimal.git", rev = "4c9ecacbb52cb1007f1d7f99bc53646bb6db129a" }
+minimal-smart-account = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-smart-account.git", rev = "84037a414f8c8ba013d64079671030623af234c2" }
 
 [soldeer]
 # whether soldeer manages remappings

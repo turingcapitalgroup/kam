@@ -25,6 +25,12 @@ interface IRegistry is IVersioned {
 
     /// @notice Emitted when an asset and its kToken are registered
     /// @param asset The underlying asset address
+    /// @param maxMintPerBatch the max mint amount per batch
+    /// @param maxBurnPerBatch the max burn amount per batch
+    event AssetBatchLimitsUpdated(address indexed asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch);
+
+    /// @notice Emitted when an asset and its kToken are registered
+    /// @param asset The underlying asset address
     /// @param kToken The corresponding kToken address
     event AssetRegistered(address indexed asset, address indexed kToken);
 
@@ -127,7 +133,8 @@ interface IRegistry is IVersioned {
         address asset,
         bytes32 id,
         uint256 maxMintPerBatch,
-        uint256 maxBurnPerBatch
+        uint256 maxBurnPerBatch,
+        address emergencyAdmin
     )
         external
         payable
@@ -179,6 +186,12 @@ interface IRegistry is IVersioned {
     /// @dev Only callable by ADMIN_ROLE. Managers can execute calls in the vault adapter.
     /// @param manager_ The address to grant manager privileges
     function grantManagerRole(address manager_) external payable;
+
+    /// @notice Revokes the specific role of a given user
+    /// @dev Only callable by ADMIN_ROLE.
+    /// @param user the address to revoke acess to
+    /// @param role the role of the address that we want to revoke
+    function revokeGivenRoles(address user, uint256 role) external payable;
 
     /// @notice Retrieves a singleton contract address by identifier
     /// @dev Reverts if contract not registered. Used for protocol contract discovery.

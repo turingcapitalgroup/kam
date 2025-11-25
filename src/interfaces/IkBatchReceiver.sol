@@ -99,6 +99,8 @@ interface IkBatchReceiver {
     /// (to prevent interfering with normal operations). Only the authorized kMinter can execute rescues, ensuring
     /// recovered assets return to the proper custodial system. Essential for maintaining protocol security while
     /// preventing accidental asset loss during the receiver contract's operational lifecycle.
-    /// @param asset_ The contract address of the asset to rescue (use address(0) for native ETH recovery)
-    function rescueAssets(address asset_) external payable;
+    /// @param asset The contract address of the asset to rescue (use address(0) for native ETH recovery)
+    /// @param to The address that will receive the recovered assets
+    /// @param amount the amount of assets to be recovered to.
+    function rescueAssets(address asset, address to, uint256 amount) external payable;
 }

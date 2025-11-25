@@ -313,6 +313,8 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
     function test_LargeNumbers_Precision() public {
         // Test with very large numbers to check for overflow/precision issues
         uint256 largeAmount = 1_000_000_000 * _1_USDC; // 1B USDC
+        vm.startPrank(users.admin);
+        vault.setMaxTotalAssets(type(uint128).max); // Was 500M
 
         // Mint large amount to Alice
         _mintKTokenToUser(users.alice, largeAmount, true);

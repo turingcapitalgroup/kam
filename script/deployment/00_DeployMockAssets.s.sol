@@ -10,7 +10,18 @@ import { MockERC7540 } from "kam/test/mocks/MockERC7540.sol";
 import { MockWallet } from "kam/test/mocks/MockWallet.sol";
 
 contract DeployMockAssetsScript is Script, DeploymentManager {
-    function run() public {
+    struct MockAssets {
+        address USDC;
+        address WBTC;
+        address ERC7540USDC;
+        address ERC7540WBTC;
+        address WalletUSDC;
+    }
+
+    /// @notice Deploy mock assets
+    /// @param writeToJson If true, writes addresses to JSON (for real deployments). If false, only deploys (for tests)
+    /// @return assets Struct containing all deployed mock asset addresses
+    function run(bool writeToJson) public returns (MockAssets memory assets) {
         require(!isProduction(), "This script is NOT for production");
         NetworkConfig memory config = readNetworkConfig();
 
@@ -18,7 +29,13 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         if (!config.mockAssets.enabled) {
             console.log("=== MOCK ASSETS DISABLED IN CONFIG ===");
             console.log("Set mockAssets.enabled to true in config to deploy mocks");
-            return;
+            return MockAssets({
+                USDC: address(0),
+                WBTC: address(0),
+                ERC7540USDC: address(0),
+                ERC7540WBTC: address(0),
+                WalletUSDC: address(0)
+            });
         }
 
         // Only deploy mock assets for testnets (localhost and sepolia)
@@ -36,7 +53,13 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
                 console.log("USDC:", config.assets.USDC);
                 console.log("WBTC:", config.assets.WBTC);
                 console.log("Skipping mock asset deployment");
-                return;
+                return MockAssets({
+                    USDC: config.assets.USDC,
+                    WBTC: config.assets.WBTC,
+                    ERC7540USDC: address(0),
+                    ERC7540WBTC: address(0),
+                    WalletUSDC: address(0)
+                });
             }
         }
 
@@ -44,7 +67,7 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         console.log("Network:", config.network);
         console.log("Chain ID:", config.chainId);
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.owner);
 
         MockERC20 mockUSDC = new MockERC20("Mock USDC", "USDC", 6);
         MockERC20 mockWBTC = new MockERC20("Mock WBTC", "WBTC", 8);
@@ -64,20 +87,23 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         console.log("Mock ERC7540 WBTC deployed at:", address(mockERC7540WBTC));
         console.log("Mock Wallet USDC deployed at:", address(mockWalletUSDC));
 
-        // Update network config with deployed addresses
-        _updateNetworkConfig(
-            config.network,
-            address(mockUSDC),
-            address(mockWBTC),
-            address(mockERC7540USDC),
-            address(mockERC7540WBTC),
-            address(mockWalletUSDC) // Pass the new MockWallet address
-        );
+        // Write to JSON only if requested (for real deployments)
+        if (writeToJson) {
+            // Update network config with deployed addresses
+            _updateNetworkConfig(
+                config.network,
+                address(mockUSDC),
+                address(mockWBTC),
+                address(mockERC7540USDC),
+                address(mockERC7540WBTC),
+                address(mockWalletUSDC)
+            );
 
-        // Write mock target addresses to deployment output
-        writeContractAddress("ERC7540USDC", address(mockERC7540USDC));
-        writeContractAddress("ERC7540WBTC", address(mockERC7540WBTC));
-        writeContractAddress("WalletUSDC", address(mockWalletUSDC));
+            // Write mock target addresses to deployment output
+            writeContractAddress("ERC7540USDC", address(mockERC7540USDC));
+            writeContractAddress("ERC7540WBTC", address(mockERC7540WBTC));
+            writeContractAddress("WalletUSDC", address(mockWalletUSDC));
+        }
 
         // Mint tokens using config amounts
         _mintTokensForTesting(mockUSDC, mockWBTC, config);
@@ -92,6 +118,17 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         console.log("Mock ERC7540 WBTC:", address(mockERC7540WBTC));
         console.log("Mock Wallet USDC:", address(mockWalletUSDC));
         console.log("Config updated at: deployments/config/", string.concat(config.network, ".json"));
+
+        // Return deployed addresses
+        assets = MockAssets({
+            USDC: address(mockUSDC),
+            WBTC: address(mockWBTC),
+            ERC7540USDC: address(mockERC7540USDC),
+            ERC7540WBTC: address(mockERC7540WBTC),
+            WalletUSDC: address(mockWalletUSDC)
+        });
+
+        return assets;
     }
 
     function _assetsAlreadyDeployed(NetworkConfig memory config) internal pure returns (bool) {
@@ -102,21 +139,22 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         return usdcDeployed && wbtcDeployed;
     }
 
-    // New function signature including the MockWallet address
+    /// @notice Convenience wrapper for real deployments (writes to JSON)
+    function run() public returns (MockAssets memory) {
+        return run(true);
+    }
+
     function _updateNetworkConfig(
         string memory network,
         address mockUSDC,
         address mockWBTC,
         address mockERC7540USDC,
         address mockERC7540WBTC,
-        address mockWalletUSDC // Added MockWallet address
+        address mockWalletUSDC
     )
         internal
     {
         string memory configPath = string.concat("deployments/config/", network, ".json");
-
-        // The vm.writeJson() cheatcode is the correct way to update specific keys
-        // in a JSON file without deleting the rest of the file content.
 
         // 1. Update Asset Addresses
         vm.writeJson(vm.toString(mockUSDC), configPath, ".assets.USDC");
@@ -127,24 +165,15 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         vm.writeJson(vm.toString(mockERC7540WBTC), configPath, ".ERC7540s.WBTC");
 
         // 3. Update the MockWallet Address
-        // This key may not exist in the original config, so we add a new top-level
-        // key or update an existing key where the MockWallet address should reside.
-        // Assuming there is a 'mockTargets' key or similar structure for non-standard assets.
-        // For simplicity, let's update an existing role or add a new key if needed.
-        // Based on the provided JSON structure, it's safer to add a new top-level key for mock-specific addresses.
-        // Since `MockWallet` isn't a main asset, we'll write it to a new mock-specific section.
-        // NOTE: If you need it in a specific existing key (like 'roles'), change the path here.
         vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".mockAssets.WalletUSDC");
 
         console.log("Updated config file with mock asset addresses");
     }
 
-    // ... (rest of the helper functions remain the same)
-
     function _mintTokensForTesting(MockERC20 mockUSDC, MockERC20 mockWBTC, NetworkConfig memory config) internal {
         console.log("=== MINTING TOKENS FOR TESTING (from config) ===");
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.owner);
 
         // Use mint amounts from config
         uint256 usdcMintAmount = config.mockAssets.mintAmounts.USDC;
@@ -207,7 +236,7 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
     {
         console.log("=== MINTING TOKENS TO MOCK TARGETS (from config) ===");
 
-        vm.startBroadcast();
+        vm.startBroadcast(config.roles.owner);
 
         // Use mock target amounts from config
         uint256 usdcAmount = config.mockAssets.mockTargetAmounts.USDC;

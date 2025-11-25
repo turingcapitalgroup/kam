@@ -63,6 +63,7 @@ string constant KBATCHRECEIVER_TRANSFER_FAILED = "B4";
 string constant KBATCHRECEIVER_WRONG_ASSET = "B5";
 string constant KBATCHRECEIVER_ZERO_ADDRESS = "B6";
 string constant KBATCHRECEIVER_ZERO_AMOUNT = "B7";
+string constant KBATCHRECEIVER_INSUFFICIENT_BALANCE = "B8";
 
 // Custodial Adapter Errors
 string constant CUSTODIAL_INVALID_CUSTODIAL_ADDRESS = "C1";
@@ -91,17 +92,16 @@ string constant KMINTER_BATCH_CLOSED = "M1";
 string constant KMINTER_BATCH_SETTLED = "M2";
 string constant KMINTER_INSUFFICIENT_BALANCE = "M3";
 string constant KMINTER_IS_PAUSED = "M4";
-string constant KMINTER_REQUEST_NOT_ELIGIBLE = "M5";
-string constant KMINTER_REQUEST_NOT_FOUND = "M6";
-string constant KMINTER_REQUEST_PROCESSED = "M7";
-string constant KMINTER_WRONG_ASSET = "M8";
-string constant KMINTER_WRONG_ROLE = "M9";
-string constant KMINTER_ZERO_ADDRESS = "M10";
-string constant KMINTER_ZERO_AMOUNT = "M11";
-string constant KMINTER_BATCH_MINT_REACHED = "M12";
-string constant KMINTER_BATCH_REDEEM_REACHED = "M13";
-string constant KMINTER_BATCH_NOT_CLOSED = "M14";
-string constant KMINTER_BATCH_NOT_SET = "M15";
+string constant KMINTER_REQUEST_NOT_FOUND = "M5";
+string constant KMINTER_WRONG_ASSET = "M6";
+string constant KMINTER_WRONG_ROLE = "M7";
+string constant KMINTER_ZERO_ADDRESS = "M8";
+string constant KMINTER_ZERO_AMOUNT = "M9";
+string constant KMINTER_BATCH_MINT_REACHED = "M10";
+string constant KMINTER_BATCH_REDEEM_REACHED = "M11";
+string constant KMINTER_BATCH_NOT_CLOSED = "M12";
+string constant KMINTER_BATCH_NOT_VALID = "M13";
+string constant KMINTER_BATCH_NOT_SETTLED = "M14";
 
 // kRegistry Errors
 string constant KREGISTRY_ADAPTER_ALREADY_SET = "R1";
@@ -116,6 +116,7 @@ string constant KREGISTRY_ZERO_AMOUNT = "R9";
 string constant KREGISTRY_FEE_EXCEEDS_MAXIMUM = "R10";
 string constant KREGISTRY_SELECTOR_ALREADY_SET = "R11";
 string constant KREGISTRY_SELECTOR_NOT_FOUND = "R12";
+string constant KREGISTRY_KTOKEN_ALREADY_SET = "R13";
 
 string constant GUARDIANMODULE_UNAUTHORIZED = "GM1";
 string constant GUARDIANMODULE_NOT_ALLOWED = "GM2";
@@ -144,12 +145,14 @@ string constant KSTAKINGVAULT_ZERO_ADDRESS = "SV8";
 string constant KSTAKINGVAULT_ZERO_AMOUNT = "SV9";
 string constant KSTAKINGVAULT_BATCH_LIMIT_REACHED = "SV10";
 string constant KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED = "SV11";
+string constant KSTAKINGVAULT_BATCH_NOT_VALID = "SV12";
 
 // kToken Errors
 string constant KTOKEN_IS_PAUSED = "T1";
 string constant KTOKEN_TRANSFER_FAILED = "T2";
 string constant KTOKEN_ZERO_ADDRESS = "T3";
 string constant KTOKEN_ZERO_AMOUNT = "T4";
+string constant KTOKEN_WRONG_ROLE = "T5";
 
 // VaultBatches Errors
 string constant VAULTBATCHES_NOT_CLOSED = "VB1";
