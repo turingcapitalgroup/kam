@@ -178,9 +178,15 @@ abstract contract DeploymentManager is Script {
         return vm.envOr("PRODUCTION", false);
     }
 
+    function getDeploymentsPath() internal view returns (string memory) {
+        string memory root = vm.projectRoot();
+        return string.concat(root, "/deployments");
+    }
+
     function readNetworkConfig() internal view returns (NetworkConfig memory config) {
         string memory network = getCurrentNetwork();
-        string memory configPath = string.concat("deployments/config/", network, ".json");
+        string memory deploymentsPath = getDeploymentsPath();
+        string memory configPath = string.concat(deploymentsPath, "/config/", network, ".json");
         require(vm.exists(configPath), string.concat("Config file not found: ", configPath));
 
         string memory json = vm.readFile(configPath);
@@ -377,10 +383,10 @@ abstract contract DeploymentManager is Script {
         revert("Unknown contract key");
     }
 
-    // Keep all existing DeploymentOutput methods from original file...
     function readDeploymentOutput() internal view returns (DeploymentOutput memory output) {
         string memory network = getCurrentNetwork();
-        string memory outputPath = string.concat("deployments/output/", network, "/addresses.json");
+        string memory deploymentsPath = getDeploymentsPath();
+        string memory outputPath = string.concat(deploymentsPath, "/output/", network, "/addresses.json");
 
         if (!vm.exists(outputPath)) {
             output.network = network;
@@ -393,7 +399,7 @@ abstract contract DeploymentManager is Script {
         output.network = json.readString(".network");
         output.timestamp = json.readUint(".timestamp");
 
-        // Parse all contract addresses (keeping existing implementation)
+        // Parse all contract addresses
         if (json.keyExists(".contracts.ERC1967Factory")) {
             output.contracts.ERC1967Factory = json.readAddress(".contracts.ERC1967Factory");
         }
@@ -481,7 +487,8 @@ abstract contract DeploymentManager is Script {
 
     function writeContractAddress(string memory contractName, address contractAddress) internal {
         string memory network = getCurrentNetwork();
-        string memory outputPath = string.concat("deployments/output/", network, "/addresses.json");
+        string memory deploymentsPath = getDeploymentsPath();
+        string memory outputPath = string.concat(deploymentsPath, "/output/", network, "/addresses.json");
 
         DeploymentOutput memory output = readDeploymentOutput();
         output.chainId = block.chainid;
