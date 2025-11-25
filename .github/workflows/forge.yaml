@@ -28,8 +28,11 @@ jobs:
           forge --version
       
       - name: Install dependencies
+        env: 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           forge soldeer install
+        
 
       - name: Run Forge fmt
         run: |
