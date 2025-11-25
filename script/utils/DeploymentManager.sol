@@ -179,8 +179,11 @@ abstract contract DeploymentManager is Script {
     }
 
     function getDeploymentsPath() internal view returns (string memory) {
-        string memory root = vm.projectRoot();
-        return string.concat(root, "/deployments");
+        string memory customPath = vm.envOr("DEPLOYMENT_BASE_PATH", string(""));
+        if (bytes(customPath).length > 0) {
+            return customPath;
+        }
+        return "deployments";
     }
 
     function readNetworkConfig() internal view returns (NetworkConfig memory config) {

@@ -344,7 +344,7 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /// @notice Internal function to validate that the contract is not in emergency pause state
     /// @dev Called before all token operations (transfers, mints, burns) to enforce emergency stops.
     /// Reverts with KTOKEN_IS_PAUSED if the contract is paused, effectively halting all token activity.
-    function _checkPaused() private view {
+    function _checkPaused() internal view {
         require(!_isPaused, KTOKEN_IS_PAUSED);
     }
 

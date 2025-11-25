@@ -123,7 +123,6 @@ interface IRegistry is IVersioned {
     /// @param name The name for the kToken (e.g., "KAM USDC")
     /// @param symbol The symbol for the kToken (e.g., "kUSDC")
     /// @param asset The underlying asset contract address to register
-    /// @param id The unique identifier for singleton asset storage (e.g., USDC, WBTC)
     /// @param maxMintPerBatch Maximum amount of the asset that can be minted in a single batch
     /// @param maxBurnPerBatch Maximum amount of the asset that can be redeemed in a single batch
     /// @return The deployed kToken contract address
@@ -131,7 +130,6 @@ interface IRegistry is IVersioned {
         string memory name,
         string memory symbol,
         address asset,
-        bytes32 id,
         uint256 maxMintPerBatch,
         uint256 maxBurnPerBatch,
         address emergencyAdmin
