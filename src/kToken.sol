@@ -135,22 +135,6 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
         _burn(_from, _amount);
     }
 
-    /// @notice Destroys kTokens from a specified address using the ERC20 allowance mechanism
-    /// @dev This function enables more complex burning scenarios where the token holder has pre-approved the burn
-    /// operation. The process involves: (1) checking and consuming the allowance between token owner and the minter,
-    /// (2) burning the specified amount from the owner's balance. This is useful for automated systems or contracts
-    /// that need to burn tokens on behalf of users, such as complex redemption flows or third-party integrations.
-    /// The allowance model provides additional security by requiring explicit approval before token destruction.
-    /// High-level business events are emitted by the calling contracts for better context.
-    /// @param _from The address from which kTokens will be burned (must have approved the burn amount)
-    /// @param _amount The quantity of kTokens to burn using the allowance mechanism
-    function burnFrom(address _from, uint256 _amount) external {
-        _checkMinter(msg.sender);
-        _checkPaused();
-        _spendAllowance(_from, msg.sender, _amount);
-        _burn(_from, _amount);
-    }
-
     /// @notice Sets approval for another address to spend tokens on behalf of the caller
     /// @param _spender The address that is approved to spend the tokens
     /// @param _amount The amount of tokens the spender is approved to spend

@@ -130,44 +130,6 @@ contract kTokenTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                                BURNFROM
-    //////////////////////////////////////////////////////////////*/
-
-    function test_BurnFrom_Success() public {
-        uint256 _amount = MINT_AMOUNT;
-
-        vm.prank(_minter);
-        kUSD.mint(users.alice, _amount);
-
-        vm.prank(users.alice);
-        kUSD.approve(_minter, _amount);
-
-        vm.prank(_minter);
-        kUSD.burnFrom(users.alice, _amount);
-
-        assertEq(kUSD.balanceOf(users.alice), 0);
-        assertEq(kUSD.allowance(users.alice, _minter), 0);
-        assertEq(kUSD.totalSupply(), 0);
-    }
-
-    function test_BurnFrom_Require_Only_Minter() public {
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
-        kUSD.burnFrom(users.alice, BURN_AMOUNT);
-    }
-
-    function test_BurnFrom_Requires_Sufficient_Allowance() public {
-        uint256 _amount = BURN_AMOUNT;
-
-        vm.prank(_minter);
-        kUSD.mint(users.alice, _amount);
-
-        vm.prank(_minter);
-        vm.expectRevert(ERC20.InsufficientAllowance.selector);
-        kUSD.burnFrom(users.alice, BURN_AMOUNT);
-    }
-
-    /* //////////////////////////////////////////////////////////////
                         ROLE MANAGEMENT TESTS
     //////////////////////////////////////////////////////////////*/
 
