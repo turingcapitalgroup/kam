@@ -217,7 +217,7 @@ abstract contract EIP3009 {
         internal
         view
     {
-        bytes32 structHash = OptimizedEfficientHashLib.hash(
+        bytes32 sh = OptimizedEfficientHashLib.hash(
             uint256(typeHash),
             uint256(uint160(signer)),
             uint256(uint160(to)),
@@ -227,7 +227,16 @@ abstract contract EIP3009 {
             uint256(nonce)
         );
 
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
+        bytes32 domain = DOMAIN_SEPARATOR();
+        bytes32 digest;
+
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, 0x1901) // Store at the END of the 32-byte word
+            mstore(add(ptr, 0x20), domain) // Next 32 bytes
+            mstore(add(ptr, 0x40), sh) // Next 32 bytes
+            digest := keccak256(add(ptr, 0x1e), 0x42) // Hash from offset 0x1e (30 bytes in)
+        }
 
         address recoveredAddress = ecrecover(digest, v, r, s);
 
