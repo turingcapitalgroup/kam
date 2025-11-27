@@ -22,17 +22,17 @@ import {
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
+import { IkTokenFactory } from "kam/src/interfaces/IkTokenFactory.sol";
 
 import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
 import { kBaseRoles } from "kam/src/base/kBaseRoles.sol";
-import { kToken } from "kam/src/kToken.sol";
 
 /// @title kRegistry
 /// @notice Central configuration hub and contract registry for the KAM protocol ecosystem
 /// @dev This contract serves as the protocol's backbone for configuration management and access control. It provides
 /// five critical functions: (1) Singleton contract management - registers and tracks core protocol contracts like
-/// kMinter and kAssetRouter ensuring single source of truth, (2) Asset and kToken management - handles asset
-/// whitelisting, kToken deployment, and maintains bidirectional mappings between underlying assets and their
+/// kMinter, kAssetRouter, and kTokenFactory ensuring single source of truth, (2) Asset and kToken management - handles asset
+/// whitelisting, kToken deployment through kTokenFactory, and maintains bidirectional mappings between underlying assets and their
 /// corresponding kTokens, (3) Vault registry - manages vault registration, classification (DN, ALPHA, BETA, etc.),
 /// and routing logic to direct assets to appropriate vaults based on type and strategy, (4) Role-based access
 /// control - implements a hierarchical permission system with ADMIN, EMERGENCY_ADMIN, GUARDIAN, RELAYER, INSTITUTION,
@@ -52,6 +52,8 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
     /// @notice kAssetRouter key
     bytes32 public constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER");
+
+    bytes32 public constant K_TOKEN_FACTORY = keccak256("K_TOKEN_FACTORY");
 
     /// @notice USDC key
     bytes32 public constant USDC = keccak256("USDC");
@@ -311,6 +313,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         address _minter = getContractById(K_MINTER);
         _checkAddressNotZero(_minter);
 
+        // Get kTokenFactory address for deploying kToken
+        address _factory = getContractById(K_TOKEN_FACTORY);
+        _checkAddressNotZero(_factory);
+
         // Extract decimals from underlying asset for kToken consistency
         (bool _success, uint8 _decimals) = _tryGetAssetDecimals(_asset);
         require(_success, KREGISTRY_WRONG_ASSET);
@@ -319,18 +325,8 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         address _kToken = $.assetToKToken[_asset];
         require(_kToken == address(0), KREGISTRY_KTOKEN_ALREADY_SET);
 
-        // Deploy new kToken with matching decimals and grant minter privileges
-        _kToken = address(
-            new kToken(
-                owner(),
-                msg.sender, // admin gets initial control
-                _emergencyAdmin, // emergency admin for safety
-                _minter, // kMinter gets minting rights
-                _name,
-                _symbol,
-                _decimals // matches underlying for consistency
-            )
-        );
+        _kToken = IkTokenFactory(_factory)
+            .deployKToken(owner(), msg.sender, _emergencyAdmin, _minter, _name, _symbol, _decimals);
 
         $.maxMintPerBatch[_asset] = _maxMintPerBatch;
         $.maxBurnPerBatch[_asset] = _maxBurnPerBatch;
