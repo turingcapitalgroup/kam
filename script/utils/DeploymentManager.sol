@@ -141,6 +141,7 @@ abstract contract DeploymentManager is Script {
         address kBTC;
         address readerModule;
         address adapterGuardianModule;
+        address kTokenFactory;
         address kStakingVaultImpl;
         address dnVault;
         address dnVaultUSDC;
@@ -178,9 +179,18 @@ abstract contract DeploymentManager is Script {
         return vm.envOr("PRODUCTION", false);
     }
 
+    function getDeploymentsPath() internal view returns (string memory) {
+        string memory customPath = vm.envOr("DEPLOYMENT_BASE_PATH", string(""));
+        if (bytes(customPath).length > 0) {
+            return customPath;
+        }
+        return "deployments";
+    }
+
     function readNetworkConfig() internal view returns (NetworkConfig memory config) {
         string memory network = getCurrentNetwork();
-        string memory configPath = string.concat("deployments/config/", network, ".json");
+        string memory deploymentsPath = getDeploymentsPath();
+        string memory configPath = string.concat(deploymentsPath, "/config/", network, ".json");
         require(vm.exists(configPath), string.concat("Config file not found: ", configPath));
 
         string memory json = vm.readFile(configPath);
@@ -377,10 +387,10 @@ abstract contract DeploymentManager is Script {
         revert("Unknown contract key");
     }
 
-    // Keep all existing DeploymentOutput methods from original file...
     function readDeploymentOutput() internal view returns (DeploymentOutput memory output) {
         string memory network = getCurrentNetwork();
-        string memory outputPath = string.concat("deployments/output/", network, "/addresses.json");
+        string memory deploymentsPath = getDeploymentsPath();
+        string memory outputPath = string.concat(deploymentsPath, "/output/", network, "/addresses.json");
 
         if (!vm.exists(outputPath)) {
             output.network = network;
@@ -393,7 +403,7 @@ abstract contract DeploymentManager is Script {
         output.network = json.readString(".network");
         output.timestamp = json.readUint(".timestamp");
 
-        // Parse all contract addresses (keeping existing implementation)
+        // Parse all contract addresses
         if (json.keyExists(".contracts.ERC1967Factory")) {
             output.contracts.ERC1967Factory = json.readAddress(".contracts.ERC1967Factory");
         }
@@ -426,6 +436,9 @@ abstract contract DeploymentManager is Script {
         }
         if (json.keyExists(".contracts.adapterGuardianModule")) {
             output.contracts.adapterGuardianModule = json.readAddress(".contracts.adapterGuardianModule");
+        }
+        if (json.keyExists(".contracts.kTokenFactory")) {
+            output.contracts.kTokenFactory = json.readAddress(".contracts.kTokenFactory");
         }
         if (json.keyExists(".contracts.kStakingVaultImpl")) {
             output.contracts.kStakingVaultImpl = json.readAddress(".contracts.kStakingVaultImpl");
@@ -481,7 +494,8 @@ abstract contract DeploymentManager is Script {
 
     function writeContractAddress(string memory contractName, address contractAddress) internal {
         string memory network = getCurrentNetwork();
-        string memory outputPath = string.concat("deployments/output/", network, "/addresses.json");
+        string memory deploymentsPath = getDeploymentsPath();
+        string memory outputPath = string.concat(deploymentsPath, "/output/", network, "/addresses.json");
 
         DeploymentOutput memory output = readDeploymentOutput();
         output.chainId = block.chainid;
@@ -511,6 +525,8 @@ abstract contract DeploymentManager is Script {
             output.contracts.readerModule = contractAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("AdapterGuardianModule"))) {
             output.contracts.adapterGuardianModule = contractAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kTokenFactory"))) {
+            output.contracts.kTokenFactory = contractAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("kStakingVaultImpl"))) {
             output.contracts.kStakingVaultImpl = contractAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("dnVaultUSDC"))) {
@@ -571,6 +587,7 @@ abstract contract DeploymentManager is Script {
         json = string.concat(json, '"readerModule":"', vm.toString(output.contracts.readerModule), '",');
         json =
             string.concat(json, '"adapterGuardianModule":"', vm.toString(output.contracts.adapterGuardianModule), '",');
+        json = string.concat(json, '"kTokenFactory":"', vm.toString(output.contracts.kTokenFactory), '",');
         json = string.concat(json, '"dnVaultUSDC":"', vm.toString(output.contracts.dnVaultUSDC), '",');
         json = string.concat(json, '"dnVaultWBTC":"', vm.toString(output.contracts.dnVaultWBTC), '",');
         json = string.concat(json, '"alphaVault":"', vm.toString(output.contracts.alphaVault), '",');

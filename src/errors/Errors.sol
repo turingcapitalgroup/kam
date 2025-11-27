@@ -7,6 +7,7 @@ pragma solidity 0.8.30;
 ///      - BV*: BaseVault errors
 ///      - B*: kBatchReceiver errors
 ///      - C*: Custodial adapter errors
+///      - F*: kTokenFactory errors
 ///      - K*: kBase errors
 ///      - M*: kMinter errors
 ///      - R*: kRegistry errors
@@ -194,3 +195,8 @@ string constant PARAMETERCHECKER_RECEIVER_NOT_ALLOWED = "PC4";
 string constant PARAMETERCHECKER_SOURCE_NOT_ALLOWED = "PC5";
 string constant PARAMETERCHECKER_SPENDER_NOT_ALLOWED = "PC6";
 string constant PARAMETERCHECKER_SELECTOR_NOT_ALLOWED = "PC7";
+
+// kTokenFactory Errors
+string constant KTOKENFACTORY_ZERO_ADDRESS = "F1";
+string constant KTOKENFACTORY_DEPLOYMENT_FAILED = "F2";
+string constant KTOKENFACTORY_WRONG_ROLE = "F3";
