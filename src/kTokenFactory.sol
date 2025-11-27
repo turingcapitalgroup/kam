@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
-
 import {
     KTOKENFACTORY_DEPLOYMENT_FAILED,
     KTOKENFACTORY_WRONG_ROLE,
@@ -21,13 +19,12 @@ import { kToken } from "kam/src/kToken.sol";
 /// off-chain tracking of deployments, (4) Returns the deployed contract address for immediate use.
 /// The factory is designed to be called by kRegistry during asset registration, ensuring all kTokens
 /// are created through a standardized process.
-contract kTokenFactory is IkTokenFactory, OptimizedOwnableRoles {
+contract kTokenFactory is IkTokenFactory {
     /* //////////////////////////////////////////////////////////////
-                              ROLES
+                               IMMUTABLE 
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Emergency admin role for emergency operations
-    uint256 internal constant DEPLOYER_ROLE = _ROLE_0;
+    address immutable registry;
 
     /* //////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -35,13 +32,12 @@ contract kTokenFactory is IkTokenFactory, OptimizedOwnableRoles {
 
     /// @notice Constructor for kTokenFactory
     /// @dev No initialization required as this is a simple factory contract
-    constructor(address _owner, address _deployer) {
-        _initializeOwner(_owner);
-        _grantRoles(_deployer, DEPLOYER_ROLE);
+    constructor(address _registry) {
+        registry = _registry;
     }
 
     /* //////////////////////////////////////////////////////////////
-                          DEPLOYMENT FUNCTIONS
+                            CORE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IkTokenFactory
@@ -79,9 +75,13 @@ contract kTokenFactory is IkTokenFactory, OptimizedOwnableRoles {
         return _kTokenAddress;
     }
 
-    /// @notice Check if caller has Admin role
-    /// @param _user Address to check
+    /* //////////////////////////////////////////////////////////////
+                            INTERNAL
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice checks the address calling is the registry
+    /// @param _user the address to be verified as registry
     function _checkDeployer(address _user) internal view {
-        require(hasAnyRole(_user, DEPLOYER_ROLE), KTOKENFACTORY_WRONG_ROLE);
+        require(_user == registry, KTOKENFACTORY_WRONG_ROLE);
     }
 }
