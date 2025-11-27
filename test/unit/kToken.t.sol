@@ -13,8 +13,10 @@ import {
 } from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
+import { EIP3009 } from "kam/src/vendor/EIP/EIP3009.sol";
 import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
 import { ERC20 } from "kam/src/vendor/solady/tokens/ERC20.sol";
+import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
 
 contract kTokenTest is DeploymentBaseTest {
     uint256 internal constant MINT_AMOUNT = 100_000 * _1_USDC;
@@ -125,44 +127,6 @@ contract kTokenTest is DeploymentBaseTest {
         vm.prank(_minter);
         vm.expectRevert(ERC20.InsufficientBalance.selector);
         kUSD.burn(users.alice, BURN_AMOUNT);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                                BURNFROM
-    //////////////////////////////////////////////////////////////*/
-
-    function test_BurnFrom_Success() public {
-        uint256 _amount = MINT_AMOUNT;
-
-        vm.prank(_minter);
-        kUSD.mint(users.alice, _amount);
-
-        vm.prank(users.alice);
-        kUSD.approve(_minter, _amount);
-
-        vm.prank(_minter);
-        kUSD.burnFrom(users.alice, _amount);
-
-        assertEq(kUSD.balanceOf(users.alice), 0);
-        assertEq(kUSD.allowance(users.alice, _minter), 0);
-        assertEq(kUSD.totalSupply(), 0);
-    }
-
-    function test_BurnFrom_Require_Only_Minter() public {
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KTOKEN_WRONG_ROLE));
-        kUSD.burnFrom(users.alice, BURN_AMOUNT);
-    }
-
-    function test_BurnFrom_Requires_Sufficient_Allowance() public {
-        uint256 _amount = BURN_AMOUNT;
-
-        vm.prank(_minter);
-        kUSD.mint(users.alice, _amount);
-
-        vm.prank(_minter);
-        vm.expectRevert(ERC20.InsufficientAllowance.selector);
-        kUSD.burnFrom(users.alice, BURN_AMOUNT);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -383,5 +347,344 @@ contract kTokenTest is DeploymentBaseTest {
         assertEq(kUSD.balanceOf(users.alice), 0);
         assertEq(kUSD.balanceOf(users.charlie), _amount);
         assertEq(kUSD.allowance(users.alice, users.bob), 0);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        EIP3009 TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Helper function to generate EIP-712 signature for transferWithAuthorization
+    /// @param privateKey The private key to sign with (must correspond to signer address)
+    function _signTransferWithAuthorization(
+        uint256 privateKey,
+        address signer,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce
+    )
+        internal
+        view
+        returns (uint8 v, bytes32 r, bytes32 s)
+    {
+        bytes32 typeHash = EIP3009(address(kUSD)).TRANSFER_WITH_AUTHORIZATION_TYPEHASH();
+        bytes32 structHash = OptimizedEfficientHashLib.hash(
+            uint256(typeHash),
+            uint256(uint160(signer)),
+            uint256(uint160(to)),
+            value,
+            validAfter,
+            validBefore,
+            uint256(nonce)
+        );
+        bytes32 domainSeparator = kUSD.DOMAIN_SEPARATOR();
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+
+        (v, r, s) = vm.sign(privateKey, digest);
+    }
+
+    /// @dev Helper function to generate EIP-712 signature for receiveWithAuthorization
+    /// @param privateKey The private key to sign with (must correspond to signer address)
+    function _signReceiveWithAuthorization(
+        uint256 privateKey,
+        address signer,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce
+    )
+        internal
+        view
+        returns (uint8 v, bytes32 r, bytes32 s)
+    {
+        bytes32 typeHash = EIP3009(address(kUSD)).RECEIVE_WITH_AUTHORIZATION_TYPEHASH();
+        bytes32 structHash = OptimizedEfficientHashLib.hash(
+            uint256(typeHash),
+            uint256(uint160(signer)),
+            uint256(uint160(to)),
+            value,
+            validAfter,
+            validBefore,
+            uint256(nonce)
+        );
+        bytes32 domainSeparator = kUSD.DOMAIN_SEPARATOR();
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+
+        (v, r, s) = vm.sign(privateKey, digest);
+    }
+
+    function test_TransferWithAuthorization_Success() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-1");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signTransferWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        assertEq(kUSD.balanceOf(signer), value);
+        assertEq(kUSD.balanceOf(to), 0);
+        assertFalse(kUSD.authorizationState(signer, nonce));
+
+        vm.expectEmit(true, true, false, true);
+        emit EIP3009.AuthorizationUsed(signer, nonce);
+        kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+
+        assertEq(kUSD.balanceOf(signer), 0);
+        assertEq(kUSD.balanceOf(to), value);
+        assertTrue(kUSD.authorizationState(signer, nonce));
+    }
+
+    function test_AuthorizationState_Success() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-3");
+
+        assertFalse(kUSD.authorizationState(signer, nonce));
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signTransferWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+        kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+
+        assertTrue(kUSD.authorizationState(signer, nonce));
+    }
+
+    function test_TransferWithAuthorization_Require_Not_Yet_Valid() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp + 1 days; // Future timestamp
+        uint256 validBefore = block.timestamp + 2 days;
+        bytes32 nonce = keccak256("test-nonce-4");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signTransferWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        vm.expectRevert(EIP3009.AuthorizationNotYetValid.selector);
+        kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function test_TransferWithAuthorization_Require_Not_Expired() public {
+        // Warp to a future timestamp to avoid underflow when calculating past timestamps
+        vm.warp(block.timestamp + 3 days);
+
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 2 days;
+        uint256 validBefore = block.timestamp - 1 days;
+        bytes32 nonce = keccak256("test-nonce-5");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signTransferWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        vm.expectRevert(EIP3009.AuthorizationExpired.selector);
+        kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function test_TransferWithAuthorization_Require_Nonce_Not_Used() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-6");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signTransferWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        vm.expectRevert(EIP3009.AuthorizationAlreadyUsed.selector);
+        kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function test_TransferWithAuthorization_Require_Valid_Signature() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-7");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        uint256 wrongPrivateKey = 2;
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signTransferWithAuthorization(wrongPrivateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        vm.expectRevert(EIP3009.InvalidSignature.selector);
+        kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function test_ReceiveWithAuthorization_Success() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-2");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signReceiveWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        assertEq(kUSD.balanceOf(signer), value);
+        assertEq(kUSD.balanceOf(to), 0);
+        assertFalse(kUSD.authorizationState(signer, nonce));
+
+        vm.prank(to);
+        vm.expectEmit(true, true, false, true);
+        emit EIP3009.AuthorizationUsed(signer, nonce);
+        kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+
+        assertEq(kUSD.balanceOf(signer), 0);
+        assertEq(kUSD.balanceOf(to), value);
+        assertTrue(kUSD.authorizationState(signer, nonce));
+    }
+
+    function test_ReceiveWithAuthorization_Require_Caller_Is_Payee() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        address wrongCaller = users.charlie;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-8");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signReceiveWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        vm.prank(wrongCaller);
+        vm.expectRevert(EIP3009.CallerNotPayee.selector);
+        kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function test_ReceiveWithAuthorization_Require_Not_Yet_Valid() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp + 1 days;
+        uint256 validBefore = block.timestamp + 2 days;
+        bytes32 nonce = keccak256("test-nonce-9");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signReceiveWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        vm.prank(to);
+        vm.expectRevert(EIP3009.AuthorizationNotYetValid.selector);
+        kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function test_ReceiveWithAuthorization_Require_Not_Expired() public {
+        vm.warp(block.timestamp + 3 days);
+
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 2 days;
+        uint256 validBefore = block.timestamp - 1 days;
+        bytes32 nonce = keccak256("test-nonce-10");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signReceiveWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        vm.prank(to);
+        vm.expectRevert(EIP3009.AuthorizationExpired.selector);
+        kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function test_ReceiveWithAuthorization_Require_Nonce_Not_Used() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-11");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signReceiveWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        vm.prank(to);
+        kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        vm.prank(to);
+        vm.expectRevert(EIP3009.AuthorizationAlreadyUsed.selector);
+        kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function test_ReceiveWithAuthorization_Require_Valid_Signature() public {
+        uint256 privateKey = 1;
+        address signer = vm.addr(privateKey);
+        address to = users.bob;
+        uint256 value = MINT_AMOUNT;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 days;
+        bytes32 nonce = keccak256("test-nonce-12");
+
+        vm.prank(_minter);
+        kUSD.mint(signer, value);
+
+        uint256 wrongPrivateKey = 2;
+        (uint8 v, bytes32 r, bytes32 s) =
+            _signReceiveWithAuthorization(wrongPrivateKey, signer, to, value, validAfter, validBefore, nonce);
+
+        vm.prank(to);
+        vm.expectRevert(EIP3009.InvalidSignature.selector);
+        kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 }

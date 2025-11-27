@@ -60,12 +60,6 @@ interface IkToken {
     /// @param amount The quantity of tokens to destroy
     function burn(address from, uint256 amount) external;
 
-    /// @notice Destroys tokens from an address using allowance mechanism
-    /// @dev Reduces allowance and burns tokens, only callable by addresses with MINTER_ROLE
-    /// @param from The address from which tokens will be destroyed
-    /// @param amount The quantity of tokens to destroy
-    function burnFrom(address from, uint256 amount) external;
-
     /* //////////////////////////////////////////////////////////////
                             ERC20 FUNCTIONS
     //////////////////////////////////////////////////////////////*/

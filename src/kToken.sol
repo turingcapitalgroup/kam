@@ -15,6 +15,7 @@ import {
     KTOKEN_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
+import { EIP3009 } from "kam/src/vendor/EIP/EIP3009.sol";
 
 /// @title kToken
 /// @notice ERC20 representation of underlying assets with guaranteed 1:1 backing in the KAM protocol
@@ -29,7 +30,7 @@ import { IkToken } from "kam/src/interfaces/IkToken.sol";
 /// protocol emergencies, (6) Supports emergency asset recovery for accidentally sent tokens. The contract ensures
 /// protocol integrity by maintaining that kToken supply accurately reflects the underlying asset backing plus any
 /// distributed yield, while enabling efficient yield distribution without physical asset transfers.
-contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGuardTransient, Multicallable {
+contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGuardTransient, Multicallable, EIP3009 {
     using SafeTransferLib for address;
 
     /* //////////////////////////////////////////////////////////////
@@ -134,22 +135,6 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
         _burn(_from, _amount);
     }
 
-    /// @notice Destroys kTokens from a specified address using the ERC20 allowance mechanism
-    /// @dev This function enables more complex burning scenarios where the token holder has pre-approved the burn
-    /// operation. The process involves: (1) checking and consuming the allowance between token owner and the minter,
-    /// (2) burning the specified amount from the owner's balance. This is useful for automated systems or contracts
-    /// that need to burn tokens on behalf of users, such as complex redemption flows or third-party integrations.
-    /// The allowance model provides additional security by requiring explicit approval before token destruction.
-    /// High-level business events are emitted by the calling contracts for better context.
-    /// @param _from The address from which kTokens will be burned (must have approved the burn amount)
-    /// @param _amount The quantity of kTokens to burn using the allowance mechanism
-    function burnFrom(address _from, uint256 _amount) external {
-        _checkMinter(msg.sender);
-        _checkPaused();
-        _spendAllowance(_from, msg.sender, _amount);
-        _burn(_from, _amount);
-    }
-
     /// @notice Sets approval for another address to spend tokens on behalf of the caller
     /// @param _spender The address that is approved to spend the tokens
     /// @param _amount The amount of tokens the spender is approved to spend
@@ -241,6 +226,12 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
         returns (uint256)
     {
         return ERC20.allowance(_owner, _spender);
+    }
+
+    /// @dev Override from ERC20 - required by EIP3009.
+    /// @dev This is the hook that EIP3009 uses for signature verification.
+    function DOMAIN_SEPARATOR() public view virtual override(ERC20, EIP3009) returns (bytes32) {
+        return super.DOMAIN_SEPARATOR();
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -340,6 +331,12 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
     /* //////////////////////////////////////////////////////////////
                         INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Override from ERC20 - required by EIP3009.
+    /// @dev This is the hook that EIP3009.transferWithAuthorization calls.
+    function _transfer(address from, address to, uint256 amount) internal virtual override(ERC20, EIP3009) {
+        super._transfer(from, to, amount);
+    }
 
     /// @notice Internal function to validate that the contract is not in emergency pause state
     /// @dev Called before all token operations (transfers, mints, burns) to enforce emergency stops.
