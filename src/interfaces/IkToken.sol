@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity 0.8.30;
 
 /// @title IkToken
 /// @notice Interface for kToken with role-based minting and burning capabilities
@@ -118,6 +118,8 @@ interface IkToken {
     /// @return True if the contract is paused, false otherwise
     function isPaused() external view returns (bool);
 
+    function DOMAIN_SEPARATOR() external view returns (bytes32);
+
     /* //////////////////////////////////////////////////////////////
                         ADMIN FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -126,6 +128,17 @@ interface IkToken {
     /// @dev Only callable by addresses with EMERGENCY_ADMIN_ROLE
     /// @param _isPaused True to pause the contract, false to unpause
     function setPaused(bool _isPaused) external;
+
+    /// @notice Emergency recovery function for accidentally sent assets
+    /// @dev This function provides a safety mechanism to recover tokens or ETH accidentally sent to the kToken
+    /// contract.
+    /// It's designed for emergency situations where users mistakenly transfer assets to the wrong address.
+    /// The function can handle both ERC20 tokens and native ETH. Only emergency admins can execute withdrawals
+    /// to prevent unauthorized asset extraction. This should not be used for regular operations.
+    /// @param _token The token contract address to withdraw (use address(0) for native ETH)
+    /// @param _to The destination address to receive the recovered assets
+    /// @param _amount The quantity of tokens or ETH to recover
+    function emergencyWithdraw(address _token, address _to, uint256 _amount) external;
 
     /* //////////////////////////////////////////////////////////////
                         ROLE MANAGEMENT

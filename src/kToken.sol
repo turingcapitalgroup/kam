@@ -230,7 +230,7 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
 
     /// @dev Override from ERC20 - required by EIP3009.
     /// @dev This is the hook that EIP3009 uses for signature verification.
-    function DOMAIN_SEPARATOR() public view virtual override(ERC20, EIP3009) returns (bytes32) {
+    function DOMAIN_SEPARATOR() public view virtual override(IkToken, ERC20, EIP3009) returns (bytes32) {
         return super.DOMAIN_SEPARATOR();
     }
 
