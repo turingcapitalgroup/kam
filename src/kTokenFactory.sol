@@ -21,7 +21,7 @@ import { kToken } from "kam/src/kToken.sol";
 /// are created through a standardized process.
 contract kTokenFactory is IkTokenFactory {
     /* //////////////////////////////////////////////////////////////
-                               IMMUTABLE 
+                               IMMUTABLE
     //////////////////////////////////////////////////////////////*/
 
     address immutable registry;
