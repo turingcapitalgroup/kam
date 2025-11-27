@@ -62,13 +62,21 @@ contract BaseTest is Test {
         return mockWBTC;
     }
 
+    function getLocalConfigPath() internal view returns (string memory) {
+        string memory customPath = vm.envOr("DEPLOYMENT_BASE_PATH", string(""));
+        if (bytes(customPath).length > 0) {
+            return string.concat(customPath, "/config/localhost.json");
+        }
+        return "deployments/config/localhost.json";
+    }
+
     function _createUsers() internal {
         // Regular test users (random addresses)
         users.alice = utils.createUser("Alice");
         users.bob = utils.createUser("Bob");
         users.charlie = utils.createUser("Charlie");
 
-        string memory configPath = "deployments/config/localhost.json";
+        string memory configPath = getLocalConfigPath();
         require(vm.exists(configPath), "Config file not found: deployments/config/localhost.json");
 
         string memory json = vm.readFile(configPath);

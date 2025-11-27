@@ -9,6 +9,7 @@ import { DeploymentManager } from "../utils/DeploymentManager.sol";
 
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { AdapterGuardianModule } from "kam/src/kRegistry/modules/AdapterGuardianModule.sol";
+import { kTokenFactory } from "kam/src/kTokenFactory.sol";
 
 contract DeployRegistryScript is Script, DeploymentManager {
     struct RegistryDeployment {
@@ -16,6 +17,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
         address registryImpl;
         address registry;
         address adapterGuardianModule;
+        address kTokenFactory;
     }
 
     /// @notice Deploy registry contracts
@@ -48,6 +50,9 @@ contract DeployRegistryScript is Script, DeploymentManager {
 
         address registryProxy = factory.deployAndCall(address(registryImpl), msg.sender, initData);
 
+        // Deploy kTokenFactory with registry as deployer (registry will call deployKToken)
+        kTokenFactory tokenFactory = new kTokenFactory(registryProxy);
+
         // Deploy AdapterGuardianModule (facet implementation)
         AdapterGuardianModule adapterGuardianModule = new AdapterGuardianModule();
 
@@ -63,6 +68,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
         console.log("kRegistry implementation deployed at:", address(registryImpl));
         console.log("kRegistry proxy deployed at:", registryProxy);
         console.log("AdapterGuardianModule deployed at:", address(adapterGuardianModule));
+        console.log("kTokenFactory deployed at:", address(tokenFactory));
         console.log("Network:", config.network);
         console.log("Chain ID:", config.chainId);
 
@@ -70,7 +76,8 @@ contract DeployRegistryScript is Script, DeploymentManager {
             factory: address(factory),
             registryImpl: address(registryImpl),
             registry: registryProxy,
-            adapterGuardianModule: address(adapterGuardianModule)
+            adapterGuardianModule: address(adapterGuardianModule),
+            kTokenFactory: address(tokenFactory)
         });
 
         // Write to JSON only if requested (for real deployments)
@@ -79,6 +86,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
             writeContractAddress("kRegistryImpl", address(registryImpl));
             writeContractAddress("kRegistry", registryProxy);
             writeContractAddress("AdapterGuardianModule", address(adapterGuardianModule));
+            writeContractAddress("kTokenFactory", address(tokenFactory));
         }
 
         return deployment;
