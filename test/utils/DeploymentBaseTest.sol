@@ -126,7 +126,7 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
 
         // Register singletons (no JSON read/write in tests)
         (new RegisterSingletonsScript())
-        .run(registryDeploy.registry, assetRouterDeploy.assetRouter, minterDeploy.minter);
+        .run(registryDeploy.registry, assetRouterDeploy.assetRouter, minterDeploy.minter, registryDeploy.kTokenFactory);
 
         // Deploy kTokens
         DeployTokensScript.TokenDeployment memory tokenDeploy =

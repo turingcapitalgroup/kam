@@ -141,6 +141,7 @@ abstract contract DeploymentManager is Script {
         address kBTC;
         address readerModule;
         address adapterGuardianModule;
+        address kTokenFactory;
         address kStakingVaultImpl;
         address dnVault;
         address dnVaultUSDC;
@@ -436,6 +437,9 @@ abstract contract DeploymentManager is Script {
         if (json.keyExists(".contracts.adapterGuardianModule")) {
             output.contracts.adapterGuardianModule = json.readAddress(".contracts.adapterGuardianModule");
         }
+        if (json.keyExists(".contracts.kTokenFactory")) {
+            output.contracts.kTokenFactory = json.readAddress(".contracts.kTokenFactory");
+        }
         if (json.keyExists(".contracts.kStakingVaultImpl")) {
             output.contracts.kStakingVaultImpl = json.readAddress(".contracts.kStakingVaultImpl");
         }
@@ -521,6 +525,8 @@ abstract contract DeploymentManager is Script {
             output.contracts.readerModule = contractAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("AdapterGuardianModule"))) {
             output.contracts.adapterGuardianModule = contractAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kTokenFactory"))) {
+            output.contracts.kTokenFactory = contractAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("kStakingVaultImpl"))) {
             output.contracts.kStakingVaultImpl = contractAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("dnVaultUSDC"))) {
@@ -581,6 +587,7 @@ abstract contract DeploymentManager is Script {
         json = string.concat(json, '"readerModule":"', vm.toString(output.contracts.readerModule), '",');
         json =
             string.concat(json, '"adapterGuardianModule":"', vm.toString(output.contracts.adapterGuardianModule), '",');
+        json = string.concat(json, '"kTokenFactory":"', vm.toString(output.contracts.kTokenFactory), '",');
         json = string.concat(json, '"dnVaultUSDC":"', vm.toString(output.contracts.dnVaultUSDC), '",');
         json = string.concat(json, '"dnVaultWBTC":"', vm.toString(output.contracts.dnVaultWBTC), '",');
         json = string.concat(json, '"alphaVault":"', vm.toString(output.contracts.alphaVault), '",');
