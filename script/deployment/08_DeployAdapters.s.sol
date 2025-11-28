@@ -6,7 +6,8 @@ import { console2 as console } from "forge-std/console2.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
-import { MinimalSmartAccount, VaultAdapter } from "src/adapters/VaultAdapter.sol";
+import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
+import { VaultAdapter } from "src/adapters/VaultAdapter.sol";
 
 contract DeployAdaptersScript is Script, DeploymentManager {
     struct AdaptersDeployment {
