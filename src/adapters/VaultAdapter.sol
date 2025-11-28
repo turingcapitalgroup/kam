@@ -16,10 +16,10 @@ import {
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
-import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
+import { SmartAdapterAccount } from "kam/src/adapters/SmartAdapterAccount.sol";
 
 /// @title VaultAdapter
-contract VaultAdapter is MinimalSmartAccount, IVaultAdapter {
+contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
     using SafeTransferLib for address;
     using OptimizedAddressEnumerableSetLib for OptimizedAddressEnumerableSetLib.AddressSet;
 

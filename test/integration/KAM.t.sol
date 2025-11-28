@@ -46,11 +46,8 @@ contract KamIntegrationTest is DeploymentBaseTest {
         assetRouter.setSettlementCooldown(0); // I set the cooldown to 0 so we can run it all at once.
         vm.stopPrank();
 
-        vm.prank(users.owner);
-        minterAdapterUSDC.grantRoles(users.relayer, 2);
-
-        vm.prank(users.owner);
-        DNVaultAdapterUSDC.grantRoles(users.relayer, 2);
+        // Note: grantRoles calls removed - SmartAdapterAccount uses registry.isManager for authorization
+        // The relayer already has MANAGER_ROLE in the registry from initialization
 
         // I clean all users and vault balances to make it easier to do the accounting
         // since this is a full protocol integration test.
