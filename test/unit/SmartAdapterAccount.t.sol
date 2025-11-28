@@ -5,9 +5,9 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { SmartAdapterAccount } from "kam/src/adapters/SmartAdapterAccount.sol";
 import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
+import { IMinimalSmartAccount } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
 import { ExecutionLib } from "minimal-smart-account/libraries/ExecutionLib.sol";
 import { ModeLib } from "minimal-smart-account/libraries/ModeLib.sol";
-import { IMinimalSmartAccount } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
 
 contract SmartAdapterAccountTest is DeploymentBaseTest {
     SmartAdapterAccount adapter;
@@ -39,9 +39,7 @@ contract SmartAdapterAccountTest is DeploymentBaseTest {
 
         vm.prank(users.relayer);
         vm.expectEmit(true, true, true, true);
-        emit IMinimalSmartAccount.Executed(
-            _nonceBefore + 1, users.relayer, testTarget, _callData, 0, ""
-        );
+        emit IMinimalSmartAccount.Executed(_nonceBefore + 1, users.relayer, testTarget, _callData, 0, "");
         adapter.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
 
         assertEq(adapter.nonce(), _nonceBefore + 1);

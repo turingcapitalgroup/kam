@@ -5,9 +5,9 @@ pragma solidity ^0.8.20;
 import { LibCall } from "minimal-smart-account/vendor/LibCall.sol";
 
 // Local Interfaces
-import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
-import { IAdapterGuardian } from "kam/src/interfaces/modules/IAdapterGuardian.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
+import { IAdapterGuardian } from "kam/src/interfaces/modules/IAdapterGuardian.sol";
+import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
 
 // Base Contract
 import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
@@ -20,6 +20,7 @@ import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.s
 /// Supports receiving Ether, ERC721, and ERC1155 tokens.
 contract SmartAdapterAccount is MinimalSmartAccount {
     using LibCall for address;
+
     /* ///////////////////////////////////////////////////////////////
                             CORE OPERATIONS
     ///////////////////////////////////////////////////////////////*/

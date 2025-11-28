@@ -13,10 +13,10 @@ import {
     VAULTADAPTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
+import { SmartAdapterAccount } from "kam/src/adapters/SmartAdapterAccount.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
-import { SmartAdapterAccount } from "kam/src/adapters/SmartAdapterAccount.sol";
 
 /// @title VaultAdapter
 contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
