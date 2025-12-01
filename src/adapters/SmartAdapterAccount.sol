@@ -22,57 +22,6 @@ contract SmartAdapterAccount is MinimalSmartAccount {
     using LibCall for address;
 
     /* ///////////////////////////////////////////////////////////////
-                            CORE OPERATIONS
-    ///////////////////////////////////////////////////////////////*/
-
-    /// @notice Internal function to execute batch calls that revert on failure
-    /// @dev Overrides parent to use IAdapterGuardian instead of IRegistry for authorization
-    /// @param executions Array of Execution structs containing target, value, and calldata
-    /// @return result Array of bytes containing the return data from each executed call
-    function _exec(Execution[] calldata executions) internal virtual override returns (bytes[] memory result) {
-        MinimalAccountStorage storage $ = _getMinimalAccountStorage();
-        IAdapterGuardian _adapterGuardian = IAdapterGuardian(address($.registry));
-        uint256 _length = executions.length;
-        result = new bytes[](_length);
-
-        for (uint256 _i; _i < _length; ++_i) {
-            ++$.nonce;
-            bytes4 _functionSig = bytes4(executions[_i].callData);
-            bytes memory _params = executions[_i].callData[4:];
-            _adapterGuardian.authorizeAdapterCall(executions[_i].target, _functionSig, _params);
-            result[_i] = executions[_i].target.callContract(executions[_i].value, executions[_i].callData);
-            emit Executed(
-                $.nonce, msg.sender, executions[_i].target, executions[_i].callData, executions[_i].value, result[_i]
-            );
-        }
-    }
-
-    /// @notice Internal function to execute batch calls that continue on failure
-    /// @dev Overrides parent to use IAdapterGuardian instead of IRegistry for authorization
-    /// @param executions Array of Execution structs containing target, value, and calldata
-    /// @return result Array of bytes containing the return data from each executed call
-    function _tryExec(Execution[] calldata executions) internal virtual override returns (bytes[] memory result) {
-        MinimalAccountStorage storage $ = _getMinimalAccountStorage();
-        IAdapterGuardian _adapterGuardian = IAdapterGuardian(address($.registry));
-        uint256 _length = executions.length;
-        result = new bytes[](_length);
-
-        for (uint256 _i; _i < _length; ++_i) {
-            ++$.nonce;
-            bytes4 _functionSig = bytes4(executions[_i].callData);
-            bytes memory _params = executions[_i].callData[4:];
-            _adapterGuardian.authorizeAdapterCall(executions[_i].target, _functionSig, _params);
-            (bool _success,, bytes memory _callResult) = executions[_i].target
-                .tryCall(executions[_i].value, type(uint256).max, type(uint16).max, executions[_i].callData);
-            result[_i] = _callResult;
-            if (!_success) emit TryExecutionFailed(_i);
-            emit Executed(
-                $.nonce, msg.sender, executions[_i].target, executions[_i].callData, executions[_i].value, result[_i]
-            );
-        }
-    }
-
-    /* ///////////////////////////////////////////////////////////////
                             ADMIN OPERATIONS
     ///////////////////////////////////////////////////////////////*/
 
@@ -92,4 +41,3 @@ contract SmartAdapterAccount is MinimalSmartAccount {
         require(IkRegistry(address($.registry)).isManager(_caller), "Unauthorized");
     }
 }
-
