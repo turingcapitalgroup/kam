@@ -259,7 +259,7 @@ contract kStakingVaultHandler is BaseHandler {
             kStakingVault_vault.claimUnstakedAssets(requestId);
             kStakingVault_actorUnstakeRequests[currentActor].remove(requestId);
         }
-        uint256 sharesToBurn = unstakeRequest.stkTokenAmount * netSharePrice / sharePrice;
+        uint256 sharesToBurn = unstakeRequest.stkTokenAmount * netSharePrice / sharePrice; // TODO: Update the math to the new convertToAssetsWith...
         kStakingVault_expectedSupply -= sharesToBurn;
         kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
         uint256 expectedShareValue = unstakeRequest.stkTokenAmount * sharePrice / (10 ** kStakingVault_vault.decimals());

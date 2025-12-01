@@ -322,13 +322,13 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @return _assets The equivalent value in underlying assets based on current vault performance
     function _convertToAssetsWithTotals(
         uint256 _shares,
-        uint256 _totalAssetsValue
+        uint256 _totalAssetsValue,
+        uint256 _totalSupply
     )
         internal
         view
         returns (uint256 _assets)
     {
-        uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) return _shares;
         return _shares.fullMulDiv(_totalAssetsValue, _totalSupply);
     }
@@ -345,13 +345,13 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @return _shares The equivalent stkToken amount based on current share price
     function _convertToSharesWithTotals(
         uint256 _assets,
-        uint256 _totalAssetsValue
+        uint256 _totalAssetsValue,
+        uint256 _totalSupply
     )
         internal
         view
         returns (uint256 _shares)
     {
-        uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) return _assets;
         return _assets.fullMulDiv(_totalSupply, _totalAssetsValue);
     }
@@ -366,7 +366,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @return Net price per stkToken in underlying asset terms (scaled to vault decimals)
     function _netSharePrice() internal view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalNetAssets());
+        return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalNetAssets(), totalSupply());
     }
 
     /// @notice Calculates gross share price per stkToken including accumulated fees
@@ -380,7 +380,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @return Gross price per stkToken in underlying asset terms (scaled to vault decimals)
     function _sharePrice() internal view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalAssets());
+        return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalAssets(), totalSupply());
     }
 
     /// @notice Calculates total assets under management including pending stakes and accrued yields
