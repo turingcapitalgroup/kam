@@ -6,8 +6,6 @@ import { LibCall } from "minimal-smart-account/vendor/LibCall.sol";
 
 // Local Interfaces
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
-import { IAdapterGuardian } from "kam/src/interfaces/modules/IAdapterGuardian.sol";
-import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
 
 // Base Contract
 import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
