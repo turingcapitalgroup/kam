@@ -239,11 +239,20 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
     function getBatchIdInfo(bytes32 _batchId)
         external
         view
-        returns (address batchReceiver, bool isClosed_, bool isSettled, uint256 sharePrice_, uint256 netSharePrice_)
+        returns (
+            address batchReceiver,
+            bool isClosed_,
+            bool isSettled,
+            uint256 sharePrice_,
+            uint256 netSharePrice_,
+            uint256 totalAssets_,
+            uint256 totalNetAssets_,
+            uint256 totalSupply_
+        )
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
-        
+
         uint256 _totalSupply = batch.totalSupply;
         uint8 decimals = _getDecimals($);
 
@@ -255,7 +264,10 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
             batch.isClosed,
             batch.isSettled,
             sharePrice_,
-            netSharePrice_
+            netSharePrice_,
+            batch.totalAssets,
+            batch.totalNetAssets,
+            batch.totalSupply
         );
     }
 
@@ -322,13 +334,29 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
     }
 
     /// @inheritdoc IVaultReader
-    function convertToSharesWithTotals(uint256 _shares, uint256 _totalAssets) external view returns (uint256) {
-        return _convertToSharesWithTotals(_shares, _totalAssets, totalSupply());
+    function convertToSharesWithTotals(
+        uint256 _shares,
+        uint256 _totalAssets,
+        uint256 _totalSupply
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _convertToSharesWithTotals(_shares, _totalAssets, _totalSupply);
     }
 
     /// @inheritdoc IVaultReader
-    function convertToAssetsWithTotals(uint256 _assets, uint256 _totalAssets) external view returns (uint256) {
-        return _convertToAssetsWithTotals(_assets, _totalAssets, totalSupply());
+    function convertToAssetsWithTotals(
+        uint256 _assets,
+        uint256 _totalAssets,
+        uint256 _totalSupply
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _convertToAssetsWithTotals(_assets, _totalAssets, _totalSupply);
     }
 
     /// @inheritdoc IVaultReader

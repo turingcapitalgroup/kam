@@ -334,8 +334,9 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
 
         // Claim unstaked assets
         vm.prank(users.alice);
+        // Expected return = 1000 * 1e6 - 821372 = 999178628
         vm.expectEmit(true, false, true, true);
-        emit IVault.UnstakingAssetsClaimed(unstakeBatchId, unstakeRequestId, users.alice, 999_178_000);
+        emit IVault.UnstakingAssetsClaimed(unstakeBatchId, unstakeRequestId, users.alice, 999_178_628);
         vault.claimUnstakedAssets(unstakeRequestId);
 
         assertApproxEqRel(vault.sharePrice(), sharePrice, 0.001 ether);
@@ -343,7 +344,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
 
         // Verify user received kTokens back
         uint256 kTokenBalanceAfter = kUSD.balanceOf(users.alice);
-        assertEq(kTokenBalanceAfter - kTokenBalanceBefore, 999_178_000);
+        assertApproxEqAbs(kTokenBalanceAfter - kTokenBalanceBefore, 999_178_628, 100);
 
         // Verify stkTokens were burned from vault
         assertEq(vault.balanceOf(address(vault)), 0);

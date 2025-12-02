@@ -326,7 +326,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         uint256 _totalSupply
     )
         internal
-        view
+        pure
         returns (uint256 _assets)
     {
         if (_totalSupply == 0) return _shares;
@@ -349,7 +349,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         uint256 _totalSupply
     )
         internal
-        view
+        pure
         returns (uint256 _shares)
     {
         if (_totalSupply == 0) return _assets;

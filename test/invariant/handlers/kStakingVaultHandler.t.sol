@@ -202,20 +202,29 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorStakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.StakeRequest memory stakeRequest = kStakingVault_vault.getStakeRequest(requestId);
         bytes32 batchId = stakeRequest.batchId;
-        (,, bool isSettled,, uint256 netSharePrice) = kStakingVault_vault.getBatchIdInfo(batchId);
+        (,, bool isSettled,,,, uint256 totalNetAssets, uint256 totalSupply) =
+            kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
             kStakingVault_vault.claimStakedShares(requestId);
             vm.stopPrank();
             return;
         } else {
+            uint256 sharesToMint = VaultMathLib.convertToSharesWithAssetsAndSupply(
+                stakeRequest.kTokenAmount, totalNetAssets, totalSupply
+            );
+            if (sharesToMint == 0) {
+                vm.expectRevert(bytes("SV9"));
+                kStakingVault_vault.claimStakedShares(requestId);
+                vm.stopPrank();
+                return;
+            }
             kStakingVault_vault.claimStakedShares(requestId);
             kStakingVault_actorStakeRequests[currentActor].remove(requestId);
             kStakingVault_pendingStakeInBatch[batchId] -= stakeRequest.kTokenAmount;
             kStakingVault_expectedTotalAssets += stakeRequest.kTokenAmount;
             kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
-            uint256 sharesToMint =
-                (uint256(stakeRequest.kTokenAmount)) * 10 ** kStakingVault_vault.decimals() / netSharePrice;
+
             kStakingVault_expectedSupply += sharesToMint;
             kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
             (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
@@ -250,26 +259,38 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorUnstakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.UnstakeRequest memory unstakeRequest = kStakingVault_vault.getUnstakeRequest(requestId);
         bytes32 batchId = unstakeRequest.batchId;
-        (,, bool isSettled, uint256 sharePrice, uint256 netSharePrice) = kStakingVault_vault.getBatchIdInfo(batchId);
+        (,, bool isSettled,,, uint256 totalAssets, uint256 totalNetAssets, uint256 totalSupply) =
+            kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
             kStakingVault_vault.claimUnstakedAssets(requestId);
+            vm.stopPrank();
             return;
         } else {
+            uint256 totalKTokensNet = VaultMathLib.convertToAssetsWithAssetsAndSupply(
+                unstakeRequest.stkTokenAmount, totalNetAssets, totalSupply
+            );
+            if (totalKTokensNet == 0) {
+                vm.expectRevert(bytes("SV9"));
+                kStakingVault_vault.claimUnstakedAssets(requestId);
+                vm.stopPrank();
+                return;
+            }
             kStakingVault_vault.claimUnstakedAssets(requestId);
             kStakingVault_actorUnstakeRequests[currentActor].remove(requestId);
+
+            uint256 sharesToBurn = uint256(unstakeRequest.stkTokenAmount).fullMulDiv(totalNetAssets, totalAssets);
+            kStakingVault_expectedSupply -= sharesToBurn;
+            kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
+
+            kStakingVault_expectedTotalAssets -= totalKTokensNet;
+            kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
+            (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
+                kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
+            );
+            kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
+            kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
         }
-        uint256 sharesToBurn = unstakeRequest.stkTokenAmount * netSharePrice / sharePrice; // TODO: Update the math to the new convertToAssetsWith...
-        kStakingVault_expectedSupply -= sharesToBurn;
-        kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
-        uint256 expectedShareValue = unstakeRequest.stkTokenAmount * sharePrice / (10 ** kStakingVault_vault.decimals());
-        kStakingVault_expectedTotalAssets -= expectedShareValue;
-        kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
-        (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
-            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
-        );
-        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
-        kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
 
         vm.stopPrank();
     }
@@ -334,7 +355,7 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_vault.closeBatch(batchId, true);
         vm.stopPrank();
 
-        // Simulate transfers between adapteds
+        // Simulate transfers between adapters
         if (netted != 0) {
             if (netted > 0) {
                 uint256 transferAmount = uint256(netted);
@@ -447,11 +468,11 @@ contract kStakingVaultHandler is BaseHandler {
                 - int256(kStakingVault_pendingStakeInBatch[proposal.batchId])
         );
 
-        (,,, uint256 sharePrice, uint256 netSharePrice) = kStakingVault_vault.getBatchIdInfo(proposal.batchId);
+        (,,,,, uint256 totalAssets, uint256 totalNetAssets,) = kStakingVault_vault.getBatchIdInfo(proposal.batchId);
         uint256 expectedSharesToBurn;
         if (totalRequestedShares != 0) {
             // Discount protocol fees
-            uint256 netRequestedShares = totalRequestedShares * netSharePrice / sharePrice;
+            uint256 netRequestedShares = totalRequestedShares.fullMulDiv(totalNetAssets, totalAssets);
             expectedSharesToBurn = totalRequestedShares - netRequestedShares;
             uint256 feeAssets = VaultMathLib.convertToAssetsWithAssetsAndSupply(
                 expectedSharesToBurn, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply

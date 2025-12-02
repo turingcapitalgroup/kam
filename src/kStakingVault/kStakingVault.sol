@@ -259,7 +259,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Calculate stkToken amount based on settlement-time values
         BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
-        uint256 _stkTokensToMint = _convertToSharesWithTotals(_request.kTokenAmount, batch.totalNetAssets, batch.totalSupply);
+        uint256 _stkTokensToMint =
+            _convertToSharesWithTotals(_request.kTokenAmount, batch.totalNetAssets, batch.totalSupply);
         _checkAmountNotZero(_stkTokensToMint);
 
         emit StakingSharesClaimed(_batchId, _requestId, _request.user, _stkTokensToMint);
@@ -296,17 +297,20 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         uint256 _totalAssets = batch.totalAssets;
         uint256 _totalNetAssets = batch.totalNetAssets;
         uint256 _totalSupply = batch.totalSupply;
-        
+
         // This should never happen, but safe Bananas never dies
         require(_totalSupply > 0, KSTAKINGVAULT_ZERO_AMOUNT);
-        
+
         // Calculate total kTokens to return: (stkTokenAmount * totalNetAssets) / totalSupply
         uint256 _totalKTokensNet = _convertToAssetsWithTotals(stkTokenAmount, _totalNetAssets, _totalSupply);
         _checkAmountNotZero(_totalKTokensNet);
-        
-        // Calculate net shares to burn: (stkTokenAmount * totalNetAssets) / totalAssets
+
+        // Calculate net shares to burn: (stkTokenAmount * netSharePrice) / sharePrice
         // This represents the net shares (after fees) that should be burned
-        uint256 _netSharesToBurn = (uint256(stkTokenAmount)).fullMulDiv(_totalNetAssets, _totalAssets);
+        uint8 decimals = _getDecimals($);
+        uint256 _sharePrice = _convertToAssetsWithTotals(10 ** decimals, _totalAssets, _totalSupply);
+        uint256 _netSharePrice = _convertToAssetsWithTotals(10 ** decimals, _totalNetAssets, _totalSupply);
+        uint256 _netSharesToBurn = (uint256(stkTokenAmount) * _netSharePrice) / _sharePrice;
 
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
