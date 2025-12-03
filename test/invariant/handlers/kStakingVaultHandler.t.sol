@@ -209,30 +209,28 @@ contract kStakingVaultHandler is BaseHandler {
             kStakingVault_vault.claimStakedShares(requestId);
             vm.stopPrank();
             return;
-        } else {
-            uint256 sharesToMint = VaultMathLib.convertToSharesWithAssetsAndSupply(
-                stakeRequest.kTokenAmount, totalNetAssets, totalSupply
-            );
-            if (sharesToMint == 0) {
-                vm.expectRevert(bytes("SV9"));
-                kStakingVault_vault.claimStakedShares(requestId);
-                vm.stopPrank();
-                return;
-            }
-            kStakingVault_vault.claimStakedShares(requestId);
-            kStakingVault_actorStakeRequests[currentActor].remove(requestId);
-            kStakingVault_pendingStakeInBatch[batchId] -= stakeRequest.kTokenAmount;
-            kStakingVault_expectedTotalAssets += stakeRequest.kTokenAmount;
-            kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
-
-            kStakingVault_expectedSupply += sharesToMint;
-            kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
-            (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
-                kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
-            );
-            kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
-            kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
         }
+        uint256 sharesToMint =
+            VaultMathLib.convertToSharesWithAssetsAndSupply(stakeRequest.kTokenAmount, totalNetAssets, totalSupply);
+        if (sharesToMint == 0) {
+            vm.expectRevert(bytes("SV9"));
+            kStakingVault_vault.claimStakedShares(requestId);
+            vm.stopPrank();
+            return;
+        }
+        kStakingVault_vault.claimStakedShares(requestId);
+        kStakingVault_actorStakeRequests[currentActor].remove(requestId);
+        kStakingVault_pendingStakeInBatch[batchId] -= stakeRequest.kTokenAmount;
+        kStakingVault_expectedTotalAssets += stakeRequest.kTokenAmount;
+        kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
+        kStakingVault_expectedSupply += sharesToMint;
+        kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
+        (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
+            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
+        );
+        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
+        kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
+
         vm.stopPrank();
     }
 
@@ -266,31 +264,28 @@ contract kStakingVaultHandler is BaseHandler {
             kStakingVault_vault.claimUnstakedAssets(requestId);
             vm.stopPrank();
             return;
-        } else {
-            uint256 totalKTokensNet = VaultMathLib.convertToAssetsWithAssetsAndSupply(
-                unstakeRequest.stkTokenAmount, totalNetAssets, totalSupply
-            );
-            if (totalKTokensNet == 0) {
-                vm.expectRevert(bytes("SV9"));
-                kStakingVault_vault.claimUnstakedAssets(requestId);
-                vm.stopPrank();
-                return;
-            }
-            kStakingVault_vault.claimUnstakedAssets(requestId);
-            kStakingVault_actorUnstakeRequests[currentActor].remove(requestId);
-
-            uint256 sharesToBurn = uint256(unstakeRequest.stkTokenAmount).fullMulDiv(totalNetAssets, totalAssets);
-            kStakingVault_expectedSupply -= sharesToBurn;
-            kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
-
-            kStakingVault_expectedTotalAssets -= totalKTokensNet;
-            kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
-            (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
-                kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
-            );
-            kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
-            kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
         }
+        uint256 totalKTokensNet = VaultMathLib.convertToAssetsWithAssetsAndSupply(
+            unstakeRequest.stkTokenAmount, totalNetAssets, totalSupply
+        );
+        if (totalKTokensNet == 0) {
+            vm.expectRevert(bytes("SV9"));
+            kStakingVault_vault.claimUnstakedAssets(requestId);
+            vm.stopPrank();
+            return;
+        }
+        kStakingVault_vault.claimUnstakedAssets(requestId);
+        kStakingVault_actorUnstakeRequests[currentActor].remove(requestId);
+        uint256 sharesToBurn = uint256(unstakeRequest.stkTokenAmount).fullMulDiv(totalNetAssets, totalAssets);
+        kStakingVault_expectedSupply -= sharesToBurn;
+        kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
+        kStakingVault_expectedTotalAssets -= totalKTokensNet;
+        kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
+        (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
+            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
+        );
+        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
+        kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
 
         vm.stopPrank();
     }
@@ -705,15 +700,16 @@ contract kStakingVaultHandler is BaseHandler {
 
     function INVARIANT_D_SHARE_PRICE() public view {
         assertEq(
-            kStakingVault_expectedSharePrice, kStakingVault_actualSharePrice, "KSTAKING_VAULT: INVARIANT_C_SHARE_PRICE"
+            kStakingVault_expectedSharePrice,
+            kStakingVault_actualSharePrice, 
+            "KSTAKING_VAULT: INVARIANT_C_SHARE_PRICE"
         );
     }
 
     function INVARIANT_E_TOTAL_NET_ASSETS() public view {
-        assertApproxEqRel(
-            kStakingVault_expectedNetTotalAssets,
-            kStakingVault_actualNetTotalAssets,
-            0.01 ether,
+        assertEq(
+            kStakingVault_expectedNetTotalAssets, 
+            kStakingVault_actualNetTotalAssets, 
             "INVARIANT_D_TOTAL_NET_ASSETS"
         );
     }
