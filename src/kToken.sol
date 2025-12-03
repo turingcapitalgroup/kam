@@ -7,6 +7,7 @@ import { Multicallable } from "solady/utils/Multicallable.sol";
 import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentrancyGuardTransient.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
+import { ERC3009 } from "kam/src/base/ERC3009.sol";
 import {
     KTOKEN_IS_PAUSED,
     KTOKEN_TRANSFER_FAILED,
@@ -15,7 +16,6 @@ import {
     KTOKEN_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
-import { EIP3009 } from "kam/src/vendor/EIP/EIP3009.sol";
 
 /// @title kToken
 /// @notice ERC20 representation of underlying assets with guaranteed 1:1 backing in the KAM protocol
@@ -30,7 +30,7 @@ import { EIP3009 } from "kam/src/vendor/EIP/EIP3009.sol";
 /// protocol emergencies, (6) Supports emergency asset recovery for accidentally sent tokens. The contract ensures
 /// protocol integrity by maintaining that kToken supply accurately reflects the underlying asset backing plus any
 /// distributed yield, while enabling efficient yield distribution without physical asset transfers.
-contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGuardTransient, Multicallable, EIP3009 {
+contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGuardTransient, Multicallable, ERC3009 {
     using SafeTransferLib for address;
 
     /* //////////////////////////////////////////////////////////////
@@ -228,9 +228,9 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
         return ERC20.allowance(_owner, _spender);
     }
 
-    /// @dev Override from ERC20 - required by EIP3009.
-    /// @dev This is the hook that EIP3009 uses for signature verification.
-    function DOMAIN_SEPARATOR() public view virtual override(IkToken, ERC20, EIP3009) returns (bytes32) {
+    /// @dev Override from ERC20 - required by ERC3009.
+    /// @dev This is the hook that ERC3009 uses for signature verification.
+    function DOMAIN_SEPARATOR() public view virtual override(IkToken, ERC20, ERC3009) returns (bytes32) {
         return super.DOMAIN_SEPARATOR();
     }
 
@@ -332,9 +332,9 @@ contract kToken is IkToken, ERC20, OptimizedOwnableRoles, OptimizedReentrancyGua
                         INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Override from ERC20 - required by EIP3009.
-    /// @dev This is the hook that EIP3009.transferWithAuthorization calls.
-    function _transfer(address from, address to, uint256 amount) internal virtual override(ERC20, EIP3009) {
+    /// @dev Override from ERC20 - required by ERC3009.
+    /// @dev This is the hook that ERC3009.transferWithAuthorization calls.
+    function _transfer(address from, address to, uint256 amount) internal virtual override(ERC20, ERC3009) {
         super._transfer(from, to, amount);
     }
 

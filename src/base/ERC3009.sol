@@ -15,7 +15,7 @@ import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLi
 /// - receiveWithAuthorization prevents front-running (payee must be caller)
 /// - Time-based validity windows (validAfter, validBefore)
 /// - EIP-712 compatible signatures
-abstract contract EIP3009 {
+abstract contract ERC3009 {
     /* //////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/

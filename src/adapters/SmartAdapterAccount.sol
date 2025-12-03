@@ -11,8 +11,8 @@ import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
 
 /// @title SmartAdapterAccount
-/// @notice Minimal implementation of ERC-7579 modular smart account standard
-/// @dev This contract provides a minimal ERC-7579 account with batch execution capabilities,
+/// @notice Minimal implementation of modular smart account
+/// @dev This contract provides a minimal account with batch execution capabilities,
 /// registry-based authorization, UUPS upgradeability, and role-based access control
 /// Now uses the ERC-7201 namespaced storage pattern.
 /// Supports receiving Ether, ERC721, and ERC1155 tokens.

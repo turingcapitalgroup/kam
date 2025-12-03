@@ -700,17 +700,13 @@ contract kStakingVaultHandler is BaseHandler {
 
     function INVARIANT_D_SHARE_PRICE() public view {
         assertEq(
-            kStakingVault_expectedSharePrice,
-            kStakingVault_actualSharePrice, 
-            "KSTAKING_VAULT: INVARIANT_C_SHARE_PRICE"
+            kStakingVault_expectedSharePrice, kStakingVault_actualSharePrice, "KSTAKING_VAULT: INVARIANT_C_SHARE_PRICE"
         );
     }
 
     function INVARIANT_E_TOTAL_NET_ASSETS() public view {
         assertEq(
-            kStakingVault_expectedNetTotalAssets, 
-            kStakingVault_actualNetTotalAssets, 
-            "INVARIANT_D_TOTAL_NET_ASSETS"
+            kStakingVault_expectedNetTotalAssets, kStakingVault_actualNetTotalAssets, "INVARIANT_D_TOTAL_NET_ASSETS"
         );
     }
 

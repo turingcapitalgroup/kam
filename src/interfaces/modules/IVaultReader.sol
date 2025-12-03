@@ -105,6 +105,9 @@ interface IVaultReader is IVersioned {
     /// @return isSettled Whether the batch has been settled
     /// @return sharePrice Share price of settlement
     /// @return netSharePrice Net share price of settlement
+    /// @return totalAssets_ Total assets of settlement
+    /// @return totalNetAssets_ Total net assets of settlement
+    /// @return totalSupply_ Total shares supply settlement
     function getBatchIdInfo(bytes32 batchId)
         external
         view
@@ -172,6 +175,7 @@ interface IVaultReader is IVersioned {
     /// @notice Converts a given amount of shares to assets with a specified total assets
     /// @param shares The amount of shares to convert
     /// @param totalAssets The total assets available for conversion
+    /// @param totalSupply The total shares supply
     /// @return The equivalent amount of assets
     function convertToAssetsWithTotals(
         uint256 shares,
@@ -185,6 +189,7 @@ interface IVaultReader is IVersioned {
     /// @notice Converts a given amount of assets to shares with a specified total assets
     /// @param assets The amount of assets to convert
     /// @param totalAssets The total assets available for conversion
+    /// @param totalSupply The total shares supply
     /// @return The equivalent amount of shares
     function convertToSharesWithTotals(
         uint256 assets,
