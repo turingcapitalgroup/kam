@@ -13,7 +13,7 @@ import {
 } from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
-import { EIP3009 } from "kam/src/vendor/EIP/EIP3009.sol";
+import { ERC3009 } from "kam/src/base/ERC3009.sol";
 import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
 import { ERC20 } from "kam/src/vendor/solady/tokens/ERC20.sol";
 import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
@@ -350,7 +350,7 @@ contract kTokenTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                        EIP3009 TESTS
+                        ERC3009 TESTS
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Helper function to generate EIP-712 signature for transferWithAuthorization
@@ -368,7 +368,7 @@ contract kTokenTest is DeploymentBaseTest {
         view
         returns (uint8 v, bytes32 r, bytes32 s)
     {
-        bytes32 typeHash = EIP3009(address(kUSD)).TRANSFER_WITH_AUTHORIZATION_TYPEHASH();
+        bytes32 typeHash = ERC3009(address(kUSD)).TRANSFER_WITH_AUTHORIZATION_TYPEHASH();
         bytes32 structHash = OptimizedEfficientHashLib.hash(
             uint256(typeHash),
             uint256(uint160(signer)),
@@ -399,7 +399,7 @@ contract kTokenTest is DeploymentBaseTest {
         view
         returns (uint8 v, bytes32 r, bytes32 s)
     {
-        bytes32 typeHash = EIP3009(address(kUSD)).RECEIVE_WITH_AUTHORIZATION_TYPEHASH();
+        bytes32 typeHash = ERC3009(address(kUSD)).RECEIVE_WITH_AUTHORIZATION_TYPEHASH();
         bytes32 structHash = OptimizedEfficientHashLib.hash(
             uint256(typeHash),
             uint256(uint160(signer)),
@@ -435,7 +435,7 @@ contract kTokenTest is DeploymentBaseTest {
         assertFalse(kUSD.authorizationState(signer, nonce));
 
         vm.expectEmit(true, true, false, true);
-        emit EIP3009.AuthorizationUsed(signer, nonce);
+        emit ERC3009.AuthorizationUsed(signer, nonce);
         kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
 
         assertEq(kUSD.balanceOf(signer), 0);
@@ -479,7 +479,7 @@ contract kTokenTest is DeploymentBaseTest {
         (uint8 v, bytes32 r, bytes32 s) =
             _signTransferWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
 
-        vm.expectRevert(EIP3009.AuthorizationNotYetValid.selector);
+        vm.expectRevert(ERC3009.AuthorizationNotYetValid.selector);
         kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 
@@ -501,7 +501,7 @@ contract kTokenTest is DeploymentBaseTest {
         (uint8 v, bytes32 r, bytes32 s) =
             _signTransferWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
 
-        vm.expectRevert(EIP3009.AuthorizationExpired.selector);
+        vm.expectRevert(ERC3009.AuthorizationExpired.selector);
         kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 
@@ -525,7 +525,7 @@ contract kTokenTest is DeploymentBaseTest {
         vm.prank(_minter);
         kUSD.mint(signer, value);
 
-        vm.expectRevert(EIP3009.AuthorizationAlreadyUsed.selector);
+        vm.expectRevert(ERC3009.AuthorizationAlreadyUsed.selector);
         kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 
@@ -545,7 +545,7 @@ contract kTokenTest is DeploymentBaseTest {
         (uint8 v, bytes32 r, bytes32 s) =
             _signTransferWithAuthorization(wrongPrivateKey, signer, to, value, validAfter, validBefore, nonce);
 
-        vm.expectRevert(EIP3009.InvalidSignature.selector);
+        vm.expectRevert(ERC3009.InvalidSignature.selector);
         kUSD.transferWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 
@@ -570,7 +570,7 @@ contract kTokenTest is DeploymentBaseTest {
 
         vm.prank(to);
         vm.expectEmit(true, true, false, true);
-        emit EIP3009.AuthorizationUsed(signer, nonce);
+        emit ERC3009.AuthorizationUsed(signer, nonce);
         kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
 
         assertEq(kUSD.balanceOf(signer), 0);
@@ -595,7 +595,7 @@ contract kTokenTest is DeploymentBaseTest {
             _signReceiveWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
 
         vm.prank(wrongCaller);
-        vm.expectRevert(EIP3009.CallerNotPayee.selector);
+        vm.expectRevert(ERC3009.CallerNotPayee.selector);
         kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 
@@ -615,7 +615,7 @@ contract kTokenTest is DeploymentBaseTest {
             _signReceiveWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
 
         vm.prank(to);
-        vm.expectRevert(EIP3009.AuthorizationNotYetValid.selector);
+        vm.expectRevert(ERC3009.AuthorizationNotYetValid.selector);
         kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 
@@ -637,7 +637,7 @@ contract kTokenTest is DeploymentBaseTest {
             _signReceiveWithAuthorization(privateKey, signer, to, value, validAfter, validBefore, nonce);
 
         vm.prank(to);
-        vm.expectRevert(EIP3009.AuthorizationExpired.selector);
+        vm.expectRevert(ERC3009.AuthorizationExpired.selector);
         kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 
@@ -663,7 +663,7 @@ contract kTokenTest is DeploymentBaseTest {
         kUSD.mint(signer, value);
 
         vm.prank(to);
-        vm.expectRevert(EIP3009.AuthorizationAlreadyUsed.selector);
+        vm.expectRevert(ERC3009.AuthorizationAlreadyUsed.selector);
         kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 
@@ -684,7 +684,7 @@ contract kTokenTest is DeploymentBaseTest {
             _signReceiveWithAuthorization(wrongPrivateKey, signer, to, value, validAfter, validBefore, nonce);
 
         vm.prank(to);
-        vm.expectRevert(EIP3009.InvalidSignature.selector);
+        vm.expectRevert(ERC3009.InvalidSignature.selector);
         kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
     }
 }

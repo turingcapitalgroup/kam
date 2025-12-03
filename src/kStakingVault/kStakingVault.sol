@@ -199,7 +199,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(balanceOf(_msgSender()) >= _stkTokenAmount, KSTAKINGVAULT_INSUFFICIENT_BALANCE);
 
         bytes32 _batchId = $.currentBatchId;
-        uint128 _withdrawn = _convertToAssetsWithTotals(_stkTokenAmount, _totalNetAssets()).toUint128();
+        uint128 _withdrawn = _convertToAssetsWithTotals(_stkTokenAmount, _totalNetAssets(), totalSupply()).toUint128();
 
         // Make sure we dont exceed the max withdraw per batch
         require(
@@ -257,12 +257,11 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
 
-        // Calculate stkToken amount based on settlement-time share price
-        uint256 _netSharePrice = $.batches[_batchId].netSharePrice;
-        _checkAmountNotZero(_netSharePrice);
-
-        // Divide the deposited assets by the share price of the batch to obtain stkTokens to mint
-        uint256 _stkTokensToMint = ((uint256(_request.kTokenAmount)) * 10 ** _getDecimals($)) / _netSharePrice;
+        // Calculate stkToken amount based on settlement-time values
+        BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
+        uint256 _stkTokensToMint =
+            _convertToSharesWithTotals(_request.kTokenAmount, batch.totalNetAssets, batch.totalSupply);
+        _checkAmountNotZero(_stkTokensToMint);
 
         emit StakingSharesClaimed(_batchId, _requestId, _request.user, _stkTokensToMint);
 
@@ -295,25 +294,33 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
         require(_msgSender() == user, VAULTCLAIMS_NOT_BENEFICIARY);
 
-        uint256 sharePrice = batch.sharePrice;
-        uint256 netSharePrice = batch.netSharePrice;
-        _checkAmountNotZero(sharePrice);
+        uint256 _totalAssets = batch.totalAssets;
+        uint256 _totalNetAssets = batch.totalNetAssets;
+        uint256 _totalSupply = batch.totalSupply;
 
-        // Calculate total kTokens to return based on settlement-time share price
-        // Multiply redeemed shares for net and gross share price to obtain gross and net amount of assets
+        // This should never happen, but safe Bananas never dies
+        require(_totalSupply > 0, KSTAKINGVAULT_ZERO_AMOUNT);
+
+        // Calculate total kTokens to return: (stkTokenAmount * totalNetAssets) / totalSupply
+        uint256 _totalKTokensNet = _convertToAssetsWithTotals(stkTokenAmount, _totalNetAssets, _totalSupply);
+        _checkAmountNotZero(_totalKTokensNet);
+
+        // Calculate net shares to burn: (stkTokenAmount * netSharePrice) / sharePrice
+        // This represents the net shares (after fees) that should be burned
         uint8 decimals = _getDecimals($);
-        uint256 totalKTokensNet = ((uint256(stkTokenAmount)) * netSharePrice) / (10 ** decimals);
-        uint256 netSharesToBurn = ((uint256(stkTokenAmount)) * netSharePrice) / sharePrice;
+        uint256 _sharePrice = _convertToAssetsWithTotals(10 ** decimals, _totalAssets, _totalSupply);
+        uint256 _netSharePrice = _convertToAssetsWithTotals(10 ** decimals, _totalNetAssets, _totalSupply);
+        uint256 _netSharesToBurn = (uint256(stkTokenAmount) * _netSharePrice) / _sharePrice;
 
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
-        _burn(address(this), netSharesToBurn);
+        _burn(address(this), _netSharesToBurn);
 
-        emit UnstakingAssetsClaimed(batchId, _requestId, user, totalKTokensNet);
-        emit KTokenUnstaked(user, stkTokenAmount, totalKTokensNet);
+        emit UnstakingAssetsClaimed(batchId, _requestId, user, _totalKTokensNet);
+        emit KTokenUnstaked(user, stkTokenAmount, _totalKTokensNet);
 
-        $.kToken.safeTransfer(user, totalKTokensNet);
+        $.kToken.safeTransfer(user, _totalKTokensNet);
 
         // Close `nonRentrant`
         _unlockReentrant();
@@ -352,9 +359,10 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(!$.batches[_batchId].isSettled, VAULTBATCHES_VAULT_SETTLED);
         $.batches[_batchId].isSettled = true;
 
-        // Snapshot the gross and net share price for this batch
-        $.batches[_batchId].sharePrice = _sharePrice().toUint128();
-        $.batches[_batchId].netSharePrice = _netSharePrice().toUint128();
+        // Snapshot total assets and supply at settlement time to calculate share prices on-demand
+        $.batches[_batchId].totalAssets = _totalAssets();
+        $.batches[_batchId].totalNetAssets = _totalNetAssets();
+        $.batches[_batchId].totalSupply = totalSupply();
 
         emit BatchSettled(_batchId);
     }

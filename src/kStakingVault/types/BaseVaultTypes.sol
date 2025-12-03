@@ -57,9 +57,11 @@ library BaseVaultTypes {
         uint128 depositedInBatch;
         /// @notice Amount of assets withdrawn in a batch
         uint128 withdrawnInBatch;
-        /// @notice Share price of settlement
-        uint128 sharePrice;
-        /// @notice Net share price of settlement(share price - fees)
-        uint128 netSharePrice;
+        /// @notice Total assets at settlement time (gross, including fees)
+        uint256 totalAssets;
+        /// @notice Total net assets at settlement time (after fees)
+        uint256 totalNetAssets;
+        /// @notice Total supply of stkTokens at settlement time
+        uint256 totalSupply;
     }
 }

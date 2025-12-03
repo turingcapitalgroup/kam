@@ -239,14 +239,35 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
     function getBatchIdInfo(bytes32 _batchId)
         external
         view
-        returns (address batchReceiver, bool isClosed_, bool isSettled, uint256 sharePrice_, uint256 netSharePrice_)
+        returns (
+            address batchReceiver,
+            bool isClosed_,
+            bool isSettled,
+            uint256 sharePrice_,
+            uint256 netSharePrice_,
+            uint256 totalAssets_,
+            uint256 totalNetAssets_,
+            uint256 totalSupply_
+        )
     {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
+
+        uint256 _totalSupply = batch.totalSupply;
+        uint8 decimals = _getDecimals($);
+
+        sharePrice_ = _convertToSharesWithTotals(10 ** decimals, batch.totalAssets, _totalSupply);
+        netSharePrice_ = _convertToSharesWithTotals(10 ** decimals, batch.totalNetAssets, _totalSupply);
+
         return (
-            _getBaseVaultStorage().batches[_batchId].batchReceiver,
-            _getBaseVaultStorage().batches[_batchId].isClosed,
-            _getBaseVaultStorage().batches[_batchId].isSettled,
-            _getBaseVaultStorage().batches[_batchId].sharePrice,
-            _getBaseVaultStorage().batches[_batchId].netSharePrice
+            batch.batchReceiver,
+            batch.isClosed,
+            batch.isSettled,
+            sharePrice_,
+            netSharePrice_,
+            batch.totalAssets,
+            batch.totalNetAssets,
+            batch.totalSupply
         );
     }
 
@@ -304,22 +325,38 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
 
     /// @inheritdoc IVaultReader
     function convertToShares(uint256 _shares) external view returns (uint256) {
-        return _convertToSharesWithTotals(_shares, _totalNetAssets());
+        return _convertToSharesWithTotals(_shares, _totalNetAssets(), totalSupply());
     }
 
     /// @inheritdoc IVaultReader
     function convertToAssets(uint256 _assets) external view returns (uint256) {
-        return _convertToAssetsWithTotals(_assets, _totalNetAssets());
+        return _convertToAssetsWithTotals(_assets, _totalNetAssets(), totalSupply());
     }
 
     /// @inheritdoc IVaultReader
-    function convertToSharesWithTotals(uint256 _shares, uint256 _totalAssets) external view returns (uint256) {
-        return _convertToSharesWithTotals(_shares, _totalAssets);
+    function convertToSharesWithTotals(
+        uint256 _shares,
+        uint256 _totalAssets,
+        uint256 _totalSupply
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _convertToSharesWithTotals(_shares, _totalAssets, _totalSupply);
     }
 
     /// @inheritdoc IVaultReader
-    function convertToAssetsWithTotals(uint256 _assets, uint256 _totalAssets) external view returns (uint256) {
-        return _convertToAssetsWithTotals(_assets, _totalAssets);
+    function convertToAssetsWithTotals(
+        uint256 _assets,
+        uint256 _totalAssets,
+        uint256 _totalSupply
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _convertToAssetsWithTotals(_assets, _totalAssets, _totalSupply);
     }
 
     /// @inheritdoc IVaultReader
