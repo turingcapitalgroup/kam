@@ -46,11 +46,8 @@ contract KamIntegrationTest is DeploymentBaseTest {
         assetRouter.setSettlementCooldown(0); // I set the cooldown to 0 so we can run it all at once.
         vm.stopPrank();
 
-        vm.prank(users.owner);
-        minterAdapterUSDC.grantRoles(users.relayer, 2);
-
-        vm.prank(users.owner);
-        DNVaultAdapterUSDC.grantRoles(users.relayer, 2);
+        // Note: grantRoles calls removed - SmartAdapterAccount uses registry.isManager for authorization
+        // The relayer already has MANAGER_ROLE in the registry from initialization
 
         // I clean all users and vault balances to make it easier to do the accounting
         // since this is a full protocol integration test.
@@ -213,8 +210,9 @@ contract KamIntegrationTest is DeploymentBaseTest {
         alphaVault.claimUnstakedAssets(_requestId);
         uint256 _balanceAfterBob = IkToken(address(kUSD)).balanceOf(users.bob);
         uint256 _claimedAmount = _balanceAfterBob - _balanceBeforeBob;
-        (,,, uint256 _sharePrice,) = alphaVault.getBatchIdInfo(_batchId);
-        assertEq(_sharesRequested * _sharePrice / 1e6, _claimedAmount);
+        (,,,,,, uint256 totalNetAssets_, uint256 totalSupply_) = alphaVault.getBatchIdInfo(_batchId);
+        uint256 _expectedAmount = alphaVault.convertToAssetsWithTotals(_sharesRequested, totalNetAssets_, totalSupply_);
+        assertEq(_expectedAmount, _claimedAmount);
 
         vm.prank(users.institution);
         kUSD.approve(_minter, _amount);

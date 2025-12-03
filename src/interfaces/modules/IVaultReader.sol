@@ -105,10 +105,22 @@ interface IVaultReader is IVersioned {
     /// @return isSettled Whether the batch has been settled
     /// @return sharePrice Share price of settlement
     /// @return netSharePrice Net share price of settlement
+    /// @return totalAssets_ Total assets of settlement
+    /// @return totalNetAssets_ Total net assets of settlement
+    /// @return totalSupply_ Total shares supply settlement
     function getBatchIdInfo(bytes32 batchId)
         external
         view
-        returns (address batchReceiver, bool isClosed, bool isSettled, uint256 sharePrice, uint256 netSharePrice);
+        returns (
+            address batchReceiver,
+            bool isClosed,
+            bool isSettled,
+            uint256 sharePrice,
+            uint256 netSharePrice,
+            uint256 totalAssets_,
+            uint256 totalNetAssets_,
+            uint256 totalSupply_
+        );
 
     /// @notice Returns the batch receiver address for a specific batch ID
     /// @param batchId The batch identifier to query
@@ -163,14 +175,30 @@ interface IVaultReader is IVersioned {
     /// @notice Converts a given amount of shares to assets with a specified total assets
     /// @param shares The amount of shares to convert
     /// @param totalAssets The total assets available for conversion
+    /// @param totalSupply The total shares supply
     /// @return The equivalent amount of assets
-    function convertToAssetsWithTotals(uint256 shares, uint256 totalAssets) external view returns (uint256);
+    function convertToAssetsWithTotals(
+        uint256 shares,
+        uint256 totalAssets,
+        uint256 totalSupply
+    )
+        external
+        view
+        returns (uint256);
 
     /// @notice Converts a given amount of assets to shares with a specified total assets
     /// @param assets The amount of assets to convert
     /// @param totalAssets The total assets available for conversion
+    /// @param totalSupply The total shares supply
     /// @return The equivalent amount of shares
-    function convertToSharesWithTotals(uint256 assets, uint256 totalAssets) external view returns (uint256);
+    function convertToSharesWithTotals(
+        uint256 assets,
+        uint256 totalAssets,
+        uint256 totalSupply
+    )
+        external
+        view
+        returns (uint256);
 
     /// @notice Gets all request IDs associated with a user
     /// @param user The address to query requests for
