@@ -77,7 +77,7 @@ contract BaseVaultTest is DeploymentBaseTest {
         vault.setHardHurdleRate(false); // Soft hurdle by default
         vm.stopPrank();
 
-        vm.prank(users.relayer);
+        vm.prank(users.admin);
         registry.setHurdleRate(tokens.usdc, TEST_HURDLE_RATE);
     }
 
