@@ -68,6 +68,7 @@ abstract contract DeploymentManager is Script {
         uint128 maxTotalAssets;
         uint256 maxDepositPerBatch;
         uint256 maxWithdrawPerBatch;
+        address trustedForwarder;
     }
 
     struct AssetRouterConfig {

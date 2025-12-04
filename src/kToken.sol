@@ -16,7 +16,6 @@ import {
     KTOKEN_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
-import { EIP3009 } from "kam/src/vendor/EIP/EIP3009.sol";
 
 /// @title kToken
 /// @notice ERC20 representation of underlying assets with guaranteed 1:1 backing in the KAM protocol
