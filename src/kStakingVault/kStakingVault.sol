@@ -97,7 +97,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         string memory _symbol,
         uint8 _decimals,
         address _asset,
-        uint128 _maxTotalAssets
+        uint128 _maxTotalAssets,
+        address _trustedForwarder
     )
         external
         initializer
@@ -107,6 +108,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Initialize ownership and roles
         __BaseVault_init(_registryAddress, _paused);
         _initializeOwner(_owner);
+        _initializeContext(_trustedForwarder);
 
         // Initialize storage with optimized packing
         BaseVaultStorage storage $ = _getBaseVaultStorage();
