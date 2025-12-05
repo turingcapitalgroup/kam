@@ -234,7 +234,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
     /// @inheritdoc IRegistry
     function setHurdleRate(address _asset, uint16 _hurdleRate) external payable {
-        _checkRelayer(msg.sender);
+        _checkAdmin(msg.sender);
         // Ensure hurdle rate doesn't exceed 100% (10,000 basis points)
         require(_hurdleRate <= MAX_BPS, KREGISTRY_FEE_EXCEEDS_MAXIMUM);
 
