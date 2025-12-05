@@ -171,7 +171,8 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 config.dnVaultUSDC.symbol,
                 config.dnVaultUSDC.decimals,
                 config.assets.USDC, // Uses USDC as underlying asset
-                config.dnVaultUSDC.maxTotalAssets
+                config.dnVaultUSDC.maxTotalAssets,
+                config.dnVaultUSDC.trustedForwarder
             )
         );
     }
@@ -194,7 +195,8 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 config.dnVaultWBTC.symbol,
                 config.dnVaultWBTC.decimals,
                 config.assets.WBTC, // Uses WBTC as underlying asset
-                config.dnVaultWBTC.maxTotalAssets
+                config.dnVaultWBTC.maxTotalAssets,
+                config.dnVaultWBTC.trustedForwarder
             )
         );
     }
@@ -217,7 +219,8 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 config.alphaVault.symbol,
                 config.alphaVault.decimals,
                 config.assets.USDC, // Uses USDC as underlying asset
-                config.alphaVault.maxTotalAssets
+                config.alphaVault.maxTotalAssets,
+                config.alphaVault.trustedForwarder
             )
         );
     }
@@ -240,7 +243,8 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 config.betaVault.symbol,
                 config.betaVault.decimals,
                 config.assets.USDC, // Uses USDC as underlying asset
-                config.betaVault.maxTotalAssets
+                config.betaVault.maxTotalAssets,
+                config.betaVault.trustedForwarder
             )
         );
     }

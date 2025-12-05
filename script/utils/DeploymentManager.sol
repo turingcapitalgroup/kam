@@ -68,6 +68,7 @@ abstract contract DeploymentManager is Script {
         uint128 maxTotalAssets;
         uint256 maxDepositPerBatch;
         uint256 maxWithdrawPerBatch;
+        address trustedForwarder;
     }
 
     struct AssetRouterConfig {
@@ -287,6 +288,7 @@ abstract contract DeploymentManager is Script {
         config.maxTotalAssets = uint128(json.readUint(string.concat(path, ".maxTotalAssets")));
         config.maxDepositPerBatch = uint128(json.readUint(string.concat(path, ".maxDepositPerBatch")));
         config.maxWithdrawPerBatch = uint128(json.readUint(string.concat(path, ".maxWithdrawPerBatch")));
+        config.trustedForwarder = json.readAddress(string.concat(path, ".trustedForwarder"));
         return config;
     }
 
