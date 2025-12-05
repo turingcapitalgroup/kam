@@ -575,7 +575,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vm.prank(users.admin);
         vault.setPerformanceFee(TEST_PERFORMANCE_FEE);
 
-        vm.prank(users.relayer);
+        vm.prank(users.admin);
         registry.setHurdleRate(tokens.usdc, 0); // No hurdle
 
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
@@ -600,7 +600,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vault.setPerformanceFee(0); // No performance fee
         vm.stopPrank();
 
-        vm.prank(users.relayer);
+        vm.prank(users.admin);
         registry.setHurdleRate(tokens.usdc, TEST_HURDLE_RATE);
 
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);

@@ -300,16 +300,17 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         uint256 _totalNetAssets = batch.totalNetAssets;
         uint256 _totalSupply = batch.totalSupply;
 
-        // This should never happen, but safe Bananas never dies
+        // This should never happen
         require(_totalSupply > 0, KSTAKINGVAULT_ZERO_AMOUNT);
 
         // Calculate total kTokens to return: (stkTokenAmount * totalNetAssets) / totalSupply
         uint256 _totalKTokensNet = _convertToAssetsWithTotals(stkTokenAmount, _totalNetAssets, _totalSupply);
         _checkAmountNotZero(_totalKTokensNet);
 
-        // Calculate net shares to burn: (stkTokenAmount * netSharePrice) / sharePrice
+        // Calculate net shares to burn: (stkTokenAmount * _totalNetAssets) / _totalAssets
         // This represents the net shares (after fees) that should be burned
-        uint256 _netSharesToBurn = (uint256(stkTokenAmount) * _totalNetAssets) / _totalAssets;
+        uint8 decimals = _getDecimals($);
+        uint256 _netSharesToBurn = uint256(stkTokenAmount).fullMulDiv(_totalNetAssets, _totalAssets);
 
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 

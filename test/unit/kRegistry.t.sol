@@ -296,36 +296,36 @@ contract kRegistryTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_SetHurdleRate_Success() public {
-        vm.prank(users.relayer);
+        vm.prank(users.admin);
         vm.expectEmit(true, true, false, true);
         emit IRegistry.HurdleRateSet(USDC, TEST_HURDLE_RATE);
         registry.setHurdleRate(USDC, TEST_HURDLE_RATE);
         assertEq(registry.getHurdleRate(USDC), TEST_HURDLE_RATE);
     }
 
-    function test_SetHurdleRate_Require_Only_Relayer() public {
+    function test_SetHurdleRate_Require_Only_Admin() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.setHurdleRate(USDC, TEST_HURDLE_RATE);
 
-        vm.prank(users.admin);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.setHurdleRate(USDC, TEST_HURDLE_RATE);
 
-        vm.prank(users.owner);
+        vm.prank(users.bob);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
         registry.setHurdleRate(USDC, TEST_HURDLE_RATE);
     }
 
     function test_SetHurdleRate_Require_Rate_Not_to_Exceed_Maximum() public {
-        vm.prank(users.relayer);
+        vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_FEE_EXCEEDS_MAXIMUM));
         registry.setHurdleRate(USDC, uint16(MAX_BPS + 1));
     }
 
-    function test_SetHurdleRate_Require_Valie_Asset() public {
+    function test_SetHurdleRate_Require_Valid_Asset() public {
         vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
-        vm.prank(users.relayer);
+        vm.prank(users.admin);
         registry.setHurdleRate(TEST_ASSET, TEST_HURDLE_RATE);
     }
 
