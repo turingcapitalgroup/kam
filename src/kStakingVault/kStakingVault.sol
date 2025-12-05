@@ -309,10 +309,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Calculate net shares to burn: (stkTokenAmount * netSharePrice) / sharePrice
         // This represents the net shares (after fees) that should be burned
-        uint8 decimals = _getDecimals($);
-        uint256 _sharePrice = _convertToAssetsWithTotals(10 ** decimals, _totalAssets, _totalSupply);
-        uint256 _netSharePrice = _convertToAssetsWithTotals(10 ** decimals, _totalNetAssets, _totalSupply);
-        uint256 _netSharesToBurn = (uint256(stkTokenAmount) * _netSharePrice) / _sharePrice;
+        uint256 _netSharesToBurn = (uint256(stkTokenAmount) * _totalNetAssets) / _totalAssets;
 
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
@@ -596,6 +593,48 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     {
         _checkOwner();
     }
+
+    /// @dev Override to use {ERC2771Context}
+    function _delegate(address implementation) internal override {
+        assembly {
+            // Get the length of _msgData()
+            let ptr := mload(0x40) // Free memory pointer
+            
+            // Store the position where we'll write the calldata
+            mstore(0x40, add(ptr, 0x20)) // Update free memory pointer temporarily
+        }
+        
+        // Get _msgData() - this is called outside assembly to properly handle the function
+        bytes memory data = _msgData();
+        
+        assembly {
+            let dataPtr := add(data, 0x20) // Skip the length prefix of the bytes array
+            let dataSize := mload(data)     // Get the actual data length
+            
+            // Copy the data from _msgData() to memory position 0
+            let i := 0
+            for { } lt(i, dataSize) { i := add(i, 0x20) } {
+                mstore(add(0, i), mload(add(dataPtr, i)))
+            }
+            
+            // Handle any remaining bytes (if dataSize is not a multiple of 32)
+            if gt(dataSize, i) {
+                let remaining := sub(dataSize, i)
+                mstore(add(0, i), mload(add(dataPtr, i)))
+            }
+
+            // Call the implementation with the data from _msgData()
+            let result := delegatecall(gas(), implementation, 0, dataSize, 0, 0)
+
+            // Copy the returned data
+            returndatacopy(0, 0, returndatasize())
+
+            switch result
+            // delegatecall returns 0 on error
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }   
+    }   
 
     /// @dev Override to use {ERC2771Context}
     function _implementation() internal view virtual override returns (address) {

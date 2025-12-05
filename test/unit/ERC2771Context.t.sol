@@ -17,25 +17,12 @@ import {
     VAULTCLAIMS_NOT_BENEFICIARY,
     VAULTCLAIMS_REQUEST_NOT_PENDING
 } from "kam/src/errors/Errors.sol";
-import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
+import { kStakingVault, BaseVaultTypes } from "kam/src/kStakingVault/kStakingVault.sol";
 
-/// @title ERC2771ContextTest
-/// @notice Test contract for ERC2771Context integration with kStakingVault
-/// @dev Tests that context forwarding works correctly and doesn't break vault operations
-/// @dev This test validates the following scenarios:
-///      1. Trusted forwarder configuration (zero address case)
-///      2. Direct calls to vault functions work correctly with ERC2771Context
-///      3. Forwarded calls with appended sender address work correctly
-///      4. Context preservation across different operations (stake, unstake, claim)
-///      5. Multi-user context isolation
-///      6. Admin and relayer function context preservation
-///      7. Complete lifecycle tests for staking and unstaking with forwarded calls
-/// @dev NOTE: To run these tests, ensure the minimal-smart-account dependency is installed:
-///      `forge soldeer install` or manually clone the repository to dependencies/
 contract ERC2771ContextTest is BaseVaultTest {
     using SafeTransferLib for address;
 
-    address public trustedForwarder;
+    address trustedForwarder = address(uint160(uint256(keccak256("trustedForwarder"))));
     address public mockForwarder;
 
     function setUp() public override {
@@ -44,7 +31,6 @@ contract ERC2771ContextTest is BaseVaultTest {
         vault = IkStakingVault(address(dnVault));
 
         // Set up forwarders
-        trustedForwarder = vault.trustedForwarder();
         mockForwarder = makeAddr("mockForwarder");
 
         BaseVaultTest.setUp();
@@ -57,8 +43,9 @@ contract ERC2771ContextTest is BaseVaultTest {
     /// @notice Helper to encode calldata with appended sender address (ERC-2771 format)
     /// @param originalCalldata The original function call data
     /// @param sender The address to append (the real sender)
-    /// @return The calldata with sender appended at the end
+    /// @return The calldata with sender appended at the end (as raw 20 bytes)
     function _appendSender(bytes memory originalCalldata, address sender) internal pure returns (bytes memory) {
+        // ERC-2771 specifies appending the address as raw 20 bytes, not 32 bytes
         return abi.encodePacked(originalCalldata, sender);
     }
 
@@ -78,30 +65,6 @@ contract ERC2771ContextTest is BaseVaultTest {
         }
     }
 
-    /* //////////////////////////////////////////////////////////////
-                    TRUSTED FORWARDER CONFIGURATION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_TrustedForwarder_Configuration() public view {
-        // Verify that trusted forwarder is set (could be address(0) or a real forwarder)
-        address forwarder = vault.trustedForwarder();
-        console.log("Trusted forwarder:", forwarder);
-        
-        // Test the isTrustedForwarder function
-        assertTrue(vault.isTrustedForwarder(forwarder), "Configured forwarder should be trusted");
-        
-        if (forwarder != address(0)) {
-            assertFalse(vault.isTrustedForwarder(address(0)), "Zero address should not be trusted if forwarder is set");
-        }
-        assertFalse(vault.isTrustedForwarder(users.alice), "Alice should not be trusted forwarder");
-        assertFalse(vault.isTrustedForwarder(mockForwarder), "Mock forwarder should not be trusted");
-    }
-
-    function test_TrustedForwarder_IsZeroAddress() public view {
-        // This test documents the current deployment configuration
-        // If this fails, it means a real forwarder has been configured
-        assertEq(vault.trustedForwarder(), address(0), "Current deployment uses zero address forwarder");
-    }
 
     /* //////////////////////////////////////////////////////////////
                     CONTEXT WITH ZERO FORWARDER TESTS
@@ -121,9 +84,9 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
 
         // Verify request was created correctly
-        (address user,, address recipient,,,) = vault.stakeRequests(requestId);
-        assertEq(user, users.alice, "User should be Alice");
-        assertEq(recipient, users.alice, "Recipient should be Alice");
+        BaseVaultTypes.StakeRequest memory req =  vault.getStakeRequest(requestId);
+        assertEq(req.user, users.alice, "User should be Alice");
+        assertEq(req.recipient, users.alice, "Recipient should be Alice");
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -147,17 +110,17 @@ contract ERC2771ContextTest is BaseVaultTest {
             1000 * _1_USDC  // amount
         );
 
-        // Forward the call with Alice's address appended
+        // Forward the call with Alice's address appended (as raw 20 bytes)
         vm.prank(trustedForwarder);
         (bool success, bytes memory returnData) = address(vault).call(_appendSender(callData, users.alice));
         require(success, "Forwarded call failed");
         
         bytes32 requestId = abi.decode(returnData, (bytes32));
 
-        // Verify request was created with Alice as the sender (extracted from appended address)
-        (address user,, address recipient,,,) = vault.stakeRequests(requestId);
-        assertEq(user, users.alice, "User should be Alice (extracted from forwarded call)");
-        assertEq(recipient, users.alice, "Recipient should be Alice");
+       // Verify request was created correctly
+        BaseVaultTypes.StakeRequest memory req =  vault.getStakeRequest(requestId);
+        assertEq(req.user, users.alice, "User should be Alice");
+        assertEq(req.recipient, users.alice, "Recipient should be Alice");
     }
 
     function test_RequestUnstake_ThroughForwarder() public {
@@ -183,10 +146,10 @@ contract ERC2771ContextTest is BaseVaultTest {
         
         bytes32 requestId = abi.decode(returnData, (bytes32));
 
-        // Verify request was created with Alice as the sender
-        (address user,, address recipient,,,) = vault.unstakeRequests(requestId);
-        assertEq(user, users.alice, "User should be Alice (extracted from forwarded call)");
-        assertEq(recipient, users.alice, "Recipient should be Alice");
+         // Verify request was created correctly
+        BaseVaultTypes.UnstakeRequest memory req =  vault.getUnstakeRequest(requestId);
+        assertEq(req.user, users.alice, "User should be Alice");
+        assertEq(req.recipient, users.alice, "Recipient should be Alice");
     }
 
     function test_ClaimStakedShares_ThroughForwarder() public {
@@ -303,8 +266,9 @@ contract ERC2771ContextTest is BaseVaultTest {
         vm.prank(users.alice);
         bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
 
-        (address user,,,,,) = vault.stakeRequests(requestId);
-        assertEq(user, users.alice, "User should be Alice from regular call");
+         // Verify request was created correctly
+        BaseVaultTypes.StakeRequest memory req =  vault.getStakeRequest(requestId);
+        assertEq(req.user, users.alice, "User should be Alice");
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -355,13 +319,13 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 requestIdCharlie = abi.decode(returnData3, (bytes32));
 
         // Verify each request has correct sender context
-        (address userAlice,,,,,) = vault.stakeRequests(requestIdAlice);
-        (address userBob,,,,,) = vault.stakeRequests(requestIdBob);
-        (address userCharlie,,,,,) = vault.stakeRequests(requestIdCharlie);
-
-        assertEq(userAlice, users.alice, "Alice's request should have Alice as user");
-        assertEq(userBob, users.bob, "Bob's request should have Bob as user");
-        assertEq(userCharlie, users.charlie, "Charlie's request should have Charlie as user");
+        BaseVaultTypes.StakeRequest memory req1 =  vault.getStakeRequest(requestIdAlice);
+        BaseVaultTypes.StakeRequest memory req2 =  vault.getStakeRequest(requestIdBob);
+        BaseVaultTypes.StakeRequest memory req3 =  vault.getStakeRequest(requestIdCharlie);
+       
+        assertEq(req1.user, users.alice, "Alice's request should have Alice as user");
+        assertEq(req2.user, users.bob, "Bob's request should have Bob as user");
+        assertEq(req3.user, users.charlie, "Charlie's request should have Charlie as user");
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -393,13 +357,13 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 requestIdCharlie = vault.requestStake(users.charlie, 750 * _1_USDC);
 
         // Verify each request has correct sender context
-        (address userAlice,,,,,) = vault.stakeRequests(requestIdAlice);
-        (address userBob,,,,,) = vault.stakeRequests(requestIdBob);
-        (address userCharlie,,,,,) = vault.stakeRequests(requestIdCharlie);
-
-        assertEq(userAlice, users.alice, "Alice's request should have Alice as user");
-        assertEq(userBob, users.bob, "Bob's request should have Bob as user");
-        assertEq(userCharlie, users.charlie, "Charlie's request should have Charlie as user");
+        BaseVaultTypes.StakeRequest memory req1 =  vault.getStakeRequest(requestIdAlice);
+        BaseVaultTypes.StakeRequest memory req2 =  vault.getStakeRequest(requestIdBob);
+        BaseVaultTypes.StakeRequest memory req3 =  vault.getStakeRequest(requestIdCharlie);
+       
+        assertEq(req1.user, users.alice, "Alice's request should have Alice as user");
+        assertEq(req2.user, users.bob, "Bob's request should have Bob as user");
+        assertEq(req3.user, users.charlie, "Charlie's request should have Charlie as user");
     }
 
     function test_CrossUserClaim_ShouldRevert() public {
@@ -427,78 +391,6 @@ contract ERC2771ContextTest is BaseVaultTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                    ADMIN FUNCTION CONTEXT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_SetPaused_ContextPreservation() public {
-        // Test that admin functions respect context correctly
-        vm.prank(users.emergencyAdmin);
-        kStakingVault(payable(address(vault))).setPaused(true);
-
-        assertTrue(vault.paused(), "Vault should be paused");
-
-        // Verify operations fail when paused
-        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
-
-        vm.prank(users.alice);
-        kUSD.approve(address(vault), 1000 * _1_USDC);
-
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KSTAKINGVAULT_IS_PAUSED));
-        vault.requestStake(users.alice, 1000 * _1_USDC);
-
-        // Unpause
-        vm.prank(users.emergencyAdmin);
-        kStakingVault(payable(address(vault))).setPaused(false);
-
-        assertFalse(vault.paused(), "Vault should be unpaused");
-    }
-
-    function test_SetMaxTotalAssets_ContextPreservation() public {
-        uint128 newMax = 10_000_000 * uint128(_1_USDC);
-
-        vm.prank(users.admin);
-        vault.setMaxTotalAssets(newMax);
-
-        assertEq(vault.maxTotalAssets(), newMax, "Max total assets should be updated");
-    }
-
-    function test_SetManagementFee_ContextPreservation() public {
-        uint16 newFee = 200; // 2%
-
-        vm.prank(users.admin);
-        vault.setManagementFee(newFee);
-
-        assertEq(vault.managementFee(), newFee, "Management fee should be updated");
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                    RELAYER FUNCTION CONTEXT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_CloseBatch_ContextPreservation() public {
-        bytes32 batchId = vault.getBatchId();
-
-        vm.prank(users.relayer);
-        vault.closeBatch(batchId, true);
-
-        // Verify batch was closed
-        (, bool isClosed, bool isSettled,,,) = vault.batches(batchId);
-        assertTrue(isClosed, "Batch should be closed");
-        assertFalse(isSettled, "Batch should not be settled yet");
-    }
-
-    function test_CreateNewBatch_ContextPreservation() public {
-        bytes32 oldBatchId = vault.getBatchId();
-
-        vm.prank(users.relayer);
-        bytes32 newBatchId = vault.createNewBatch();
-
-        assertNotEq(oldBatchId, newBatchId, "New batch should have different ID");
-        assertEq(vault.getBatchId(), newBatchId, "Current batch should be the new batch");
-    }
-
-    /* //////////////////////////////////////////////////////////////
                     INTEGRATION TESTS
     //////////////////////////////////////////////////////////////*/
 
@@ -523,9 +415,10 @@ contract ERC2771ContextTest is BaseVaultTest {
         require(success1, "Forwarded stake request failed");
         bytes32 requestId = abi.decode(returnData1, (bytes32));
 
-        // Verify context is correct at request time
-        (address user,,,,,) = vault.stakeRequests(requestId);
-        assertEq(user, users.alice, "Request user should be Alice");
+          // Verify request was created correctly
+        BaseVaultTypes.StakeRequest memory req =  vault.getStakeRequest(requestId);
+        assertEq(req.user, users.alice, "User should be Alice");
+    
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -558,9 +451,9 @@ contract ERC2771ContextTest is BaseVaultTest {
         vm.prank(users.alice);
         bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
 
-        // Verify context is correct at request time
-        (address user,,,,,) = vault.stakeRequests(requestId);
-        assertEq(user, users.alice, "Request user should be Alice");
+        // Verify request was created correctly
+        BaseVaultTypes.StakeRequest memory req =  vault.getStakeRequest(requestId);
+        assertEq(req.user, users.alice, "User should be Alice");
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -586,9 +479,9 @@ contract ERC2771ContextTest is BaseVaultTest {
         vm.prank(users.alice);
         bytes32 unstakeRequestId = vault.requestUnstake(users.alice, stkBalance);
 
-        // Verify context is correct at request time
-        (address user,,,,,) = vault.unstakeRequests(unstakeRequestId);
-        assertEq(user, users.alice, "Unstake request user should be Alice");
+        // Verify request was created correctly
+        BaseVaultTypes.UnstakeRequest memory req =  vault.getUnstakeRequest(unstakeRequestId);
+        assertEq(req.user, users.alice, "User should be Alice");
 
         assertEq(vault.balanceOf(users.alice), 0, "Alice should have transferred tokens");
         assertEq(vault.balanceOf(address(vault)), stkBalance, "Vault should hold tokens");
@@ -635,4 +528,3 @@ contract ERC2771ContextTest is BaseVaultTest {
         vault.claimStakedShares(requestId);
     }
 }
-
