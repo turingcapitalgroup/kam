@@ -288,6 +288,7 @@ abstract contract DeploymentManager is Script {
         config.maxTotalAssets = uint128(json.readUint(string.concat(path, ".maxTotalAssets")));
         config.maxDepositPerBatch = uint128(json.readUint(string.concat(path, ".maxDepositPerBatch")));
         config.maxWithdrawPerBatch = uint128(json.readUint(string.concat(path, ".maxWithdrawPerBatch")));
+        config.trustedForwarder = json.readAddress(string.concat(path, ".trustedForwarder"));
         return config;
     }
 

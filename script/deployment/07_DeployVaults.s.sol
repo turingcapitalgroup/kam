@@ -243,7 +243,8 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 config.betaVault.symbol,
                 config.betaVault.decimals,
                 config.assets.USDC, // Uses USDC as underlying asset
-                config.betaVault.maxTotalAssets
+                config.betaVault.maxTotalAssets,
+                config.betaVault.trustedForwarder
             )
         );
     }

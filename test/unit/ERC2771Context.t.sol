@@ -223,14 +223,8 @@ contract ERC2771ContextTest is BaseVaultTest {
     }
 
     function test_ForwardedCall_WithWrongForwarder_ShouldUseActualSender() public {
-
-
-        // Setup: Mint kTokens to Alice and Bob
+        // Setup: Mint kTokens to Alice
         _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
-        _mintKTokenToUser(users.bob, 1000 * _1_USDC, true);
-
-        vm.prank(users.bob);
-        kUSD.approve(address(vault), 1000 * _1_USDC);
 
         // Prepare call data with Alice's address appended
         bytes memory callData = abi.encodeWithSelector(
