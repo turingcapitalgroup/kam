@@ -84,6 +84,12 @@
             "trustedForwarder": "0x0000000000000000000000000000000000000000"
         }
     },
+    "registry": {
+        "hurdleRate": {
+            "USDC": 500,
+            "WBTC": 500
+        }
+    },
     "assetRouter": {
         "settlementCooldown": 0,
         "maxAllowedDelta": 1000

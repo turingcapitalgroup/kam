@@ -600,24 +600,24 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         assembly {
             // Get the length of _msgData()
             let ptr := mload(0x40) // Free memory pointer
-            
+
             // Store the position where we'll write the calldata
             mstore(0x40, add(ptr, 0x20)) // Update free memory pointer temporarily
         }
-        
+
         // Get _msgData() - this is called outside assembly to properly handle the function
         bytes memory data = _msgData();
-        
+
         assembly {
             let dataPtr := add(data, 0x20) // Skip the length prefix of the bytes array
-            let dataSize := mload(data)     // Get the actual data length
-            
+            let dataSize := mload(data) // Get the actual data length
+
             // Copy the data from _msgData() to memory position 0
             let i := 0
             for { } lt(i, dataSize) { i := add(i, 0x20) } {
                 mstore(add(0, i), mload(add(dataPtr, i)))
             }
-            
+
             // Handle any remaining bytes (if dataSize is not a multiple of 32)
             if gt(dataSize, i) {
                 let remaining := sub(dataSize, i)
@@ -634,8 +634,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             // delegatecall returns 0 on error
             case 0 { revert(0, returndatasize()) }
             default { return(0, returndatasize()) }
-        }   
-    }   
+        }
+    }
 
     /// @dev Override to use {ERC2771Context}
     function _implementation() internal view virtual override returns (address) {

@@ -1,7 +1,7 @@
 {
   "chainId": 31337,
   "network": "localhost",
-  "timestamp": 1764847531,
+  "timestamp": 1764953968,
   "contracts": {
     "ERC1967Factory": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
     "kRegistryImpl": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
@@ -30,6 +30,6 @@
     "ERC7540USDC": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
     "ERC7540WBTC": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
     "WalletUSDC": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-    "erc20ParameterChecker": "0x162A433068F51e18b7d13932F27e66a3f99E6890"
+    "erc20ParameterChecker": "0x5081a39b8A5f0E35a8D959395a630b68B74Dd30f"
   }
 }

@@ -21,6 +21,7 @@ abstract contract DeploymentManager is Script {
         VaultConfig dnVaultWBTC;
         VaultConfig alphaVault;
         VaultConfig betaVault;
+        RegistryConfig registry;
         AssetRouterConfig assetRouter;
         ParameterCheckerConfig parameterChecker;
         MockAssetsConfig mockAssets;
@@ -69,6 +70,15 @@ abstract contract DeploymentManager is Script {
         uint256 maxDepositPerBatch;
         uint256 maxWithdrawPerBatch;
         address trustedForwarder;
+    }
+
+    struct RegistryConfig {
+        HurdleRateConfig hurdleRate;
+    }
+
+    struct HurdleRateConfig {
+        uint16 USDC;
+        uint16 WBTC;
     }
 
     struct AssetRouterConfig {
@@ -248,6 +258,10 @@ abstract contract DeploymentManager is Script {
     }
 
     function _readRouterAndMocks(string memory json, NetworkConfig memory config) private pure {
+        // Parse registry config
+        config.registry.hurdleRate.USDC = uint16(json.readUint(".registry.hurdleRate.USDC"));
+        config.registry.hurdleRate.WBTC = uint16(json.readUint(".registry.hurdleRate.WBTC"));
+
         // Parse asset router config
         config.assetRouter.settlementCooldown = json.readUint(".assetRouter.settlementCooldown");
         config.assetRouter.maxAllowedDelta = json.readUint(".assetRouter.maxAllowedDelta");
