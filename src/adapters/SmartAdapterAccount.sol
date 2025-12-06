@@ -27,8 +27,7 @@ contract SmartAdapterAccount is MinimalSmartAccount {
     /// @dev Overrides parent to use registry.isAdmin instead of owner check
     /// @param _caller the address calling
     function _authorizeUpgrade(address _caller) internal virtual override {
-        MinimalAccountStorage storage $ = _getMinimalAccountStorage();
-        require(IkRegistry(address($.registry)).isAdmin(_caller), "Unauthorized");
+        _checkOwner();
     }
 
     /// @notice Internal authorization check for execute operations

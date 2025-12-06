@@ -580,7 +580,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /// @notice Authorize upgrade (only owner can upgrade)
     /// @dev This allows upgrading the main contract while keeping modules separate
     function _authorizeUpgrade(address _newImplementation) internal view override {
-        _checkAdmin(_msgSender());
+        _checkOwner();
         require(_newImplementation != address(0), KSTAKINGVAULT_ZERO_ADDRESS);
     }
 
