@@ -309,7 +309,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Calculate net shares to burn: (stkTokenAmount * _totalNetAssets) / _totalAssets
         // This represents the net shares (after fees) that should be burned
-        uint8 decimals = _getDecimals($);
         uint256 _netSharesToBurn = uint256(stkTokenAmount).fullMulDiv(_totalNetAssets, _totalAssets);
 
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
