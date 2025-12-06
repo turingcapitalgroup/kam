@@ -8,6 +8,7 @@ import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMath
 import { OptimizedLibClone } from "solady/utils/OptimizedLibClone.sol";
 import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
 import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 import { Extsload } from "uniswap/Extsload.sol";
 
@@ -47,7 +48,7 @@ import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 /// redemption, (5) Cancellation mechanism for pending requests before batch closure. The contract enforces strict
 /// access control, ensuring only verified institutions can access these privileged operations while maintaining
 /// the security and integrity of the protocol's asset backing.
-contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
+contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, Ownable {
     using SafeTransferLib for address;
     using OptimizedSafeCastLib for uint256;
     using OptimizedSafeCastLib for uint64;
@@ -107,9 +108,10 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
 
     /// @notice Initializes the kMinter contract
     /// @param _registry Address of the registry contract
-    function initialize(address _registry) external initializer {
+    function initialize(address _registry, address _owner) external initializer {
         require(_registry != address(0), KMINTER_ZERO_ADDRESS);
         __kBase_init(_registry);
+        _initializeOwner(_owner);
 
         kMinterStorage storage $ = _getkMinterStorage();
         $.receiverImplementation = address(new kBatchReceiver(address(this)));
@@ -536,7 +538,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload {
     /// @dev Only callable by ADMIN_ROLE
     /// @param _newImplementation New implementation address
     function _authorizeUpgrade(address _newImplementation) internal view override {
-        require(_isAdmin(msg.sender), KMINTER_WRONG_ROLE);
+        _checkOwner();
         require(_newImplementation != address(0), KMINTER_ZERO_ADDRESS);
     }
 

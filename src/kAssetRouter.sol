@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
-import { Multicallable } from "solady/utils/Multicallable.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
 import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
 import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
@@ -51,7 +51,7 @@ import { kBase } from "kam/src/base/kBase.sol";
 /// cooldown periods for settlement proposals, (6) Executing peg protection mechanisms during market stress.
 /// The contract ensures protocol integrity by maintaining the 1:1 backing guarantee through carefully orchestrated
 /// money flows while enabling efficient capital utilization across the entire vault network.
-contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, Multicallable {
+contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, Ownable {
     using OptimizedFixedPointMathLib for uint256;
     using OptimizedFixedPointMathLib for int256;
     using SafeTransferLib for address;
@@ -137,8 +137,9 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     /// Must be called immediately after proxy deployment to establish connection with the protocol
     /// registry and initialize the money flow coordination system.
     /// @param _registry Address of the kRegistry contract that manages protocol configuration
-    function initialize(address _registry) external initializer {
+    function initialize(address _registry, address _owner) external initializer {
         __kBase_init(_registry);
+        _initializeOwner(_owner);
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         $.vaultSettlementCooldown = DEFAULT_VAULT_SETTLEMENT_COOLDOWN;
@@ -698,7 +699,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, M
     /// @notice Authorize contract upgrade
     /// @param _newImplementation New implementation address
     function _authorizeUpgrade(address _newImplementation) internal view override {
-        _checkAdmin(msg.sender);
+        _checkOwner();
         _checkAddressNotZero(_newImplementation);
     }
 
