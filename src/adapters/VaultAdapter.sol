@@ -200,7 +200,7 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
     /// @dev Only callable by ADMIN_ROLE
     /// @param _newImplementation New implementation address
     function _authorizeUpgrade(address _newImplementation) internal view override {
-        _checkAdmin(msg.sender);
+        _checkOwner();
         require(_newImplementation != address(0), VAULTADAPTER_ZERO_ADDRESS);
     }
 

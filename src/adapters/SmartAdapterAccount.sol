@@ -8,6 +8,7 @@ import { LibCall } from "minimal-smart-account/vendor/LibCall.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 // Base Contract
+import { VAULTADAPTER_WRONG_ROLE, VAULTADAPTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
 import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
 
 /// @title SmartAdapterAccount
@@ -25,10 +26,10 @@ contract SmartAdapterAccount is MinimalSmartAccount {
 
     /// @notice Internal authorization check for UUPS upgrades
     /// @dev Overrides parent to use registry.isAdmin instead of owner check
-    /// @param _caller the address calling
-    function _authorizeUpgrade(address _caller) internal virtual override {
-        MinimalAccountStorage storage $ = _getMinimalAccountStorage();
-        require(IkRegistry(address($.registry)).isAdmin(_caller), "Unauthorized");
+    /// @param _newImplementation the address of new implementation
+    function _authorizeUpgrade(address _newImplementation) internal virtual override {
+        _checkOwner();
+        require(_newImplementation != address(0), VAULTADAPTER_ZERO_ADDRESS);
     }
 
     /// @notice Internal authorization check for execute operations
@@ -36,6 +37,6 @@ contract SmartAdapterAccount is MinimalSmartAccount {
     /// @param _caller the address calling
     function _authorizeExecute(address _caller) internal virtual override {
         MinimalAccountStorage storage $ = _getMinimalAccountStorage();
-        require(IkRegistry(address($.registry)).isManager(_caller), "Unauthorized");
+        require(IkRegistry(address($.registry)).isManager(_caller), VAULTADAPTER_WRONG_ROLE);
     }
 }
