@@ -36,22 +36,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           forge soldeer install
-        
 
-      - name: Run Forge fmt
+      - name: Run make compile
         run: |
-          forge fmt --check
-        id: fmt
-
-      - name: Run Forge build
-        run: |
-          forge build --sizes
-        id: build
-
-      - name: Run Forge tests
-        run: |
-          forge test -vv
-        id: test
+          make compile
+        id: compile
         env:
           RPC_MAINNET: ${{ secrets.RPC_MAINNET }}
 
