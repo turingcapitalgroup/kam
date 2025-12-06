@@ -77,7 +77,7 @@ contract kMinterTest is DeploymentBaseTest {
 
     function test_Initialize_Require_Not_Initialized() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        minter.initialize(address(registry));
+        minter.initialize(address(registry), users.owner);
     }
 
     /* //////////////////////////////////////////////////////////////

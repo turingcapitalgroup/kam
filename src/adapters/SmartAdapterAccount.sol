@@ -8,10 +8,7 @@ import { LibCall } from "minimal-smart-account/vendor/LibCall.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 // Base Contract
-import {
-    VAULTADAPTER_WRONG_ROLE,
-    VAULTADAPTER_ZERO_ADDRESS
-} from "kam/src/errors/Errors.sol";
+import { VAULTADAPTER_WRONG_ROLE, VAULTADAPTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
 import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
 
 /// @title SmartAdapterAccount
