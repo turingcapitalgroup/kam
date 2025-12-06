@@ -136,6 +136,7 @@ coverage:
 compile:
 	@$(MAKE) check-selectors
 	@$(MAKE) check-interface-completeness
+	@$(MAKE) check-natspec
 	forge fmt --check
 	forge build --sizes --skip test
 
@@ -156,6 +157,191 @@ clean-all:
 # Documentation
 docs:
 	forge doc --serve --port 4000
+
+check-natspec:
+	@echo "🔍 Checking NatSpec documentation completeness..."
+	@bash -c '\
+	found_issues=0; \
+	\
+	get_interface_file() { \
+		local contract_file=$$1; \
+		local interface_name=$$(grep -oE "is[[:space:]]+I[A-Za-z0-9_]+" "$$contract_file" | head -n 1 | sed -E "s/is[[:space:]]+//"); \
+		if [ -z "$$interface_name" ]; then \
+			echo ""; \
+			return; \
+		fi; \
+		local interface_file=$$(find src/interfaces -type f -name "$$interface_name.sol" | head -n 1); \
+		echo "$$interface_file"; \
+	}; \
+	\
+	get_specific_interface_file() { \
+		local interface_name=$$1; \
+		local interface_file=$$(find src/interfaces -type f -name "$$interface_name.sol" | head -n 1); \
+		echo "$$interface_file"; \
+	}; \
+	\
+	get_function_natspec() { \
+		local file=$$1; \
+		local func_name=$$2; \
+		local in_natspec=0; \
+		local in_function=0; \
+		local natspec_params=(); \
+		local has_return=0; \
+		local inheritdoc_interface=""; \
+		\
+		while IFS= read -r line; do \
+			if echo "$$line" | grep -q "/// @inheritdoc"; then \
+				inheritdoc_interface=$$(echo "$$line" | sed -n "s/.*@inheritdoc[[:space:]]\+\([A-Za-z0-9_]\+\).*/\1/p"); \
+				echo "INHERITDOC:$$inheritdoc_interface"; \
+				return; \
+			fi; \
+			\
+			if echo "$$line" | grep -q "/// @param"; then \
+				param_name=$$(echo "$$line" | sed -n "s/.*@param[[:space:]]\+\([a-zA-Z0-9_]\+\).*/\1/p"); \
+				if [ -n "$$param_name" ]; then \
+					natspec_params+=("$$param_name"); \
+				fi; \
+			fi; \
+			\
+			if echo "$$line" | grep -q "/// @return"; then \
+				has_return=1; \
+			fi; \
+			\
+			if echo "$$line" | grep -qE "function[[:space:]]+$$func_name[[:space:]]*\("; then \
+				break; \
+			fi; \
+		done < "$$file"; \
+		\
+		echo "$${natspec_params[@]}|$$has_return"; \
+	}; \
+	\
+	for file in $$(find src -name "*.sol" -type f ! -path "src/vendor/*" ! -path "src/interfaces/*" ! -path "src/adapters/parameters/*"); do \
+		echo "Checking $$file..."; \
+		interface_file=$$(get_interface_file "$$file"); \
+		\
+		temp_file=$$(mktemp); \
+		in_function=0; \
+		func_name=""; \
+		func_line=""; \
+		func_start_line=0; \
+		current_line=0; \
+		has_inheritdoc=0; \
+		inheritdoc_interface=""; \
+		\
+		while IFS= read -r line; do \
+			current_line=$$((current_line + 1)); \
+			clean_line=$$(echo "$$line" | sed "s://.*$$::"); \
+			\
+			if echo "$$line" | grep -q "/// @inheritdoc"; then \
+				has_inheritdoc=1; \
+				inheritdoc_interface=$$(echo "$$line" | sed -n "s/.*@inheritdoc[[:space:]]\+\([A-Za-z0-9_]\+\).*/\1/p"); \
+			fi; \
+			\
+			if echo "$$clean_line" | grep -qE "function[[:space:]]+[a-zA-Z0-9_]+[[:space:]]*\("; then \
+				func_name=$$(echo "$$clean_line" | sed -n "s/.*function[[:space:]]\+\([a-zA-Z0-9_]\+\)[[:space:]]*(.*/\1/p"); \
+				func_line="$$clean_line"; \
+				func_start_line=$$current_line; \
+				in_function=1; \
+			fi; \
+			\
+			if [ $$in_function -eq 1 ]; then \
+				func_line="$$func_line $$clean_line"; \
+				\
+				if echo "$$clean_line" | grep -qE "\{|;"; then \
+					is_public_external=0; \
+					if echo "$$func_line" | grep -qE "(public|external)"; then \
+						is_public_external=1; \
+					fi; \
+					\
+					if [ $$is_public_external -eq 1 ] && [ -n "$$func_name" ] && [ "$$func_name" != "constructor" ]; then \
+						if [ $$has_inheritdoc -eq 1 ]; then \
+							target_interface_file=""; \
+							if [ -n "$$inheritdoc_interface" ]; then \
+								target_interface_file=$$(get_specific_interface_file "$$inheritdoc_interface"); \
+							else \
+								target_interface_file="$$interface_file"; \
+							fi; \
+							\
+							if [ -z "$$target_interface_file" ] || [ ! -f "$$target_interface_file" ]; then \
+								if [ -n "$$inheritdoc_interface" ]; then \
+									echo "  ⚠️  Function $$func_name has @inheritdoc $$inheritdoc_interface but interface file not found (line $$func_start_line)"; \
+								else \
+									echo "  ⚠️  Function $$func_name has @inheritdoc but no interface file found (line $$func_start_line)"; \
+								fi; \
+								found_issues=$$((found_issues + 1)); \
+							fi; \
+							has_inheritdoc=0; \
+							inheritdoc_interface=""; \
+						else \
+							actual_params=$$(echo "$$func_line" | sed -n "s/.*function[[:space:]]\+[a-zA-Z0-9_]\+[[:space:]]*(\([^)]*\)).*/\1/p" | grep -o "[a-zA-Z0-9_]\+[[:space:]]\+[a-zA-Z0-9_]\+" | grep -v "memory" | awk "{print \$$NF}" | grep -v "^$$"); \
+							\
+							has_return=0; \
+							if echo "$$func_line" | grep -qE "returns[[:space:]]*\("; then \
+								has_return=1; \
+							fi; \
+							\
+							natspec_info=$$(get_function_natspec "$$file" "$$func_name"); \
+							\
+							if echo "$$natspec_info" | grep -q "^INHERITDOC:"; then \
+								inheritdoc_from_natspec=$$(echo "$$natspec_info" | cut -d: -f2); \
+								target_interface_file=""; \
+								if [ -n "$$inheritdoc_from_natspec" ]; then \
+									target_interface_file=$$(get_specific_interface_file "$$inheritdoc_from_natspec"); \
+								else \
+									target_interface_file="$$interface_file"; \
+								fi; \
+								\
+								if [ -z "$$target_interface_file" ] || [ ! -f "$$target_interface_file" ]; then \
+									if [ -n "$$inheritdoc_from_natspec" ]; then \
+										echo "  ⚠️  Function $$func_name has @inheritdoc $$inheritdoc_from_natspec but interface file not found (line $$func_start_line)"; \
+									else \
+										echo "  ⚠️  Function $$func_name has @inheritdoc but no interface file found (line $$func_start_line)"; \
+									fi; \
+									found_issues=$$((found_issues + 1)); \
+								fi; \
+							else \
+								natspec_params=$$(echo "$$natspec_info" | cut -d"|" -f1); \
+								natspec_has_return=$$(echo "$$natspec_info" | cut -d"|" -f2); \
+								\
+								for param in $$actual_params; do \
+									found=0; \
+									for natspec_param in $$natspec_params; do \
+										if [ "$$param" = "$$natspec_param" ]; then \
+											found=1; \
+											break; \
+										fi; \
+									done; \
+									if [ $$found -eq 0 ]; then \
+										echo "  ❌ Missing @param $$param in function $$func_name (line $$func_start_line)"; \
+										found_issues=$$((found_issues + 1)); \
+									fi; \
+								done; \
+								\
+								if [ $$has_return -eq 1 ] && [ "$$natspec_has_return" != "1" ]; then \
+									echo "  ❌ Missing @return in function $$func_name (line $$func_start_line)"; \
+									found_issues=$$((found_issues + 1)); \
+								fi; \
+							fi; \
+						fi; \
+					fi; \
+					\
+					in_function=0; \
+					func_name=""; \
+					func_line=""; \
+					has_inheritdoc=0; \
+					inheritdoc_interface=""; \
+				fi; \
+			fi; \
+		done < "$$file"; \
+	done; \
+	if [ $$found_issues -gt 0 ]; then \
+		echo ""; \
+		echo "❌ Found $$found_issues NatSpec issue(s)"; \
+		exit 1; \
+	else \
+		echo ""; \
+		echo "✅ All public/external functions have complete NatSpec documentation"; \
+	fi'
 
 # Verify that IModule contracts have complete selectors() functions
 check-selectors:
