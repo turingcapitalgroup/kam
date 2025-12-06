@@ -36,13 +36,16 @@ abstract contract ERC2771Context {
         $.trustedForwarder = trustedForwarder_;
     }
 
-    /// @dev Returns the address of the trusted forwarder.
-    function trustedForwarder() public view virtual returns (address) {
+    /// @notice Returns the address of the trusted forwarder.
+    /// @return forwarder the special address for metatransactions
+    function trustedForwarder() public view virtual returns (address forwarder) {
         return _getERC2771ContextStorage().trustedForwarder;
     }
 
-    /// @dev Indicates whether any particular address is the trusted forwarder.
-    function isTrustedForwarder(address forwarder) public view virtual returns (bool) {
+    /// @notice Indicates whether any particular address is the trusted forwarder.
+    /// @param forwarder wallet address
+    /// @return isTrusted wether is a trusted forwarder or not.
+    function isTrustedForwarder(address forwarder) public view virtual returns (bool isTrusted) {
         return forwarder == trustedForwarder();
     }
 

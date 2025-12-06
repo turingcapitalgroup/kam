@@ -89,6 +89,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /// @param _symbol ERC20 token symbol for the stkToken (e.g., "stkUSDC")
     /// @param _decimals Token decimals matching the underlying asset precision
     /// @param _asset Underlying asset address that this vault will generate yield on
+    /// @param _maxTotalAssets The max TVL in underlying tokens
+    /// @param _trustedForwarder The trusted forwarder for ERC2771 metatransactions
     function initialize(
         address _owner,
         address _registryAddress,
