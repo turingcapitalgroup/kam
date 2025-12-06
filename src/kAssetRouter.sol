@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
+import { Ownable } from "solady/auth/Ownable.sol";
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
-import { Ownable } from "solady/auth/Ownable.sol";
 import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
 import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
@@ -137,6 +137,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// Must be called immediately after proxy deployment to establish connection with the protocol
     /// registry and initialize the money flow coordination system.
     /// @param _registry Address of the kRegistry contract that manages protocol configuration
+    /// @param _owner Initial owner of the contract
     function initialize(address _registry, address _owner) external initializer {
         __kBase_init(_registry);
         _initializeOwner(_owner);

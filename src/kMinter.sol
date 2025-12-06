@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
+import { Ownable } from "solady/auth/Ownable.sol";
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
 import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
@@ -8,7 +9,6 @@ import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMath
 import { OptimizedLibClone } from "solady/utils/OptimizedLibClone.sol";
 import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
-import { Ownable } from "solady/auth/Ownable.sol";
 import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 import { Extsload } from "uniswap/Extsload.sol";
 
@@ -108,6 +108,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
 
     /// @notice Initializes the kMinter contract
     /// @param _registry Address of the registry contract
+    /// @param _owner Initial owner fo the contract
     function initialize(address _registry, address _owner) external initializer {
         require(_registry != address(0), KMINTER_ZERO_ADDRESS);
         __kBase_init(_registry);

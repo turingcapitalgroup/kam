@@ -50,7 +50,8 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         kAssetRouter assetRouterImpl = new kAssetRouter();
 
         // Deploy proxy with initialization
-        bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, registryAddr, config.roles.owner);
+        bytes memory initData =
+            abi.encodeWithSelector(kAssetRouter.initialize.selector, registryAddr, config.roles.owner);
 
         address assetRouterProxy = factory.deployAndCall(address(assetRouterImpl), msg.sender, initData);
 
