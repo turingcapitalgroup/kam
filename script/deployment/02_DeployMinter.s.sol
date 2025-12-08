@@ -50,7 +50,7 @@ contract DeployMinterScript is Script, DeploymentManager {
         kMinter minterImpl = new kMinter();
 
         // Deploy proxy with initialization
-        bytes memory initData = abi.encodeWithSelector(kMinter.initialize.selector, registryAddr, config.roles.owner);
+        bytes memory initData = abi.encodeCall(kMinter.initialize, (registryAddr, config.roles.owner));
 
         address minterProxy = factory.deployAndCall(address(minterImpl), msg.sender, initData);
 

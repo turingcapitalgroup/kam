@@ -13,6 +13,7 @@ import {
     VAULTADAPTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
 
 contract VaultAdapterTest is DeploymentBaseTest {
     address internal constant ZERO_ADDRESS = address(0);
@@ -326,11 +327,11 @@ contract VaultAdapterTest is DeploymentBaseTest {
         address _newImpl = address(new VaultAdapter());
 
         vm.prank(users.alice);
-        vm.expectRevert(bytes(VAULTADAPTER_WRONG_ROLE));
+        vm.expectRevert(Ownable.Unauthorized.selector);
         adapter.upgradeToAndCall(_newImpl, "");
 
         vm.prank(users.emergencyAdmin);
-        vm.expectRevert(bytes(VAULTADAPTER_WRONG_ROLE));
+        vm.expectRevert(Ownable.Unauthorized.selector);
         adapter.upgradeToAndCall(_newImpl, "");
     }
 

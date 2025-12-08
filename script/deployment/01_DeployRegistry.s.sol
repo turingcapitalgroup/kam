@@ -38,14 +38,16 @@ contract DeployRegistryScript is Script, DeploymentManager {
         kRegistry registryImpl = new kRegistry();
 
         // Deploy proxy with initialization
-        bytes memory initData = abi.encodeWithSelector(
-            kRegistry.initialize.selector,
-            config.roles.owner,
-            config.roles.admin,
-            config.roles.emergencyAdmin,
-            config.roles.guardian,
-            config.roles.relayer,
-            config.roles.treasury
+        bytes memory initData = abi.encodeCall(
+            kRegistry.initialize,
+            (
+                config.roles.owner,
+                config.roles.admin,
+                config.roles.emergencyAdmin,
+                config.roles.guardian,
+                config.roles.relayer,
+                config.roles.treasury
+            )
         );
 
         address registryProxy = factory.deployAndCall(address(registryImpl), msg.sender, initData);

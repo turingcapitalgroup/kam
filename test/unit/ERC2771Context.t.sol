@@ -90,10 +90,12 @@ contract ERC2771ContextTest is BaseVaultTest {
         kUSD.approve(address(vault), 1000 * _1_USDC);
 
         // Prepare the call data
-        bytes memory callData = abi.encodeWithSelector(
-            vault.requestStake.selector,
-            users.alice, // recipient
-            1000 * _1_USDC // amount
+        bytes memory callData = abi.encodeCall(
+            vault.requestStake,
+            (
+                users.alice, // recipient
+                1000 * _1_USDC // amount
+            )
         );
 
         // Forward the call with Alice's address appended (as raw 20 bytes)
@@ -117,10 +119,12 @@ contract ERC2771ContextTest is BaseVaultTest {
         assertEq(stkBalance, 1000 * _1_USDC);
 
         // Prepare the call data
-        bytes memory callData = abi.encodeWithSelector(
-            vault.requestUnstake.selector,
-            users.alice, // recipient
-            stkBalance // amount
+        bytes memory callData = abi.encodeCall(
+            vault.requestUnstake,
+            (
+                users.alice, // recipient
+                stkBalance // amount
+            )
         );
 
         // Forward the call with Alice's address appended
@@ -156,7 +160,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         uint256 balanceBefore = vault.balanceOf(users.alice);
 
         // Test: Forward the claim call
-        bytes memory callData = abi.encodeWithSelector(vault.claimStakedShares.selector, requestId);
+        bytes memory callData = abi.encodeCall(vault.claimStakedShares, (requestId));
 
         vm.prank(trustedForwarder);
         (bool success,) = address(vault).call(_appendSender(callData, users.alice));
@@ -186,7 +190,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         uint256 kTokenBalanceBefore = kUSD.balanceOf(users.alice);
 
         // Test: Forward the claim call
-        bytes memory callData = abi.encodeWithSelector(vault.claimUnstakedAssets.selector, unstakeRequestId);
+        bytes memory callData = abi.encodeCall(vault.claimUnstakedAssets, (unstakeRequestId));
 
         vm.prank(trustedForwarder);
         (bool success,) = address(vault).call(_appendSender(callData, users.alice));
@@ -201,7 +205,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
 
         // Prepare call data with Alice's address appended
-        bytes memory callData = abi.encodeWithSelector(vault.requestStake.selector, users.alice, 1000 * _1_USDC);
+        bytes memory callData = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
 
         // Try to call from Bob (not the trusted forwarder) with Alice's address appended
         // This should fail because Bob doesn't have approval or balance
@@ -254,19 +258,19 @@ contract ERC2771ContextTest is BaseVaultTest {
         kUSD.approve(address(vault), 750 * _1_USDC);
 
         // Forward calls for each user
-        bytes memory callDataAlice = abi.encodeWithSelector(vault.requestStake.selector, users.alice, 1000 * _1_USDC);
+        bytes memory callDataAlice = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
         vm.prank(trustedForwarder);
         (bool success1, bytes memory returnData1) = address(vault).call(_appendSender(callDataAlice, users.alice));
         require(success1, "Alice's forwarded call failed");
         bytes32 requestIdAlice = abi.decode(returnData1, (bytes32));
 
-        bytes memory callDataBob = abi.encodeWithSelector(vault.requestStake.selector, users.bob, 500 * _1_USDC);
+        bytes memory callDataBob = abi.encodeCall(vault.requestStake, (users.bob, 500 * _1_USDC));
         vm.prank(trustedForwarder);
         (bool success2, bytes memory returnData2) = address(vault).call(_appendSender(callDataBob, users.bob));
         require(success2, "Bob's forwarded call failed");
         bytes32 requestIdBob = abi.decode(returnData2, (bytes32));
 
-        bytes memory callDataCharlie = abi.encodeWithSelector(vault.requestStake.selector, users.charlie, 750 * _1_USDC);
+        bytes memory callDataCharlie = abi.encodeCall(vault.requestStake, (users.charlie, 750 * _1_USDC));
         vm.prank(trustedForwarder);
         (bool success3, bytes memory returnData3) = address(vault).call(_appendSender(callDataCharlie, users.charlie));
         require(success3, "Charlie's forwarded call failed");
@@ -355,7 +359,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         // Forward stake request
-        bytes memory stakeCallData = abi.encodeWithSelector(vault.requestStake.selector, users.alice, 1000 * _1_USDC);
+        bytes memory stakeCallData = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
         vm.prank(trustedForwarder);
         (bool success1, bytes memory returnData1) = address(vault).call(_appendSender(stakeCallData, users.alice));
         require(success1, "Forwarded stake request failed");
@@ -372,7 +376,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
 
         // Forward claim request
-        bytes memory claimCallData = abi.encodeWithSelector(vault.claimStakedShares.selector, requestId);
+        bytes memory claimCallData = abi.encodeCall(vault.claimStakedShares, (requestId));
         vm.prank(trustedForwarder);
         (bool success2,) = address(vault).call(_appendSender(claimCallData, users.alice));
         require(success2, "Forwarded claim failed");

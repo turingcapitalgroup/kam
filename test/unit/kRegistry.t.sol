@@ -536,7 +536,7 @@ contract kRegistryTest is DeploymentBaseTest {
 
     function test_GetHurdleRate() public {
         uint16 _hurdleRate = registry.getHurdleRate(USDC);
-        assertEq(_hurdleRate, 0);
+        assertEq(_hurdleRate, TEST_HURDLE_RATE);
 
         vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
         registry.getHurdleRate(TEST_ASSET);

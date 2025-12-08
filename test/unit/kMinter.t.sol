@@ -27,6 +27,7 @@ import {
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { kMinter } from "kam/src/kMinter.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
 
 contract kMinterTest is DeploymentBaseTest {
     uint256 internal constant MINT_AMOUNT = 100_000 * _1_USDC;
@@ -68,9 +69,10 @@ contract kMinterTest is DeploymentBaseTest {
     function test_Initialize_Require_Registry_Not_Zero_Address() public {
         kMinter newMinterImpl = new kMinter();
 
-        bytes memory initData = abi.encodeWithSelector(kMinter.initialize.selector, address(0));
+        bytes memory initData = abi.encodeCall(kMinter.initialize, (address(0), users.admin));
 
         ERC1967Factory factory = new ERC1967Factory();
+
         vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
         factory.deployAndCall(address(newMinterImpl), users.admin, initData);
     }
@@ -347,7 +349,7 @@ contract kMinterTest is DeploymentBaseTest {
         address newImpl = address(new kMinter());
 
         vm.prank(users.alice);
-        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        vm.expectRevert(Ownable.Unauthorized.selector);
         minter.upgradeToAndCall(newImpl, "");
     }
 
