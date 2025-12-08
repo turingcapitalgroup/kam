@@ -28,9 +28,9 @@ import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVaultBatch } from "kam/src/interfaces/IVaultBatch.sol";
 import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { kAssetRouter } from "kam/src/kAssetRouter.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
-import { Ownable } from "solady/auth/Ownable.sol";
 
 contract kAssetRouterTest is DeploymentBaseTest {
     bytes32 internal constant TEST_BATCH_ID = bytes32(uint256(1));

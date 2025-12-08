@@ -72,7 +72,7 @@ contract kMinterTest is DeploymentBaseTest {
         bytes memory initData = abi.encodeWithSelector(kMinter.initialize.selector, address(0), users.admin);
 
         ERC1967Factory factory = new ERC1967Factory();
-        
+
         vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
         factory.deployAndCall(address(newMinterImpl), users.admin, initData);
     }
