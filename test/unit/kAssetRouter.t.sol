@@ -78,7 +78,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
     function test_Initialize_Success() public {
         kAssetRouter newAssetRouterImpl = new kAssetRouter();
 
-        bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, address(registry), users.owner);
+        bytes memory initData = abi.encodeCall(kAssetRouter.initialize, (address(registry), users.owner));
 
         ERC1967Factory factory = new ERC1967Factory();
         address newProxy = factory.deployAndCall(address(newAssetRouterImpl), users.admin, initData);
@@ -97,7 +97,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
     function test_Initialize_Require_Registry_Not_Zero_Address() public {
         kAssetRouter newAssetRouterImpl = new kAssetRouter();
 
-        bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, address(0), users.admin);
+        bytes memory initData = abi.encodeCall(kAssetRouter.initialize, (address(0), users.admin));
 
         ERC1967Factory factory = new ERC1967Factory();
         vm.expectRevert(bytes(KBASE_INVALID_REGISTRY));

@@ -162,17 +162,19 @@ contract DeployVaultsScript is Script, DeploymentManager {
         return factory.deployAndCall(
             stakingVaultImpl,
             msg.sender,
-            abi.encodeWithSelector(
-                kStakingVault.initialize.selector,
-                config.roles.owner,
-                existing.contracts.kRegistry,
-                config.dnVaultUSDC.useKToken,
-                config.dnVaultUSDC.name,
-                config.dnVaultUSDC.symbol,
-                config.dnVaultUSDC.decimals,
-                config.assets.USDC, // Uses USDC as underlying asset
-                config.dnVaultUSDC.maxTotalAssets,
-                config.dnVaultUSDC.trustedForwarder
+            abi.encodeCall(
+                kStakingVault.initialize,
+                (
+                    config.roles.owner,
+                    existing.contracts.kRegistry,
+                    config.dnVaultUSDC.useKToken,
+                    config.dnVaultUSDC.name,
+                    config.dnVaultUSDC.symbol,
+                    config.dnVaultUSDC.decimals,
+                    config.assets.USDC, // Uses USDC as underlying asset
+                    config.dnVaultUSDC.maxTotalAssets,
+                    config.dnVaultUSDC.trustedForwarder
+                )
             )
         );
     }
@@ -186,17 +188,19 @@ contract DeployVaultsScript is Script, DeploymentManager {
         return factory.deployAndCall(
             stakingVaultImpl,
             msg.sender,
-            abi.encodeWithSelector(
-                kStakingVault.initialize.selector,
-                config.roles.owner,
-                existing.contracts.kRegistry,
-                config.dnVaultWBTC.useKToken,
-                config.dnVaultWBTC.name,
-                config.dnVaultWBTC.symbol,
-                config.dnVaultWBTC.decimals,
-                config.assets.WBTC, // Uses WBTC as underlying asset
-                config.dnVaultWBTC.maxTotalAssets,
-                config.dnVaultWBTC.trustedForwarder
+            abi.encodeCall(
+                kStakingVault.initialize,
+                (
+                    config.roles.owner,
+                    existing.contracts.kRegistry,
+                    config.dnVaultWBTC.useKToken,
+                    config.dnVaultWBTC.name,
+                    config.dnVaultWBTC.symbol,
+                    config.dnVaultWBTC.decimals,
+                    config.assets.WBTC, // Uses WBTC as underlying asset
+                    config.dnVaultWBTC.maxTotalAssets,
+                    config.dnVaultWBTC.trustedForwarder
+                )
             )
         );
     }
@@ -210,17 +214,19 @@ contract DeployVaultsScript is Script, DeploymentManager {
         return factory.deployAndCall(
             stakingVaultImpl,
             msg.sender,
-            abi.encodeWithSelector(
-                kStakingVault.initialize.selector,
-                config.roles.owner,
-                existing.contracts.kRegistry,
-                config.alphaVault.useKToken,
-                config.alphaVault.name,
-                config.alphaVault.symbol,
-                config.alphaVault.decimals,
-                config.assets.USDC, // Uses USDC as underlying asset
-                config.alphaVault.maxTotalAssets,
-                config.alphaVault.trustedForwarder
+            abi.encodeCall(
+                kStakingVault.initialize,
+                (
+                    config.roles.owner,
+                    existing.contracts.kRegistry,
+                    config.alphaVault.useKToken,
+                    config.alphaVault.name,
+                    config.alphaVault.symbol,
+                    config.alphaVault.decimals,
+                    config.assets.USDC, // Uses USDC as underlying asset
+                    config.alphaVault.maxTotalAssets,
+                    config.alphaVault.trustedForwarder
+                )
             )
         );
     }
@@ -234,17 +240,19 @@ contract DeployVaultsScript is Script, DeploymentManager {
         return factory.deployAndCall(
             stakingVaultImpl,
             msg.sender,
-            abi.encodeWithSelector(
-                kStakingVault.initialize.selector,
-                config.roles.owner,
-                existing.contracts.kRegistry,
-                config.betaVault.useKToken,
-                config.betaVault.name,
-                config.betaVault.symbol,
-                config.betaVault.decimals,
-                config.assets.USDC, // Uses USDC as underlying asset
-                config.betaVault.maxTotalAssets,
-                config.betaVault.trustedForwarder
+            abi.encodeCall(
+                kStakingVault.initialize,
+                (
+                    config.roles.owner,
+                    existing.contracts.kRegistry,
+                    config.betaVault.useKToken,
+                    config.betaVault.name,
+                    config.betaVault.symbol,
+                    config.betaVault.decimals,
+                    config.assets.USDC, // Uses USDC as underlying asset
+                    config.betaVault.maxTotalAssets,
+                    config.betaVault.trustedForwarder
+                )
             )
         );
     }

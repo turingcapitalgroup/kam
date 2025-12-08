@@ -69,7 +69,7 @@ contract kMinterTest is DeploymentBaseTest {
     function test_Initialize_Require_Registry_Not_Zero_Address() public {
         kMinter newMinterImpl = new kMinter();
 
-        bytes memory initData = abi.encodeWithSelector(kMinter.initialize.selector, address(0), users.admin);
+        bytes memory initData = abi.encodeCall(kMinter.initialize, (address(0), users.admin));
 
         ERC1967Factory factory = new ERC1967Factory();
 
