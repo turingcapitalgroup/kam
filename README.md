@@ -36,6 +36,14 @@ forge soldeer install
 
 This will install all dependencies specified in `soldeer.toml` and `soldeer.lock`.
 
+## Building
+
+To build the project with a more exhaustive review:
+
+```
+make compile
+```
+
 ## Testing
 
 ### in `default` mode
@@ -49,7 +57,7 @@ forge test
 ### in `coverage` mode
 
 ```sh
-forge coverage
+forge coverage --ir-minimum
 ```
 
 ### Using solx compiler (optional)
@@ -65,6 +73,17 @@ Use with forge:
 ```sh
 forge build --use $(which solx)
 forge test --use $(which solx)
+```
+
+## Smart Contracts Deployment
+
+You can deploy to any environment(localhost/sepolia/mainnet) and get deployment 
+addresses in `deployments/output/<environment>/addresses.json`. To configure deployment modify `deployments/config/<environment>.json`.
+
+```
+make deploy-localhost
+make deploy-sepolia
+make deploy-mainnet 
 ```
 
 ## Smart Contracts Documentation
