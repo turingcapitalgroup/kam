@@ -349,28 +349,30 @@ Secure execution proxy contracts deployed per vault for controlled external stra
 
 **Deployment Architecture:**
 
-- **One adapter per registered vault**: kMinter gets USDC + WBTC adapters, DN vaults get their own adapters, Alpha/Beta vaults get separate adapters
-- **Granular Permission System**: Each adapter has specific target contracts and function selectors it can call, configured via `setAdapterAllowedSelector()` in kRegistry
-- **Parameter Validation**: ERC20ParameterChecker validates transfer amounts, recipients, and spenders for token operations
+- **One adapter per vault per asset**: Each vault-asset combination gets its own VaultAdapter for isolated operations
+- **Granular Permission System**: Each adapter has specific target contracts and function selectors it can call, validated via `registry.isAdapterSelectorAllowed(adapter, target, selector)`
+- **Parameter Validation**: Optional parameter checkers can be configured per adapter to validate call data parameters
 
 **Core Functions:**
 
-- **`execute(target, data, value)`**: Relayer-only function that validates permissions through kRegistry and executes calls to external strategies
-- **`setTotalAssets(uint256)`**: Admin-only function to update virtual balance tracking for settlement calculations  
+- **`execute(target, data, value)`**: Manager-only function (via MANAGER_ROLE) that validates permissions through registry and executes calls to external strategies
+- **`setTotalAssets(uint256)`**: kAssetRouter-only function to update virtual balance tracking for settlement calculations  
 - **`totalAssets()`**: Returns current virtual balance for vault accounting
+- **`pull(asset, amount)`**: kAssetRouter-only function to transfer assets during settlement
 
 **Strategy Integration Patterns:**
 
-- **kMinter Adapters**: Interact with ERC7540 vaults (Delta Neutral strategies) and handle asset transfers to custodial wallets (CEFFU)
-- **DN Vault Adapters**: Manage ERC7540 vault interactions for institutional yield farming
-- **Alpha/Beta Adapters**: Handle transfers to custodial addresses for external custody strategies
+- **kMinter Adapters**: Manage institutional deposits and coordinate with yield strategies via permissioned external protocol calls
+- **kStakingVault Adapters**: Handle retail staking yield generation through approved external protocol integrations
+- **Permission Model**: All external calls validated against registered target/selector pairs in kRegistry
 
 **Security Model:**
 
-- Only relayers can execute calls through the adapter
-- kRegistry validates each target contract and function selector
-- Parameter checkers enforce limits (e.g., max 100k USDC, 3 WBTC transfers)
-- Emergency pause and asset rescue capabilities for risk management
+- Only addresses with MANAGER_ROLE can execute calls through adapters
+- kRegistry validates each target contract and function selector via `isAdapterSelectorAllowed()`
+- Optional parameter checkers can enforce additional validation rules
+- Emergency pause (EMERGENCY_ADMIN_ROLE) and asset rescue (ADMIN_ROLE) capabilities for risk management
+- kAssetRouter has exclusive access to `setTotalAssets()` and `pull()` functions
 
 The VaultAdapter pattern provides secure, controlled access to external strategies while maintaining protocol oversight and virtual balance reporting for accurate settlement operations.
 
@@ -503,9 +505,9 @@ The two-phase commit system provides multiple safeguards:
 ### Timelock Protection ###
 
 - Mandatory cooldown period (1hr default, max 1 day)
-- Proposal cancellation capability
-- Parameter update mechanism
-- On-chain validation
+- Guardian-only proposal cancellation during cooldown
+- Yield tolerance validation (default 10% max deviation)
+- On-chain validation of all settlement parameters
 
 ### Emergency Controls
 

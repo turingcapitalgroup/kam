@@ -7,7 +7,7 @@ Think of KAM like a bank connecting two groups:
 - **Institutions** (banks, hedge funds) deposit USDC or Bitcoin → Get kTokens instantly
 - **Regular users** (you and me) stake kTokens → Earn yield from strategies
 
-**The Key Insight**: kMinter and Delta Neutral Vault share the SAME external strategy. That's why they transfer shares, not actual USDC. Alpha and Beta use DIFFERENT strategies (CEFFU custody), so USDC must physically move from Delta Neutral to them.
+**The Key Insight**: kMinter and DN Vaults share the SAME external strategy per asset. That's why they transfer shares, not actual USDC/WBTC. Alpha and Beta use DIFFERENT strategies (CEFFU custody), so physical assets move from the shared strategy via kMinter Adapter to CEFFU. The kMinter Adapter is the central hub for all physical asset movements.
 
 ---
 
@@ -17,31 +17,39 @@ Think of KAM like a bank connecting two groups:
 
 - Where institutions deposit USDC or Bitcoin (WBTC)
 - Issues kTokens instantly (1:1 exchange)
-- **Shares the same investment strategy with Delta Neutral Vault**
+- **Shares the same investment strategy with DN Vaults (per asset)**
+- **kMinter Adapter is THE central hub - only one physically moving assets**
 
-### 2. **kStakingVaults** - Three Yield Strategies
+### 2. **kStakingVaults** - Four Yield Strategies
 
-**Delta Neutral Vault (THE main vault)**:
+**DN Vaults (Delta Neutral - per asset: USDC, WBTC)**:
 
-- Accepts USDC and Bitcoin  
-- **Uses THE SAME strategy as kMinter** (this is critical!)
-- When institutions deposit → Goes to Delta Neutral strategy
+- Accepts USDC or WBTC (separate vaults)
+- **Uses THE SAME strategy as kMinter for that asset** (this is critical!)
+- When institutions deposit → Goes to shared strategy (e.g., DN USDC strategy)
 - When users stake in DN → They get shares of that same strategy
-- No USDC needs to move between kMinter and DN (just share bookkeeping!)
+- No physical USDC/WBTC moves between kMinter and DN (just share bookkeeping!)
+- DN adapters track virtual balances (shares in shared strategy)
 
-**Alpha Vault**:
+**Alpha Vault (USDC only)**:
 
 - Only USDC (no Bitcoin)
-- Uses CEFFU custody (DIFFERENT strategy from Delta Neutral)
-- USDC flows: DN strategy → kMinter Adapter → CEFFU
+- Uses CEFFU custody (DIFFERENT strategy from DN)
+- Physical USDC flows: Shared DN strategy → kMinter Adapter → CEFFU
 - Alpha adapter only tracks virtual balances (no physical USDC)
 
-**Beta Vault**:
+**Beta Vault (USDC only)**:
 
 - Only USDC (no Bitcoin)  
-- Also uses CEFFU custody (DIFFERENT strategy)
-- USDC flows: DN strategy → kMinter Adapter → CEFFU
+- Also uses CEFFU custody (DIFFERENT strategy from DN)
+- Physical USDC flows: Shared DN strategy → kMinter Adapter → CEFFU
 - Beta adapter only tracks virtual balances (no physical USDC)
+
+**Key Architecture Points**:
+
+- kMinter + DN (same asset) = Share accounting in same strategy
+- Alpha/Beta = Asset accounting, physical movement via kMinter Adapter
+- kMinter Adapter = Central hub for ALL physical asset movements
 
 ### 3. **kAssetRouter** - The Bookkeeper
 
@@ -52,24 +60,37 @@ Think of KAM like a bank connecting two groups:
 
 ### 4. **Adapters** - The Smart Wallets
 
-- Each vault has its own adapter for tracking and permissions
-- **kMinter Adapter** (THE central hub - only one holding USDC):
-  - Physically holds USDC
-  - Deploys to DN strategy
-  - Sends/receives to/from CEFFU
-  - All physical money flows through here
-- **DN/Alpha/Beta Adapters**:
-  - Track virtual balances only
-  - Don't physically hold USDC
-  - Used for accounting and permissions
+- Each vault-asset pair has its own adapter for tracking and permissions
+- **kMinter Adapter** (THE central hub - only one physically holding/moving assets):
+  - Physically holds USDC/WBTC temporarily
+  - Deploys to shared DN strategy (per asset)
+  - Sends/receives to/from CEFFU for Alpha/Beta
+  - ALL physical asset flows go through kMinter Adapter
+- **DN Adapters** (USDC and WBTC - separate adapters):
+  - Track virtual balances only (shares in shared strategy)
+  - Don't physically hold USDC/WBTC
+  - Share same external strategy as kMinter (per asset)
+  - Used for accounting and share tracking
+- **Alpha/Beta Adapters**:
+  - Track virtual balances only (no physical assets)
+  - Assets physically at CEFFU (moved via kMinter Adapter)
+  - Used for accounting and permissions only
 
-### 5. **Relayers** - The Operators
+### 5. **Relayers and Managers** - The Operators
 
-- Automated bots (or manual operators) that:
-  - Tell adapters to deploy money
-  - Move USDC between strategies
-  - Propose settlements
-  - Pull yields from external strategies
+**RELAYER_ROLE**:
+
+- Propose and coordinate batch settlements
+- Close batches to prepare for settlement
+- Submit totalAssets values from external strategies
+
+**MANAGER_ROLE**:
+
+- Execute kMinter Adapter calls to external protocols
+- Deploy assets to shared DN strategies
+- Move USDC between shared strategy and CEFFU (for Alpha/Beta)
+- Retrieve yields from external strategies
+- ALL physical movements go through kMinterAdapter.execute()
 
 ### 6. **BatchReceiver** - Withdrawal Desk
 
@@ -102,17 +123,20 @@ Virtual Accounting:
 ---
 
 Day 0 or 1 - Deployment (separate step):
-4. Relayer sees 10M sitting in kMinter adapter
-5. Relayer calls: kMinterAdapter.execute()
+4. Manager sees 10M sitting in kMinter adapter
+5. Manager calls: kMinterAdapter.execute(target, data, value)
+   - Requires MANAGER_ROLE
+   - Target/selector must be whitelisted in registry
    
 Physical Movement:
-   kMinter Adapter → Delta Neutral External Strategy
+   kMinter Adapter → Shared DN Strategy (e.g., DN USDC strategy)
    (10M USDC deployed to earn yield)
 
 Result:
-   Money now earning yield in Delta Neutral strategy
+   Money now earning yield in shared DN strategy
    kMinter adapter balance: 0 USDC (all deployed)
-   Virtual balance still tracks: kMinter owns 10M
+   Virtual balance still tracks: kMinter owns 10M shares in shared strategy
+   DN Vault can now receive shares of this same strategy
 ```
 
 **Key Insight**: 
@@ -123,47 +147,47 @@ Result:
 
 ---
 
-## Money Flow #2: User Stakes in Delta Neutral
+## Money Flow #2: User Stakes in DN Vault
 
 **Step by Step:**
 
 ```
 User Action:
 1. User has 100,000 kUSDC
-2. Calls DeltaNeutralVault.requestStake(100000)
+2. Calls DNVaultUSDC.requestStake(100000)
 
 Physical Movement:
-   User → Delta Neutral Vault
+   User → DN Vault USDC
    (100K kUSDC physically transferred to vault)
 
 Virtual Accounting (this is key!):
    kAssetRouter updates:
-   - kMinter.requested += 100K (taking from kMinter)
-   - DeltaNeutralVault.deposited += 100K (giving to DN vault)
+   - kMinter.requested += 100K (taking shares from kMinter)
+   - DNVault.deposited += 100K (giving shares to DN vault)
    
 BUT NO USDC MOVES!
    Why? Because kMinter and DN share the same strategy
-   The 10M USDC is ALREADY in Delta Neutral strategy
+   The 10M USDC is ALREADY in shared DN USDC strategy
    Just need to update who owns how much (share accounting)
 
 ---
 
 Settlement (next day):
-Relayer proposes settlement with yield data
-Router calculates shares
+Relayer proposes settlement with yield data from shared strategy
+Router calculates shares based on strategy performance
 User claims stkTokens
 
 Result:
    User gets stkTokens representing ownership
-   Physical USDC never moved (stayed in DN strategy)
-   Just ownership changed from "kMinter's share" to "User's share"
+   Physical USDC never moved (stayed in shared DN strategy)
+   Just ownership changed from "kMinter's shares" to "DN Vault's shares"
 ```
 
 **Key Insight**: 
 
-- kMinter and Delta Neutral use SHARE accounting
+- kMinter and DN (same asset) use SHARE accounting in shared strategy
 - No USDC moves because they're in the same strategy
-- More efficient!
+- More efficient - just updating share ownership!
 
 ---
 
@@ -191,13 +215,13 @@ Settlement Process:
 Router calculates: Alpha needs 100K USDC at CEFFU
 Key: Everything flows through kMinter Adapter!
 
-Physical Movement #2 (relayer coordinates):
+Physical Movement #2 (manager coordinates):
 Step A: Get USDC to kMinter Adapter (if needed)
    If kMinter adapter low on USDC:
-   DN strategy → kMinter adapter (withdraw 100K)
+   Shared DN strategy → kMinter adapter (withdraw 100K)
    
 Step B: Deploy DIRECTLY from kMinter Adapter to CEFFU
-   kMinterAdapter.execute() called by relayer
+   kMinterAdapter.execute() called by manager (MANAGER_ROLE)
    kMinter Adapter → CEFFU (Alpha custody): 100K USDC
    
    IMPORTANT: Alpha adapter NEVER holds USDC!
@@ -206,7 +230,7 @@ Step B: Deploy DIRECTLY from kMinter Adapter to CEFFU
 Virtual Updates (Settlement):
    - kMinter adapter: reduced by 100K (gave to Alpha)
    - Alpha adapter: virtual balance +100K (tracking only)
-   - DN strategy: reduced by 100K (source of USDC)
+   - Shared DN strategy: reduced by 100K (source of USDC)
 
 Result:
    100K USDC now at CEFFU earning Alpha strategy yield
@@ -270,11 +294,12 @@ Settlement Execution:
 
 **Physical Transfers Happen SEPARATELY:**
 
-The relayer must separately:
+The manager (MANAGER_ROLE) must separately use kMinter Adapter:
 
-1. Deploy new deposits to strategies
-2. Withdraw from strategies for redemptions  
-3. Move USDC between strategies (for Alpha/Beta)
+1. Deploy new deposits to shared DN strategies via kMinterAdapter.execute()
+2. Withdraw from shared DN strategies for Alpha/Beta deployments
+3. Move USDC between shared DN strategy and CEFFU (for Alpha/Beta)
+4. All physical movements go through kMinter Adapter only
 
 ---
 
@@ -350,24 +375,24 @@ State:
    - kMinter virtual balance: 10M
 
 ═══════════════════════════════════════════════════════════
-DAY 5: ALICE STAKES IN DELTA NEUTRAL
+DAY 5: ALICE STAKES IN DN VAULT USDC
 ═══════════════════════════════════════════════════════════
 
-Alice → DN Vault: 100K kUSDC
+Alice → DN Vault USDC: 100K kUSDC
 
 Virtual Accounting:
-   - kMinter.requested: +100K
-   - DN.deposited: +100K
+   - kMinter.requested: +100K (shares)
+   - DNVaultUSDC.deposited: +100K (shares)
 
 Physical Reality:
-   - DN strategy STILL has 10M USDC
+   - Shared DN USDC strategy STILL has 10M USDC
    - NO USDC MOVED!
-   - Just tracking changed: kMinter owns less, DN owns more
+   - Just tracking changed: kMinter owns less shares, DN Vault owns more shares
 
 Settlement (Day 6):
-   DN strategy reports: 10.2M USDC (2% yield!)
+   Shared DN USDC strategy reports: 10.2M USDC (2% yield!)
    Yield: 10.2M - 10M = +200K
-   Mint 200K kUSDC to DN Vault
+   Mint 200K kUSDC to DN Vault USDC
    
    Share price: 1.002
    Alice claims: 100K / 1.002 ≈ 99,800 stkTokens
@@ -384,26 +409,26 @@ Virtual Accounting:
 
 Alpha needs USDC at CEFFU (different strategy!)
 
-Relayer Actions (CENTRALIZED through kMinter Adapter):
+Manager Actions (CENTRALIZED through kMinter Adapter):
 Step 1: Get USDC to kMinter Adapter
-   DN strategy: 10.2M → 8.2M USDC
+   Shared DN USDC strategy: 10.2M → 8.2M USDC
    Withdraw 2M to kMinter adapter
    
 Step 2: Deploy DIRECTLY from kMinter Adapter to CEFFU
-   kMinterAdapter.execute() called by relayer
+   kMinterAdapter.execute() called by manager
    kMinter Adapter → CEFFU (Alpha): 2M USDC
    (Alpha adapter NEVER touches the USDC!)
 
 Settlement (Day 11):
    Router updates virtuals:
-   - kMinter adapter: tracks 8.2M
-   - DN adapter: tracks 8.2M (actual strategy balance)
+   - kMinter adapter: tracks 8.2M (shares in shared strategy)
+   - DN Vault adapter: tracks shares in shared DN strategy (8.2M USDC there)
    - Alpha adapter: tracks 2M (but USDC at CEFFU)
    
    Bob claims stkTokens for Alpha
 
 Current State:
-   - DN strategy: 8.2M USDC
+   - Shared DN USDC strategy: 8.2M USDC
    - CEFFU Alpha: 2M USDC
    - kMinter adapter: 0 USDC (all deployed)
    - Total: 10.2M USDC backing 10.2M kUSDC ✓
@@ -412,20 +437,20 @@ Current State:
 DAY 30: EVERYONE MADE MONEY
 ═══════════════════════════════════════════════════════════
 
-DN strategy: 8.2M → 8.7M (6% gain!)
+Shared DN USDC strategy: 8.2M → 8.7M (6% gain!)
 CEFFU Alpha: 2M → 2.15M (7.5% gain!)
 
 Settlement:
-   DN yield: +500K → Mint 500K kUSDC to DN Vault
+   DN yield: +500K → Mint 500K kUSDC to DN Vault USDC
    Alpha yield: +150K → Mint 150K kUSDC to Alpha Vault
    
 Total kUSDC supply: 10.2M + 0.65M = 10.85M
 Total USDC backing: 8.7M + 2.15M = 10.85M
-Still 1:1
+Still 1:1 ✓
 
 Share prices increased:
-   - Alice's stkTokens worth more
-   - Bob's stkTokens worth more
+   - Alice's stkTokens worth more (DN Vault)
+   - Bob's stkTokens worth more (Alpha Vault)
    - Institutions' kUSDC still 1:1 with USDC
 ```
 
@@ -455,17 +480,18 @@ Relayers call this to:
 
 ### 3. Two Accounting Systems
 
-**Share Accounting** (kMinter ↔ Delta Neutral):
+**Share Accounting** (kMinter ↔ DN Vaults, same asset):
 
-- Both invest in same external strategy
-- Transfer shares, not USDC
+- Both invest in same external strategy (per asset)
+- Transfer shares, not USDC/WBTC
 - More efficient (no physical moves)
 - Code: `vaultRequestedShares` mapping
 
-**Asset Accounting** (everything else):
+**Asset Accounting** (kMinter ↔ Alpha/Beta):
 
 - Different strategies require USDC movement
 - Track actual USDC amounts
+- Physical movement via kMinter Adapter
 - Code: `vaultBatchBalances.deposited/requested`
 
 ### 4. kAssetRouter Never Holds USDC
@@ -477,14 +503,15 @@ The router just updates numbers! It:
 - Tells adapters to update their totalAssets
 - Does NOT hold or transfer USDC itself
 
-Physical USDC is always in:
+Physical USDC/WBTC is always in:
 
-- kMinter Adapter (central hub)
-- External strategies (DN)
-- CEFFU custody (Alpha/Beta)
+- kMinter Adapter (central hub - temporarily holds before deployment)
+- Shared DN strategies (per asset - USDC and WBTC separate)
+- CEFFU custody (Alpha/Beta strategies)
 - BatchReceivers (temporarily for withdrawals)
 
-Note: Alpha/Beta adapters DON'T hold USDC - only virtual tracking!
+Note: DN/Alpha/Beta adapters DON'T physically hold assets - only virtual tracking!
+Only kMinter Adapter physically holds and moves assets!
 
 ---
 
@@ -496,27 +523,27 @@ A: Correct! Settlement only updates the bookkeeping (virtual balances). Physical
 **Q: Why have virtual balances at all?**  
 A: Efficiency! Users can stake/unstake instantly. Physical deployment happens in batches to save gas and keep money earning yield continuously.
 
-**Q: When does USDC actually move?**  
-A: When relayers call kMinterAdapter.execute() to:
+**Q: When does USDC/WBTC actually move?**  
+A: When managers (MANAGER_ROLE) call kMinterAdapter.execute() to:
 
-- Deploy to DN strategy
-- Withdraw from DN strategy
+- Deploy to shared DN strategies (per asset)
+- Withdraw from shared DN strategies
 - Send to CEFFU (for Alpha/Beta)
 - Receive from CEFFU (for Alpha/Beta withdrawals)
 
-All physical USDC flows through kMinter Adapter - it's the central hub!
+All physical USDC/WBTC flows through kMinter Adapter - it's the central hub!
 
-**Q: Why do kMinter and DN use shares?**  
-A: They invest in the SAME strategy, so they can just split ownership (shares) instead of moving USDC back and forth. More efficient!
+**Q: Why do kMinter and DN (same asset) use shares?**  
+A: They invest in the SAME strategy (per asset), so they can just split ownership (shares) instead of moving USDC/WBTC back and forth. Much more efficient!
 
 **Q: Why do Alpha/Beta use assets?**  
-A: They use a DIFFERENT strategy (CEFFU custody). USDC physically moves: DN strategy → kMinter adapter → CEFFU. Their adapters only track virtual balances.
+A: They use a DIFFERENT strategy (CEFFU custody). Physical USDC must move: Shared DN strategy → kMinter adapter → CEFFU. Their adapters only track virtual balances.
 
 **Q: What if there's not enough USDC in kMinter adapter?**  
-A: Relayer first withdraws from DN strategy into kMinter adapter, then can send to CEFFU or institutional withdrawals.
+A: Manager first withdraws from shared DN strategy into kMinter adapter, then can send to CEFFU or institutional withdrawals.
 
-**Q: Do Alpha/Beta adapters ever hold USDC?**  
-A: NO! They only track virtual balances. All physical USDC stays in kMinter adapter or deployed locations (DN strategy, CEFFU). This minimizes transactions and centralizes control.
+**Q: Do DN/Alpha/Beta adapters ever physically hold USDC?**  
+A: NO! They only track virtual balances. All physical USDC stays in kMinter adapter (temporarily) or deployed locations (shared DN strategies, CEFFU). This minimizes transactions and centralizes control.
 
 **Q: Is my money safe during all this?**  
 A: Yes! Multiple protections:
@@ -571,10 +598,11 @@ USER FLOW - ALPHA/BETA (assets):
 
 **Remember**: 
 
-1. kMinter + Delta Neutral = SAME strategy = Share accounting
+1. kMinter + DN (same asset) = SAME strategy = Share accounting
 2. Alpha/Beta = DIFFERENT strategies = Asset accounting
-3. **kMinter Adapter = Central hub** - ALL physical USDC flows through it
-4. Alpha/Beta adapters = Virtual tracking only (never hold USDC)
+3. **kMinter Adapter = Central hub** - ALL physical USDC/WBTC flows through it
+4. DN/Alpha/Beta adapters = Virtual tracking only (never physically hold assets)
 5. Settlement = Virtual bookkeeping ONLY
-6. Relayers = Physical money movers via kMinterAdapter.execute()
-7. Always 1:1 backing maintained!
+6. Managers = Physical money movers via kMinterAdapter.execute() (MANAGER_ROLE)
+7. Relayers = Propose settlements (RELAYER_ROLE)
+8. Always 1:1 backing maintained!

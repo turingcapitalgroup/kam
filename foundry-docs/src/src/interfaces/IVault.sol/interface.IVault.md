@@ -1,5 +1,5 @@
 # IVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/interfaces/IVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IVault.sol)
 
 **Inherits:**
 [IVaultBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)

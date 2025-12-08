@@ -68,12 +68,11 @@ The KAM Protocol implements a comprehensive role-based access control system usi
   - Emergency asset recovery
   - Crisis response operations
 - **Key Functions**:
-  - `kBaseRoles.setPaused()` - Emergency pause protocol
-  - `kBase.setPaused()` - Pause individual contracts
   - `kStakingVault.setPaused()` - Pause staking vault
   - `kToken.setPaused()` - Pause token operations
-  - `kToken.emergencyWithdraw()` - Emergency asset recovery
+  - `VaultAdapter.setPaused()` - Pause adapter operations
   - `kRegistry.rescueAssets()` - Emergency asset recovery
+  - `VaultAdapter.rescueAssets()` - Emergency adapter asset recovery
 
 ### GUARDIAN_ROLE
 
@@ -91,19 +90,17 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 
 **Settlement Operations**
 
-- **Scope**: kAssetRouter, kMinter, kStakingVault, kRegistry
+- **Scope**: kAssetRouter, kMinter, kStakingVault
 - **Key Permissions**:
   - Batch lifecycle management
   - Settlement proposal and execution
-  - Hurdle rate configuration
   - Automated protocol operations
 - **Key Functions**:
   - `kAssetRouter.proposeSettleBatch()` - Propose batch settlements
   - `kMinter.closeBatch()` - Close minting batches
-  - `kMinter.settleBatch()` - Mark batches as settled
+  - `kMinter.createNewBatch()` - Create new minting batches
   - `kStakingVault.createNewBatch()` - Create new staking batches
   - `kStakingVault.closeBatch()` - Close staking batches
-  - `kRegistry.setHurdleRate()` - Set performance thresholds
 
 ### INSTITUTION_ROLE
 
@@ -135,13 +132,14 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 
 **Adapter Management**
 
-- **Scope**: VaultAdapter
+- **Scope**: VaultAdapter (via SmartAdapterAccount)
 - **Key Permissions**:
-  - Execute arbitrary calls to external protocols
-  - Manage adapter operations
-  - Coordinate with external protocols
+  - Execute permissioned calls to external protocols via adapters
+  - Manage adapter operations within allowed selectors
+  - Coordinate with external protocols following permission model
 - **Key Functions**:
-  - `VaultAdapter.execute()` - Execute arbitrary calls to external protocols (only function using MANAGER_ROLE)
+  - `VaultAdapter.execute()` - Execute calls to whitelisted targets/selectors (only function using MANAGER_ROLE)
+- **Note**: Execution is restricted by `isAdapterSelectorAllowed()` checks enforced by registry
 
 ## Role Usage Flow Diagrams
 
@@ -326,15 +324,27 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │                                                                 │
 │  MANAGER_ROLE Functions:                                        │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │• execute() - Execute arbitrary calls to external protocols  ││
-│  │  (only function using MANAGER_ROLE)                         ││
+│  │• execute() - Execute permissioned calls to external         ││
+│  │  protocols (only function using MANAGER_ROLE)               ││
+│  │  - Validates via registry.isAdapterSelectorAllowed()        ││
+│  │  - Only whitelisted target/selector combinations allowed    ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
-│  kAssetRouter-Only Functions (No Role Required):                │
+│  kAssetRouter-Only Functions (Contract-based Access):           │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │• setTotalAssets() - Set total assets for accounting         ││
 │  │• pull() - Transfer assets to kAssetRouter                   ││
 │  │  (only kAssetRouter can call these functions)               ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  ADMIN_ROLE Functions:                                          │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │• rescueAssets() - Emergency asset recovery                  ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  EMERGENCY_ADMIN_ROLE Functions:                                │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │• setPaused() - Pause adapter operations                     ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -362,9 +372,10 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  │• grantInstitutionRole() - Grant institutional access        │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                  │
-│  RELAYER_ROLE Functions:                                         │
+│  ADMIN_ROLE Functions (continued):                               │
 │  ┌─────────────────────────────────────────────────────────────┐ │
-│  │• setHurdleRate() - Set performance thresholds               │ │
+│  │• setHurdleRate() - Set performance thresholds per asset     │ │
+│  │• setAssetBatchLimits() - Set max mint/redeem per batch      │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                  │
 │  EMERGENCY_ADMIN_ROLE Functions:                                 │
@@ -430,10 +441,11 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │__kBaseRoles_init():                                         ││
 │  │• owner_ → OWNER                                             ││
-│  │• admin_ → ADMIN_ROLE + VENDOR_ROLE                          ││
+│  │• admin_ → ADMIN_ROLE                                        ││
 │  │• emergencyAdmin_ → EMERGENCY_ADMIN_ROLE                     ││
 │  │• guardian_ → GUARDIAN_ROLE                                  ││
-│  │• relayer_ → RELAYER_ROLE + MANAGER_ROLE                     ││
+│  │• relayer_ → RELAYER_ROLE                                    ││
+│  │Note: VENDOR_ROLE and MANAGER_ROLE granted separately       ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘

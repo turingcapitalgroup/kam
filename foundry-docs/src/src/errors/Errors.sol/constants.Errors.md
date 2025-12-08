@@ -1,5 +1,5 @@
 # Constants
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/errors/Errors.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/errors/Errors.sol)
 
 ### KASSETROUTER_ALREADY_REGISTERED
 All error codes use contract-specific prefixes for easier debugging:
@@ -8,6 +8,7 @@ All error codes use contract-specific prefixes for easier debugging:
 - BV*: BaseVault errors
 - B*: kBatchReceiver errors
 - C*: Custodial adapter errors
+- F*: kTokenFactory errors
 - K*: kBase errors
 - M*: kMinter errors
 - R*: kRegistry errors
@@ -262,6 +263,12 @@ string constant KBATCHRECEIVER_ZERO_ADDRESS = "B6"
 string constant KBATCHRECEIVER_ZERO_AMOUNT = "B7"
 ```
 
+### KBATCHRECEIVER_INSUFFICIENT_BALANCE
+
+```solidity
+string constant KBATCHRECEIVER_INSUFFICIENT_BALANCE = "B8"
+```
+
 ### CUSTODIAL_INVALID_CUSTODIAL_ADDRESS
 
 ```solidity
@@ -394,70 +401,64 @@ string constant KMINTER_INSUFFICIENT_BALANCE = "M3"
 string constant KMINTER_IS_PAUSED = "M4"
 ```
 
-### KMINTER_REQUEST_NOT_ELIGIBLE
-
-```solidity
-string constant KMINTER_REQUEST_NOT_ELIGIBLE = "M5"
-```
-
 ### KMINTER_REQUEST_NOT_FOUND
 
 ```solidity
-string constant KMINTER_REQUEST_NOT_FOUND = "M6"
-```
-
-### KMINTER_REQUEST_PROCESSED
-
-```solidity
-string constant KMINTER_REQUEST_PROCESSED = "M7"
+string constant KMINTER_REQUEST_NOT_FOUND = "M5"
 ```
 
 ### KMINTER_WRONG_ASSET
 
 ```solidity
-string constant KMINTER_WRONG_ASSET = "M8"
+string constant KMINTER_WRONG_ASSET = "M6"
 ```
 
 ### KMINTER_WRONG_ROLE
 
 ```solidity
-string constant KMINTER_WRONG_ROLE = "M9"
+string constant KMINTER_WRONG_ROLE = "M7"
 ```
 
 ### KMINTER_ZERO_ADDRESS
 
 ```solidity
-string constant KMINTER_ZERO_ADDRESS = "M10"
+string constant KMINTER_ZERO_ADDRESS = "M8"
 ```
 
 ### KMINTER_ZERO_AMOUNT
 
 ```solidity
-string constant KMINTER_ZERO_AMOUNT = "M11"
+string constant KMINTER_ZERO_AMOUNT = "M9"
 ```
 
 ### KMINTER_BATCH_MINT_REACHED
 
 ```solidity
-string constant KMINTER_BATCH_MINT_REACHED = "M12"
+string constant KMINTER_BATCH_MINT_REACHED = "M10"
 ```
 
 ### KMINTER_BATCH_REDEEM_REACHED
 
 ```solidity
-string constant KMINTER_BATCH_REDEEM_REACHED = "M13"
+string constant KMINTER_BATCH_REDEEM_REACHED = "M11"
 ```
 
 ### KMINTER_BATCH_NOT_CLOSED
 
 ```solidity
-string constant KMINTER_BATCH_NOT_CLOSED = "M14"
+string constant KMINTER_BATCH_NOT_CLOSED = "M12"
 ```
 
-### KMINTER_BATCH_NOT_SET
+### KMINTER_BATCH_NOT_VALID
 
 ```solidity
-string constant KMINTER_BATCH_NOT_SET = "M15"
+string constant KMINTER_BATCH_NOT_VALID = "M13"
+```
+
+### KMINTER_BATCH_NOT_SETTLED
+
+```solidity
+string constant KMINTER_BATCH_NOT_SETTLED = "M14"
 ```
 
 ### KREGISTRY_ADAPTER_ALREADY_SET
@@ -530,6 +531,12 @@ string constant KREGISTRY_SELECTOR_ALREADY_SET = "R11"
 
 ```solidity
 string constant KREGISTRY_SELECTOR_NOT_FOUND = "R12"
+```
+
+### KREGISTRY_KTOKEN_ALREADY_SET
+
+```solidity
+string constant KREGISTRY_KTOKEN_ALREADY_SET = "R13"
 ```
 
 ### GUARDIANMODULE_UNAUTHORIZED
@@ -670,6 +677,12 @@ string constant KSTAKINGVAULT_BATCH_LIMIT_REACHED = "SV10"
 string constant KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED = "SV11"
 ```
 
+### KSTAKINGVAULT_BATCH_NOT_VALID
+
+```solidity
+string constant KSTAKINGVAULT_BATCH_NOT_VALID = "SV12"
+```
+
 ### KTOKEN_IS_PAUSED
 
 ```solidity
@@ -692,6 +705,12 @@ string constant KTOKEN_ZERO_ADDRESS = "T3"
 
 ```solidity
 string constant KTOKEN_ZERO_AMOUNT = "T4"
+```
+
+### KTOKEN_WRONG_ROLE
+
+```solidity
+string constant KTOKEN_WRONG_ROLE = "T5"
 ```
 
 ### VAULTBATCHES_NOT_CLOSED
@@ -878,5 +897,23 @@ string constant PARAMETERCHECKER_SPENDER_NOT_ALLOWED = "PC6"
 
 ```solidity
 string constant PARAMETERCHECKER_SELECTOR_NOT_ALLOWED = "PC7"
+```
+
+### KTOKENFACTORY_ZERO_ADDRESS
+
+```solidity
+string constant KTOKENFACTORY_ZERO_ADDRESS = "F1"
+```
+
+### KTOKENFACTORY_DEPLOYMENT_FAILED
+
+```solidity
+string constant KTOKENFACTORY_DEPLOYMENT_FAILED = "F2"
+```
+
+### KTOKENFACTORY_WRONG_ROLE
+
+```solidity
+string constant KTOKENFACTORY_WRONG_ROLE = "F3"
 ```
 

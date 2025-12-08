@@ -12,3 +12,4 @@
 - [kBatchReceiver](kBatchReceiver.sol/contract.kBatchReceiver.md)
 - [kMinter](kMinter.sol/contract.kMinter.md)
 - [kToken](kToken.sol/contract.kToken.md)
+- [kTokenFactory](kTokenFactory.sol/contract.kTokenFactory.md)

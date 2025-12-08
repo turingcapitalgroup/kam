@@ -1,5 +1,5 @@
 # OptimizedEfficientHashLib
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/vendor/solady/utils/OptimizedEfficientHashLib.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/vendor/solady/utils/OptimizedEfficientHashLib.sol)
 
 **Author:**
 Originally by Solady (https://github.com/vectorized/solady/blob/main/src/utils/EfficientHashLib.sol)
@@ -28,5 +28,25 @@ Returns `keccak256(abi.encode(v0, .., v4))`.
 
 ```solidity
 function hash(uint256 v0, uint256 v1, uint256 v2, uint256 v3, uint256 v4) internal pure returns (bytes32 result);
+```
+
+### hash
+
+Returns `keccak256(abi.encode(v0, .., v6))`.
+
+
+```solidity
+function hash(
+    uint256 v0,
+    uint256 v1,
+    uint256 v2,
+    uint256 v3,
+    uint256 v4,
+    uint256 v5,
+    uint256 v6
+)
+    internal
+    pure
+    returns (bytes32 result);
 ```
 

@@ -1,5 +1,5 @@
 # OptimizedFixedPointMathLib
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/vendor/solady/utils/OptimizedFixedPointMathLib.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/vendor/solady/utils/OptimizedFixedPointMathLib.sol)
 
 **Authors:**
 Originally by Solady (https://github.com/vectorized/solady/blob/main/src/utils/FixedPointMathLib.sol), Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/utils/FixedPointMathLib.sol)
@@ -30,6 +30,13 @@ Returns the absolute value of `x`.
 
 ```solidity
 function abs(int256 x) internal pure returns (uint256 z);
+```
+
+### zeroFloorSub
+
+
+```solidity
+function zeroFloorSub(uint256 x, uint256 y) internal pure returns (uint256 z);
 ```
 
 ## Errors

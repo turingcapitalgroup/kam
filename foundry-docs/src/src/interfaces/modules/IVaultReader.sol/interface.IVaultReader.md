@@ -1,5 +1,5 @@
 # IVaultReader
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/interfaces/modules/IVaultReader.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/modules/IVaultReader.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -287,7 +287,16 @@ Returns comprehensive information about a specific batch
 function getBatchIdInfo(bytes32 batchId)
     external
     view
-    returns (address batchReceiver, bool isClosed, bool isSettled, uint256 sharePrice, uint256 netSharePrice);
+    returns (
+        address batchReceiver,
+        bool isClosed,
+        bool isSettled,
+        uint256 sharePrice,
+        uint256 netSharePrice,
+        uint256 totalAssets_,
+        uint256 totalNetAssets_,
+        uint256 totalSupply_
+    );
 ```
 **Parameters**
 
@@ -304,6 +313,9 @@ function getBatchIdInfo(bytes32 batchId)
 |`isSettled`|`bool`|Whether the batch has been settled|
 |`sharePrice`|`uint256`|Share price of settlement|
 |`netSharePrice`|`uint256`|Net share price of settlement|
+|`totalAssets_`|`uint256`|Total assets of settlement|
+|`totalNetAssets_`|`uint256`|Total net assets of settlement|
+|`totalSupply_`|`uint256`|Total shares supply settlement|
 
 
 ### getBatchReceiver
@@ -495,7 +507,14 @@ Converts a given amount of shares to assets with a specified total assets
 
 
 ```solidity
-function convertToAssetsWithTotals(uint256 shares, uint256 totalAssets) external view returns (uint256);
+function convertToAssetsWithTotals(
+    uint256 shares,
+    uint256 totalAssets,
+    uint256 totalSupply
+)
+    external
+    view
+    returns (uint256);
 ```
 **Parameters**
 
@@ -503,6 +522,7 @@ function convertToAssetsWithTotals(uint256 shares, uint256 totalAssets) external
 |----|----|-----------|
 |`shares`|`uint256`|The amount of shares to convert|
 |`totalAssets`|`uint256`|The total assets available for conversion|
+|`totalSupply`|`uint256`|The total shares supply|
 
 **Returns**
 
@@ -517,7 +537,14 @@ Converts a given amount of assets to shares with a specified total assets
 
 
 ```solidity
-function convertToSharesWithTotals(uint256 assets, uint256 totalAssets) external view returns (uint256);
+function convertToSharesWithTotals(
+    uint256 assets,
+    uint256 totalAssets,
+    uint256 totalSupply
+)
+    external
+    view
+    returns (uint256);
 ```
 **Parameters**
 
@@ -525,6 +552,7 @@ function convertToSharesWithTotals(uint256 assets, uint256 totalAssets) external
 |----|----|-----------|
 |`assets`|`uint256`|The amount of assets to convert|
 |`totalAssets`|`uint256`|The total assets available for conversion|
+|`totalSupply`|`uint256`|The total shares supply|
 
 **Returns**
 
