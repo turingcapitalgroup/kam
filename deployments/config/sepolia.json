@@ -160,6 +160,7 @@
     },
     "mockAssets": {
         "enabled": true,
+        "WalletUSDC": "0x0000000000000000000000000000000000000000",
         "mintAmounts": {
             "USDC": "10000000000000",
             "WBTC": "100000000000"
