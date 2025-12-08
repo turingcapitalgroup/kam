@@ -52,9 +52,9 @@ graph TB
         DEFI_B[🌐 DeFi Protocol B<br/>Strategy Integration]
     end
 
-    subgraph "REGISTRY"
-        REGISTRY[🗂️ kREGISTRY<br/>Configuration Hub:<br/>Contract Mappings<br/>Asset Registration<br/>Vault Registry<br/>Role Management<br/>Adapter Permissions]
-        ROLES[👥 ROLE SYSTEM<br/>OWNER: Upgrades<br/>ADMIN: Config<br/>EMERGENCY: Pause<br/>MINTER: Mint/Burn<br/>INSTITUTION: Access<br/>RELAYER: Settle<br/>GUARDIAN: Safety<br/>MANAGER: Adapters]
+    subgraph "GOVERNANCE"
+        REG_STORE[🗂️ kREGISTRY<br/>Configuration Hub:<br/>Contract Mappings<br/>Asset Registration<br/>Vault Registry<br/>Role Management<br/>Adapter Permissions]
+        ROLE_MGR[👥 ROLE SYSTEM<br/>OWNER: Upgrades<br/>ADMIN: Config<br/>EMERGENCY: Pause<br/>MINTER: Mint/Burn<br/>INSTITUTION: Access<br/>RELAYER: Settle<br/>GUARDIAN: Safety<br/>MANAGER: Adapters]
     end
 
     subgraph "BATCH FLOW"
@@ -130,11 +130,11 @@ graph TB
     DEFI_B -.->|Yield| ADAPTER_BAL
     
     %% Registry Connections
-    REGISTRY -.->|Config| MINT_OPS
-    REGISTRY -.->|Config| STAKE_OPS
-    REGISTRY -.->|Config| VIRTUAL_BAL
-    REGISTRY -.->|Config| ADAPTER_PERM
-    ROLES -.->|Authorize| REGISTRY
+    REG_STORE -.->|Config| MINT_OPS
+    REG_STORE -.->|Config| STAKE_OPS
+    REG_STORE -.->|Config| VIRTUAL_BAL
+    REG_STORE -.->|Config| ADAPTER_PERM
+    ROLE_MGR -.->|Authorize| REG_STORE
     
     %% Safety Connections
     PAUSE -.->|Control| MINT_OPS
@@ -166,8 +166,8 @@ graph TB
     style ADAPTER_EXEC fill:#e6ccff
     style ADAPTER_BAL fill:#e6ccff
     
-    style REGISTRY fill:#ccffcc
-    style ROLES fill:#ccffcc
+    style REG_STORE fill:#ccffcc
+    style ROLE_MGR fill:#ccffcc
     
     style PAUSE fill:#ff9999
     style COOLDOWN fill:#ffcc99
