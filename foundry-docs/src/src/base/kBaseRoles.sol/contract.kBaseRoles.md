@@ -1,5 +1,5 @@
 # kBaseRoles
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/base/kBaseRoles.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/base/kBaseRoles.sol)
 
 **Inherits:**
 [OptimizedOwnableRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md)
@@ -108,29 +108,6 @@ function __kBaseRoles_init(
 )
     internal;
 ```
-
-### setPaused
-
-Toggles the emergency pause state affecting all protocol operations in this contract
-
-This function provides critical risk management capability by allowing emergency admins to halt
-contract operations during security incidents or market anomalies. The pause mechanism: (1) Affects all
-state-changing operations in inheriting contracts that check _isPaused(), (2) Does not affect view/pure
-functions ensuring protocol state remains readable, (3) Enables rapid response to potential exploits by
-halting operations protocol-wide, (4) Requires emergency admin role ensuring only authorized governance
-can trigger pauses. Inheriting contracts should check _isPaused() modifier in critical functions to
-respect the pause state. The external visibility with role check prevents unauthorized pause manipulation.
-
-
-```solidity
-function setPaused(bool _paused) external;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_paused`|`bool`|The desired pause state (true = halt operations, false = resume normal operation)|
-
 
 ### _hasRole
 
@@ -276,25 +253,6 @@ function _checkAddressNotZero(address _addr) internal pure;
 |`_addr`|`address`|Address to check|
 
 
-## Events
-### Paused
-Emitted when the emergency pause state is toggled for protocol-wide risk mitigation
-
-This event signals a critical protocol state change that affects all inheriting contracts.
-When paused=true, protocol operations are halted to prevent potential exploits or manage emergencies.
-Only emergency admins can trigger this, providing rapid response capability during security incidents.
-
-
-```solidity
-event Paused(bool paused_);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`paused_`|`bool`|The new pause state (true = operations halted, false = normal operation)|
-
 ## Structs
 ### kBaseRolesStorage
 Storage struct following ERC-7201 namespaced storage pattern to prevent collisions during upgrades.
@@ -310,8 +268,6 @@ storage-location: erc7201:kam.storage.kBaseRoles
 struct kBaseRolesStorage {
     /// @dev Initialization flag preventing multiple initialization calls (reentrancy protection)
     bool initialized;
-    /// @dev Emergency pause state affecting all protocol operations in inheriting contracts
-    bool paused;
 }
 ```
 

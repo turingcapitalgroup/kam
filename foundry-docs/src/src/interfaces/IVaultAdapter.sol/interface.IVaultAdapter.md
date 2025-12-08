@@ -1,5 +1,5 @@
 # IVaultAdapter
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/interfaces/IVaultAdapter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IVaultAdapter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -54,44 +54,7 @@ function rescueAssets(address asset_, address to_, uint256 amount_) external pay
 |`to_`|`address`|The recipient address that will receive the rescued assets (cannot be zero address)|
 |`amount_`|`uint256`|The quantity to rescue (must not exceed available balance)|
 
-### execute
 
-Allows the relayer to execute arbitrary calls on behalf of the protocol
-
-This function enables the relayer role to perform flexible interactions with external contracts
-as part of protocol operations. Key aspects of this function include: (1) Authorization restricted to relayer
-role to prevent misuse, (2) Pause state check to ensure operations are halted during emergencies, (3) Validates
-target addresses are non-zero to prevent calls to the zero address, (4) Uses low-level calls to enable arbitrary
-function execution
-
-
-```solidity
-function execute(
-    address[] calldata targets,
-    bytes[] calldata data,
-    uint256[] calldata values
-)
-    external
-    payable
-    returns (bytes[] memory result);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`targets`|`address[]`|Array of target contracts to make calls to|
-|`data`|`bytes[]`|Array of calldata to send to each target contract|
-|`values`|`uint256[]`|Array of asset amounts to send with each call|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`result`|`bytes[]`|The combined return data from all calls|
-
-
->>>>>>> main
->>>>>>> development
 ### setTotalAssets
 
 Sets the last recorded total assets for vault accounting and performance tracking
@@ -219,31 +182,6 @@ event RescuedETH(address indexed to_, uint256 amount_);
 |`to_`|`address`|The recipient address receiving the rescued ETH (cannot be zero address)|
 |`amount_`|`uint256`|The quantity of ETH rescued in wei (must not exceed contract balance)|
 
-
-### TotalAssetsUpdated
-Emitted when total assets are updated
-=======
-### Executed
-Emitted when the relayer executes an arbitrary call on behalf of the protocol
-
-This event provides transparency into all external interactions initiated by the relayer.
-It logs the caller, target contract, function data, value sent, and the resulting returndata.
-This is critical for auditing and monitoring protocol actions executed via the relayer role.
->>>>>>> main
-
-
-```solidity
-event TotalAssetsUpdated(uint256 oldTotalAssets, uint256 newTotalAssets);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`oldTotalAssets`|`uint256`|The previous total assets value|
-|`newTotalAssets`|`uint256`|The new total assets value|
-
->>>>>>> development
 ### TotalAssetsUpdated
 Emitted when total assets are updated
 

@@ -1,5 +1,5 @@
 # kStakingVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/kStakingVault/kStakingVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kStakingVault/kStakingVault.sol)
 
 **Inherits:**
 [IVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
@@ -51,7 +51,8 @@ function initialize(
     string memory _symbol,
     uint8 _decimals,
     address _asset,
-    uint128 _maxTotalAssets
+    uint128 _maxTotalAssets,
+    address _trustedForwarder
 )
     external
     initializer;
@@ -67,7 +68,8 @@ function initialize(
 |`_symbol`|`string`|ERC20 token symbol for the stkToken (e.g., "stkUSDC")|
 |`_decimals`|`uint8`|Token decimals matching the underlying asset precision|
 |`_asset`|`address`|Underlying asset address that this vault will generate yield on|
-|`_maxTotalAssets`|`uint128`||
+|`_maxTotalAssets`|`uint128`|The max TVL in underlying tokens|
+|`_trustedForwarder`|`address`|The trusted forwarder for ERC2771 metatransactions|
 
 
 ### requestStake
@@ -658,6 +660,6 @@ Allows the contract to receive ether directly
 
 
 ```solidity
-receive() external payable override;
+receive() external payable;
 ```
 

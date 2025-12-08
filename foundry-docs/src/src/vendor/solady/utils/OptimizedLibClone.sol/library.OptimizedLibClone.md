@@ -1,5 +1,5 @@
 # OptimizedLibClone
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/vendor/solady/utils/OptimizedLibClone.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/vendor/solady/utils/OptimizedLibClone.sol)
 
 **Authors:**
 Originally by Solady (https://github.com/vectorized/solady/blob/main/src/utils/LibClone.sol), Minimal proxy by 0age (https://github.com/0age), Clones with immutable args by wighawag, zefram.eth, Saw-mon & Natalie

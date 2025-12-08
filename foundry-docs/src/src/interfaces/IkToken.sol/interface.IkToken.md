@@ -1,5 +1,5 @@
 # IkToken
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/interfaces/IkToken.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IkToken.sol)
 
 Interface for kToken with role-based minting and burning capabilities
 
@@ -34,24 +34,6 @@ Only callable by addresses with MINTER_ROLE, emits Burned event
 
 ```solidity
 function burn(address from, uint256 amount) external;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`from`|`address`|The address from which tokens will be destroyed|
-|`amount`|`uint256`|The quantity of tokens to destroy|
-
-
-### burnFrom
-
-Destroys tokens from an address using allowance mechanism
-
-Reduces allowance and burns tokens, only callable by addresses with MINTER_ROLE
-
-
-```solidity
-function burnFrom(address from, uint256 amount) external;
 ```
 **Parameters**
 
@@ -246,6 +228,13 @@ function isPaused() external view returns (bool);
 |`<none>`|`bool`|True if the contract is paused, false otherwise|
 
 
+### DOMAIN_SEPARATOR
+
+
+```solidity
+function DOMAIN_SEPARATOR() external view returns (bytes32);
+```
+
 ### setPaused
 
 Sets the pause state of the contract
@@ -261,6 +250,29 @@ function setPaused(bool _isPaused) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`_isPaused`|`bool`|True to pause the contract, false to unpause|
+
+
+### emergencyWithdraw
+
+Emergency recovery function for accidentally sent assets
+
+This function provides a safety mechanism to recover tokens or ETH accidentally sent to the kToken
+contract.
+It's designed for emergency situations where users mistakenly transfer assets to the wrong address.
+The function can handle both ERC20 tokens and native ETH. Only emergency admins can execute withdrawals
+to prevent unauthorized asset extraction. This should not be used for regular operations.
+
+
+```solidity
+function emergencyWithdraw(address _token, address _to, uint256 _amount) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_token`|`address`|The token contract address to withdraw (use address(0) for native ETH)|
+|`_to`|`address`|The destination address to receive the recovered assets|
+|`_amount`|`uint256`|The quantity of tokens or ETH to recover|
 
 
 ### grantAdminRole

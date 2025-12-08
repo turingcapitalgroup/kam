@@ -1,5 +1,5 @@
 # kRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/kRegistry/kRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kRegistry/kRegistry.sol)
 
 **Inherits:**
 [IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
@@ -8,8 +8,8 @@ Central configuration hub and contract registry for the KAM protocol ecosystem
 
 This contract serves as the protocol's backbone for configuration management and access control. It provides
 five critical functions: (1) Singleton contract management - registers and tracks core protocol contracts like
-kMinter and kAssetRouter ensuring single source of truth, (2) Asset and kToken management - handles asset
-whitelisting, kToken deployment, and maintains bidirectional mappings between underlying assets and their
+kMinter, kAssetRouter, and kTokenFactory ensuring single source of truth, (2) Asset and kToken management - handles asset
+whitelisting, kToken deployment through kTokenFactory, and maintains bidirectional mappings between underlying assets and their
 corresponding kTokens, (3) Vault registry - manages vault registration, classification (DN, ALPHA, BETA, etc.),
 and routing logic to direct assets to appropriate vaults based on type and strategy, (4) Role-based access
 control - implements a hierarchical permission system with ADMIN, EMERGENCY_ADMIN, GUARDIAN, RELAYER, INSTITUTION,
@@ -34,6 +34,13 @@ kAssetRouter key
 
 ```solidity
 bytes32 public constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER")
+```
+
+
+### K_TOKEN_FACTORY
+
+```solidity
+bytes32 public constant K_TOKEN_FACTORY = keccak256("K_TOKEN_FACTORY")
 ```
 
 
@@ -216,6 +223,24 @@ function grantManagerRole(address _manager) external payable;
 |`_manager`|`address`||
 
 
+### revokeGivenRoles
+
+Revokes the specific role of a given user
+
+Only callable by ADMIN_ROLE.
+
+
+```solidity
+function revokeGivenRoles(address _user, uint256 _role) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_user`|`address`||
+|`_role`|`uint256`||
+
+
 ### setTreasury
 
 Sets the treasury address
@@ -310,9 +335,9 @@ function registerAsset(
     string memory _name,
     string memory _symbol,
     address _asset,
-    bytes32 _id,
     uint256 _maxMintPerBatch,
-    uint256 _maxBurnPerBatch
+    uint256 _maxBurnPerBatch,
+    address _emergencyAdmin
 )
     external
     payable
@@ -325,9 +350,9 @@ function registerAsset(
 |`_name`|`string`||
 |`_symbol`|`string`||
 |`_asset`|`address`||
-|`_id`|`bytes32`||
 |`_maxMintPerBatch`|`uint256`||
 |`_maxBurnPerBatch`|`uint256`||
+|`_emergencyAdmin`|`address`||
 
 **Returns**
 
@@ -1063,7 +1088,7 @@ Received ETH can be rescued using the rescueAssets function with address(0).
 
 
 ```solidity
-receive() external payable override;
+receive() external payable;
 ```
 
 ### contractName
