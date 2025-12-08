@@ -89,6 +89,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /// @param _symbol ERC20 token symbol for the stkToken (e.g., "stkUSDC")
     /// @param _decimals Token decimals matching the underlying asset precision
     /// @param _asset Underlying asset address that this vault will generate yield on
+    /// @param _maxTotalAssets The max TVL in underlying tokens
+    /// @param _trustedForwarder The trusted forwarder for ERC2771 metatransactions
     function initialize(
         address _owner,
         address _registryAddress,
@@ -309,7 +311,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Calculate net shares to burn: (stkTokenAmount * _totalNetAssets) / _totalAssets
         // This represents the net shares (after fees) that should be burned
-        uint8 decimals = _getDecimals($);
         uint256 _netSharesToBurn = uint256(stkTokenAmount).fullMulDiv(_totalNetAssets, _totalAssets);
 
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
@@ -579,7 +580,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /// @notice Authorize upgrade (only owner can upgrade)
     /// @dev This allows upgrading the main contract while keeping modules separate
     function _authorizeUpgrade(address _newImplementation) internal view override {
-        _checkAdmin(_msgSender());
+        _checkOwner();
         require(_newImplementation != address(0), KSTAKINGVAULT_ZERO_ADDRESS);
     }
 

@@ -30,6 +30,7 @@ import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { kAssetRouter } from "kam/src/kAssetRouter.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
 
 contract kAssetRouterTest is DeploymentBaseTest {
     bytes32 internal constant TEST_BATCH_ID = bytes32(uint256(1));
@@ -77,7 +78,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
     function test_Initialize_Success() public {
         kAssetRouter newAssetRouterImpl = new kAssetRouter();
 
-        bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, address(registry));
+        bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, address(registry), users.owner);
 
         ERC1967Factory factory = new ERC1967Factory();
         address newProxy = factory.deployAndCall(address(newAssetRouterImpl), users.admin, initData);
@@ -90,13 +91,13 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
     function test_Initialize_Require_Not_Initialized() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        assetRouter.initialize(address(registry));
+        assetRouter.initialize(address(registry), users.owner);
     }
 
     function test_Initialize_Require_Registry_Not_Zero_Address() public {
         kAssetRouter newAssetRouterImpl = new kAssetRouter();
 
-        bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, address(0));
+        bytes memory initData = abi.encodeWithSelector(kAssetRouter.initialize.selector, address(0), users.admin);
 
         ERC1967Factory factory = new ERC1967Factory();
         vm.expectRevert(bytes(KBASE_INVALID_REGISTRY));
@@ -867,7 +868,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         address newImpl = address(new kAssetRouter());
 
         vm.prank(users.alice);
-        vm.expectRevert(bytes(KASSETROUTER_WRONG_ROLE));
+        vm.expectRevert(Ownable.Unauthorized.selector);
         assetRouter.upgradeToAndCall(newImpl, "");
 
         assertTrue(true);

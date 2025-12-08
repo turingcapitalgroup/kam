@@ -6,17 +6,10 @@ import { _1_USDC } from "../utils/Constants.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
-import { IVault } from "kam/src/interfaces/IVault.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 
-import {
-    KSTAKINGVAULT_INSUFFICIENT_BALANCE,
-    KSTAKINGVAULT_IS_PAUSED,
-    VAULTCLAIMS_BATCH_NOT_SETTLED,
-    VAULTCLAIMS_NOT_BENEFICIARY,
-    VAULTCLAIMS_REQUEST_NOT_PENDING
-} from "kam/src/errors/Errors.sol";
-import { BaseVaultTypes, kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
+import { VAULTCLAIMS_NOT_BENEFICIARY } from "kam/src/errors/Errors.sol";
+import { BaseVaultTypes } from "kam/src/kStakingVault/kStakingVault.sol";
 
 contract ERC2771ContextTest is BaseVaultTest {
     using SafeTransferLib for address;
@@ -75,8 +68,6 @@ contract ERC2771ContextTest is BaseVaultTest {
         vm.prank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
 
-        bytes32 batchId = vault.getBatchId();
-
         // Test: Direct call should work normally
         vm.prank(users.alice);
         bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
@@ -97,8 +88,6 @@ contract ERC2771ContextTest is BaseVaultTest {
 
         vm.prank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
-
-        bytes32 batchId = vault.getBatchId();
 
         // Prepare the call data
         bytes memory callData = abi.encodeWithSelector(
@@ -264,8 +253,6 @@ contract ERC2771ContextTest is BaseVaultTest {
         vm.prank(users.charlie);
         kUSD.approve(address(vault), 750 * _1_USDC);
 
-        bytes32 batchId = vault.getBatchId();
-
         // Forward calls for each user
         bytes memory callDataAlice = abi.encodeWithSelector(vault.requestStake.selector, users.alice, 1000 * _1_USDC);
         vm.prank(trustedForwarder);
@@ -304,8 +291,6 @@ contract ERC2771ContextTest is BaseVaultTest {
         _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
         _mintKTokenToUser(users.bob, 500 * _1_USDC, true);
         _mintKTokenToUser(users.charlie, 750 * _1_USDC, true);
-
-        bytes32 batchId = vault.getBatchId();
 
         // Each user makes their own request
         vm.prank(users.alice);
@@ -362,8 +347,6 @@ contract ERC2771ContextTest is BaseVaultTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_CompleteStakingLifecycle_ThroughForwarder() public {
-        uint256 balanceBefore = kUSD.balanceOf(users.alice);
-
         _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
 
         vm.prank(users.alice);
@@ -399,8 +382,6 @@ contract ERC2771ContextTest is BaseVaultTest {
     }
 
     function test_CompleteStakingLifecycle_WithZeroForwarder() public {
-        uint256 balanceBefore = kUSD.balanceOf(users.alice);
-
         _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
 
         vm.prank(users.alice);
