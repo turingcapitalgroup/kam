@@ -74,7 +74,7 @@ ignore = [
 
 [dependencies]
 forge-std = "1.9.7"
-minimal-smart-account = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-smart-account.git", rev = "84037a414f8c8ba013d64079671030623af234c2" }
+minimal-smart-account = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-smart-account.git", rev = "4fdbac1afcb22af516442b502dc56c062ff9f537" }
 
 [soldeer]
 # whether soldeer manages remappings
