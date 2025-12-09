@@ -1,5 +1,5 @@
 # MultiFacetProxy
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/base/MultiFacetProxy.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/base/MultiFacetProxy.sol)
 
 **Inherits:**
 [Proxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md)
@@ -115,7 +115,7 @@ Required override from OpenZeppelin Proxy contract
 
 
 ```solidity
-function _implementation() internal view override returns (address);
+function _implementation() internal view virtual override returns (address);
 ```
 **Returns**
 
@@ -123,17 +123,6 @@ function _implementation() internal view override returns (address);
 |----|----|-----------|
 |`<none>`|`address`|The implementation contract address|
 
-
-### receive
-
-Receive ether function
-
-Allows the contract to receive ether directly
-
-
-```solidity
-receive() external payable virtual;
-```
 
 ## Events
 ### FunctionAdded

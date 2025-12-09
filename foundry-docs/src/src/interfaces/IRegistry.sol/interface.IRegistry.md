@@ -1,5 +1,5 @@
 # IRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/interfaces/IRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IRegistry.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -63,9 +63,9 @@ function registerAsset(
     string memory name,
     string memory symbol,
     address asset,
-    bytes32 id,
     uint256 maxMintPerBatch,
-    uint256 maxBurnPerBatch
+    uint256 maxBurnPerBatch,
+    address emergencyAdmin
 )
     external
     payable
@@ -78,9 +78,9 @@ function registerAsset(
 |`name`|`string`|The name for the kToken (e.g., "KAM USDC")|
 |`symbol`|`string`|The symbol for the kToken (e.g., "kUSDC")|
 |`asset`|`address`|The underlying asset contract address to register|
-|`id`|`bytes32`|The unique identifier for singleton asset storage (e.g., USDC, WBTC)|
 |`maxMintPerBatch`|`uint256`|Maximum amount of the asset that can be minted in a single batch|
 |`maxBurnPerBatch`|`uint256`|Maximum amount of the asset that can be redeemed in a single batch|
+|`emergencyAdmin`|`address`||
 
 **Returns**
 
@@ -218,6 +218,24 @@ function grantManagerRole(address manager_) external payable;
 |Name|Type|Description|
 |----|----|-----------|
 |`manager_`|`address`|The address to grant manager privileges|
+
+
+### revokeGivenRoles
+
+Revokes the specific role of a given user
+
+Only callable by ADMIN_ROLE.
+
+
+```solidity
+function revokeGivenRoles(address user, uint256 role) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`user`|`address`|the address to revoke acess to|
+|`role`|`uint256`|the role of the address that we want to revoke|
 
 
 ### getContractById
@@ -773,16 +791,6 @@ Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume ass
 
 ```solidity
 function setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
-
-function setAssetBatchLimits(
-    address asset,
-    uint256 maxMintPerBatch_,
-    uint256 maxBurnPerBatch_
-)
-    external
-    payable;
->>>>>>> main
->>>>>>> development
 ```
 **Parameters**
 
@@ -884,6 +892,22 @@ event VaultRemoved(address indexed vault);
 |Name|Type|Description|
 |----|----|-----------|
 |`vault`|`address`|The vault contract address being removed|
+
+### AssetBatchLimitsUpdated
+Emitted when an asset and its kToken are registered
+
+
+```solidity
+event AssetBatchLimitsUpdated(address indexed asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`asset`|`address`|The underlying asset address|
+|`maxMintPerBatch`|`uint256`|the max mint amount per batch|
+|`maxBurnPerBatch`|`uint256`|the max burn amount per batch|
 
 ### AssetRegistered
 Emitted when an asset and its kToken are registered

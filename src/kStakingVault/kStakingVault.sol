@@ -89,6 +89,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /// @param _symbol ERC20 token symbol for the stkToken (e.g., "stkUSDC")
     /// @param _decimals Token decimals matching the underlying asset precision
     /// @param _asset Underlying asset address that this vault will generate yield on
+    /// @param _maxTotalAssets The max TVL in underlying tokens
+    /// @param _trustedForwarder The trusted forwarder for ERC2771 metatransactions
     function initialize(
         address _owner,
         address _registryAddress,
@@ -97,7 +99,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         string memory _symbol,
         uint8 _decimals,
         address _asset,
-        uint128 _maxTotalAssets
+        uint128 _maxTotalAssets,
+        address _trustedForwarder
     )
         external
         initializer
@@ -107,6 +110,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Initialize ownership and roles
         __BaseVault_init(_registryAddress, _paused);
         _initializeOwner(_owner);
+        _initializeContext(_trustedForwarder);
 
         // Initialize storage with optimized packing
         BaseVaultStorage storage $ = _getBaseVaultStorage();
@@ -298,19 +302,16 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         uint256 _totalNetAssets = batch.totalNetAssets;
         uint256 _totalSupply = batch.totalSupply;
 
-        // This should never happen, but safe Bananas never dies
+        // This should never happen
         require(_totalSupply > 0, KSTAKINGVAULT_ZERO_AMOUNT);
 
         // Calculate total kTokens to return: (stkTokenAmount * totalNetAssets) / totalSupply
         uint256 _totalKTokensNet = _convertToAssetsWithTotals(stkTokenAmount, _totalNetAssets, _totalSupply);
         _checkAmountNotZero(_totalKTokensNet);
 
-        // Calculate net shares to burn: (stkTokenAmount * netSharePrice) / sharePrice
+        // Calculate net shares to burn: (stkTokenAmount * _totalNetAssets) / _totalAssets
         // This represents the net shares (after fees) that should be burned
-        uint8 decimals = _getDecimals($);
-        uint256 _sharePrice = _convertToAssetsWithTotals(10 ** decimals, _totalAssets, _totalSupply);
-        uint256 _netSharePrice = _convertToAssetsWithTotals(10 ** decimals, _totalNetAssets, _totalSupply);
-        uint256 _netSharesToBurn = (uint256(stkTokenAmount) * _netSharePrice) / _sharePrice;
+        uint256 _netSharesToBurn = uint256(stkTokenAmount).fullMulDiv(_totalNetAssets, _totalAssets);
 
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
@@ -579,7 +580,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /// @notice Authorize upgrade (only owner can upgrade)
     /// @dev This allows upgrading the main contract while keeping modules separate
     function _authorizeUpgrade(address _newImplementation) internal view override {
-        _checkAdmin(_msgSender());
+        _checkOwner();
         require(_newImplementation != address(0), KSTAKINGVAULT_ZERO_ADDRESS);
     }
 
@@ -593,16 +594,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         override
     {
         _checkOwner();
-    }
-
-    /// @dev Override to use {ERC2771Context}
-    function _implementation() internal view virtual override returns (address) {
-        bytes calldata msgData = _msgData();
-        bytes4 _selector = bytes4(msgData);
-        MultiFacetProxyStorage storage $ = _getMultiFacetProxyStorage();
-        address _impl = $.selectorToImplementation[_selector];
-        if (_impl == address(0)) revert();
-        return _impl;
     }
 
     /// @notice Receive ether function

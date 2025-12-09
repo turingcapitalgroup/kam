@@ -7,6 +7,7 @@ import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
+import { IRegistry } from "minimal-smart-account/interfaces/IRegistry.sol";
 import { VaultAdapter } from "src/adapters/VaultAdapter.sol";
 
 contract DeployAdaptersScript is Script, DeploymentManager {
@@ -59,43 +60,44 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         VaultAdapter vaultAdapterImpl = new VaultAdapter();
 
         // Deploy DN Vault USDC Adapter
-        bytes memory adapterInitDataUSDC = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector,
-            config.roles.owner, // owner (zero address = no specific owner, inherits from registry)
-            registryAddr,
-            "kam.dnVault.usdc"
+        bytes memory adapterInitDataUSDC = abi.encodeCall(
+            MinimalSmartAccount.initialize,
+            (
+                config.roles.owner, // owner (zero address = no specific owner, inherits from registry)
+                IRegistry(registryAddr),
+                "kam.dnVault.usdc"
+            )
         );
         address dnVaultAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataUSDC);
 
         // Deploy DN Vault WBTC Adapter
-        bytes memory adapterInitDataWBTC = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.dnVault.wbtc"
+        bytes memory adapterInitDataWBTC = abi.encodeCall(
+            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.dnVault.wbtc")
         );
         address dnVaultAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataWBTC);
 
         // Deploy Alpha Vault Adapter
-        bytes memory adapterInitDataAlpha = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.alphaVault.usdc"
+        bytes memory adapterInitDataAlpha = abi.encodeCall(
+            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.alphaVault.usdc")
         );
         address alphaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataAlpha);
 
         // Deploy Beta Vault Adapter
-        bytes memory adapterInitDataBeta = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.betaVault.usdc"
+        bytes memory adapterInitDataBeta = abi.encodeCall(
+            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.betaVault.usdc")
         );
         address betaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataBeta);
 
         // Deploy kMinter USDC Adapter
-        bytes memory adapterInitDataMinterUSDC = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector, config.roles.owner, registryAddr, "kam.minter.usdc"
+        bytes memory adapterInitDataMinterUSDC = abi.encodeCall(
+            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.minter.usdc")
         );
         address kMinterAdapterUSDC =
             factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataMinterUSDC);
 
         // Deploy kMinter WBTC Adapter
-        bytes memory adapterInitDataMinterWBTC = abi.encodeWithSelector(
-            MinimalSmartAccount.initialize.selector, address(0), registryAddr, "kam.minter.wbtc"
-        );
+        bytes memory adapterInitDataMinterWBTC =
+            abi.encodeCall(MinimalSmartAccount.initialize, (address(0), IRegistry(registryAddr), "kam.minter.wbtc"));
         address kMinterAdapterWBTC =
             factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataMinterWBTC);
 

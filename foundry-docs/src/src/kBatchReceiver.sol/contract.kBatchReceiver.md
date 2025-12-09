@@ -1,5 +1,5 @@
 # kBatchReceiver
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/kBatchReceiver.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kBatchReceiver.sol)
 
 **Inherits:**
 [IkBatchReceiver](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkBatchReceiver.sol/interface.IkBatchReceiver.md)
@@ -157,13 +157,15 @@ preventing accidental asset loss during the receiver contract's operational life
 
 
 ```solidity
-function rescueAssets(address _asset) external payable;
+function rescueAssets(address _asset, address _to, uint256 _amount) external payable;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`_asset`|`address`||
+|`_to`|`address`||
+|`_amount`|`uint256`||
 
 
 ### _checkMinter
@@ -191,5 +193,12 @@ Checks amount is not zero
 
 ```solidity
 function _checkAmountNotZero(uint256 _amount) private pure;
+```
+
+### _checkBalance
+
+
+```solidity
+function _checkBalance(uint256 _balance, uint256 _amount) private pure;
 ```
 

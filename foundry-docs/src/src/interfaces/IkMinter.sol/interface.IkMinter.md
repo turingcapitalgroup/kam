@@ -1,5 +1,5 @@
 # IkMinter
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/interfaces/IkMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IkMinter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -462,12 +462,7 @@ Emitted when a new redemption request is created and enters the batch queue
 
 ```solidity
 event BurnRequestCreated(
-    bytes32 indexed requestId,
-    address indexed user,
-    address indexed kToken,
-    uint256 amount,
-    address recipient,
-    bytes32 batchId
+    bytes32 indexed requestId, address indexed user, address indexed kToken, uint256 amount, bytes32 batchId
 );
 ```
 
@@ -479,7 +474,6 @@ event BurnRequestCreated(
 |`user`|`address`|The address that initiated the redemption request|
 |`kToken`|`address`|The kToken contract address being burned|
 |`amount`|`uint256`|The amount of kTokens being burned|
-|`recipient`|`address`|The address that will receive the underlying assets|
 |`batchId`|`bytes32`|The batch identifier this request is associated with|
 
 ### Burned

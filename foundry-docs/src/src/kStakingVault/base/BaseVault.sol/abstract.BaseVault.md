@@ -1,8 +1,8 @@
 # BaseVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/kStakingVault/base/BaseVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kStakingVault/base/BaseVault.sol)
 
 **Inherits:**
-[ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md)
+[ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
 
 Foundation contract providing essential shared functionality for all kStakingVault implementations
 
@@ -450,10 +450,11 @@ function is critical for determining redemption values, share price calculations
 ```solidity
 function _convertToAssetsWithTotals(
     uint256 _shares,
-    uint256 _totalAssetsValue
+    uint256 _totalAssetsValue,
+    uint256 _totalSupply
 )
     internal
-    view
+    pure
     returns (uint256 _assets);
 ```
 **Parameters**
@@ -462,6 +463,7 @@ function _convertToAssetsWithTotals(
 |----|----|-----------|
 |`_shares`|`uint256`|The quantity of stkTokens to convert to underlying asset terms|
 |`_totalAssetsValue`|`uint256`|The total asset value managed by the vault including yields but excluding pending operations|
+|`_totalSupply`|`uint256`||
 
 **Returns**
 
@@ -485,10 +487,11 @@ is essential for determining share issuance during staking operations and mainta
 ```solidity
 function _convertToSharesWithTotals(
     uint256 _assets,
-    uint256 _totalAssetsValue
+    uint256 _totalAssetsValue,
+    uint256 _totalSupply
 )
     internal
-    view
+    pure
     returns (uint256 _shares);
 ```
 **Parameters**
@@ -497,6 +500,7 @@ function _convertToSharesWithTotals(
 |----|----|-----------|
 |`_assets`|`uint256`|The underlying asset amount to convert to share terms|
 |`_totalAssetsValue`|`uint256`|The total asset value managed by the vault including yields but excluding pending operations|
+|`_totalSupply`|`uint256`||
 
 **Returns**
 

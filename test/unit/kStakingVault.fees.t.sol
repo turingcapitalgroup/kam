@@ -41,7 +41,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
     function test_InitialFeeState() public view {
         assertEq(vault.managementFee(), 0);
         assertEq(vault.performanceFee(), 0);
-        assertEq(vault.hurdleRate(), 0);
+        assertEq(vault.hurdleRate(), TEST_HURDLE_RATE);
 
         assertEq(vault.sharePriceWatermark(), 1e6);
 
@@ -575,7 +575,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vm.prank(users.admin);
         vault.setPerformanceFee(TEST_PERFORMANCE_FEE);
 
-        vm.prank(users.relayer);
+        vm.prank(users.admin);
         registry.setHurdleRate(tokens.usdc, 0); // No hurdle
 
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
@@ -600,8 +600,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vault.setPerformanceFee(0); // No performance fee
         vm.stopPrank();
 
-        vm.prank(users.relayer);
-        registry.setHurdleRate(tokens.usdc, TEST_HURDLE_RATE);
+        assertEq(registry.getHurdleRate(tokens.usdc), TEST_HURDLE_RATE);
 
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 

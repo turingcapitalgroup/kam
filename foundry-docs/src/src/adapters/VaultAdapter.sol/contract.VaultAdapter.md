@@ -1,8 +1,8 @@
 # VaultAdapter
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/adapters/VaultAdapter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/adapters/VaultAdapter.sol)
 
 **Inherits:**
-ERC7579Minimal, [IVaultAdapter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md)
+[SmartAdapterAccount](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/adapters/SmartAdapterAccount.sol/contract.SmartAdapterAccount.md), [IVaultAdapter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md)
 
 
 ## State Variables
@@ -241,13 +241,13 @@ function _checkZeroAddress(address _addr) internal pure;
 |`_addr`|`address`|Address to check|
 
 
-### _checkAsset
+### _checkAssetNotRegistered
 
-Reverts if the asset is not supported by the protocol
+Reverts if the asset is a registered protocol asset
 
 
 ```solidity
-function _checkAsset(address _asset) private view;
+function _checkAssetNotRegistered(address _asset) private view;
 ```
 **Parameters**
 

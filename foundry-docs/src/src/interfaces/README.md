@@ -18,3 +18,4 @@
 - [IkRegistry](IkRegistry.sol/interface.IkRegistry.md)
 - [IkStakingVault](IkStakingVault.sol/interface.IkStakingVault.md)
 - [IkToken](IkToken.sol/interface.IkToken.md)
+- [IkTokenFactory](IkTokenFactory.sol/interface.IkTokenFactory.md)

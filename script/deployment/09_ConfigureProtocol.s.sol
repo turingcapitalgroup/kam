@@ -138,7 +138,16 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         );
 
         console.log("");
-        console.log("2. Registering adapters with vaults...");
+        console.log("2. Setting hurdle rates for assets...");
+
+        // Set hurdle rates from config
+        registry.setHurdleRate(config.assets.USDC, config.registry.hurdleRate.USDC);
+        console.log("   - Set hurdle rate for USDC:", config.registry.hurdleRate.USDC);
+        registry.setHurdleRate(config.assets.WBTC, config.registry.hurdleRate.WBTC);
+        console.log("   - Set hurdle rate for WBTC:", config.registry.hurdleRate.WBTC);
+
+        console.log("");
+        console.log("3. Registering adapters with vaults...");
 
         // Register adapters for kMinter
         registry.registerAdapter(minterAddr, config.assets.USDC, minterAdapterUSDCAddr);
@@ -159,7 +168,7 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         console.log("   - Registered Beta Vault Adapter for Beta Vault");
 
         console.log("");
-        console.log("3. Granting roles...");
+        console.log("4. Granting roles...");
 
         // Grant MINTER_ROLE to kMinter and kAssetRouter on kTokens
         kToken kUSD = kToken(payable(kUSDAddr));
@@ -182,6 +191,7 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         console.log("=======================================");
         console.log("Protocol configuration complete!");
         console.log("All vaults registered in kRegistry");
+        console.log("Hurdle rates set for all assets");
         console.log("All adapters registered");
         console.log("All roles granted");
     }

@@ -77,8 +77,7 @@ contract BaseVaultTest is DeploymentBaseTest {
         vault.setHardHurdleRate(false); // Soft hurdle by default
         vm.stopPrank();
 
-        vm.prank(users.relayer);
-        registry.setHurdleRate(tokens.usdc, TEST_HURDLE_RATE);
+        assertEq(registry.getHurdleRate(tokens.usdc), TEST_HURDLE_RATE);
     }
 
     function _mintKTokensToUsers() internal {

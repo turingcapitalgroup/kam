@@ -66,10 +66,11 @@ abstract contract ERC3009 {
                            REQUIRED INTERFACE
     //////////////////////////////////////////////////////////////*/
 
-    /// Should return the EIP-712 domain separator.
-    function DOMAIN_SEPARATOR() public view virtual returns (bytes32);
+    /// @notice Should return the EIP-712 domain separator.
+    /// @return domainSeparator domain separator hash
+    function DOMAIN_SEPARATOR() public view virtual returns (bytes32 domainSeparator);
 
-    /// Executes the actual token transfer.
+    /// @notice Executes the actual token transfer.
     function _transfer(address from, address to, uint256 amount) internal virtual;
 
     /* //////////////////////////////////////////////////////////////

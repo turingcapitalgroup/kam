@@ -1,8 +1,8 @@
 # kToken
-[Git Source](https://github.com/VerisLabs/KAM/blob/23d03b05f3e96964e57bd3b573e4ae3d882ae057/src/kToken.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kToken.sol)
 
 **Inherits:**
-[IkToken](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkToken.sol/interface.IkToken.md), [ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedOwnableRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [Multicallable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Multicallable.sol/abstract.Multicallable.md)
+[IkToken](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkToken.sol/interface.IkToken.md), [ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedOwnableRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [Multicallable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Multicallable.sol/abstract.Multicallable.md), [ERC3009](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC3009.sol/abstract.ERC3009.md)
 
 ERC20 representation of underlying assets with guaranteed 1:1 backing in the KAM protocol
 
@@ -134,7 +134,7 @@ High-level business events are emitted by the calling contracts (kMinter, kAsset
 
 
 ```solidity
-function mint(address _to, uint256 _amount) external onlyRoles(MINTER_ROLE);
+function mint(address _to, uint256 _amount) external;
 ```
 **Parameters**
 
@@ -157,7 +157,7 @@ High-level business events are emitted by the calling contracts (kMinter, kAsset
 
 
 ```solidity
-function burn(address _from, uint256 _amount) external onlyRoles(MINTER_ROLE);
+function burn(address _from, uint256 _amount) external;
 ```
 **Parameters**
 
@@ -167,27 +167,79 @@ function burn(address _from, uint256 _amount) external onlyRoles(MINTER_ROLE);
 |`_amount`|`uint256`|The quantity of kTokens to burn (matches redeemed assets or loss amounts)|
 
 
-### burnFrom
+### approve
 
-Destroys kTokens from a specified address using the ERC20 allowance mechanism
-
-This function enables more complex burning scenarios where the token holder has pre-approved the burn
-operation. The process involves: (1) checking and consuming the allowance between token owner and the minter,
-(2) burning the specified amount from the owner's balance. This is useful for automated systems or contracts
-that need to burn tokens on behalf of users, such as complex redemption flows or third-party integrations.
-The allowance model provides additional security by requiring explicit approval before token destruction.
-High-level business events are emitted by the calling contracts for better context.
+Sets approval for another address to spend tokens on behalf of the caller
 
 
 ```solidity
-function burnFrom(address _from, uint256 _amount) external onlyRoles(MINTER_ROLE);
+function approve(address _spender, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_from`|`address`|The address from which kTokens will be burned (must have approved the burn amount)|
-|`_amount`|`uint256`|The quantity of kTokens to burn using the allowance mechanism|
+|`_spender`|`address`|The address that is approved to spend the tokens|
+|`_amount`|`uint256`|The amount of tokens the spender is approved to spend|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|success True if the approval succeeded|
+
+
+### transfer
+
+Transfers tokens from the caller to another address
+
+
+```solidity
+function transfer(address _to, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_to`|`address`|The address to transfer tokens to|
+|`_amount`|`uint256`|The amount of tokens to transfer|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|success True if the transfer succeeded|
+
+
+### transferFrom
+
+Transfers tokens from one address to another using allowance mechanism
+
+
+```solidity
+function transferFrom(
+    address _from,
+    address _to,
+    uint256 _amount
+)
+    public
+    virtual
+    override(ERC20, IkToken)
+    returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_from`|`address`|The address to transfer tokens from|
+|`_to`|`address`|The address to transfer tokens to|
+|`_amount`|`uint256`|The amount of tokens to transfer|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|success True if the transfer succeeded|
 
 
 ### name
@@ -294,28 +346,6 @@ function balanceOf(address _account) public view virtual override(ERC20, IkToken
 |`<none>`|`uint256`|The token balance of the specified account|
 
 
-### transfer
-
-Transfers tokens from the caller to another address
-
-
-```solidity
-function transfer(address _to, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_to`|`address`|The address to transfer tokens to|
-|`_amount`|`uint256`|The amount of tokens to transfer|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`bool`|success True if the transfer succeeded|
-
-
 ### allowance
 
 Returns the amount of tokens that spender is allowed to spend on behalf of owner
@@ -343,58 +373,16 @@ function allowance(address _owner, address _spender)
 |`<none>`|`uint256`|The amount of tokens the spender is allowed to spend|
 
 
-### approve
+### DOMAIN_SEPARATOR
 
-Sets approval for another address to spend tokens on behalf of the caller
+Override from ERC20 - required by ERC3009.
 
-
-```solidity
-function approve(address _spender, uint256 _amount) public virtual override(ERC20, IkToken) returns (bool);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_spender`|`address`|The address that is approved to spend the tokens|
-|`_amount`|`uint256`|The amount of tokens the spender is approved to spend|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`bool`|success True if the approval succeeded|
-
-
-### transferFrom
-
-Transfers tokens from one address to another using allowance mechanism
+This is the hook that ERC3009 uses for signature verification.
 
 
 ```solidity
-function transferFrom(
-    address _from,
-    address _to,
-    uint256 _amount
-)
-    public
-    virtual
-    override(ERC20, IkToken)
-    returns (bool);
+function DOMAIN_SEPARATOR() public view virtual override(IkToken, ERC20, ERC3009) returns (bytes32);
 ```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_from`|`address`|The address to transfer tokens from|
-|`_to`|`address`|The address to transfer tokens to|
-|`_amount`|`uint256`|The amount of tokens to transfer|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`bool`|success True if the transfer succeeded|
-
 
 ### grantAdminRole
 
@@ -442,7 +430,7 @@ operational procedures in place. Only existing admins can grant emergency roles.
 
 
 ```solidity
-function grantEmergencyRole(address _emergency) external onlyRoles(ADMIN_ROLE);
+function grantEmergencyRole(address _emergency) external;
 ```
 **Parameters**
 
@@ -460,7 +448,7 @@ carefully as it reduces the protocol's ability to respond to emergencies.
 
 
 ```solidity
-function revokeEmergencyRole(address _emergency) external onlyRoles(ADMIN_ROLE);
+function revokeEmergencyRole(address _emergency) external;
 ```
 **Parameters**
 
@@ -477,7 +465,7 @@ Calls internal _grantRoles function to assign MINTER_ROLE
 
 
 ```solidity
-function grantMinterRole(address _minter) external onlyRoles(ADMIN_ROLE);
+function grantMinterRole(address _minter) external;
 ```
 **Parameters**
 
@@ -494,7 +482,7 @@ Calls internal _removeRoles function to remove MINTER_ROLE
 
 
 ```solidity
-function revokeMinterRole(address _minter) external onlyRoles(ADMIN_ROLE);
+function revokeMinterRole(address _minter) external;
 ```
 **Parameters**
 
@@ -513,7 +501,7 @@ rapid response capability. The pause state affects all token operations through 
 
 
 ```solidity
-function setPaused(bool _paused) external onlyRoles(EMERGENCY_ADMIN_ROLE);
+function setPaused(bool _paused) external;
 ```
 **Parameters**
 
@@ -534,7 +522,7 @@ to prevent unauthorized asset extraction. This should not be used for regular op
 
 
 ```solidity
-function emergencyWithdraw(address _token, address _to, uint256 _amount) external onlyRoles(EMERGENCY_ADMIN_ROLE);
+function emergencyWithdraw(address _token, address _to, uint256 _amount) external;
 ```
 **Parameters**
 
@@ -545,6 +533,17 @@ function emergencyWithdraw(address _token, address _to, uint256 _amount) externa
 |`_amount`|`uint256`|The quantity of tokens or ETH to recover|
 
 
+### _transfer
+
+Override from ERC20 - required by ERC3009.
+
+This is the hook that ERC3009.transferWithAuthorization calls.
+
+
+```solidity
+function _transfer(address from, address to, uint256 amount) internal virtual override(ERC20, ERC3009);
+```
+
 ### _checkPaused
 
 Internal function to validate that the contract is not in emergency pause state
@@ -554,8 +553,53 @@ Reverts with KTOKEN_IS_PAUSED if the contract is paused, effectively halting all
 
 
 ```solidity
-function _checkPaused() private view;
+function _checkPaused() internal view;
 ```
+
+### _checkAdmin
+
+Check if caller has Admin role
+
+
+```solidity
+function _checkAdmin(address _user) internal view;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_user`|`address`|Address to check|
+
+
+### _checkEmergencyAdmin
+
+Check if caller has Emergency Admin role
+
+
+```solidity
+function _checkEmergencyAdmin(address _user) internal view;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_user`|`address`|Address to check|
+
+
+### _checkMinter
+
+Check if caller has a minter role
+
+
+```solidity
+function _checkMinter(address _user) internal view;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_user`|`address`|Address to check|
+
 
 ### _beforeTokenTransfer
 

@@ -43,7 +43,8 @@
       "useKToken": false,
       "maxTotalAssets": 500000000000000,
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-      "maxWithdrawPerBatch": 50000000000000
+      "maxWithdrawPerBatch": 50000000000000,
+      "trustedForwarder": "0x717AF6845eA3d3A84F22b54E5744AC25EF224C92"
     },
     "dnVaultWBTC": {
       "name": "KAM DN Vault BTC",
@@ -53,7 +54,8 @@
       "useKToken": false,
       "maxTotalAssets": 20000000000,
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-      "maxWithdrawPerBatch": 2000000000
+      "maxWithdrawPerBatch": 2000000000,
+      "trustedForwarder": "0x717AF6845eA3d3A84F22b54E5744AC25EF224C92"
     },
     "alphaVault": {
       "name": "KAM Alpha Vault USD",
@@ -63,7 +65,8 @@
       "useKToken": false,
       "maxTotalAssets": "200000000000000",
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-      "maxWithdrawPerBatch": 20000000000000
+      "maxWithdrawPerBatch": 20000000000000,
+      "trustedForwarder": "0x717AF6845eA3d3A84F22b54E5744AC25EF224C92"
     },
     "betaVault": {
       "name": "KAM Beta Vault USD",
@@ -73,7 +76,14 @@
       "useKToken": false,
       "maxTotalAssets": 200000000000000,
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-      "maxWithdrawPerBatch": 20000000000000
+      "maxWithdrawPerBatch": 20000000000000,
+      "trustedForwarder": "0x717AF6845eA3d3A84F22b54E5744AC25EF224C92"
+    }
+  },
+  "registry": {
+    "hurdleRate": {
+      "USDC": 500,
+      "WBTC": 500
     }
   },
   "assetRouter": {
@@ -154,6 +164,6 @@
       "USDC": "1000000000000",
       "WBTC": "10000000000"
     },
-    "WalletUSDC": "0xD49a0e9A4CD5979aE36840f542D2d7f02C4817Be"
+    "WalletUSDC": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
   }
 }
