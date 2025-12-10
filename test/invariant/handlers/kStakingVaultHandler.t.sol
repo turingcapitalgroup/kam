@@ -60,6 +60,7 @@ contract kStakingVaultHandler is BaseHandler {
     uint256 kStakingVault_actualSupply;
     uint256 kStakingVault_expectedSharePrice;
     uint256 kStakingVault_actualSharePrice;
+    int256 kStakingVault_sharePriceDelta;
 
     constructor(
         address _vault,
@@ -122,12 +123,15 @@ contract kStakingVaultHandler is BaseHandler {
             vm.stopPrank();
             return;
         }
+        uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
         kStakingVault_kToken.safeApprove(address(kStakingVault_vault), amount);
         if (kStakingVault_minterAdapter.totalAssets() < amount) vm.expectRevert();
         bytes32 requestId = kStakingVault_vault.requestStake(currentActor, amount);
         kStakingVault_actorStakeRequests[currentActor].add(requestId);
         kStakingVault_depositedInBatch[kStakingVault_vault.getBatchId()] += amount;
         kStakingVault_pendingStakeInBatch[kStakingVault_vault.getBatchId()] += amount;
+        uint256 sharePriceAfter = kStakingVault_vault.sharePrice();
+        kStakingVault_sharePriceDelta = int256(sharePriceAfter) - int256(sharePriceBefore);
 
         vm.stopPrank();
     }
@@ -234,6 +238,7 @@ contract kStakingVaultHandler is BaseHandler {
             vm.stopPrank();
             return;
         }
+        uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
         kStakingVault_vault.claimStakedShares(requestId);
         kStakingVault_actorStakeRequests[currentActor].remove(requestId);
         kStakingVault_pendingStakeInBatch[batchId] -= stakeRequest.kTokenAmount;
@@ -246,6 +251,8 @@ contract kStakingVaultHandler is BaseHandler {
         );
         kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
+        uint256 sharePriceAfter = kStakingVault_vault.sharePrice();
+        kStakingVault_sharePriceDelta = int256(sharePriceAfter) - int256(sharePriceBefore);
 
         vm.stopPrank();
     }
@@ -257,9 +264,12 @@ contract kStakingVaultHandler is BaseHandler {
             vm.stopPrank();
             return;
         }
+        uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
         kStakingVault_requestedInBatch[kStakingVault_vault.getBatchId()] -= amount;
         bytes32 requestId = kStakingVault_vault.requestUnstake(currentActor, amount);
         kStakingVault_actorUnstakeRequests[currentActor].add(requestId);
+        uint256 sharePriceAfter = kStakingVault_vault.sharePrice();
+        kStakingVault_sharePriceDelta = int256(sharePriceAfter) - int256(sharePriceBefore);
 
         vm.stopPrank();
     }
@@ -290,6 +300,7 @@ contract kStakingVaultHandler is BaseHandler {
             vm.stopPrank();
             return;
         }
+        uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
         kStakingVault_vault.claimUnstakedAssets(requestId);
         kStakingVault_actorUnstakeRequests[currentActor].remove(requestId);
         uint256 sharesToBurn = uint256(unstakeRequest.stkTokenAmount).fullMulDiv(totalNetAssets, totalAssets);
@@ -302,6 +313,8 @@ contract kStakingVaultHandler is BaseHandler {
         );
         kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
+        uint256 sharePriceAfter = kStakingVault_vault.sharePrice();
+        kStakingVault_sharePriceDelta = int256(sharePriceAfter) - int256(sharePriceBefore);
 
         vm.stopPrank();
     }
@@ -636,6 +649,10 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_actualSharePrice = _value;
     }
 
+    function set_kStakingVault_sharePriceDelta(int256 _value) public {
+        kStakingVault_sharePriceDelta = _value;
+    }
+
     // Set operations for sets
     function add_kStakingVault_minterActor(address _actor) public {
         kStakingVault_minterActors.add(_actor);
@@ -714,5 +731,9 @@ contract kStakingVaultHandler is BaseHandler {
 
     function INVARIANT_F_SUPPLY() public view {
         assertEq(kStakingVault_expectedSupply, kStakingVault_actualSupply, "KSTAKING_VAULT: INVARIANT_F_SUPPLY");
+    }
+
+    function INVARIANT_G_SHARE_PRICE_DELTA() public view {
+        assertEq(kStakingVault_sharePriceDelta, 0, "KSTAKING_VAULT: INVARIANT_G_SHARE_PRICE_DELTA");
     }
 }
