@@ -8,6 +8,7 @@ import {
     KREGISTRY_ADAPTER_ALREADY_SET,
     KREGISTRY_ALREADY_REGISTERED,
     KREGISTRY_ASSET_NOT_SUPPORTED,
+    KREGISTRY_EMPTY_STRING,
     KREGISTRY_INVALID_ADAPTER,
     KREGISTRY_WRONG_ASSET,
     KREGISTRY_ZERO_ADDRESS,
@@ -141,6 +142,18 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         registry.registerAsset(
             TEST_NAME, TEST_SYMBOL, address(0x347474), type(uint256).max, type(uint256).max, users.emergencyAdmin
         );
+    }
+
+    function test_RegisterAsset_Require_String_Not_Empty() public {
+        vm.startPrank(users.admin);
+
+        vm.expectRevert(bytes(KREGISTRY_EMPTY_STRING));
+        registry.registerAsset("", TEST_SYMBOL, TEST_ASSET, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+
+        vm.expectRevert(bytes(KREGISTRY_EMPTY_STRING));
+        registry.registerAsset(TEST_NAME, "", TEST_ASSET, type(uint256).max, type(uint256).max, users.emergencyAdmin);
+
+        vm.stopPrank();
     }
 
     /* //////////////////////////////////////////////////////////////

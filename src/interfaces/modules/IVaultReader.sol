@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
@@ -226,4 +226,12 @@ interface IVaultReader is IVersioned {
     /// @param batchId_ the batchId to verify
     /// @return isClosed_ the state of the given batchId
     function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
+
+    /// @notice Returns the maximum total assets (TVL cap) allowed in the vault
+    /// @return The maximum total assets in underlying token terms
+    function maxTotalAssets() external view returns (uint128);
+
+    /// @notice Returns the receiver implementation address used to clone batch receivers
+    /// @return The address of the receiver implementation contract
+    function receiverImplementation() external view returns (address);
 }

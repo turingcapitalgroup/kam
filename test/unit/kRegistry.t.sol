@@ -13,6 +13,7 @@ import {
 } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
+import { K_MINTER } from "kam/src/constants/Constants.sol";
 import {
     KREGISTRY_ALREADY_REGISTERED,
     KREGISTRY_ASSET_NOT_SUPPORTED,
@@ -543,7 +544,7 @@ contract kRegistryTest is DeploymentBaseTest {
     }
 
     function test_GetContractById() public {
-        address _kMinterAddr = registry.getContractById(registry.K_MINTER());
+        address _kMinterAddr = registry.getContractById(K_MINTER);
         assertEq(_kMinterAddr, address(minter));
 
         bytes32 _invalidId = keccak256("Banana");

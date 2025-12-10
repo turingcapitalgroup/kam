@@ -9,7 +9,7 @@ import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 import { kBase } from "kam/src/base/kBase.sol";
 import {
     KASSETROUTER_BATCH_ID_PROPOSED,
-    KASSETROUTER_COOLDOOWN_IS_UP,
+    KASSETROUTER_COOLDOWN_IS_UP,
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_IS_PAUSED,
     KASSETROUTER_NOT_BATCH_CLOSED,
@@ -654,7 +654,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.prank(users.alice);
-        vm.expectRevert(bytes(KASSETROUTER_COOLDOOWN_IS_UP));
+        vm.expectRevert(bytes(KASSETROUTER_COOLDOWN_IS_UP));
         assetRouter.executeSettleBatch(testProposalId);
     }
 
