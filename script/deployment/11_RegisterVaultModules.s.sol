@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
-import { console2 as console } from "forge-std/console2.sol";
 import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
@@ -46,9 +45,9 @@ contract RegisterModulesScript is DeploymentManager {
         require(alphaVaultAddr != address(0), "alphaVault address required");
         require(betaVaultAddr != address(0), "betaVault address required");
 
-        console.log("=== MODULE REGISTRATION ===");
-        console.log("Network:", config.network);
-        console.log("");
+        _log("=== MODULE REGISTRATION ===");
+        _log("Network:", config.network);
+        _log("");
 
         // Get the ReaderModule selectors using the selectors() function
         ReaderModule readerModule = ReaderModule(readerModuleAddr);
@@ -59,33 +58,33 @@ contract RegisterModulesScript is DeploymentManager {
         // Register ReaderModule to DN Vault USDC
         kStakingVault dnVaultUSDC = kStakingVault(payable(dnVaultUSDCAddr));
         dnVaultUSDC.addFunctions(readerSelectors, readerModuleAddr, true);
-        console.log("Registered ReaderModule to DN Vault USDC");
+        _log("Registered ReaderModule to DN Vault USDC");
 
         // Register ReaderModule to DN Vault WBTC
         kStakingVault dnVaultWBTC = kStakingVault(payable(dnVaultWBTCAddr));
         dnVaultWBTC.addFunctions(readerSelectors, readerModuleAddr, true);
-        console.log("Registered ReaderModule to DN Vault WBTC");
+        _log("Registered ReaderModule to DN Vault WBTC");
 
         // Register ReaderModule to Alpha Vault
         kStakingVault alphaVault = kStakingVault(payable(alphaVaultAddr));
         alphaVault.addFunctions(readerSelectors, readerModuleAddr, true);
-        console.log("Registered ReaderModule to Alpha Vault");
+        _log("Registered ReaderModule to Alpha Vault");
 
         // Register ReaderModule to Beta Vault
         kStakingVault betaVault = kStakingVault(payable(betaVaultAddr));
         betaVault.addFunctions(readerSelectors, readerModuleAddr, true);
-        console.log("Registered ReaderModule to Beta Vault");
+        _log("Registered ReaderModule to Beta Vault");
 
         vm.stopBroadcast();
 
-        console.log("");
-        console.log("=======================================");
-        console.log("Module registration complete!");
-        console.log("ReaderModule registered to all vaults:");
-        console.log("  - DN Vault USDC:", dnVaultUSDCAddr);
-        console.log("  - DN Vault WBTC:", dnVaultWBTCAddr);
-        console.log("  - Alpha Vault:", alphaVaultAddr);
-        console.log("  - Beta Vault:", betaVaultAddr);
+        _log("");
+        _log("=======================================");
+        _log("Module registration complete!");
+        _log("ReaderModule registered to all vaults:");
+        _log("  - DN Vault USDC:", dnVaultUSDCAddr);
+        _log("  - DN Vault WBTC:", dnVaultWBTCAddr);
+        _log("  - Alpha Vault:", alphaVaultAddr);
+        _log("  - Beta Vault:", betaVaultAddr);
     }
 
     /// @notice Convenience wrapper for real deployments (reads addresses from JSON)

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { K_ASSET_ROUTER, K_MINTER, K_TOKEN_FACTORY } from "kam/src/constants/Constants.sol";
@@ -36,8 +35,8 @@ contract RegisterSingletonsScript is Script, DeploymentManager {
         require(minterAddr != address(0), "kMinter address required");
         require(factoryAddr != address(0), "kTokenFactory address required");
 
-        console.log("=== REGISTRY SINGLETON REGISTRATION ===");
-        console.log("Network:", config.network);
+        _log("=== REGISTRY SINGLETON REGISTRATION ===");
+        _log("Network:", config.network);
 
         vm.startBroadcast(config.roles.admin);
 
@@ -54,11 +53,11 @@ contract RegisterSingletonsScript is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        console.log("=== REGISTRATION COMPLETE ===");
-        console.log("Registered kAssetRouter:", assetRouterAddr);
-        console.log("Registered kMinter:", minterAddr);
-        console.log("Registered kTokenFactory:", factoryAddr);
-        console.log("Registry address:", registryAddr);
+        _log("=== REGISTRATION COMPLETE ===");
+        _log("Registered kAssetRouter:", assetRouterAddr);
+        _log("Registered kMinter:", minterAddr);
+        _log("Registered kTokenFactory:", factoryAddr);
+        _log("Registry address:", registryAddr);
     }
 
     /// @notice Convenience wrapper for real deployments (reads dependencies from JSON)

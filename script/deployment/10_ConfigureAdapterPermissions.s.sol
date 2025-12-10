@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
 import { ERC20ParameterChecker } from "kam/src/adapters/parameters/ERC20ParameterChecker.sol";
 
 import { IERC7540 } from "kam/src/interfaces/IERC7540.sol";
@@ -139,9 +138,9 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         // Validate required contracts
         require(registryAddr != address(0), "kRegistry address required");
 
-        console.log("=== CONFIGURING ADAPTER PERMISSIONS ===");
-        console.log("Network:", config.network);
-        console.log("");
+        _log("=== CONFIGURING ADAPTER PERMISSIONS ===");
+        _log("Network:", config.network);
+        _log("");
 
         vm.startBroadcast(config.roles.admin);
 
@@ -149,14 +148,14 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
 
         // Deploy ERC20 parameters checker
         ERC20ParameterChecker erc20ParameterChecker = new ERC20ParameterChecker(registryAddr);
-        console.log("Deployed ERC20ParameterChecker at:", address(erc20ParameterChecker));
+        _log("Deployed ERC20ParameterChecker at:", address(erc20ParameterChecker));
 
         // Get addresses from config
         address usdc = config.assets.USDC;
         address wbtc = config.assets.WBTC;
 
-        console.log("");
-        console.log("1. Configuring Adapter permissions...");
+        _log("");
+        _log("1. Configuring Adapter permissions...");
         configureAdapterPermissions(registry, kMinterAdapterUSDCAddr, erc7540USDCAddr, usdc, true);
         configureAdapterPermissions(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, wbtc, true);
         configureAdapterPermissions(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, usdc, false);
@@ -164,8 +163,8 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         configureCustodialAdapterPermissions(registry, alphaVaultAdapterAddr, walletUSDCAddr);
         configureCustodialAdapterPermissions(registry, betaVaultAdapterAddr, walletUSDCAddr);
 
-        console.log("");
-        console.log("2. Configuring parameter checkers...");
+        _log("");
+        _log("2. Configuring parameter checkers...");
         address paramChecker = address(erc20ParameterChecker);
         configureParameterChecker(registry, kMinterAdapterUSDCAddr, usdc, paramChecker, true);
         configureParameterChecker(registry, kMinterAdapterWBTCAddr, wbtc, paramChecker, true);
@@ -176,8 +175,8 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         configureParameterChecker(registry, alphaVaultAdapterAddr, walletUSDCAddr, paramChecker, false);
         configureParameterChecker(registry, betaVaultAdapterAddr, walletUSDCAddr, paramChecker, false);
 
-        console.log("");
-        console.log("3. Configuring parameter checker permissions from config...");
+        _log("");
+        _log("3. Configuring parameter checker permissions from config...");
 
         // Create a temporary DeploymentOutput struct for _resolveAddress helper
         existing.contracts.kMinterAdapterUSDC = kMinterAdapterUSDCAddr;
@@ -200,7 +199,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         _configureAllowedSpenders(erc20ParameterChecker, config, existing, usdc, wbtc, erc7540USDCAddr, erc7540WBTCAddr);
 
         // Set max transfer limits from config
-        console.log("   - Set max transfer limits");
+        _log("   - Set max transfer limits");
         erc20ParameterChecker.setMaxSingleTransfer(usdc, config.parameterChecker.maxSingleTransfer.USDC);
         erc20ParameterChecker.setMaxSingleTransfer(wbtc, config.parameterChecker.maxSingleTransfer.WBTC);
         erc20ParameterChecker.setMaxSingleTransfer(
@@ -220,9 +219,9 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
             writeContractAddress("erc20ParameterChecker", address(erc20ParameterChecker));
         }
 
-        console.log("");
-        console.log("=======================================");
-        console.log("Adapter permissions configuration complete!");
+        _log("");
+        _log("=======================================");
+        _log("Adapter permissions configuration complete!");
 
         return deployment;
     }
@@ -254,7 +253,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
     )
         internal
     {
-        console.log("   - Set allowed receivers from config");
+        _log("   - Set allowed receivers from config");
 
         // USDC receivers
         for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.USDC.length; i++) {
@@ -300,7 +299,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
     )
         internal
     {
-        console.log("   - Set allowed sources from config");
+        _log("   - Set allowed sources from config");
 
         // ERC7540USDC sources
         for (uint256 i = 0; i < config.parameterChecker.allowedSources.ERC7540USDC.length; i++) {
@@ -330,7 +329,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
     )
         internal
     {
-        console.log("   - Set allowed spenders from config");
+        _log("   - Set allowed spenders from config");
 
         // USDC spenders
         for (uint256 i = 0; i < config.parameterChecker.allowedSpenders.USDC.length; i++) {

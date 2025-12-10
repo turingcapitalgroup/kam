@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
@@ -61,12 +60,12 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        console.log("=== DEPLOYMENT COMPLETE ===");
-        console.log("kAssetRouter implementation deployed at:", address(assetRouterImpl));
-        console.log("kAssetRouter proxy deployed at:", assetRouterProxy);
-        console.log("Registry:", registryAddr);
-        console.log("Network:", config.network);
-        console.log("Settlement cooldown set to:", config.assetRouter.settlementCooldown);
+        _log("=== DEPLOYMENT COMPLETE ===");
+        _log("kAssetRouter implementation deployed at:", address(assetRouterImpl));
+        _log("kAssetRouter proxy deployed at:", assetRouterProxy);
+        _log("Registry:", registryAddr);
+        _log("Network:", config.network);
+        _log("Settlement cooldown set to:", config.assetRouter.settlementCooldown);
 
         // Return deployed addresses
         deployment = AssetRouterDeployment({ assetRouterImpl: address(assetRouterImpl), assetRouter: assetRouterProxy });
