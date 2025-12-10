@@ -10,6 +10,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentrancyGuardTransient.sol";
 
 import { ERC2771Context } from "kam/src/base/ERC2771Context.sol";
+import { K_ASSET_ROUTER, K_MINTER } from "kam/src/constants/Constants.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
@@ -51,11 +52,6 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
                               CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice kAssetRouter key
-    bytes32 internal constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER");
-    /// @notice kMinter key
-    bytes32 internal constant K_MINTER = keccak256("K_MINTER");
-
     /// @dev Bitmask and shift constants for module configuration
     uint256 internal constant DECIMALS_MASK = 0xFF;
     uint256 internal constant DECIMALS_SHIFT = 0;
@@ -89,20 +85,22 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         //3
         uint256 currentBatch;
         //4
-        bytes32 currentBatchId;
+        uint256 requestCounter;
         //5
-        address registry;
+        bytes32 currentBatchId;
         //6
-        address receiverImplementation;
+        address registry;
         //7
-        address underlyingAsset;
+        address receiverImplementation;
         //8
-        address kToken;
+        address underlyingAsset;
         //9
-        uint128 maxTotalAssets;
+        address kToken;
         //10
-        string name;
+        uint128 maxTotalAssets;
         //11
+        string name;
+        //12
         string symbol;
         mapping(bytes32 => BaseVaultTypes.BatchInfo) batches;
         mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;
@@ -459,9 +457,6 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @param _kAssetRouter The address to validate against the registered kAssetRouter
     /// @return True if the address matches the registered kAssetRouter contract
     function _isKAssetRouter(address _kAssetRouter) internal view returns (bool) {
-        bool _isTrue;
-        address _kAssetRouterAddr = _registry().getContractById(K_ASSET_ROUTER);
-        if (_kAssetRouterAddr == _kAssetRouter) _isTrue = true;
-        return _isTrue;
+        return _registry().getContractById(K_ASSET_ROUTER) == _kAssetRouter;
     }
 }

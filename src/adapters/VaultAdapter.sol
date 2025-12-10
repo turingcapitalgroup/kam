@@ -14,6 +14,7 @@ import {
 } from "kam/src/errors/Errors.sol";
 
 import { SmartAdapterAccount } from "kam/src/adapters/SmartAdapterAccount.sol";
+import { K_ASSET_ROUTER } from "kam/src/constants/Constants.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
@@ -41,12 +42,6 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
     // keccak256(abi.encode(uint256(keccak256("kam.storage.VaultAdapter")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant VAULTADAPTER_STORAGE_LOCATION =
         0xf3245d0f4654bfd28a91ebbd673859481bdc20aeda8fc19798f835927d79aa00;
-
-    /// @notice Registry lookup key for the kAssetRouter singleton contract
-    /// @dev This hash is used to retrieve the kAssetRouter address from the registry's contract mapping.
-    /// kAssetRouter coordinates all asset movements and settlements, making it a critical dependency
-    /// for vaults and other protocol components. The hash-based lookup enables dynamic upgrades.
-    bytes32 internal constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER");
 
     /// @notice Retrieves the VaultAdapter storage struct from its designated storage slot
     /// @dev Uses ERC-7201 namespaced storage pattern to access the storage struct at a deterministic location.

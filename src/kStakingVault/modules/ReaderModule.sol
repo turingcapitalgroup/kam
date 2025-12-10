@@ -6,6 +6,7 @@ import { OptimizedDateTimeLib } from "solady/utils/OptimizedDateTimeLib.sol";
 import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { Extsload } from "uniswap/Extsload.sol";
 
+import { MAX_BPS } from "kam/src/constants/Constants.sol";
 import {
     KSTAKINGVAULT_NOT_INITIALIZED,
     KSTAKINGVAULT_VAULT_CLOSED,
@@ -22,8 +23,6 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
     using OptimizedFixedPointMathLib for uint256;
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
 
-    /// @notice Maximum basis points
-    uint256 constant MAX_BPS = 10_000;
     /// @notice Number of seconds in a year
     uint256 constant SECS_PER_YEAR = 31_556_952;
 

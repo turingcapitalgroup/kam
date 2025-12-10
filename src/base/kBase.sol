@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentrancyGuardTransient.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
+import { K_ASSET_ROUTER, K_MINTER } from "kam/src/constants/Constants.sol";
 import {
     KBASE_ALREADY_INITIALIZED,
     KBASE_ASSET_NOT_SUPPORTED,
@@ -65,22 +66,6 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// @param to_ The recipient address receiving the rescued ETH (cannot be zero address)
     /// @param amount_ The quantity of ETH rescued in wei (must not exceed contract balance)
     event RescuedETH(address indexed to_, uint256 amount_);
-
-    /* //////////////////////////////////////////////////////////////
-                              CONSTANTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Registry lookup key for the kMinter singleton contract
-    /// @dev This hash is used to retrieve the kMinter address from the registry's contract mapping.
-    /// kMinter handles institutional minting/redemption flows, so many contracts need to identify it
-    /// for access control and routing decisions. The hash ensures consistent lookups across the protocol.
-    bytes32 internal constant K_MINTER = keccak256("K_MINTER");
-
-    /// @notice Registry lookup key for the kAssetRouter singleton contract
-    /// @dev This hash is used to retrieve the kAssetRouter address from the registry's contract mapping.
-    /// kAssetRouter coordinates all asset movements and settlements, making it a critical dependency
-    /// for vaults and other protocol components. The hash-based lookup enables dynamic upgrades.
-    bytes32 internal constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER");
 
     /* //////////////////////////////////////////////////////////////
                         STORAGE LAYOUT
@@ -181,6 +166,7 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// @param _to The recipient address that will receive the rescued assets (cannot be zero address)
     /// @param _amount The quantity to rescue (must not exceed available balance)
     function rescueAssets(address _asset, address _to, uint256 _amount) external payable {
+        _lockReentrant();
         require(_isAdmin(msg.sender), KBASE_WRONG_ROLE);
         require(_to != address(0), KBASE_ZERO_ADDRESS);
 
@@ -200,6 +186,7 @@ contract kBase is OptimizedReentrancyGuardTransient {
             _asset.safeTransfer(_to, _amount);
             emit RescuedAssets(_asset, _to, _amount);
         }
+        _unlockReentrant();
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -352,10 +339,7 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// @param _vault The address to check against kMinter
     /// @return Whether the address is the registered kMinter contract
     function _isKMinter(address _vault) internal view returns (bool) {
-        bool _isTrue;
-        address _kminter = _registry().getContractById(K_MINTER);
-        if (_kminter == _vault) _isTrue = true;
-        return _isTrue;
+        return _registry().getContractById(K_MINTER) == _vault;
     }
 
     /// @notice Checks if an address is a registered vault

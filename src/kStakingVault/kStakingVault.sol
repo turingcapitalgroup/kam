@@ -40,6 +40,7 @@ import {
 } from "kam/src/errors/Errors.sol";
 
 import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
+import { K_MINTER } from "kam/src/constants/Constants.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
@@ -551,10 +552,10 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     function _createStakeRequestId(address _user, uint256 _amount, uint256 _timestamp) private returns (bytes32) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         unchecked {
-            $.currentBatch++;
+            $.requestCounter++;
         }
         return OptimizedEfficientHashLib.hash(
-            uint256(uint160(address(this))), uint256(uint160(_user)), _amount, _timestamp, $.currentBatch
+            uint256(uint160(address(this))), uint256(uint160(_user)), _amount, _timestamp, $.requestCounter
         );
     }
 

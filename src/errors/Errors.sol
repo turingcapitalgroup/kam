@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
 /// @dev All error codes use contract-specific prefixes for easier debugging:
@@ -22,7 +22,7 @@ string constant KASSETROUTER_ALREADY_REGISTERED = "A1";
 string constant KASSETROUTER_BATCH_CLOSED = "A2";
 string constant KASSETROUTER_BATCH_ID_PROPOSED = "A3";
 string constant KASSETROUTER_BATCH_SETTLED = "A4";
-string constant KASSETROUTER_COOLDOOWN_IS_UP = "A5";
+string constant KASSETROUTER_COOLDOWN_IS_UP = "A5";
 string constant KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE = "A6";
 string constant KASSETROUTER_INVALID_COOLDOWN = "A7";
 string constant KASSETROUTER_INVALID_VAULT = "A8";
@@ -103,6 +103,7 @@ string constant KMINTER_BATCH_REDEEM_REACHED = "M11";
 string constant KMINTER_BATCH_NOT_CLOSED = "M12";
 string constant KMINTER_BATCH_NOT_VALID = "M13";
 string constant KMINTER_BATCH_NOT_SETTLED = "M14";
+string constant KMINTER_UNAUTHORIZED = "M15";
 
 // kRegistry Errors
 string constant KREGISTRY_ADAPTER_ALREADY_SET = "R1";
@@ -118,6 +119,7 @@ string constant KREGISTRY_FEE_EXCEEDS_MAXIMUM = "R10";
 string constant KREGISTRY_SELECTOR_ALREADY_SET = "R11";
 string constant KREGISTRY_SELECTOR_NOT_FOUND = "R12";
 string constant KREGISTRY_KTOKEN_ALREADY_SET = "R13";
+string constant KREGISTRY_EMPTY_STRING = "R14";
 
 string constant GUARDIANMODULE_UNAUTHORIZED = "GM1";
 string constant GUARDIANMODULE_NOT_ALLOWED = "GM2";

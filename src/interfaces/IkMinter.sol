@@ -99,11 +99,6 @@ interface IkMinter is IVersioned {
         bytes32 batchId
     );
 
-    /// @notice Emitted when a pending redemption request is cancelled before batch closure
-    /// @param requestId The unique identifier of the cancelled redemption request
-    /// @param user The address of the user requesting the cancellation
-    event Cancelled(bytes32 indexed requestId, address user, uint256 amount, bytes32 batchId);
-
     // VaultBatches Events
     // / @notice Emitted when a new batch is created
     // / @param asset The asset in which the batch will be created

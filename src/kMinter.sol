@@ -23,6 +23,7 @@ import {
     KMINTER_INSUFFICIENT_BALANCE,
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
+    KMINTER_UNAUTHORIZED,
     KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
@@ -35,6 +36,7 @@ import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import { kBase } from "kam/src/base/kBase.sol";
+import { K_ASSET_ROUTER } from "kam/src/constants/Constants.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 
 /// @title kMinter
@@ -205,7 +207,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         });
 
         // Add request ID to user's set for efficient lookup of all their requests
-        $.userRequests[_to].add(_requestId);
+        $.userRequests[msg.sender].add(_requestId);
 
         // Escrow kTokens in this contract - NOT burned yet to allow cancellation
         _kToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -227,6 +229,9 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
 
         kMinterStorage storage $ = _getkMinterStorage();
         BurnRequest storage _burnRequest = $.burnRequests[_requestId];
+
+        // Validate caller is the request creator
+        require(msg.sender == _burnRequest.user, KMINTER_UNAUTHORIZED);
 
         uint256 _amount = _burnRequest.amount;
         address _asset = _burnRequest.asset;
