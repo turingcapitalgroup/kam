@@ -5,6 +5,7 @@ import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
+import { K_ASSET_ROUTER, K_MINTER, K_TOKEN_FACTORY } from "kam/src/constants/Constants.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 
 contract RegisterSingletonsScript is Script, DeploymentManager {
@@ -43,13 +44,13 @@ contract RegisterSingletonsScript is Script, DeploymentManager {
         kRegistry registry = kRegistry(payable(registryAddr));
 
         // Register kAssetRouter as singleton
-        registry.setSingletonContract(registry.K_ASSET_ROUTER(), assetRouterAddr);
+        registry.setSingletonContract(K_ASSET_ROUTER, assetRouterAddr);
 
         // Register kMinter as singleton
-        registry.setSingletonContract(registry.K_MINTER(), minterAddr);
+        registry.setSingletonContract(K_MINTER, minterAddr);
 
         // Register kTokenFactory as singleton
-        registry.setSingletonContract(registry.K_TOKEN_FACTORY(), factoryAddr);
+        registry.setSingletonContract(K_TOKEN_FACTORY, factoryAddr);
 
         vm.stopBroadcast();
 

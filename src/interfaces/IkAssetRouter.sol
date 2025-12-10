@@ -63,6 +63,11 @@ interface IkAssetRouter is IVersioned {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Emitted when the kAssetRouter contract is initialized with registry configuration
+    /// @param adapter The address of the adapter that was updated
+    /// @param totalAssets the totalAssets used as param to update
+    event TotalAssetsSet(address indexed adapter, uint256 totalAssets);
+
+    /// @notice Emitted when the kAssetRouter contract is initialized with registry configuration
     /// @param registry The address of the kRegistry contract that manages protocol configuration
     event ContractInitialized(address indexed registry);
 
@@ -472,6 +477,18 @@ interface IkAssetRouter is IVersioned {
     /// @param asset The underlying asset of the vault
     /// @return balance The total virtual asset balance across all vault adapters
     function virtualBalance(address vault, address asset) external view returns (uint256);
+
+    /// @notice Checks if a specific proposal has been executed
+    /// @dev Used to verify whether a settlement proposal has already been processed
+    /// @param proposalId The unique identifier of the proposal to check
+    /// @return True if the proposal has been executed, false otherwise
+    function isProposalExecuted(bytes32 proposalId) external view returns (bool);
+
+    /// @notice Checks if a specific batch ID has been registered in the router
+    /// @dev Used to verify whether a batch ID exists in the protocol's tracking system
+    /// @param batchId The batch identifier to check
+    /// @return True if the batch ID is registered, false otherwise
+    function isBatchIdRegistered(bytes32 batchId) external view returns (bool);
 
     // contractName() and contractVersion() functions are inherited from IVersioned
 }

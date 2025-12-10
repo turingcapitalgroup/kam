@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
 import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedAddressEnumerableSetLib.sol";
@@ -10,6 +10,7 @@ import {
     KREGISTRY_ADAPTER_ALREADY_SET,
     KREGISTRY_ALREADY_REGISTERED,
     KREGISTRY_ASSET_NOT_SUPPORTED,
+    KREGISTRY_EMPTY_STRING,
     KREGISTRY_FEE_EXCEEDS_MAXIMUM,
     KREGISTRY_INVALID_ADAPTER,
     KREGISTRY_KTOKEN_ALREADY_SET,
@@ -26,6 +27,7 @@ import { IkTokenFactory } from "kam/src/interfaces/IkTokenFactory.sol";
 
 import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
 import { kBaseRoles } from "kam/src/base/kBaseRoles.sol";
+import { K_ASSET_ROUTER, K_MINTER, K_TOKEN_FACTORY, MAX_BPS } from "kam/src/constants/Constants.sol";
 
 /// @title kRegistry
 /// @notice Central configuration hub and contract registry for the KAM protocol ecosystem
@@ -42,27 +44,6 @@ import { kBaseRoles } from "kam/src/base/kBaseRoles.sol";
 contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, MultiFacetProxy {
     using OptimizedAddressEnumerableSetLib for OptimizedAddressEnumerableSetLib.AddressSet;
     using SafeTransferLib for address;
-
-    /* //////////////////////////////////////////////////////////////
-                              CONSTANTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice kMinter key
-    bytes32 public constant K_MINTER = keccak256("K_MINTER");
-
-    /// @notice kAssetRouter key
-    bytes32 public constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER");
-
-    bytes32 public constant K_TOKEN_FACTORY = keccak256("K_TOKEN_FACTORY");
-
-    /// @notice USDC key
-    bytes32 public constant USDC = keccak256("USDC");
-
-    /// @notice WBTC key
-    bytes32 public constant WBTC = keccak256("WBTC");
-
-    /// @notice Maximum basis points (100%)
-    uint256 constant MAX_BPS = 10_000;
 
     /* //////////////////////////////////////////////////////////////
                               STORAGE
@@ -298,6 +279,8 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         returns (address)
     {
         _checkAdmin(msg.sender);
+        _checkString(_name);
+        _checkString(_symbol);
         _checkAddressNotZero(_asset);
         _checkAddressNotZero(_emergencyAdmin);
 
@@ -633,6 +616,14 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     function _checkVaultRegistered(address _vault) private view {
         kRegistryStorage storage $ = _getkRegistryStorage();
         require($.allVaults.contains(_vault), KREGISTRY_ASSET_NOT_SUPPORTED);
+    }
+
+    /// @notice Validates that a string is not empty
+    /// @dev Reverts with KREGISTRY_EMPTY_STRING if the string has zero length.
+    /// Used to ensure token names and symbols are properly defined during asset registration.
+    /// @param _str The string to validate
+    function _checkString(string memory _str) private pure {
+        require(bytes(_str).length > 0, KREGISTRY_EMPTY_STRING);
     }
 
     /// @dev Helper function to get the decimals of the underlying asset.
