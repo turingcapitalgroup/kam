@@ -109,37 +109,52 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         utils = new Utilities();
         _createUsers();
 
-        DeployMockAssetsScript.MockAssets memory mocks = (new DeployMockAssetsScript()).run(false);
+        // Disable verbose logging for tests
+        DeployMockAssetsScript mockAssetsScript = new DeployMockAssetsScript();
+        mockAssetsScript.setVerbose(false);
+        DeployMockAssetsScript.MockAssets memory mocks = mockAssetsScript.run(false);
 
         _setupAssets(mocks.USDC, mocks.WBTC);
 
         _labelAddresses();
 
-        // Now deploy protocol contracts
-        DeployRegistryScript.RegistryDeployment memory registryDeploy = (new DeployRegistryScript()).run(false);
+        // Now deploy protocol contracts (all with verbose=false)
+        DeployRegistryScript registryScript = new DeployRegistryScript();
+        registryScript.setVerbose(false);
+        DeployRegistryScript.RegistryDeployment memory registryDeploy = registryScript.run(false);
 
         // Deploy minter and asset router, passing factory and registry addresses
+        DeployMinterScript minterScript = new DeployMinterScript();
+        minterScript.setVerbose(false);
         DeployMinterScript.MinterDeployment memory minterDeploy =
-            (new DeployMinterScript()).run(false, registryDeploy.factory, registryDeploy.registry);
+            minterScript.run(false, registryDeploy.factory, registryDeploy.registry);
 
+        DeployAssetRouterScript assetRouterScript = new DeployAssetRouterScript();
+        assetRouterScript.setVerbose(false);
         DeployAssetRouterScript.AssetRouterDeployment memory assetRouterDeploy =
-            (new DeployAssetRouterScript()).run(false, registryDeploy.factory, registryDeploy.registry);
+            assetRouterScript.run(false, registryDeploy.factory, registryDeploy.registry);
 
         // Register singletons (no JSON read/write in tests)
-        (new RegisterSingletonsScript())
-        .run(registryDeploy.registry, assetRouterDeploy.assetRouter, minterDeploy.minter, registryDeploy.kTokenFactory);
+        RegisterSingletonsScript singletonsScript = new RegisterSingletonsScript();
+        singletonsScript.setVerbose(false);
+        singletonsScript.run(
+            registryDeploy.registry, assetRouterDeploy.assetRouter, minterDeploy.minter, registryDeploy.kTokenFactory
+        );
 
         // Deploy kTokens
-        DeployTokensScript.TokenDeployment memory tokenDeploy =
-            (new DeployTokensScript()).run(false, registryDeploy.registry);
+        DeployTokensScript tokensScript = new DeployTokensScript();
+        tokensScript.setVerbose(false);
+        DeployTokensScript.TokenDeployment memory tokenDeploy = tokensScript.run(false, registryDeploy.registry);
 
         // Deploy vault modules
-        DeployVaultModulesScript.VaultModulesDeployment memory modulesDeploy =
-            (new DeployVaultModulesScript()).run(false);
+        DeployVaultModulesScript modulesScript = new DeployVaultModulesScript();
+        modulesScript.setVerbose(false);
+        DeployVaultModulesScript.VaultModulesDeployment memory modulesDeploy = modulesScript.run(false);
 
         // Deploy vaults
-        DeployVaultsScript.VaultsDeployment memory vaultsDeploy = (new DeployVaultsScript())
-        .run(
+        DeployVaultsScript vaultsScript = new DeployVaultsScript();
+        vaultsScript.setVerbose(false);
+        DeployVaultsScript.VaultsDeployment memory vaultsDeploy = vaultsScript.run(
             false,
             registryDeploy.factory,
             registryDeploy.registry,
@@ -149,12 +164,15 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         );
 
         // Deploy adapters
+        DeployAdaptersScript adaptersScript = new DeployAdaptersScript();
+        adaptersScript.setVerbose(false);
         DeployAdaptersScript.AdaptersDeployment memory adaptersDeploy =
-            (new DeployAdaptersScript()).run(false, registryDeploy.factory, registryDeploy.registry);
+            adaptersScript.run(false, registryDeploy.factory, registryDeploy.registry);
 
         // Configure protocol
-        (new ConfigureProtocolScript())
-        .run(
+        ConfigureProtocolScript configProtocolScript = new ConfigureProtocolScript();
+        configProtocolScript.setVerbose(false);
+        configProtocolScript.run(
             registryDeploy.registry,
             minterDeploy.minter,
             assetRouterDeploy.assetRouter,
@@ -172,8 +190,9 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             adaptersDeploy.kMinterAdapterWBTC
         );
 
-        (new ConfigureAdapterPermissionsScript())
-        .run(
+        ConfigureAdapterPermissionsScript adapterPermissionsScript = new ConfigureAdapterPermissionsScript();
+        adapterPermissionsScript.setVerbose(false);
+        adapterPermissionsScript.run(
             false,
             registryDeploy.registry,
             adaptersDeploy.kMinterAdapterUSDC,
@@ -187,8 +206,9 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             mocks.WalletUSDC
         );
 
-        (new RegisterModulesScript())
-        .run(
+        RegisterModulesScript registerModulesScript = new RegisterModulesScript();
+        registerModulesScript.setVerbose(false);
+        registerModulesScript.run(
             modulesDeploy.readerModule,
             vaultsDeploy.dnVaultUSDC,
             vaultsDeploy.dnVaultWBTC,

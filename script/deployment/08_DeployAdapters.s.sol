@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
@@ -48,8 +47,8 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         require(factoryAddr != address(0), "ERC1967Factory address required");
         require(registryAddr != address(0), "kRegistry address required");
 
-        console.log("=== DEPLOYING ADAPTERS ===");
-        console.log("Network:", config.network);
+        _log("=== DEPLOYING ADAPTERS ===");
+        _log("Network:", config.network);
 
         vm.startBroadcast(config.roles.admin);
 
@@ -103,19 +102,19 @@ contract DeployAdaptersScript is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        console.log("=== DEPLOYMENT COMPLETE ===");
-        console.log("VaultAdapter implementation deployed at:", address(vaultAdapterImpl));
-        console.log("DN Vault USDC Adapter deployed at:", dnVaultAdapterUSDC);
-        console.log("DN Vault WBTC Adapter deployed at:", dnVaultAdapterWBTC);
-        console.log("Alpha Vault Adapter deployed at:", alphaVaultAdapter);
-        console.log("Beta Vault Adapter deployed at:", betaVaultAdapter);
-        console.log("kMinter USDC Adapter deployed at:", kMinterAdapterUSDC);
-        console.log("kMinter WBTC Adapter deployed at:", kMinterAdapterWBTC);
-        console.log("Registry:", registryAddr);
-        console.log("Network:", config.network);
-        console.log("");
-        console.log("Note: All adapters inherit roles from registry");
-        console.log("      Configure adapter permissions in next script");
+        _log("=== DEPLOYMENT COMPLETE ===");
+        _log("VaultAdapter implementation deployed at:", address(vaultAdapterImpl));
+        _log("DN Vault USDC Adapter deployed at:", dnVaultAdapterUSDC);
+        _log("DN Vault WBTC Adapter deployed at:", dnVaultAdapterWBTC);
+        _log("Alpha Vault Adapter deployed at:", alphaVaultAdapter);
+        _log("Beta Vault Adapter deployed at:", betaVaultAdapter);
+        _log("kMinter USDC Adapter deployed at:", kMinterAdapterUSDC);
+        _log("kMinter WBTC Adapter deployed at:", kMinterAdapterWBTC);
+        _log("Registry:", registryAddr);
+        _log("Network:", config.network);
+        _log("");
+        _log("Note: All adapters inherit roles from registry");
+        _log("      Configure adapter permissions in next script");
 
         // Return deployed addresses
         deployment = AdaptersDeployment({

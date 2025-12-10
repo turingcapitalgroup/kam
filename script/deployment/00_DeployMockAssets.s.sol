@@ -3,8 +3,8 @@ pragma solidity ^0.8.20;
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { Script } from "forge-std/Script.sol";
-
 import { console2 as console } from "forge-std/console2.sol";
+
 import { MockERC20 } from "kam/test/mocks/MockERC20.sol";
 import { MockERC7540 } from "kam/test/mocks/MockERC7540.sol";
 import { MockWallet } from "kam/test/mocks/MockWallet.sol";
@@ -27,8 +27,8 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
 
         // Check if mock assets are enabled in config
         if (!config.mockAssets.enabled) {
-            console.log("=== MOCK ASSETS DISABLED IN CONFIG ===");
-            console.log("Set mockAssets.enabled to true in config to deploy mocks");
+            _log("=== MOCK ASSETS DISABLED IN CONFIG ===");
+            _log("Set mockAssets.enabled to true in config to deploy mocks");
             return MockAssets({
                 USDC: address(0),
                 WBTC: address(0),
@@ -49,10 +49,10 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         // For other networks, check if assets are already deployed
         if (keccak256(bytes(config.network)) != keccak256(bytes("localhost"))) {
             if (_assetsAlreadyDeployed(config)) {
-                console.log("=== MOCK ASSETS ALREADY DEPLOYED ===");
-                console.log("USDC:", config.assets.USDC);
-                console.log("WBTC:", config.assets.WBTC);
-                console.log("Skipping mock asset deployment");
+                _log("=== MOCK ASSETS ALREADY DEPLOYED ===");
+                _log("USDC:", config.assets.USDC);
+                _log("WBTC:", config.assets.WBTC);
+                _log("Skipping mock asset deployment");
                 return MockAssets({
                     USDC: config.assets.USDC,
                     WBTC: config.assets.WBTC,
@@ -63,9 +63,9 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
             }
         }
 
-        console.log("=== DEPLOYING MOCK ASSETS ===");
-        console.log("Network:", config.network);
-        console.log("Chain ID:", config.chainId);
+        _log("=== DEPLOYING MOCK ASSETS ===");
+        _log("Network:", config.network);
+        _log("Chain ID:", config.chainId);
 
         vm.startBroadcast(config.roles.owner);
 
@@ -81,11 +81,11 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        console.log("Mock USDC deployed at:", address(mockUSDC));
-        console.log("Mock WBTC deployed at:", address(mockWBTC));
-        console.log("Mock ERC7540 USDC deployed at:", address(mockERC7540USDC));
-        console.log("Mock ERC7540 WBTC deployed at:", address(mockERC7540WBTC));
-        console.log("Mock Wallet USDC deployed at:", address(mockWalletUSDC));
+        _log("Mock USDC deployed at:", address(mockUSDC));
+        _log("Mock WBTC deployed at:", address(mockWBTC));
+        _log("Mock ERC7540 USDC deployed at:", address(mockERC7540USDC));
+        _log("Mock ERC7540 WBTC deployed at:", address(mockERC7540WBTC));
+        _log("Mock Wallet USDC deployed at:", address(mockWalletUSDC));
 
         // Write to JSON only if requested (for real deployments)
         if (writeToJson) {
@@ -111,13 +111,13 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         // Also mint tokens to mock targets for testing
         _mintTokensToMockTargets(mockUSDC, mockWBTC, mockERC7540USDC, mockERC7540WBTC, mockWalletUSDC, config);
 
-        console.log("=== MOCK ASSET DEPLOYMENT COMPLETE ===");
-        console.log("Mock USDC:", address(mockUSDC));
-        console.log("Mock WBTC:", address(mockWBTC));
-        console.log("Mock ERC7540 USDC:", address(mockERC7540USDC));
-        console.log("Mock ERC7540 WBTC:", address(mockERC7540WBTC));
-        console.log("Mock Wallet USDC:", address(mockWalletUSDC));
-        console.log("Config updated at: deployments/config/", string.concat(config.network, ".json"));
+        _log("=== MOCK ASSET DEPLOYMENT COMPLETE ===");
+        _log("Mock USDC:", address(mockUSDC));
+        _log("Mock WBTC:", address(mockWBTC));
+        _log("Mock ERC7540 USDC:", address(mockERC7540USDC));
+        _log("Mock ERC7540 WBTC:", address(mockERC7540WBTC));
+        _log("Mock Wallet USDC:", address(mockWalletUSDC));
+        _log("Config updated at: deployments/config/", string.concat(config.network, ".json"));
 
         // Return deployed addresses
         assets = MockAssets({
@@ -167,11 +167,11 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         // 3. Update the MockWallet Address
         vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".mockAssets.WalletUSDC");
 
-        console.log("Updated config file with mock asset addresses");
+        _log("Updated config file with mock asset addresses");
     }
 
     function _mintTokensForTesting(MockERC20 mockUSDC, MockERC20 mockWBTC, NetworkConfig memory config) internal {
-        console.log("=== MINTING TOKENS FOR TESTING (from config) ===");
+        _log("=== MINTING TOKENS FOR TESTING (from config) ===");
 
         vm.startBroadcast(config.roles.owner);
 
@@ -179,8 +179,10 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         uint256 usdcMintAmount = config.mockAssets.mintAmounts.USDC;
         uint256 wbtcMintAmount = config.mockAssets.mintAmounts.WBTC;
 
-        console.log("Minting", usdcMintAmount, "USDC");
-        console.log(wbtcMintAmount, "WBTC per account");
+        if (verbose) {
+            console.log("Minting", usdcMintAmount, "USDC");
+            console.log(wbtcMintAmount, "WBTC per account");
+        }
 
         // Mint to deployer (msg.sender)
         mockUSDC.mint(msg.sender, usdcMintAmount);
@@ -209,18 +211,18 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        console.log("Minted to deployer:", msg.sender);
+        _log("Minted to deployer:", msg.sender);
         if (config.roles.treasury != address(0)) {
-            console.log("Minted to treasury:", config.roles.treasury);
+            _log("Minted to treasury:", config.roles.treasury);
         }
         if (config.roles.owner != address(0) && config.roles.owner != msg.sender) {
-            console.log("Minted to owner:", config.roles.owner);
+            _log("Minted to owner:", config.roles.owner);
         }
         if (
             config.roles.admin != address(0) && config.roles.admin != msg.sender
                 && config.roles.admin != config.roles.owner
         ) {
-            console.log("Minted to admin:", config.roles.admin);
+            _log("Minted to admin:", config.roles.admin);
         }
     }
 
@@ -234,7 +236,7 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
     )
         internal
     {
-        console.log("=== MINTING TOKENS TO MOCK TARGETS (from config) ===");
+        _log("=== MINTING TOKENS TO MOCK TARGETS (from config) ===");
 
         vm.startBroadcast(config.roles.owner);
 
@@ -242,8 +244,10 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         uint256 usdcAmount = config.mockAssets.mockTargetAmounts.USDC;
         uint256 wbtcAmount = config.mockAssets.mockTargetAmounts.WBTC;
 
-        console.log("Minting", usdcAmount, "USDC");
-        console.log(wbtcAmount, "WBTC per account");
+        if (verbose) {
+            console.log("Minting", usdcAmount, "USDC");
+            console.log(wbtcAmount, "WBTC per account");
+        }
 
         mockUSDC.mint(address(mockERC7540USDC), usdcAmount);
         mockWBTC.mint(address(mockERC7540WBTC), wbtcAmount);
@@ -251,8 +255,8 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        console.log("Minted to Mock ERC7540 USDC vault");
-        console.log("Minted to Mock ERC7540 WBTC vault");
-        console.log("Minted to Mock Wallet");
+        _log("Minted to Mock ERC7540 USDC vault");
+        _log("Minted to Mock ERC7540 WBTC vault");
+        _log("Minted to Mock Wallet");
     }
 }
