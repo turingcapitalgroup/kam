@@ -693,6 +693,18 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         return $.vaultRequestedShares[_vault][_batchId];
     }
 
+    /// @inheritdoc IkAssetRouter
+    function isProposalExecuted(bytes32 _proposalId) external view returns (bool) {
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+        return $.executedProposalIds.contains(_proposalId);
+    }
+
+    /// @inheritdoc IkAssetRouter
+    function isBatchIdRegistered(bytes32 _batchId) external view returns (bool) {
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+        return $.batchIds.contains(_batchId);
+    }
+
     /* //////////////////////////////////////////////////////////////
                           UPGRADE FUNCTION
     //////////////////////////////////////////////////////////////*/

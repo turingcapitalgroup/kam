@@ -396,6 +396,16 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
         return $.unstakeRequests[_requestId];
     }
 
+    /// @inheritdoc IVaultReader
+    function maxTotalAssets() external view returns (uint128) {
+        return _getBaseVaultStorage().maxTotalAssets;
+    }
+
+    /// @inheritdoc IVaultReader
+    function receiverImplementation() external view returns (address) {
+        return _getBaseVaultStorage().receiverImplementation;
+    }
+
     /// @inheritdoc IVersioned
     function contractName() external pure returns (string memory) {
         return "kStakingVault";
@@ -408,7 +418,7 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](36);
+        bytes4[] memory moduleSelectors = new bytes4[](38);
         moduleSelectors[0] = this.registry.selector;
         moduleSelectors[1] = this.asset.selector;
         moduleSelectors[2] = this.underlyingAsset.selector;
@@ -443,8 +453,10 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
         moduleSelectors[31] = this.getUserRequests.selector;
         moduleSelectors[32] = this.getStakeRequest.selector;
         moduleSelectors[33] = this.getUnstakeRequest.selector;
-        moduleSelectors[34] = this.contractName.selector;
-        moduleSelectors[35] = this.contractVersion.selector;
+        moduleSelectors[34] = this.maxTotalAssets.selector;
+        moduleSelectors[35] = this.receiverImplementation.selector;
+        moduleSelectors[36] = this.contractName.selector;
+        moduleSelectors[37] = this.contractVersion.selector;
         return moduleSelectors;
     }
 }

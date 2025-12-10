@@ -422,6 +422,12 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         _isClosed = $.batches[_batchId].isClosed;
     }
 
+    /// @inheritdoc IkMinter
+    function receiverImplementation() external view returns (address) {
+        kMinterStorage storage $ = _getkMinterStorage();
+        return $.receiverImplementation;
+    }
+
     /* //////////////////////////////////////////////////////////////
                       INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
