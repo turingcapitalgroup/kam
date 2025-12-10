@@ -12,7 +12,7 @@ import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import {
     KASSETROUTER_BATCH_ID_PROPOSED,
-    KASSETROUTER_COOLDOOWN_IS_UP,
+    KASSETROUTER_COOLDOWN_IS_UP,
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_INVALID_COOLDOWN,
     KASSETROUTER_IS_PAUSED,
@@ -38,6 +38,7 @@ import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import { kBase } from "kam/src/base/kBase.sol";
+import { MAX_BPS } from "kam/src/constants/Constants.sol";
 
 /// @title kAssetRouter
 /// @notice Central money flow coordinator for the KAM protocol, orchestrating all asset movements and yield
@@ -327,7 +328,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
         // Check if yield exceeds tolerance threshold to prevent excessive yield deviations
         if (_lastTotalAssets > 0) {
-            uint256 _maxAllowedYield = _lastTotalAssets * $.maxAllowedDelta / 10_000;
+            uint256 _maxAllowedYield = _lastTotalAssets * $.maxAllowedDelta / MAX_BPS;
             if (_yield.abs() > _maxAllowedYield) {
                 emit YieldExceedsMaxDeltaWarning(_vault, _asset, _batchId, _yield, _maxAllowedYield);
             }
@@ -380,7 +381,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
         // Remove proposal from vault queue
         require($.vaultPendingProposalIds[_vault].remove(_proposalId), KASSETROUTER_PROPOSAL_NOT_FOUND);
-        require(block.timestamp >= _proposal.executeAfter, KASSETROUTER_COOLDOOWN_IS_UP);
+        require(block.timestamp >= _proposal.executeAfter, KASSETROUTER_COOLDOWN_IS_UP);
 
         // Mark the proposal as executed, add to the list of executed
         $.executedProposalIds.add(_proposalId);
@@ -435,8 +436,9 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         uint256 _requested = $.vaultBatchBalances[_vault][_batchId].requested;
         address _kMinter = _getKMinter();
         address _kToken = _getKTokenForAsset(_asset);
+        IRegistry _registry = _registry();
 
-        IVaultAdapter _adapter = IVaultAdapter(_registry().getAdapter(_vault, _asset));
+        IVaultAdapter _adapter = IVaultAdapter(_registry.getAdapter(_vault, _asset));
         _checkAddressNotZero(address(_adapter));
 
         // kMinter settlement
@@ -459,6 +461,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             // Mark batch as settled in the vault
             ISettleBatch(_vault).settleBatch(_batchId);
             _adapter.setTotalAssets(_totalAssets);
+            emit TotalAssetsSet(address(_adapter), _totalAssets);
         } else {
             uint256 _totalRequestedShares = $.vaultRequestedShares[_vault][_batchId];
             // kMinter yield is sent to insuranceFund, cannot be minted.
@@ -473,13 +476,14 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 emit YieldDistributed(_vault, _yield);
             }
 
-            IVaultAdapter _kMinterAdapter = IVaultAdapter(_registry().getAdapter(_getKMinter(), _asset));
+            IVaultAdapter _kMinterAdapter = IVaultAdapter(_registry.getAdapter(_getKMinter(), _asset));
             _checkAddressNotZero(address(_kMinterAdapter));
             int256 _kMinterTotalAssets = int256(_kMinterAdapter.totalAssets()) - _netted;
             require(_kMinterTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
             // casting to 'uint256' is safe because _kMinterTotalAssets is >= 0 due to require check
             // forge-lint: disable-next-line(unsafe-typecast)
             _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
+            emit TotalAssetsSet(address(_adapter), _totalAssets);
 
             // If global fees were charged in the batch, notify the vault to udpate share price
             if (_proposal.lastFeesChargedManagement != 0) {
@@ -493,6 +497,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             // Mark batch as settled in the vault
             ISettleBatch(_vault).settleBatch(_batchId);
             _adapter.setTotalAssets(_totalAssets);
+            emit TotalAssetsSet(address(_adapter), _totalAssets);
 
             // If there were withdrawals we take fees on them
             if (_totalRequestedShares != 0) {
@@ -509,7 +514,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 // Move fees as ktokens to treasury
                 if (_feeAssets != 0) {
                     IkToken(_kToken).burn(_vault, _feeAssets);
-                    IkToken(_kToken).mint(_registry().getTreasury(), _feeAssets);
+                    IkToken(_kToken).mint(_registry.getTreasury(), _feeAssets);
                 }
             }
         }
@@ -586,6 +591,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         return (true, "");
     }
 
+    /// @inheritdoc IkAssetRouter
     function getSettlementCooldown() external view returns (uint256) {
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         return $.vaultSettlementCooldown;
@@ -720,8 +726,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                             RECEIVE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Receive ETH (for gas refunds, etc.)
-    receive() external payable { }
+    /// @notice Receive ETH ()
+    receive() external payable { } // TODO: validate with auditors best approach
 
     /* //////////////////////////////////////////////////////////////
                         CONTRACT INFO

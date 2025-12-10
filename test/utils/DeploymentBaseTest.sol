@@ -9,6 +9,7 @@ import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 // Protocol contracts
 
+import { K_ASSET_ROUTER, K_MINTER } from "kam/src/constants/Constants.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 import { kAssetRouter } from "kam/src/kAssetRouter.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
@@ -337,8 +338,8 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
 
     function assertProtocolInitialized() internal view {
         // Check registry has core contracts
-        assertEq(registry.getContractById(registry.K_ASSET_ROUTER()), address(assetRouter));
-        assertEq(registry.getContractById(registry.K_MINTER()), address(minter));
+        assertEq(registry.getContractById(K_ASSET_ROUTER), address(assetRouter));
+        assertEq(registry.getContractById(K_MINTER), address(minter));
 
         // Check assets are registered
         assertTrue(registry.isAsset(tokens.usdc));

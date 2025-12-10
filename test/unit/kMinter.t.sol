@@ -19,6 +19,7 @@ import {
     KMINTER_BATCH_REDEEM_REACHED,
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
+    KMINTER_UNAUTHORIZED,
     KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
@@ -290,15 +291,18 @@ contract kMinterTest is DeploymentBaseTest {
         vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
         minter.burn(_requestIds[0]);
 
+        // Different institution cannot burn another institution's request
         vm.prank(users.institution2);
+        vm.expectRevert(bytes(KMINTER_UNAUTHORIZED));
         minter.burn(_requestIds[0]);
     }
 
     function test_Burn_Require_Valid_RequestId() public {
         bytes32 invalidRequestId = keccak256("Banana");
 
+        // Invalid request ID will have user = address(0), so authorization check fails first
         vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_REQUEST_NOT_FOUND));
+        vm.expectRevert(bytes(KMINTER_UNAUTHORIZED));
         minter.burn(invalidRequestId);
     }
 

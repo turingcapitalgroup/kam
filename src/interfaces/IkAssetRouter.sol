@@ -63,6 +63,11 @@ interface IkAssetRouter is IVersioned {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Emitted when the kAssetRouter contract is initialized with registry configuration
+    /// @param adapter The address of the adapter that was updated
+    /// @param totalAssets the totalAssets used as param to update
+    event TotalAssetsSet(address indexed adapter, uint256 totalAssets);
+
+    /// @notice Emitted when the kAssetRouter contract is initialized with registry configuration
     /// @param registry The address of the kRegistry contract that manages protocol configuration
     event ContractInitialized(address indexed registry);
 
