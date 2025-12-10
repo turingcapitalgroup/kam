@@ -76,17 +76,19 @@
 
   Structural Issues
 
-  2.1 Inconsistent Storage Patterns - aknowledeged(ktoken is not upgradeable)
+  2.1 Inconsistent Storage Patterns - ✅ FIXED
 
-  kToken uses regular storage variables while other contracts use ERC-7201 namespaced
-  storage:
+  Previously, kToken used regular storage variables while other contracts used ERC-7201 
+  namespaced storage. This has been resolved:
 
-  bool _isPaused;  // Regular storage
-  string private _name;
-  string private _symbol;
-  uint8 private _decimals;
-
-  This creates upgrade risks if kToken ever needs to be upgradeable.
+  **Fixed Implementation:**
+  - kToken now uses ERC-7201 namespaced storage pattern
+  - Storage struct: `kTokenStorage` with namespaced slot location
+  - Storage accessor: `_getkTokenStorage()` using assembly
+  - All storage variables (isPaused, name, symbol, decimals) now in struct
+  - kToken is now upgradeable using UUPS proxy pattern
+  - Atomic initialization via `deployAndCall()` prevents frontrunning
+  - Shared implementation deployed by kTokenFactory for gas efficiency
 
   2.2 Duplicate Constants Across Contracts - MUST FIX
 

@@ -258,9 +258,9 @@ KAM is split into the following main contracts:
 
 The fundamental ERC20 implementation representing tokenized real-world assets. Each kToken maintains a 1:1 peg with its underlying asset (e.g., kUSD:USDC, kBTC:WBTC).
 
-The kToken contract is the foundational building block of the KAM protocol, implementing a role-restricted ERC20 token with advanced security features. **Importantly, kToken contracts are NOT upgradeable** - they use a standard implementation pattern without proxy architecture, providing maximum trust and immutability for token holders.
+The kToken contract is the foundational building block of the KAM protocol, implementing a role-restricted ERC20 token with advanced security features. **kToken contracts are upgradeable using the UUPS proxy pattern** with ERC-7201 namespaced storage to prevent storage collisions. Deployment uses atomic initialization via `deployAndCall()` to prevent frontrunning attacks where an attacker could initialize the proxy before the legitimate deployer. All kTokens share a single implementation contract deployed by kTokenFactory, providing gas efficiency while maintaining independent storage per token instance.
 
-Role-based access control integrates Solady's OptimizedOwnableRoles for gas-efficient permission management, with MINTER_ROLE for token operations, ADMIN_ROLE for configuration, and EMERGENCY_ADMIN_ROLE for crisis response.
+Role-based access control integrates Solady's OptimizedOwnableRoles for gas-efficient permission management, with MINTER_ROLE for token operations, ADMIN_ROLE for configuration, and EMERGENCY_ADMIN_ROLE for crisis response. Upgrades are restricted to the contract owner (typically kRegistry owner) through the `_authorizeUpgrade()` function.
 
 All core functions respect a global pause state, allowing immediate shutdown if security issues are detected. 
 
@@ -647,7 +647,7 @@ The protocol implements multiple optimization strategies for cost efficiency:
 
 ## Upgrade Mechanism
 
-Most core contracts use the UUPS pattern with proper authorization controls. Only addresses with ADMIN_ROLE can authorize upgrades, and the new implementation address must be non-zero. Storage preservation is ensured through ERC-7201 namespaced layout with no storage collision risk and append-only modifications.
+Most core contracts use the UUPS pattern with proper authorization controls. Only the contract owner can authorize upgrades through the `_authorizeUpgrade()` function, and the new implementation address must be non-zero. Storage preservation is ensured through ERC-7201 namespaced layout with no storage collision risk and append-only modifications.
 
 **Upgradeable Contracts:**
 
@@ -655,14 +655,14 @@ Most core contracts use the UUPS pattern with proper authorization controls. Onl
 - kAssetRouter (UUPS + ERC-7201 namespaced storage)
 - kRegistry (UUPS + ERC-7201 namespaced storage)
 - kStakingVault (UUPS + ERC-7201 namespaced storage)
+- kToken (UUPS + ERC-7201 namespaced storage + Atomic initialization)
 - VaultAdapter (UUPS + ERC-7201 namespaced storage)
 
 **Non-Upgradeable Contracts:**
 
-- kToken (Standard implementation for maximum trust and immutability)
-- kBatchReceiver (Minimal proxy implementation using EIP-1167 for gas efficiency)
+- kBatchReceiver (Minimal proxy implementation using EIP-1167 for gas efficiency and maximum security)
 
-Some components remain immutable by design: kToken contracts provide immutable token guarantees for holders, and kBatchReceiver contracts have no upgrade capability for maximum security during redemption distribution.
+The kBatchReceiver contract remains immutable by design with no upgrade capability, providing maximum security and trust during redemption distribution. All other core protocol contracts are upgradeable to enable protocol evolution and critical bug fixes while maintaining strict authorization controls.
 
 ## Integration Points
 

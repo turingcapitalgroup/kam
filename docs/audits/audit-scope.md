@@ -18,8 +18,8 @@ The protocol's **two-phase settlement system** with mandatory cooldown periods p
 | **kAssetRouter** | Virtual balance coordinator | ✅ UUPS | Guardian oversight + Yield tolerance |
 | **kRegistry** | Protocol configuration hub | ✅ UUPS | Single source of truth |
 | **kStakingVault** | Retail yield generation | ✅ UUPS | Share price appreciation |
+| **kToken** | Asset-backed ERC20 | ✅ UUPS | 1:1 backing + Atomic initialization |
 | **kBatchReceiver** | Settlement distribution | ❌ Minimal Proxy | Batch isolation + Immutable auth |
-| **kToken** | Asset-backed ERC20 | ❌ Immutable | 1:1 backing guarantee |
 
 ## Audit Scope
 
@@ -298,21 +298,23 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 ### kTokenFactory - Token Deployment Factory
 
-**Primary Function**: Factory contract for deploying new kToken instances when assets are registered in the protocol.
+**Primary Function**: Factory contract for deploying upgradeable kToken instances using UUPS proxy pattern when assets are registered in the protocol.
 
 **Deployment Process**:
 
-1. Registry calls `deployKToken(owner, admin, emergencyAdmin, minter, name, symbol, decimals)` when registering new asset
-2. Factory deploys immutable kToken instance with specified parameters
-3. Grants initial roles: owner, admin, emergency admin, and minter role to kMinter
-4. Returns deployed kToken address to Registry for asset mapping
-5. Each kToken is a separate immutable contract instance
+1. Factory constructor deploys shared kToken implementation contract (reused by all kTokens)
+2. Factory constructor creates ERC1967Factory instance for proxy deployments
+3. Registry calls `deployKToken(owner, admin, emergencyAdmin, minter, name, symbol, decimals)` when registering new asset
+4. Factory uses `proxyFactory.deployAndCall()` to atomically deploy proxy and initialize it (prevents frontrunning)
+5. Initialization grants roles: owner, admin, emergency admin, and minter role to kMinter
+6. Returns deployed kToken proxy address to Registry for asset mapping
+7. Each kToken is a separate ERC1967 proxy pointing to shared implementation
 
-**Security Considerations**: Factory enables consistent kToken deployment with proper role initialization, ensuring all kTokens follow same security model and initialization pattern.
+**Security Considerations**: Factory enables consistent kToken deployment with atomic initialization preventing frontrunning attacks. All kTokens share the same implementation for gas efficiency while maintaining independent storage via ERC-7201 namespaced storage pattern.
 
 ### kToken - Asset-Backed Token
 
-**Primary Function**: Immutable ERC20 token representing real-world assets with guaranteed 1:1 backing and institutional-grade security controls.
+**Primary Function**: Upgradeable ERC20 token (UUPS proxy pattern) representing real-world assets with guaranteed 1:1 backing and institutional-grade security controls.
 
 **Token Lifecycle Management**:
 
