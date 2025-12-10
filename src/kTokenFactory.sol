@@ -17,10 +17,12 @@ import { kToken } from "kam/src/kToken.sol";
 /// @dev This factory contract handles the deployment of kToken contracts for the KAM protocol.
 /// It provides a centralized way to create kTokens with consistent initialization parameters.
 /// The factory follows best practices: (1) Deploys kToken implementation once for gas efficiency,
-/// (2) Uses ERC1967 proxy pattern for upgradeability, (3) Input validation to ensure all required
-/// parameters are non-zero, (4) Event emission for off-chain tracking of deployments, (5) Returns
-/// the deployed proxy address for immediate use. The factory is designed to be called by kRegistry
-/// during asset registration, ensuring all kTokens are created through a standardized process.
+/// (2) Uses a pre-deployed ERC1967Factory shared across the protocol to prevent frontrunning,
+/// (3) Input validation to ensure all required parameters are non-zero, (4) Event emission for
+/// off-chain tracking of deployments, (5) Returns the deployed proxy address for immediate use.
+/// The factory is designed to be called by kRegistry during asset registration, ensuring all
+/// kTokens are created through a standardized process. By using a pre-deployed factory instead
+/// of deploying a new one, we save gas and maintain consistency across the protocol.
 contract kTokenFactory is IkTokenFactory {
     /* //////////////////////////////////////////////////////////////
                                IMMUTABLE
@@ -35,19 +37,20 @@ contract kTokenFactory is IkTokenFactory {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Constructor for kTokenFactory
-    /// @dev Deploys the kToken implementation once and creates the proxy factory.
-    /// This approach saves gas by reusing the same implementation for all kTokens.
+    /// @dev Deploys the kToken implementation once and uses the provided proxy factory.
+    /// This approach saves gas by reusing the same implementation for all kTokens and
+    /// using a pre-deployed factory shared across the protocol.
     /// @param _registry The kRegistry address that will be authorized to deploy kTokens
-    constructor(address _registry) {
+    /// @param _proxyFactory The pre-deployed ERC1967Factory address for proxy deployments
+    constructor(address _registry, address _proxyFactory) {
         require(_registry != address(0), KTOKENFACTORY_ZERO_ADDRESS);
+        require(_proxyFactory != address(0), KTOKENFACTORY_ZERO_ADDRESS);
 
         registry = _registry;
+        proxyFactory = ERC1967Factory(_proxyFactory);
 
         // Deploy kToken implementation once (shared by all proxies)
         implementation = address(new kToken());
-
-        // Deploy ERC1967Factory for proxy deployments
-        proxyFactory = new ERC1967Factory();
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -71,28 +74,22 @@ contract kTokenFactory is IkTokenFactory {
     {
         _checkDeployer(msg.sender);
 
-        // Validate all addresses are non-zero
         require(_owner != address(0), KTOKENFACTORY_ZERO_ADDRESS);
         require(_admin != address(0), KTOKENFACTORY_ZERO_ADDRESS);
         require(_emergencyAdmin != address(0), KTOKENFACTORY_ZERO_ADDRESS);
         require(_minter != address(0), KTOKENFACTORY_ZERO_ADDRESS);
 
-        // Prepare initialization data for atomic deployment
         bytes memory initData =
             abi.encodeCall(kToken.initialize, (_owner, _admin, _emergencyAdmin, _minter, _name, _symbol, _decimals));
 
-        // Deploy proxy with implementation and call initialize atomically
-        // This prevents frontrunning - no one can call initialize before us
         address _kTokenAddress = proxyFactory.deployAndCall(
             implementation,
             msg.sender, // admin of the proxy (registry)
             initData
         );
 
-        // Validate deployment succeeded
         require(_kTokenAddress != address(0), KTOKENFACTORY_DEPLOYMENT_FAILED);
 
-        // Emit deployment event
         emit KTokenDeployed(_kTokenAddress, _owner, _admin, _emergencyAdmin, _minter, _name, _symbol, _decimals);
 
         return _kTokenAddress;

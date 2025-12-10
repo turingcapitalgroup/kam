@@ -52,8 +52,8 @@ contract DeployRegistryScript is Script, DeploymentManager {
 
         address registryProxy = factory.deployAndCall(address(registryImpl), msg.sender, initData);
 
-        // Deploy kTokenFactory with registry as deployer (registry will call deployKToken)
-        kTokenFactory tokenFactory = new kTokenFactory(registryProxy);
+        // Deploy kTokenFactory with registry and factory (registry will call deployKToken)
+        kTokenFactory tokenFactory = new kTokenFactory(registryProxy, address(factory));
 
         // Deploy AdapterGuardianModule (facet implementation)
         AdapterGuardianModule adapterGuardianModule = new AdapterGuardianModule();
