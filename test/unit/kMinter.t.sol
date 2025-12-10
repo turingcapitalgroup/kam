@@ -342,11 +342,21 @@ contract kMinterTest is DeploymentBaseTest {
                         UPGRADE TESTS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev ERC-1967 implementation slot
+    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
     function test_AuthorizeUpgrade_Sucess() public {
+        address oldImpl = address(uint160(uint256(vm.load(address(minter), IMPLEMENTATION_SLOT))));
         address newImpl = address(new kMinter());
+
+        assertFalse(oldImpl == newImpl);
 
         vm.prank(users.admin);
         minter.upgradeToAndCall(newImpl, "");
+
+        address currentImpl = address(uint160(uint256(vm.load(address(minter), IMPLEMENTATION_SLOT))));
+        assertEq(currentImpl, newImpl);
+        assertFalse(currentImpl == oldImpl);
     }
 
     function test_AuthorizeUpgrade_Require_Only_Admin() public {

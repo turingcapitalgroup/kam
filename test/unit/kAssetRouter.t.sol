@@ -864,6 +864,23 @@ contract kAssetRouterTest is DeploymentBaseTest {
                         UPGRADE FUNCTION TESTS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev ERC-1967 implementation slot
+    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    function test_AuthorizeUpgrade_Success() public {
+        address oldImpl = address(uint160(uint256(vm.load(address(assetRouter), IMPLEMENTATION_SLOT))));
+        address newImpl = address(new kAssetRouter());
+
+        assertFalse(oldImpl == newImpl);
+
+        vm.prank(users.admin);
+        assetRouter.upgradeToAndCall(newImpl, "");
+
+        address currentImpl = address(uint160(uint256(vm.load(address(assetRouter), IMPLEMENTATION_SLOT))));
+        assertEq(currentImpl, newImpl);
+        assertFalse(currentImpl == oldImpl);
+    }
+
     function test_AuthorizeUpgrade_OnlyAdmin() public {
         address newImpl = address(new kAssetRouter());
 
