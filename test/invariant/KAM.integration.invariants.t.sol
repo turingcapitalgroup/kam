@@ -64,4 +64,10 @@ contract IntegrationInvariants is SetUp {
         vaultHandlerAlpha.INVARIANT_F_SUPPLY();
         vaultHandlerBeta.INVARIANT_F_SUPPLY();
     }
+
+    function invariant_INTEGRATION_kStakingVaultSharePriceDelta() public view {
+        vaultHandlerDeltaNeutral.INVARIANT_G_SHARE_PRICE_DELTA();
+        vaultHandlerAlpha.INVARIANT_G_SHARE_PRICE_DELTA();
+        vaultHandlerBeta.INVARIANT_G_SHARE_PRICE_DELTA();
+    }
 }
