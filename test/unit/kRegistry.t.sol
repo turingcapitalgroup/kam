@@ -655,11 +655,21 @@ contract kRegistryTest is DeploymentBaseTest {
         assertEq(address(registry).balance, _amount);
     }
 
+    /// @dev ERC-1967 implementation slot
+    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
     function test_AuthorizeUpgrade_Success() public {
+        address oldImpl = address(uint160(uint256(vm.load(_registry, IMPLEMENTATION_SLOT))));
         address _newImpl = address(new kRegistry());
+
+        assertFalse(oldImpl == _newImpl);
 
         vm.prank(users.owner);
         registry.upgradeToAndCall(_newImpl, "");
+
+        address currentImpl = address(uint160(uint256(vm.load(_registry, IMPLEMENTATION_SLOT))));
+        assertEq(currentImpl, _newImpl);
+        assertFalse(currentImpl == oldImpl);
 
         assertEq(registry.owner(), users.owner);
         assertEq(registry.contractName(), "kRegistry");

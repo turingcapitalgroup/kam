@@ -55,4 +55,3 @@ interface IkTokenFactory {
         external
         returns (address);
 }
-

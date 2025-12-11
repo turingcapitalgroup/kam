@@ -8,6 +8,14 @@ import { console2 as console } from "forge-std/console2.sol";
 abstract contract DeploymentManager is Script {
     using stdJson for string;
 
+    /// @notice Controls whether deployment logs are printed. Set to false in tests.
+    bool public verbose = true;
+
+    /// @notice Set verbose mode for logging
+    function setVerbose(bool _verbose) public {
+        verbose = _verbose;
+    }
+
     struct NetworkConfig {
         string network;
         uint256 chainId;
@@ -662,7 +670,8 @@ abstract contract DeploymentManager is Script {
         require(existing.contracts.betaVaultAdapter != address(0), "betaVaultAdapter not deployed");
     }
 
-    function logConfig(NetworkConfig memory config) internal pure {
+    function logConfig(NetworkConfig memory config) internal view {
+        if (!verbose) return;
         console.log("=== DEPLOYMENT CONFIGURATION ===");
         console.log("Network:", config.network);
         console.log("Chain ID:", config.chainId);
@@ -678,5 +687,39 @@ abstract contract DeploymentManager is Script {
         console.log("Settlement Cooldown:", config.assetRouter.settlementCooldown);
         console.log("Max Allowed Delta:", config.assetRouter.maxAllowedDelta);
         console.log("===============================");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            LOGGING HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Log a string message (only if verbose)
+    function _log(string memory message) internal view {
+        if (verbose) console.log(message);
+    }
+
+    /// @dev Log a string message with a string value (only if verbose)
+    function _log(string memory message, string memory value) internal view {
+        if (verbose) console.log(message, value);
+    }
+
+    /// @dev Log a string message with an address value (only if verbose)
+    function _log(string memory message, address value) internal view {
+        if (verbose) console.log(message, value);
+    }
+
+    /// @dev Log a string message with a uint256 value (only if verbose)
+    function _log(string memory message, uint256 value) internal view {
+        if (verbose) console.log(message, value);
+    }
+
+    /// @dev Log two uint256 values with a message (only if verbose)
+    function _log(uint256 value1, string memory message) internal view {
+        if (verbose) console.log(value1, message);
+    }
+
+    /// @dev Log a string message with two string values (only if verbose)
+    function _log(string memory message, string memory value1, string memory value2) internal view {
+        if (verbose) console.log(message, value1, value2);
     }
 }

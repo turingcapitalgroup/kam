@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { Script } from "forge-std/Script.sol";
 
-import { console2 as console } from "forge-std/console2.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { kToken } from "kam/src/kToken.sol";
@@ -93,35 +92,35 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         require(minterAdapterUSDCAddr != address(0), "kMinterAdapterUSDC address required");
         require(minterAdapterWBTCAddr != address(0), "kMinterAdapterWBTC address required");
 
-        console.log("=== EXECUTING PROTOCOL CONFIGURATION ===");
-        console.log("Network:", config.network);
-        console.log("");
+        _log("=== EXECUTING PROTOCOL CONFIGURATION ===");
+        _log("Network:", config.network);
+        _log("");
 
         vm.startBroadcast(config.roles.admin);
 
         kRegistry registry = kRegistry(payable(registryAddr));
 
-        console.log("1. Registering vaults with kRegistry...");
+        _log("1. Registering vaults with kRegistry...");
 
         // Register kMinter as MINTER vault type for both assets
         registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, config.assets.USDC);
-        console.log("   - Registered kMinter as MINTER vault for USDC");
+        _log("   - Registered kMinter as MINTER vault for USDC");
         registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, config.assets.WBTC);
-        console.log("   - Registered kMinter as MINTER vault for WBTC");
+        _log("   - Registered kMinter as MINTER vault for WBTC");
 
         // Register DN Vaults
         registry.registerVault(dnVaultUSDCAddr, IRegistry.VaultType.DN, config.assets.USDC);
-        console.log("   - Registered DN Vault USDC as DN vault for USDC");
+        _log("   - Registered DN Vault USDC as DN vault for USDC");
         registry.registerVault(dnVaultWBTCAddr, IRegistry.VaultType.DN, config.assets.WBTC);
-        console.log("   - Registered DN Vault WBTC as DN vault for WBTC");
+        _log("   - Registered DN Vault WBTC as DN vault for WBTC");
 
         // Register Alpha Vault as ALPHA vault type
         registry.registerVault(alphaVaultAddr, IRegistry.VaultType.ALPHA, config.assets.USDC);
-        console.log("   - Registered Alpha Vault as ALPHA vault for USDC");
+        _log("   - Registered Alpha Vault as ALPHA vault for USDC");
 
         // Register Beta Vault as BETA vault type
         registry.registerVault(betaVaultAddr, IRegistry.VaultType.BETA, config.assets.USDC);
-        console.log("   - Registered Beta Vault as BETA vault for USDC");
+        _log("   - Registered Beta Vault as BETA vault for USDC");
 
         // Set asset batch limits
         registry.setAssetBatchLimits(
@@ -137,63 +136,63 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
             betaVaultAddr, config.betaVault.maxDepositPerBatch, config.betaVault.maxWithdrawPerBatch
         );
 
-        console.log("");
-        console.log("2. Setting hurdle rates for assets...");
+        _log("");
+        _log("2. Setting hurdle rates for assets...");
 
         // Set hurdle rates from config
         registry.setHurdleRate(config.assets.USDC, config.registry.hurdleRate.USDC);
-        console.log("   - Set hurdle rate for USDC:", config.registry.hurdleRate.USDC);
+        _log("   - Set hurdle rate for USDC:", config.registry.hurdleRate.USDC);
         registry.setHurdleRate(config.assets.WBTC, config.registry.hurdleRate.WBTC);
-        console.log("   - Set hurdle rate for WBTC:", config.registry.hurdleRate.WBTC);
+        _log("   - Set hurdle rate for WBTC:", config.registry.hurdleRate.WBTC);
 
-        console.log("");
-        console.log("3. Registering adapters with vaults...");
+        _log("");
+        _log("3. Registering adapters with vaults...");
 
         // Register adapters for kMinter
         registry.registerAdapter(minterAddr, config.assets.USDC, minterAdapterUSDCAddr);
-        console.log("   - Registered kMinter USDC Adapter for kMinter");
+        _log("   - Registered kMinter USDC Adapter for kMinter");
         registry.registerAdapter(minterAddr, config.assets.WBTC, minterAdapterWBTCAddr);
-        console.log("   - Registered kMinter WBTC Adapter for kMinter");
+        _log("   - Registered kMinter WBTC Adapter for kMinter");
 
         // Register adapters for DN vaults
         registry.registerAdapter(dnVaultUSDCAddr, config.assets.USDC, dnVaultAdapterUSDCAddr);
-        console.log("   - Registered DN Vault USDC Adapter for DN Vault USDC");
+        _log("   - Registered DN Vault USDC Adapter for DN Vault USDC");
         registry.registerAdapter(dnVaultWBTCAddr, config.assets.WBTC, dnVaultAdapterWBTCAddr);
-        console.log("   - Registered DN Vault WBTC Adapter for DN Vault WBTC");
+        _log("   - Registered DN Vault WBTC Adapter for DN Vault WBTC");
 
         // Register adapters for Alpha and Beta vaults
         registry.registerAdapter(alphaVaultAddr, config.assets.USDC, alphaVaultAdapterAddr);
-        console.log("   - Registered Alpha Vault Adapter for Alpha Vault");
+        _log("   - Registered Alpha Vault Adapter for Alpha Vault");
         registry.registerAdapter(betaVaultAddr, config.assets.USDC, betaVaultAdapterAddr);
-        console.log("   - Registered Beta Vault Adapter for Beta Vault");
+        _log("   - Registered Beta Vault Adapter for Beta Vault");
 
-        console.log("");
-        console.log("4. Granting roles...");
+        _log("");
+        _log("4. Granting roles...");
 
         // Grant MINTER_ROLE to kMinter and kAssetRouter on kTokens
         kToken kUSD = kToken(payable(kUSDAddr));
         kUSD.grantMinterRole(minterAddr);
         kUSD.grantMinterRole(assetRouterAddr);
-        console.log("   - Granted MINTER_ROLE on kUSD to kMinter and kAssetRouter");
+        _log("   - Granted MINTER_ROLE on kUSD to kMinter and kAssetRouter");
 
         kToken kBTC = kToken(payable(kBTCAddr));
         kBTC.grantMinterRole(minterAddr);
         kBTC.grantMinterRole(assetRouterAddr);
-        console.log("   - Granted MINTER_ROLE on kBTC to kMinter and kAssetRouter");
+        _log("   - Granted MINTER_ROLE on kBTC to kMinter and kAssetRouter");
 
         // Grant INSTITUTION_ROLE to institution address
         registry.grantInstitutionRole(config.roles.institution);
-        console.log("   - Granted INSTITUTION_ROLE to institution address");
+        _log("   - Granted INSTITUTION_ROLE to institution address");
 
         vm.stopBroadcast();
 
-        console.log("");
-        console.log("=======================================");
-        console.log("Protocol configuration complete!");
-        console.log("All vaults registered in kRegistry");
-        console.log("Hurdle rates set for all assets");
-        console.log("All adapters registered");
-        console.log("All roles granted");
+        _log("");
+        _log("=======================================");
+        _log("Protocol configuration complete!");
+        _log("All vaults registered in kRegistry");
+        _log("Hurdle rates set for all assets");
+        _log("All adapters registered");
+        _log("All roles granted");
     }
 
     /// @notice Convenience wrapper for real deployments (reads all addresses from JSON)

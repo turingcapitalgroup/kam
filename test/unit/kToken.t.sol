@@ -14,6 +14,7 @@ import {
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import { ERC3009 } from "kam/src/base/ERC3009.sol";
+import { kToken } from "kam/src/kToken.sol";
 import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
 import { ERC20 } from "kam/src/vendor/solady/tokens/ERC20.sol";
 import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
@@ -686,5 +687,50 @@ contract kTokenTest is DeploymentBaseTest {
         vm.prank(to);
         vm.expectRevert(ERC3009.InvalidSignature.selector);
         kUSD.receiveWithAuthorization(signer, to, value, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        UPGRADE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev ERC-1967 implementation slot
+    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    function test_AuthorizeUpgrade_Success() public {
+        address oldImpl = address(uint160(uint256(vm.load(address(kUSD), IMPLEMENTATION_SLOT))));
+        address newImpl = address(new kToken());
+
+        assertFalse(oldImpl == newImpl);
+
+        vm.prank(users.owner);
+        kUSD.upgradeToAndCall(newImpl, "");
+
+        address currentImpl = address(uint160(uint256(vm.load(address(kUSD), IMPLEMENTATION_SLOT))));
+        assertEq(currentImpl, newImpl);
+        assertFalse(currentImpl == oldImpl);
+    }
+
+    function test_AuthorizeUpgrade_Require_Only_Owner() public {
+        address newImpl = address(new kToken());
+
+        vm.prank(users.alice);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        kUSD.upgradeToAndCall(newImpl, "");
+
+        // Note: users.admin is NOT the owner, so this should revert
+        // The kToken owner is users.owner, not users.admin
+        vm.prank(users.bob);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        kUSD.upgradeToAndCall(newImpl, "");
+
+        vm.prank(_minter);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        kUSD.upgradeToAndCall(newImpl, "");
+    }
+
+    function test_AuthorizeUpgrade_Require_Implementation_Not_Zero_Address() public {
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(KTOKEN_ZERO_ADDRESS));
+        kUSD.upgradeToAndCall(ZERO_ADDRESS, "");
     }
 }
