@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
@@ -72,8 +71,8 @@ contract DeployVaultsScript is Script, DeploymentManager {
         require(kUSDAddr != address(0), "kUSD address required");
         require(kBTCAddr != address(0), "kBTC address required");
 
-        console.log("=== DEPLOYING VAULTS ===");
-        console.log("Network:", config.network);
+        _log("=== DEPLOYING VAULTS ===");
+        _log("Network:", config.network);
 
         vm.startBroadcast(config.roles.admin);
 
@@ -87,8 +86,8 @@ contract DeployVaultsScript is Script, DeploymentManager {
         address alphaVault = _deployAlphaVault();
         address betaVault = _deployBetaVault();
 
-        console.log("");
-        console.log("=== SETTING BATCH LIMITS IN REGISTRY ===");
+        _log("");
+        _log("=== SETTING BATCH LIMITS IN REGISTRY ===");
 
         // Get registry reference
         kRegistry registry = kRegistry(payable(registryAddr));
@@ -96,36 +95,36 @@ contract DeployVaultsScript is Script, DeploymentManager {
         registry;
 
         // Set batch limits for DN Vault USDC
-        console.log("Setting batch limits for DN Vault USDC:");
-        console.log("  Max Deposit:", config.dnVaultUSDC.maxDepositPerBatch);
-        console.log("  Max Withdraw:", config.dnVaultUSDC.maxWithdrawPerBatch);
+        _log("Setting batch limits for DN Vault USDC:");
+        _log("  Max Deposit:", config.dnVaultUSDC.maxDepositPerBatch);
+        _log("  Max Withdraw:", config.dnVaultUSDC.maxWithdrawPerBatch);
 
         // Set batch limits for DN Vault WBTC
-        console.log("Setting batch limits for DN Vault WBTC:");
-        console.log("  Max Deposit:", config.dnVaultWBTC.maxDepositPerBatch);
-        console.log("  Max Withdraw:", config.dnVaultWBTC.maxWithdrawPerBatch);
+        _log("Setting batch limits for DN Vault WBTC:");
+        _log("  Max Deposit:", config.dnVaultWBTC.maxDepositPerBatch);
+        _log("  Max Withdraw:", config.dnVaultWBTC.maxWithdrawPerBatch);
 
         // Set batch limits for Alpha Vault
-        console.log("Setting batch limits for Alpha Vault:");
-        console.log("  Max Deposit:", config.alphaVault.maxDepositPerBatch);
-        console.log("  Max Withdraw:", config.alphaVault.maxWithdrawPerBatch);
+        _log("Setting batch limits for Alpha Vault:");
+        _log("  Max Deposit:", config.alphaVault.maxDepositPerBatch);
+        _log("  Max Withdraw:", config.alphaVault.maxWithdrawPerBatch);
 
         // Set batch limits for Beta Vault
-        console.log("Setting batch limits for Beta Vault:");
-        console.log("  Max Deposit:", config.betaVault.maxDepositPerBatch);
-        console.log("  Max Withdraw:", config.betaVault.maxWithdrawPerBatch);
+        _log("Setting batch limits for Beta Vault:");
+        _log("  Max Deposit:", config.betaVault.maxDepositPerBatch);
+        _log("  Max Withdraw:", config.betaVault.maxWithdrawPerBatch);
 
         vm.stopBroadcast();
 
-        console.log("");
-        console.log("=== DEPLOYMENT COMPLETE ===");
-        console.log("kStakingVault implementation deployed at:", stakingVaultImpl);
-        console.log("DN Vault USDC proxy deployed at:", dnVaultUSDC);
-        console.log("DN Vault WBTC proxy deployed at:", dnVaultWBTC);
-        console.log("Alpha Vault proxy deployed at:", alphaVault);
-        console.log("Beta Vault proxy deployed at:", betaVault);
-        console.log("Network:", config.network);
-        console.log("");
+        _log("");
+        _log("=== DEPLOYMENT COMPLETE ===");
+        _log("kStakingVault implementation deployed at:", stakingVaultImpl);
+        _log("DN Vault USDC proxy deployed at:", dnVaultUSDC);
+        _log("DN Vault WBTC proxy deployed at:", dnVaultWBTC);
+        _log("Alpha Vault proxy deployed at:", alphaVault);
+        _log("Beta Vault proxy deployed at:", betaVault);
+        _log("Network:", config.network);
+        _log("");
 
         // Return deployed addresses
         deployment = VaultsDeployment({
@@ -154,10 +153,10 @@ contract DeployVaultsScript is Script, DeploymentManager {
     }
 
     function _deployDNVaultUSDC() internal returns (address) {
-        console.log("Deploying DN Vault USDC:");
-        console.log("  Name:", config.dnVaultUSDC.name);
-        console.log("  Symbol:", config.dnVaultUSDC.symbol);
-        console.log("  Max Total Assets:", config.dnVaultUSDC.maxTotalAssets);
+        _log("Deploying DN Vault USDC:");
+        _log("  Name:", config.dnVaultUSDC.name);
+        _log("  Symbol:", config.dnVaultUSDC.symbol);
+        _log("  Max Total Assets:", config.dnVaultUSDC.maxTotalAssets);
 
         return factory.deployAndCall(
             stakingVaultImpl,
@@ -180,10 +179,10 @@ contract DeployVaultsScript is Script, DeploymentManager {
     }
 
     function _deployDNVaultWBTC() internal returns (address) {
-        console.log("Deploying DN Vault WBTC:");
-        console.log("  Name:", config.dnVaultWBTC.name);
-        console.log("  Symbol:", config.dnVaultWBTC.symbol);
-        console.log("  Max Total Assets:", config.dnVaultWBTC.maxTotalAssets);
+        _log("Deploying DN Vault WBTC:");
+        _log("  Name:", config.dnVaultWBTC.name);
+        _log("  Symbol:", config.dnVaultWBTC.symbol);
+        _log("  Max Total Assets:", config.dnVaultWBTC.maxTotalAssets);
 
         return factory.deployAndCall(
             stakingVaultImpl,
@@ -206,10 +205,10 @@ contract DeployVaultsScript is Script, DeploymentManager {
     }
 
     function _deployAlphaVault() internal returns (address) {
-        console.log("Deploying Alpha Vault:");
-        console.log("  Name:", config.alphaVault.name);
-        console.log("  Symbol:", config.alphaVault.symbol);
-        console.log("  Max Total Assets:", config.alphaVault.maxTotalAssets);
+        _log("Deploying Alpha Vault:");
+        _log("  Name:", config.alphaVault.name);
+        _log("  Symbol:", config.alphaVault.symbol);
+        _log("  Max Total Assets:", config.alphaVault.maxTotalAssets);
 
         return factory.deployAndCall(
             stakingVaultImpl,
@@ -232,10 +231,10 @@ contract DeployVaultsScript is Script, DeploymentManager {
     }
 
     function _deployBetaVault() internal returns (address) {
-        console.log("Deploying Beta Vault:");
-        console.log("  Name:", config.betaVault.name);
-        console.log("  Symbol:", config.betaVault.symbol);
-        console.log("  Max Total Assets:", config.betaVault.maxTotalAssets);
+        _log("Deploying Beta Vault:");
+        _log("  Name:", config.betaVault.name);
+        _log("  Symbol:", config.betaVault.symbol);
+        _log("  Max Total Assets:", config.betaVault.maxTotalAssets);
 
         return factory.deployAndCall(
             stakingVaultImpl,

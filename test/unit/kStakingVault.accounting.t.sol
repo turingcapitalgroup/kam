@@ -8,8 +8,14 @@ import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMath
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
+import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
 
-import { KSTAKINGVAULT_INSUFFICIENT_BALANCE, KSTAKINGVAULT_ZERO_AMOUNT } from "kam/src/errors/Errors.sol";
+import {
+    KSTAKINGVAULT_INSUFFICIENT_BALANCE,
+    KSTAKINGVAULT_ZERO_ADDRESS,
+    KSTAKINGVAULT_ZERO_AMOUNT
+} from "kam/src/errors/Errors.sol";
 
 contract kStakingVaultAccountingTest is BaseVaultTest {
     using OptimizedFixedPointMathLib for uint256;
@@ -389,5 +395,48 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         // Edge case: what happens with zero total supply
         // Should maintain 1:1 ratio (1e6 for 6 decimals)
         assertEq(vault.netSharePrice(), 1e6);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        UPGRADE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev ERC-1967 implementation slot
+    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    function test_AuthorizeUpgrade_Success() public {
+        address vaultAddr = address(vault);
+        address oldImpl = address(uint160(uint256(vm.load(vaultAddr, IMPLEMENTATION_SLOT))));
+        address newImpl = address(new kStakingVault());
+
+        assertFalse(oldImpl == newImpl);
+
+        vm.prank(users.admin);
+        kStakingVault(payable(vaultAddr)).upgradeToAndCall(newImpl, "");
+
+        address currentImpl = address(uint160(uint256(vm.load(vaultAddr, IMPLEMENTATION_SLOT))));
+        assertEq(currentImpl, newImpl);
+        assertFalse(currentImpl == oldImpl);
+    }
+
+    function test_AuthorizeUpgrade_Require_Only_Owner() public {
+        address vaultAddr = address(vault);
+        address newImpl = address(new kStakingVault());
+
+        vm.prank(users.alice);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        kStakingVault(payable(vaultAddr)).upgradeToAndCall(newImpl, "");
+
+        vm.prank(users.relayer);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        kStakingVault(payable(vaultAddr)).upgradeToAndCall(newImpl, "");
+    }
+
+    function test_AuthorizeUpgrade_Require_Implementation_Not_Zero_Address() public {
+        address vaultAddr = address(vault);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KSTAKINGVAULT_ZERO_ADDRESS));
+        kStakingVault(payable(vaultAddr)).upgradeToAndCall(address(0), "");
     }
 }

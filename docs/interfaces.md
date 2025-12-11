@@ -255,7 +255,7 @@ Minimal proxy contract that holds and distributes settled assets for batch redem
 
 ### IkToken
 
-ERC20 token representing wrapped underlying assets in the KAM protocol. Implements role-restricted minting and burning with emergency pause capabilities and comprehensive role management.
+ERC20 token representing wrapped underlying assets in the KAM protocol. Implements role-restricted minting and burning with emergency pause capabilities and comprehensive role management. Deployed as UUPS upgradeable proxies with ERC-7201 namespaced storage and atomic initialization to prevent frontrunning.
 
 **Token Operations**
 

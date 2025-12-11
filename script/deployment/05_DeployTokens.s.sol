@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
@@ -30,20 +29,20 @@ contract DeployTokensScript is Script, DeploymentManager {
         // Validate required contracts
         require(registryAddr != address(0), "kRegistry address required");
 
-        console.log("=== KTOKEN DEPLOYMENT ===");
-        console.log("Network:", config.network);
+        _log("=== KTOKEN DEPLOYMENT ===");
+        _log("Network:", config.network);
 
         vm.startBroadcast(config.roles.admin);
 
         kRegistry registry = kRegistry(payable(registryAddr));
 
         // Deploy kUSD using config values
-        console.log("Deploying kUSD with config:");
-        console.log("  Name:", config.kUSD.name);
-        console.log("  Symbol:", config.kUSD.symbol);
-        console.log("  Decimals:", config.kUSD.decimals);
-        console.log("  Max Mint Per Batch:", config.kUSD.maxMintPerBatch);
-        console.log("  Max Redeem Per Batch:", config.kUSD.maxRedeemPerBatch);
+        _log("Deploying kUSD with config:");
+        _log("  Name:", config.kUSD.name);
+        _log("  Symbol:", config.kUSD.symbol);
+        _log("  Decimals:", config.kUSD.decimals);
+        _log("  Max Mint Per Batch:", config.kUSD.maxMintPerBatch);
+        _log("  Max Redeem Per Batch:", config.kUSD.maxRedeemPerBatch);
 
         address kUSDAddress = registry.registerAsset(
             config.kUSD.name,
@@ -55,12 +54,12 @@ contract DeployTokensScript is Script, DeploymentManager {
         );
 
         // Deploy kBTC using config values
-        console.log("Deploying kBTC with config:");
-        console.log("  Name:", config.kBTC.name);
-        console.log("  Symbol:", config.kBTC.symbol);
-        console.log("  Decimals:", config.kBTC.decimals);
-        console.log("  Max Mint Per Batch:", config.kBTC.maxMintPerBatch);
-        console.log("  Max Redeem Per Batch:", config.kBTC.maxRedeemPerBatch);
+        _log("Deploying kBTC with config:");
+        _log("  Name:", config.kBTC.name);
+        _log("  Symbol:", config.kBTC.symbol);
+        _log("  Decimals:", config.kBTC.decimals);
+        _log("  Max Mint Per Batch:", config.kBTC.maxMintPerBatch);
+        _log("  Max Redeem Per Batch:", config.kBTC.maxRedeemPerBatch);
 
         address kBTCAddress = registry.registerAsset(
             config.kBTC.name,
@@ -73,12 +72,12 @@ contract DeployTokensScript is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        console.log("=== DEPLOYMENT COMPLETE ===");
-        console.log("kUSD deployed at:", kUSDAddress);
-        console.log("kBTC deployed at:", kBTCAddress);
-        console.log("Admin address:", config.roles.admin);
-        console.log("EmergencyAdmin address:", config.roles.emergencyAdmin);
-        console.log("Registry address:", registryAddr);
+        _log("=== DEPLOYMENT COMPLETE ===");
+        _log("kUSD deployed at:", kUSDAddress);
+        _log("kBTC deployed at:", kBTCAddress);
+        _log("Admin address:", config.roles.admin);
+        _log("EmergencyAdmin address:", config.roles.emergencyAdmin);
+        _log("Registry address:", registryAddr);
 
         // Return deployed addresses
         deployment = TokenDeployment({ kUSD: kUSDAddress, kBTC: kBTCAddress });

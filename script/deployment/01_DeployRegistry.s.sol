@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { console2 as console } from "forge-std/console2.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
@@ -52,8 +51,8 @@ contract DeployRegistryScript is Script, DeploymentManager {
 
         address registryProxy = factory.deployAndCall(address(registryImpl), msg.sender, initData);
 
-        // Deploy kTokenFactory with registry as deployer (registry will call deployKToken)
-        kTokenFactory tokenFactory = new kTokenFactory(registryProxy);
+        // Deploy kTokenFactory with registry and factory (registry will call deployKToken)
+        kTokenFactory tokenFactory = new kTokenFactory(registryProxy, address(factory));
 
         // Deploy AdapterGuardianModule (facet implementation)
         AdapterGuardianModule adapterGuardianModule = new AdapterGuardianModule();
@@ -65,14 +64,14 @@ contract DeployRegistryScript is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        console.log("=== DEPLOYMENT COMPLETE ===");
-        console.log("ERC1967Factory deployed at:", address(factory));
-        console.log("kRegistry implementation deployed at:", address(registryImpl));
-        console.log("kRegistry proxy deployed at:", registryProxy);
-        console.log("AdapterGuardianModule deployed at:", address(adapterGuardianModule));
-        console.log("kTokenFactory deployed at:", address(tokenFactory));
-        console.log("Network:", config.network);
-        console.log("Chain ID:", config.chainId);
+        _log("=== DEPLOYMENT COMPLETE ===");
+        _log("ERC1967Factory deployed at:", address(factory));
+        _log("kRegistry implementation deployed at:", address(registryImpl));
+        _log("kRegistry proxy deployed at:", registryProxy);
+        _log("AdapterGuardianModule deployed at:", address(adapterGuardianModule));
+        _log("kTokenFactory deployed at:", address(tokenFactory));
+        _log("Network:", config.network);
+        _log("Chain ID:", config.chainId);
 
         deployment = RegistryDeployment({
             factory: address(factory),

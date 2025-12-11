@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
+import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+
 import {
     KTOKENFACTORY_DEPLOYMENT_FAILED,
     KTOKENFACTORY_WRONG_ROLE,
@@ -11,29 +13,44 @@ import { IkTokenFactory } from "kam/src/interfaces/IkTokenFactory.sol";
 import { kToken } from "kam/src/kToken.sol";
 
 /// @title kTokenFactory
-/// @notice Factory contract for deploying kToken instances
+/// @notice Factory contract for deploying upgradeable kToken instances using UUPS proxy pattern
 /// @dev This factory contract handles the deployment of kToken contracts for the KAM protocol.
 /// It provides a centralized way to create kTokens with consistent initialization parameters.
-/// The factory follows best practices: (1) Simple deployment pattern without CREATE2 for flexibility,
-/// (2) Input validation to ensure all required parameters are non-zero, (3) Event emission for
-/// off-chain tracking of deployments, (4) Returns the deployed contract address for immediate use.
-/// The factory is designed to be called by kRegistry during asset registration, ensuring all kTokens
-/// are created through a standardized process.
+/// The factory follows best practices: (1) Deploys kToken implementation once for gas efficiency,
+/// (2) Uses a pre-deployed ERC1967Factory shared across the protocol to prevent frontrunning,
+/// (3) Input validation to ensure all required parameters are non-zero, (4) Event emission for
+/// off-chain tracking of deployments, (5) Returns the deployed proxy address for immediate use.
+/// The factory is designed to be called by kRegistry during asset registration, ensuring all
+/// kTokens are created through a standardized process. By using a pre-deployed factory instead
+/// of deploying a new one, we save gas and maintain consistency across the protocol.
 contract kTokenFactory is IkTokenFactory {
     /* //////////////////////////////////////////////////////////////
                                IMMUTABLE
     //////////////////////////////////////////////////////////////*/
 
-    address immutable registry;
+    address public immutable registry;
+    address public immutable implementation;
+    ERC1967Factory public immutable proxyFactory;
 
     /* //////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Constructor for kTokenFactory
-    /// @dev No initialization required as this is a simple factory contract
-    constructor(address _registry) {
+    /// @dev Deploys the kToken implementation once and uses the provided proxy factory.
+    /// This approach saves gas by reusing the same implementation for all kTokens and
+    /// using a pre-deployed factory shared across the protocol.
+    /// @param _registry The kRegistry address that will be authorized to deploy kTokens
+    /// @param _proxyFactory The pre-deployed ERC1967Factory address for proxy deployments
+    constructor(address _registry, address _proxyFactory) {
+        require(_registry != address(0), KTOKENFACTORY_ZERO_ADDRESS);
+        require(_proxyFactory != address(0), KTOKENFACTORY_ZERO_ADDRESS);
+
         registry = _registry;
+        proxyFactory = ERC1967Factory(_proxyFactory);
+
+        // Deploy kToken implementation once (shared by all proxies)
+        implementation = address(new kToken());
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -41,6 +58,8 @@ contract kTokenFactory is IkTokenFactory {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IkTokenFactory
+    /// @dev Uses ERC1967Factory.deployAndCall to atomically deploy proxy and initialize it,
+    /// preventing frontrunning attacks where an attacker could call initialize before the legitimate deployer.
     function deployKToken(
         address _owner,
         address _admin,
@@ -55,21 +74,22 @@ contract kTokenFactory is IkTokenFactory {
     {
         _checkDeployer(msg.sender);
 
-        // Validate all addresses are non-zero
         require(_owner != address(0), KTOKENFACTORY_ZERO_ADDRESS);
         require(_admin != address(0), KTOKENFACTORY_ZERO_ADDRESS);
         require(_emergencyAdmin != address(0), KTOKENFACTORY_ZERO_ADDRESS);
         require(_minter != address(0), KTOKENFACTORY_ZERO_ADDRESS);
 
-        // Deploy new kToken contract
-        kToken _kToken = new kToken(_owner, _admin, _emergencyAdmin, _minter, _name, _symbol, _decimals);
+        bytes memory initData =
+            abi.encodeCall(kToken.initialize, (_owner, _admin, _emergencyAdmin, _minter, _name, _symbol, _decimals));
 
-        address _kTokenAddress = address(_kToken);
+        address _kTokenAddress = proxyFactory.deployAndCall(
+            implementation,
+            msg.sender, // admin of the proxy (registry)
+            initData
+        );
 
-        // Validate deployment succeeded
         require(_kTokenAddress != address(0), KTOKENFACTORY_DEPLOYMENT_FAILED);
 
-        // Emit deployment event
         emit KTokenDeployed(_kTokenAddress, _owner, _admin, _emergencyAdmin, _minter, _name, _symbol, _decimals);
 
         return _kTokenAddress;

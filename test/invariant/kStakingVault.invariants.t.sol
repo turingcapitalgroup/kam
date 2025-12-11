@@ -34,4 +34,8 @@ contract kStakingVaultInvariants is SetUp {
     function invariant_kStakingVaultSupply() public view {
         vaultHandlerAlpha.INVARIANT_F_SUPPLY();
     }
+
+    function invariant_kStakingVaultSharePriceDelta() public view {
+        vaultHandlerAlpha.INVARIANT_G_SHARE_PRICE_DELTA();
+    }
 }
