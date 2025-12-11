@@ -3,7 +3,12 @@ pragma solidity ^0.8.4;
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 
+/// @title ISettleBatch
+/// @notice Interface for contracts that implement batch settlement functionality.
+/// @dev Used by kAssetRouter to settle batches across different vault types.
 interface ISettleBatch {
+    /// @notice Marks a batch as settled after yield distribution and enables user claiming.
+    /// @param _batchId The batch identifier to mark as settled.
     function settleBatch(bytes32 _batchId) external;
 }
 
@@ -93,7 +98,7 @@ interface IkAssetRouter is IVersioned {
     /// @param targetVault The vault receiving assets (gaining virtual balance)
     /// @param asset The underlying asset address being transferred
     /// @param amount The quantity of assets being transferred between vaults
-    event AssetsTransfered(
+    event AssetsTransferred(
         address indexed sourceVault, address indexed targetVault, address indexed asset, uint256 amount
     );
     /// @notice Emitted when shares are requested for push operations in kStakingVault flows
