@@ -61,7 +61,8 @@
          ▼
 ┌─────────────────┐
 │Notify Router    │
-│kAssetTransfer() │
+│kSharesRequest   │
+│Pull()           │
 └────────┬────────┘
          │
          ▼
@@ -516,11 +517,11 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │  │                 │                          │                 │                               │
 │  └─────────────────┘                          └─────────┬───────┘                               │
 │                                                         │                                       │
-│                    Virtual transfer via kAssetRouter    │                                       │
+│                    kSharesRequestPull() via kAssetRouter│                                       │
 │                                                         ▼                                       │
 │                                               ┌─────────────────┐                               │
-│                                               │From kMinter     │                               │
-│                                               │to Vault         │                               │
+│                                               │Virtual transfer │                               │
+│                                               │kMinter → Vault  │                               │
 │                                               └─────────┬───────┘                               │
 │                                                         │                                       │
 │                      After Settlement                   ▼                                       │
@@ -531,9 +532,9 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │                                               └─────────────────┘                               │
 │                                                                                                 │
 │  UNSTAKING FLOW:                                                                                │
-│  ┌─────────────────┐    Track shares          ┌─────────────────┐                               │
-│  │User requests    │─────────────────--───--─▶│   kAssetRouter  │                               │
-│  │unstaking        │                          │                 │                               │
+│  ┌─────────────────┐    kSharesRequestPush()  ┌─────────────────┐                               │
+│  │User requests    │─────────────────────────▶│   kAssetRouter  │                               │
+│  │unstaking        │    (via vault)           │                 │                               │
 │  └─────────────────┘                          └─────────────────┘                               │
 │                                                         │                                       │
 │                        Settlement yield                 ▼                                       │

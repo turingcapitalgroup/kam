@@ -68,7 +68,7 @@ interface IVault is IVaultBatch, IVaultClaim, IVaultFees {
     /// @notice Emitted when fees are charged to the vault
     /// @param managementFees Amount of management fees collected
     /// @param performanceFees Amount of performance fees collected
-    event FeesAssesed(uint256 managementFees, uint256 performanceFees);
+    event FeesAssessed(uint256 managementFees, uint256 performanceFees);
 
     /// @notice Emitted when management fees are charged
     /// @param timestamp Timestamp of the fee charge

@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
 
+/// @title ERC3009
 /// @notice EIP-3009 implementation for meta-transaction token transfers.
 /// @dev This contract extends an ERC20 token to support gasless transfers via signed authorizations.
 ///

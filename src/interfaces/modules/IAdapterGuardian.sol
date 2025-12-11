@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-// ParametersChecker Errors
+/// @dev ParametersChecker Errors - Custom errors for parameter validation in adapter calls.
 error ParametersCheckerZeroAddress();
 error ParametersCheckerZeroAmount();
 error ParametersCheckerInvalidToken();
@@ -17,11 +17,21 @@ error ParametersCheckerInvalidAmount();
 error ParametersCheckerInvalidBlockAmount();
 error ParametersCheckerInvalidFrom();
 
+/// @title IParametersChecker
+/// @notice Interface for parameter validation contracts used in adapter call authorization.
+/// @dev Implementations validate call parameters to ensure adapter operations are safe and authorized.
 interface IParametersChecker {
+    /// @notice Validates and authorizes an adapter call with specific parameters.
+    /// @param adapter The adapter address making the call.
+    /// @param target The target contract address.
+    /// @param selector The function selector being called.
+    /// @param params The encoded function parameters.
     function authorizeAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params) external;
 }
 
 /// @title IAdapterGuardian
+/// @notice Interface for managing adapter permissions and security controls.
+/// @dev Controls which functions adapters can call on target contracts with optional parameter validation.
 interface IAdapterGuardian {
     /* //////////////////////////////////////////////////////////////
                               EVENTS

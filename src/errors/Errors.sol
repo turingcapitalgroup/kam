@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
-/// @dev All error codes use contract-specific prefixes for easier debugging:
+/// @dev KAM Protocol Error Codes - Centralized error code constants for the KAM protocol.
+/// All error codes use contract-specific prefixes for easier debugging:
 ///      - A*: kAssetRouter errors
 ///      - BA*: BaseAdapter errors
 ///      - BV*: BaseVault errors

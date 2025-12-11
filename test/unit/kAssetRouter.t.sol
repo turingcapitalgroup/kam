@@ -230,7 +230,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(address(alphaVault));
         vm.expectEmit(true, true, true, true);
-        emit IkAssetRouter.AssetsTransfered(address(alphaVault), address(betaVault), USDC, _amount);
+        emit IkAssetRouter.AssetsTransferred(address(alphaVault), address(betaVault), USDC, _amount);
 
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
 

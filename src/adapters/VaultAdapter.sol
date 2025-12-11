@@ -20,6 +20,9 @@ import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 /// @title VaultAdapter
+/// @notice Protocol adapter enabling secure interaction with external DeFi protocols for yield generation.
+/// @dev Extends SmartAdapterAccount with KAM-specific functionality including total assets tracking,
+/// asset rescue capabilities, and kAssetRouter integration for settlement coordination.
 contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
     using SafeTransferLib for address;
     using OptimizedAddressEnumerableSetLib for OptimizedAddressEnumerableSetLib.AddressSet;

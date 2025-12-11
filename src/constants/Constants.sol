@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
 
-/// @dev Centralized constants used across the KAM protocol
-/// This file provides shared constants to ensure consistency across all protocol contracts
+/// @title KAM Protocol Constants
+/// @notice Centralized constants used across the KAM protocol.
+/// @dev This file provides shared constants to ensure consistency across all protocol contracts.
 
 /* //////////////////////////////////////////////////////////////
                        CONTRACT IDENTIFIERS
