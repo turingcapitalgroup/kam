@@ -3,21 +3,29 @@
 -include .env
 export
 
-.PHONY: help deploy-mainnet deploy-sepolia deploy-localhost deploy-all deploy-mock-assets verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage
+.PHONY: help deploy-mainnet deploy-sepolia deploy-localhost config-mainnet config-sepolia config-localhost deploy-all config-all deploy-mock-assets verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage
 
 # Default target
 help:
 	@echo "KAM Protocol Deployment Commands"
 	@echo "================================="
+	@echo ""
+	@echo "Deploy contracts (00-08):"
 	@echo "make deploy-mainnet     - Deploy to mainnet"
-	@echo "make deploy-sepolia     - Deploy to Sepolia testnet"  
+	@echo "make deploy-sepolia     - Deploy to Sepolia testnet"
 	@echo "make deploy-localhost   - Deploy to localhost"
-	@echo "make deploy-all         - Deploy complete protocol (current network)"
+	@echo ""
+	@echo "Configure protocol (09-10):"
+	@echo "make config-mainnet     - Configure on mainnet"
+	@echo "make config-sepolia     - Configure on Sepolia testnet"
+	@echo "make config-localhost   - Configure on localhost"
+	@echo ""
+	@echo "Other commands:"
 	@echo "make verify             - Verify deployment configuration"
 	@echo "make clean              - Clean localhost deployment files"
 	@echo "make clean-all          - Clean ALL deployment files (DANGER)"
 	@echo ""
-	@echo "Individual deployment steps:"
+	@echo "Individual deployment steps (script/deployment/):"
 	@echo "make deploy-mock-assets - Deploy mock assets for testnets (00)"
 	@echo "make deploy-core        - Deploy core contracts (01-03)"
 	@echo "make setup-singletons   - Register singletons (04)"
@@ -25,6 +33,8 @@ help:
 	@echo "make deploy-modules     - Deploy vault modules (06)"
 	@echo "make deploy-vaults      - Deploy vaults (07)"
 	@echo "make deploy-adapters    - Deploy adapters (08)"
+	@echo ""
+	@echo "Individual configuration steps (script/actions/):"
 	@echo "make configure          - Configure protocol (09)"
 	@echo "make configure-adapters - Configure adapter permissions (10)"
 	@echo "make register-modules   - Register vault modules (11) [OPTIONAL]"
@@ -44,9 +54,26 @@ deploy-localhost:
 	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
 	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
 
-# Complete deployment sequence
-deploy-all: deploy-core setup-singletons deploy-tokens deploy-modules deploy-vaults deploy-adapters configure configure-adapters format-output
-	@echo "✅ Complete protocol deployment finished!"
+# Network-specific configurations
+config-mainnet:
+	@echo "🔴 Configuring on MAINNET..."
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow --verify --etherscan-api-key ${ETHERSCAN_MAINNET_KEY}"
+
+config-sepolia:
+	@echo "🟡 Configuring on SEPOLIA..."
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS}	--slow"
+
+config-localhost:
+	@echo "🟢 Configuring on LOCALHOST..."
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
+
+# Complete deployment sequence (deploys contracts only)
+deploy-all: deploy-core setup-singletons deploy-tokens deploy-modules deploy-vaults deploy-adapters format-output
+	@echo "✅ Protocol deployment finished!"
+
+# Complete configuration sequence (configures deployed contracts)
+config-all: configure configure-adapters format-output
+	@echo "✅ Protocol configuration finished!"
 
 # Format JSON output files
 format-output:
@@ -98,20 +125,20 @@ deploy-adapters:
 	@echo "🔌 Deploying adapters..."
 	forge script script/deployment/08_DeployAdapters.s.sol --sig "run()" $(FORGE_ARGS)
 
-# Final configuration (09)
+# Final configuration (09) - in actions folder
 configure:
 	@echo "⚙️  Executing protocol configuration..."
-	forge script script/deployment/09_ConfigureProtocol.s.sol --sig "run()" $(FORGE_ARGS)
+	forge script script/actions/09_ConfigureProtocol.s.sol --sig "run()" $(FORGE_ARGS)
 
-# Adapter permissions configuration (10)
+# Adapter permissions configuration (10) - in actions folder
 configure-adapters:
 	@echo "🔐 Configuring adapter permissions..."
-	forge script script/deployment/10_ConfigureAdapterPermissions.s.sol --sig "run()" $(FORGE_ARGS)
+	forge script script/actions/10_ConfigureAdapterPermissions.s.sol --sig "run()" $(FORGE_ARGS)
 
-# Register vault modules (11) - Optional step for adding ReaderModule to vaults
+# Register vault modules (11) - Optional step for adding ReaderModule to vaults - in actions folder
 register-modules:
 	@echo "📦 Registering vault modules..."
-	forge script script/deployment/11_RegisterVaultModules.s.sol --sig "run()" $(FORGE_ARGS)
+	forge script script/actions/11_RegisterVaultModules.s.sol --sig "run()" $(FORGE_ARGS)
 	@echo "⚠️  Execute the displayed admin calls via admin account"
 
 # Verification
