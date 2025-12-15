@@ -84,10 +84,10 @@ verify-mainnet:
 	@forge verify-contract $$(jq -r '.contracts.kMinterImpl' deployments/output/mainnet/addresses.json) src/kMinter.sol:kMinter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying kAssetRouter implementation..."
 	@forge verify-contract $$(jq -r '.contracts.kAssetRouterImpl' deployments/output/mainnet/addresses.json) src/kAssetRouter.sol:kAssetRouter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
-	@echo "Verifying kUSD..."
-	@forge verify-contract $$(jq -r '.contracts.kUSD' deployments/output/mainnet/addresses.json) src/kToken.sol:kToken --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
-	@echo "Verifying kBTC..."
-	@forge verify-contract $$(jq -r '.contracts.kBTC' deployments/output/mainnet/addresses.json) src/kToken.sol:kToken --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@echo "Verifying kTokenFactory..."
+	@forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/mainnet/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json) $$(jq -r '.contracts.ERC1967Factory' deployments/output/mainnet/addresses.json)) --watch || true
+	@echo "Verifying kToken implementation (via kTokenFactory.implementation())..."
+	@forge verify-contract $$(cast call $$(jq -r '.contracts.kTokenFactory' deployments/output/mainnet/addresses.json) "implementation()(address)" --rpc-url ${RPC_MAINNET}) src/kToken.sol:kToken --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying kStakingVault implementation..."
 	@forge verify-contract $$(jq -r '.contracts.kStakingVaultImpl' deployments/output/mainnet/addresses.json) src/kStakingVault/kStakingVault.sol:kStakingVault --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying ReaderModule..."
@@ -98,6 +98,8 @@ verify-mainnet:
 	@forge verify-contract $$(jq -r '.contracts.vaultAdapterImpl' deployments/output/mainnet/addresses.json) src/adapters/VaultAdapter.sol:VaultAdapter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying ERC20ParameterChecker..."
 	@forge verify-contract $$(jq -r '.contracts.erc20ParameterChecker' deployments/output/mainnet/addresses.json) src/adapters/parameters/ERC20ParameterChecker.sol:ERC20ParameterChecker --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json)) --watch || true
+	@echo ""
+	@echo "Note: kUSD/kBTC are ERC1967 proxies - Etherscan will auto-detect them once kToken implementation is verified"
 	@echo "✅ Mainnet verification complete!"
 
 # Etherscan verification (sepolia)
@@ -113,10 +115,10 @@ verify-sepolia:
 	@forge verify-contract $$(jq -r '.contracts.kMinterImpl' deployments/output/sepolia/addresses.json) src/kMinter.sol:kMinter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying kAssetRouter implementation..."
 	@forge verify-contract $$(jq -r '.contracts.kAssetRouterImpl' deployments/output/sepolia/addresses.json) src/kAssetRouter.sol:kAssetRouter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
-	@echo "Verifying kUSD..."
-	@forge verify-contract $$(jq -r '.contracts.kUSD' deployments/output/sepolia/addresses.json) src/kToken.sol:kToken --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
-	@echo "Verifying kBTC..."
-	@forge verify-contract $$(jq -r '.contracts.kBTC' deployments/output/sepolia/addresses.json) src/kToken.sol:kToken --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@echo "Verifying kTokenFactory..."
+	@forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/sepolia/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json) $$(jq -r '.contracts.ERC1967Factory' deployments/output/sepolia/addresses.json)) --watch || true
+	@echo "Verifying kToken implementation (via kTokenFactory.implementation())..."
+	@forge verify-contract $$(cast call $$(jq -r '.contracts.kTokenFactory' deployments/output/sepolia/addresses.json) "implementation()(address)" --rpc-url ${RPC_SEPOLIA}) src/kToken.sol:kToken --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying kStakingVault implementation..."
 	@forge verify-contract $$(jq -r '.contracts.kStakingVaultImpl' deployments/output/sepolia/addresses.json) src/kStakingVault/kStakingVault.sol:kStakingVault --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying ReaderModule..."
@@ -127,6 +129,8 @@ verify-sepolia:
 	@forge verify-contract $$(jq -r '.contracts.vaultAdapterImpl' deployments/output/sepolia/addresses.json) src/adapters/VaultAdapter.sol:VaultAdapter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying ERC20ParameterChecker..."
 	@forge verify-contract $$(jq -r '.contracts.erc20ParameterChecker' deployments/output/sepolia/addresses.json) src/adapters/parameters/ERC20ParameterChecker.sol:ERC20ParameterChecker --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json)) --watch || true
+	@echo ""
+	@echo "Note: kUSD/kBTC are ERC1967 proxies - Etherscan will auto-detect them once kToken implementation is verified"
 	@echo "✅ Sepolia verification complete!"
 
 # Complete deployment sequence (deploys contracts only)
