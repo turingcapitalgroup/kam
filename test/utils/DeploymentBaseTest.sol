@@ -28,6 +28,9 @@ import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 import { IRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 // Scripts
+import { ConfigureProtocolScript } from "kam/script/actions/09_ConfigureProtocol.s.sol";
+import { ConfigureAdapterPermissionsScript } from "kam/script/actions/10_ConfigureAdapterPermissions.s.sol";
+import { RegisterModulesScript } from "kam/script/actions/11_RegisterVaultModules.s.sol";
 import { DeployMockAssetsScript } from "kam/script/deployment/00_DeployMockAssets.s.sol";
 import { DeployRegistryScript } from "kam/script/deployment/01_DeployRegistry.s.sol";
 import { DeployMinterScript } from "kam/script/deployment/02_DeployMinter.s.sol";
@@ -37,9 +40,6 @@ import { DeployTokensScript } from "kam/script/deployment/05_DeployTokens.s.sol"
 import { DeployVaultModulesScript } from "kam/script/deployment/06_DeployVaultModules.s.sol";
 import { DeployVaultsScript } from "kam/script/deployment/07_DeployVaults.s.sol";
 import { DeployAdaptersScript } from "kam/script/deployment/08_DeployAdapters.s.sol";
-import { ConfigureProtocolScript } from "kam/script/actions/09_ConfigureProtocol.s.sol";
-import { ConfigureAdapterPermissionsScript } from "kam/script/actions/10_ConfigureAdapterPermissions.s.sol";
-import { RegisterModulesScript } from "kam/script/actions/11_RegisterVaultModules.s.sol";
 
 // Deployment manager for reading addresses
 import { DeploymentManager } from "kam/script/utils/DeploymentManager.sol";
