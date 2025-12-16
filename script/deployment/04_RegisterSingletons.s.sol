@@ -16,18 +16,31 @@ contract RegisterSingletonsScript is Script, DeploymentManager {
     function run(address registryAddr, address assetRouterAddr, address minterAddr, address factoryAddr) public {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        DeploymentOutput memory existing;
 
         // If addresses not provided, read from JSON (for real deployments)
         if (
             registryAddr == address(0) || assetRouterAddr == address(0) || minterAddr == address(0)
                 || factoryAddr == address(0)
         ) {
-            DeploymentOutput memory existing = readDeploymentOutput();
+            existing = readDeploymentOutput();
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
             if (assetRouterAddr == address(0)) assetRouterAddr = existing.contracts.kAssetRouter;
             if (minterAddr == address(0)) minterAddr = existing.contracts.kMinter;
             if (factoryAddr == address(0)) factoryAddr = existing.contracts.kTokenFactory;
         }
+
+        // Populate existing for logging
+        existing.contracts.kRegistry = registryAddr;
+        existing.contracts.kAssetRouter = assetRouterAddr;
+        existing.contracts.kMinter = minterAddr;
+        existing.contracts.kTokenFactory = factoryAddr;
+
+        // Log script header and configuration
+        logScriptHeader("04_RegisterSingletons");
+        logRoles(config);
+        logDependencies(existing);
+        logBroadcaster(config.roles.admin);
 
         // Validate required contracts
         require(registryAddr != address(0), "kRegistry address required");
@@ -35,8 +48,7 @@ contract RegisterSingletonsScript is Script, DeploymentManager {
         require(minterAddr != address(0), "kMinter address required");
         require(factoryAddr != address(0), "kTokenFactory address required");
 
-        _log("=== REGISTRY SINGLETON REGISTRATION ===");
-        _log("Network:", config.network);
+        logExecutionStart();
 
         vm.startBroadcast(config.roles.admin);
 

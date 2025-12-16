@@ -693,6 +693,255 @@ abstract contract DeploymentManager is Script {
                             LOGGING HELPERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Log the script header with network info and config file paths
+    function logScriptHeader(string memory scriptName) internal view {
+        if (!verbose) return;
+
+        string memory network = getCurrentNetwork();
+        string memory deploymentsPath = getDeploymentsPath();
+        string memory configPath = string.concat(deploymentsPath, "/config/", network, ".json");
+        string memory outputPath = string.concat(deploymentsPath, "/output/", network, "/addresses.json");
+
+        console.log("");
+        console.log("================================================================================");
+        console.log("  SCRIPT:", scriptName);
+        console.log("================================================================================");
+        console.log("");
+        console.log("--- ENVIRONMENT ---");
+        console.log("Network:          ", network);
+        console.log("Chain ID:         ", block.chainid);
+        console.log("Production mode:  ", isProduction() ? "YES" : "NO");
+        console.log("Config file:      ", configPath);
+        console.log("Output file:      ", outputPath);
+        console.log("");
+    }
+
+    /// @notice Log all role addresses from config
+    function logRoles(NetworkConfig memory config) internal view {
+        if (!verbose) return;
+
+        console.log("--- ROLE ADDRESSES ---");
+        console.log("Owner:            ", config.roles.owner);
+        console.log("Admin:            ", config.roles.admin);
+        console.log("Emergency Admin:  ", config.roles.emergencyAdmin);
+        console.log("Guardian:         ", config.roles.guardian);
+        console.log("Relayer:          ", config.roles.relayer);
+        console.log("Institution:      ", config.roles.institution);
+        console.log("Treasury:         ", config.roles.treasury);
+        console.log("");
+    }
+
+    /// @notice Log all asset addresses from config
+    function logAssets(NetworkConfig memory config) internal view {
+        if (!verbose) return;
+
+        console.log("--- ASSET ADDRESSES ---");
+        console.log("USDC:             ", config.assets.USDC);
+        console.log("WBTC:             ", config.assets.WBTC);
+        console.log("");
+    }
+
+    /// @notice Log ERC7540 and custodial target addresses
+    function logExternalTargets(NetworkConfig memory config) internal view {
+        if (!verbose) return;
+
+        console.log("--- EXTERNAL TARGETS ---");
+        console.log("ERC7540 USDC:     ", config.ERC7540s.USDC);
+        console.log("ERC7540 WBTC:     ", config.ERC7540s.WBTC);
+        console.log("Wallet USDC:      ", config.custodialTargets.walletUSDC);
+        console.log("Wallet WBTC:      ", config.custodialTargets.walletWBTC);
+        console.log("");
+    }
+
+    /// @notice Log kToken configuration
+    function logKTokenConfig(KTokenConfig memory kToken, string memory tokenName) internal view {
+        if (!verbose) return;
+
+        console.log(string.concat("--- ", tokenName, " CONFIG ---"));
+        console.log("Name:             ", kToken.name);
+        console.log("Symbol:           ", kToken.symbol);
+        console.log("Decimals:         ", kToken.decimals);
+        console.log("Max Mint/Batch:   ", kToken.maxMintPerBatch);
+        console.log("Max Redeem/Batch: ", kToken.maxRedeemPerBatch);
+        console.log("");
+    }
+
+    /// @notice Log vault configuration
+    function logVaultConfig(VaultConfig memory vault, string memory vaultName) internal view {
+        if (!verbose) return;
+
+        console.log(string.concat("--- ", vaultName, " CONFIG ---"));
+        console.log("Name:             ", vault.name);
+        console.log("Symbol:           ", vault.symbol);
+        console.log("Decimals:         ", vault.decimals);
+        console.log("Underlying Asset: ", vault.underlyingAsset);
+        console.log("Use kToken:       ", vault.useKToken ? "YES" : "NO");
+        console.log("Max Total Assets: ", vault.maxTotalAssets);
+        console.log("Max Deposit/Batch:", vault.maxDepositPerBatch);
+        console.log("Max Withdraw/Batch:", vault.maxWithdrawPerBatch);
+        console.log("Trusted Forwarder:", vault.trustedForwarder);
+        console.log("");
+    }
+
+    /// @notice Log asset router configuration
+    function logAssetRouterConfig(NetworkConfig memory config) internal view {
+        if (!verbose) return;
+
+        console.log("--- ASSET ROUTER CONFIG ---");
+        console.log("Settlement Cooldown:", config.assetRouter.settlementCooldown);
+        console.log("Max Allowed Delta:  ", config.assetRouter.maxAllowedDelta);
+        console.log("");
+    }
+
+    /// @notice Log registry configuration (hurdle rates)
+    function logRegistryConfig(NetworkConfig memory config) internal view {
+        if (!verbose) return;
+
+        console.log("--- REGISTRY CONFIG ---");
+        console.log("Hurdle Rate USDC: ", config.registry.hurdleRate.USDC);
+        console.log("Hurdle Rate WBTC: ", config.registry.hurdleRate.WBTC);
+        console.log("");
+    }
+
+    /// @notice Log parameter checker configuration
+    function logParameterCheckerConfig(NetworkConfig memory config) internal view {
+        if (!verbose) return;
+
+        console.log("--- PARAMETER CHECKER CONFIG ---");
+        console.log("Max Transfer USDC:      ", config.parameterChecker.maxSingleTransfer.USDC);
+        console.log("Max Transfer WBTC:      ", config.parameterChecker.maxSingleTransfer.WBTC);
+        console.log("Max Transfer ERC7540USDC:", config.parameterChecker.maxSingleTransfer.ERC7540USDC);
+        console.log("Max Transfer ERC7540WBTC:", config.parameterChecker.maxSingleTransfer.ERC7540WBTC);
+        console.log("");
+
+        console.log("Allowed Receivers USDC:        ", config.parameterChecker.allowedReceivers.USDC.length, "entries");
+        console.log("Allowed Receivers WBTC:        ", config.parameterChecker.allowedReceivers.WBTC.length, "entries");
+        console.log(
+            "Allowed Receivers ERC7540USDC: ", config.parameterChecker.allowedReceivers.ERC7540USDC.length, "entries"
+        );
+        console.log(
+            "Allowed Receivers ERC7540WBTC: ", config.parameterChecker.allowedReceivers.ERC7540WBTC.length, "entries"
+        );
+        console.log(
+            "Allowed Sources ERC7540USDC:   ", config.parameterChecker.allowedSources.ERC7540USDC.length, "entries"
+        );
+        console.log(
+            "Allowed Sources ERC7540WBTC:   ", config.parameterChecker.allowedSources.ERC7540WBTC.length, "entries"
+        );
+        console.log("Allowed Spenders USDC:         ", config.parameterChecker.allowedSpenders.USDC.length, "entries");
+        console.log("Allowed Spenders WBTC:         ", config.parameterChecker.allowedSpenders.WBTC.length, "entries");
+        console.log("");
+    }
+
+    /// @notice Log mock assets configuration
+    function logMockAssetsConfig(NetworkConfig memory config) internal view {
+        if (!verbose) return;
+
+        console.log("--- MOCK ASSETS CONFIG ---");
+        console.log("Enabled:          ", config.mockAssets.enabled ? "YES" : "NO");
+        console.log("Mint Amount USDC: ", config.mockAssets.mintAmounts.USDC);
+        console.log("Mint Amount WBTC: ", config.mockAssets.mintAmounts.WBTC);
+        console.log("Mock Target USDC: ", config.mockAssets.mockTargetAmounts.USDC);
+        console.log("Mock Target WBTC: ", config.mockAssets.mockTargetAmounts.WBTC);
+        console.log("");
+    }
+
+    /// @notice Log deployed contract addresses being used as dependencies
+    function logDependencies(DeploymentOutput memory existing) internal view {
+        if (!verbose) return;
+
+        console.log("--- DEPLOYED CONTRACT DEPENDENCIES ---");
+        if (existing.contracts.ERC1967Factory != address(0)) {
+            console.log("ERC1967Factory:   ", existing.contracts.ERC1967Factory);
+        }
+        if (existing.contracts.kRegistry != address(0)) {
+            console.log("kRegistry:        ", existing.contracts.kRegistry);
+        }
+        if (existing.contracts.kMinter != address(0)) {
+            console.log("kMinter:          ", existing.contracts.kMinter);
+        }
+        if (existing.contracts.kAssetRouter != address(0)) {
+            console.log("kAssetRouter:     ", existing.contracts.kAssetRouter);
+        }
+        if (existing.contracts.kTokenFactory != address(0)) {
+            console.log("kTokenFactory:    ", existing.contracts.kTokenFactory);
+        }
+        if (existing.contracts.kUSD != address(0)) {
+            console.log("kUSD:             ", existing.contracts.kUSD);
+        }
+        if (existing.contracts.kBTC != address(0)) {
+            console.log("kBTC:             ", existing.contracts.kBTC);
+        }
+        if (existing.contracts.readerModule != address(0)) {
+            console.log("ReaderModule:     ", existing.contracts.readerModule);
+        }
+        if (existing.contracts.adapterGuardianModule != address(0)) {
+            console.log("AdapterGuardianModule:", existing.contracts.adapterGuardianModule);
+        }
+        if (existing.contracts.dnVaultUSDC != address(0)) {
+            console.log("dnVaultUSDC:      ", existing.contracts.dnVaultUSDC);
+        }
+        if (existing.contracts.dnVaultWBTC != address(0)) {
+            console.log("dnVaultWBTC:      ", existing.contracts.dnVaultWBTC);
+        }
+        if (existing.contracts.alphaVault != address(0)) {
+            console.log("alphaVault:       ", existing.contracts.alphaVault);
+        }
+        if (existing.contracts.betaVault != address(0)) {
+            console.log("betaVault:        ", existing.contracts.betaVault);
+        }
+        if (existing.contracts.dnVaultAdapterUSDC != address(0)) {
+            console.log("dnVaultAdapterUSDC:", existing.contracts.dnVaultAdapterUSDC);
+        }
+        if (existing.contracts.dnVaultAdapterWBTC != address(0)) {
+            console.log("dnVaultAdapterWBTC:", existing.contracts.dnVaultAdapterWBTC);
+        }
+        if (existing.contracts.alphaVaultAdapter != address(0)) {
+            console.log("alphaVaultAdapter:", existing.contracts.alphaVaultAdapter);
+        }
+        if (existing.contracts.betaVaultAdapter != address(0)) {
+            console.log("betaVaultAdapter: ", existing.contracts.betaVaultAdapter);
+        }
+        if (existing.contracts.kMinterAdapterUSDC != address(0)) {
+            console.log("kMinterAdapterUSDC:", existing.contracts.kMinterAdapterUSDC);
+        }
+        if (existing.contracts.kMinterAdapterWBTC != address(0)) {
+            console.log("kMinterAdapterWBTC:", existing.contracts.kMinterAdapterWBTC);
+        }
+        if (existing.contracts.ERC7540USDC != address(0)) {
+            console.log("ERC7540USDC:      ", existing.contracts.ERC7540USDC);
+        }
+        if (existing.contracts.ERC7540WBTC != address(0)) {
+            console.log("ERC7540WBTC:      ", existing.contracts.ERC7540WBTC);
+        }
+        if (existing.contracts.WalletUSDC != address(0)) {
+            console.log("WalletUSDC:       ", existing.contracts.WalletUSDC);
+        }
+        if (existing.contracts.erc20ParameterChecker != address(0)) {
+            console.log("ERC20ParameterChecker:", existing.contracts.erc20ParameterChecker);
+        }
+        console.log("");
+    }
+
+    /// @notice Log the broadcaster address that will execute transactions
+    function logBroadcaster(address broadcaster) internal view {
+        if (!verbose) return;
+
+        console.log("--- BROADCASTER ---");
+        console.log("Transactions will be sent from:", broadcaster);
+        console.log("");
+    }
+
+    /// @notice Log a separator before execution begins
+    function logExecutionStart() internal view {
+        if (!verbose) return;
+
+        console.log("================================================================================");
+        console.log("  EXECUTING TRANSACTIONS");
+        console.log("================================================================================");
+        console.log("");
+    }
+
     /// @dev Log a string message (only if verbose)
     function _log(string memory message) internal view {
         if (verbose) console.log(message);

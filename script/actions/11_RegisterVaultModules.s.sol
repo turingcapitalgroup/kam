@@ -24,19 +24,33 @@ contract RegisterModulesScript is DeploymentManager {
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        DeploymentOutput memory existing;
 
         // If any address is zero, read from JSON (for real deployments)
         if (
             readerModuleAddr == address(0) || dnVaultUSDCAddr == address(0) || dnVaultWBTCAddr == address(0)
                 || alphaVaultAddr == address(0) || betaVaultAddr == address(0)
         ) {
-            DeploymentOutput memory existing = readDeploymentOutput();
+            existing = readDeploymentOutput();
             if (readerModuleAddr == address(0)) readerModuleAddr = existing.contracts.readerModule;
             if (dnVaultUSDCAddr == address(0)) dnVaultUSDCAddr = existing.contracts.dnVaultUSDC;
             if (dnVaultWBTCAddr == address(0)) dnVaultWBTCAddr = existing.contracts.dnVaultWBTC;
             if (alphaVaultAddr == address(0)) alphaVaultAddr = existing.contracts.alphaVault;
             if (betaVaultAddr == address(0)) betaVaultAddr = existing.contracts.betaVault;
         }
+
+        // Populate existing for logging
+        existing.contracts.readerModule = readerModuleAddr;
+        existing.contracts.dnVaultUSDC = dnVaultUSDCAddr;
+        existing.contracts.dnVaultWBTC = dnVaultWBTCAddr;
+        existing.contracts.alphaVault = alphaVaultAddr;
+        existing.contracts.betaVault = betaVaultAddr;
+
+        // Log script header and configuration
+        logScriptHeader("11_RegisterVaultModules");
+        logRoles(config);
+        logDependencies(existing);
+        logBroadcaster(config.roles.owner);
 
         // Validate required contracts
         require(readerModuleAddr != address(0), "readerModule address required");
@@ -45,9 +59,7 @@ contract RegisterModulesScript is DeploymentManager {
         require(alphaVaultAddr != address(0), "alphaVault address required");
         require(betaVaultAddr != address(0), "betaVault address required");
 
-        _log("=== MODULE REGISTRATION ===");
-        _log("Network:", config.network);
-        _log("");
+        logExecutionStart();
 
         // Get the ReaderModule selectors using the selectors() function
         ReaderModule readerModule = ReaderModule(readerModuleAddr);

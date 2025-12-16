@@ -47,6 +47,7 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        DeploymentOutput memory existing;
 
         // If any address is zero, read from JSON (for real deployments)
         if (
@@ -57,7 +58,7 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
                 || alphaVaultAdapterAddr == address(0) || betaVaultAdapterAddr == address(0)
                 || minterAdapterUSDCAddr == address(0) || minterAdapterWBTCAddr == address(0)
         ) {
-            DeploymentOutput memory existing = readDeploymentOutput();
+            existing = readDeploymentOutput();
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
             if (minterAddr == address(0)) minterAddr = existing.contracts.kMinter;
             if (assetRouterAddr == address(0)) assetRouterAddr = existing.contracts.kAssetRouter;
@@ -74,6 +75,35 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
             if (minterAdapterUSDCAddr == address(0)) minterAdapterUSDCAddr = existing.contracts.kMinterAdapterUSDC;
             if (minterAdapterWBTCAddr == address(0)) minterAdapterWBTCAddr = existing.contracts.kMinterAdapterWBTC;
         }
+
+        // Populate existing for logging
+        existing.contracts.kRegistry = registryAddr;
+        existing.contracts.kMinter = minterAddr;
+        existing.contracts.kAssetRouter = assetRouterAddr;
+        existing.contracts.kUSD = kUSDAddr;
+        existing.contracts.kBTC = kBTCAddr;
+        existing.contracts.dnVaultUSDC = dnVaultUSDCAddr;
+        existing.contracts.dnVaultWBTC = dnVaultWBTCAddr;
+        existing.contracts.alphaVault = alphaVaultAddr;
+        existing.contracts.betaVault = betaVaultAddr;
+        existing.contracts.dnVaultAdapterUSDC = dnVaultAdapterUSDCAddr;
+        existing.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
+        existing.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
+        existing.contracts.betaVaultAdapter = betaVaultAdapterAddr;
+        existing.contracts.kMinterAdapterUSDC = minterAdapterUSDCAddr;
+        existing.contracts.kMinterAdapterWBTC = minterAdapterWBTCAddr;
+
+        // Log script header and configuration
+        logScriptHeader("09_ConfigureProtocol");
+        logRoles(config);
+        logAssets(config);
+        logRegistryConfig(config);
+        logVaultConfig(config.dnVaultUSDC, "DN_VAULT_USDC");
+        logVaultConfig(config.dnVaultWBTC, "DN_VAULT_WBTC");
+        logVaultConfig(config.alphaVault, "ALPHA_VAULT");
+        logVaultConfig(config.betaVault, "BETA_VAULT");
+        logDependencies(existing);
+        logBroadcaster(config.roles.admin);
 
         // Validate all required contracts
         require(registryAddr != address(0), "kRegistry address required");
@@ -92,9 +122,7 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         require(minterAdapterUSDCAddr != address(0), "kMinterAdapterUSDC address required");
         require(minterAdapterWBTCAddr != address(0), "kMinterAdapterWBTC address required");
 
-        _log("=== EXECUTING PROTOCOL CONFIGURATION ===");
-        _log("Network:", config.network);
-        _log("");
+        logExecutionStart();
 
         vm.startBroadcast(config.roles.admin);
 
