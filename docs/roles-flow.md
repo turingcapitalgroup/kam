@@ -265,8 +265,15 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │                                                                 │
 │  RELAYER_ROLE Functions:                                        │
 │  ┌─────────────────────────────────────────────────────────────┐│
+│  │• createNewBatch() - Create new batch for asset              ││
 │  │• closeBatch() - Close batch to new requests                 ││
-│  │• settleBatch() - Mark batch as settled                      ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  kAssetRouter-Only Functions (Contract-based Access):           │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │• settleBatch() - Mark batch as settled after processing     ││
+│  │• createBatchReceiver() - Deploy BatchReceiver for batch     ││
+│  │  (only kAssetRouter can call these functions)               ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘

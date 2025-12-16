@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+/// @title ERC2771Context
+/// @notice Context variant with ERC-2771 support for meta-transactions.
 /// @dev Context variant with ERC-2771 support.
 ///
 /// WARNING: Avoid using this pattern in contracts that rely on a specific calldata length as they'll

@@ -39,11 +39,11 @@ graph TB
             ADAPTER_EXEC[EXECUTION ENGINE<br/>execute target, data:<br/>1. Validate permissions<br/>2. Check parameters<br/>3. Call external protocol<br/>4. Report results]
             ADAPTER_BAL[BALANCE TRACKING<br/>totalAssets: Virtual<br/>setTotalAssets: Update<br/>pull: Transfer back<br/>Used in settlements]
         end
-        
-        MINTER_ADAPTER[kMinter Adapter<br/>Manages deposits]
-        DN_ADAPTER[DN Vault Adapter<br/>Delta Neutral Strategy]
-        ALPHA_ADAPTER[Alpha Vault Adapter<br/>Growth Strategy]
-        BETA_ADAPTER[Beta Vault Adapter<br/>Conservative Strategy]
+
+        MINTER_ADAPTER[🏦 kMinter Adapter<br/>CENTRAL HUB<br/>Only adapter holding<br/>physical assets<br/>All movements flow<br/>through here]
+        DN_ADAPTER[DN Vault Adapter<br/>Virtual tracking only<br/>Shares same strategy<br/>as kMinter]
+        ALPHA_ADAPTER[Alpha Vault Adapter<br/>Virtual tracking only<br/>Assets at CEFFU]
+        BETA_ADAPTER[Beta Vault Adapter<br/>Virtual tracking only<br/>Assets at CEFFU]
     end
 
     subgraph "EXTERNAL PROTOCOLS"
@@ -165,6 +165,7 @@ graph TB
     style ADAPTER_PERM fill:#e6ccff
     style ADAPTER_EXEC fill:#e6ccff
     style ADAPTER_BAL fill:#e6ccff
+    style MINTER_ADAPTER fill:#ffcc00,stroke:#ff6600,stroke-width:3px
     
     style REG_STORE fill:#ccffcc
     style ROLE_MGR fill:#ccffcc

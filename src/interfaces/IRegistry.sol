@@ -3,6 +3,10 @@ pragma solidity ^0.8.4;
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 
+/// @title IRegistry
+/// @notice Core protocol registry interface for managing assets, vaults, adapters, and access control.
+/// @dev Central configuration hub that maintains all protocol state including singleton contracts, vault mappings,
+/// and role-based permissions.
 interface IRegistry is IVersioned {
     /* //////////////////////////////////////////////////////////////
                               EVENTS

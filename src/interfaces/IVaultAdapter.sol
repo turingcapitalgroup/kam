@@ -3,6 +3,9 @@ pragma solidity ^0.8.4;
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 
+/// @title IVaultAdapter
+/// @notice Interface for vault adapters that manage external protocol integrations for yield generation.
+/// @dev Provides standardized methods for pausing, asset rescue, and total assets tracking across adapters.
 interface IVaultAdapter is IVersioned {
     /* //////////////////////////////////////////////////////////////
                               EVENTS

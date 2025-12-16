@@ -220,7 +220,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
         $.vaultBatchBalances[_targetVault][_batchId].deposited += _amount.toUint128();
 
-        emit AssetsTransfered(_sourceVault, _targetVault, _asset, _amount);
+        emit AssetsTransferred(_sourceVault, _targetVault, _asset, _amount);
         _unlockReentrant();
     }
 
