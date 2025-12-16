@@ -25,6 +25,12 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         require(!isProduction(), "This script is NOT for production");
         NetworkConfig memory config = readNetworkConfig();
 
+        // Log script header and configuration
+        logScriptHeader("00_DeployMockAssets");
+        logRoles(config);
+        logMockAssetsConfig(config);
+        logBroadcaster(config.roles.owner);
+
         // Check if mock assets are enabled in config
         if (!config.mockAssets.enabled) {
             _log("=== MOCK ASSETS DISABLED IN CONFIG ===");
@@ -63,9 +69,7 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
             }
         }
 
-        _log("=== DEPLOYING MOCK ASSETS ===");
-        _log("Network:", config.network);
-        _log("Chain ID:", config.chainId);
+        logExecutionStart();
 
         vm.startBroadcast(config.roles.owner);
 

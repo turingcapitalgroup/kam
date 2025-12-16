@@ -28,17 +28,31 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        DeploymentOutput memory existing;
 
         // If addresses not provided, read from JSON (for real deployments)
         if (factoryAddr == address(0) || registryAddr == address(0)) {
-            DeploymentOutput memory existing = readDeploymentOutput();
+            existing = readDeploymentOutput();
             if (factoryAddr == address(0)) factoryAddr = existing.contracts.ERC1967Factory;
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
         }
 
+        // Populate existing for logging
+        existing.contracts.ERC1967Factory = factoryAddr;
+        existing.contracts.kRegistry = registryAddr;
+
+        // Log script header and configuration
+        logScriptHeader("03_DeployAssetRouter");
+        logRoles(config);
+        logAssetRouterConfig(config);
+        logDependencies(existing);
+        logBroadcaster(config.roles.admin);
+
         // Validate dependencies
         require(factoryAddr != address(0), "ERC1967Factory address required");
         require(registryAddr != address(0), "kRegistry address required");
+
+        logExecutionStart();
 
         vm.startBroadcast(config.roles.admin);
 

@@ -64,6 +64,17 @@ contract DeployVaultsScript is Script, DeploymentManager {
         existing.contracts.kUSD = kUSDAddr;
         existing.contracts.kBTC = kBTCAddr;
 
+        // Log script header and configuration
+        logScriptHeader("07_DeployVaults");
+        logRoles(config);
+        logAssets(config);
+        logVaultConfig(config.dnVaultUSDC, "DN_VAULT_USDC");
+        logVaultConfig(config.dnVaultWBTC, "DN_VAULT_WBTC");
+        logVaultConfig(config.alphaVault, "ALPHA_VAULT");
+        logVaultConfig(config.betaVault, "BETA_VAULT");
+        logDependencies(existing);
+        logBroadcaster(config.roles.admin);
+
         // Validate required contracts
         require(factoryAddr != address(0), "ERC1967Factory address required");
         require(registryAddr != address(0), "kRegistry address required");
@@ -71,8 +82,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         require(kUSDAddr != address(0), "kUSD address required");
         require(kBTCAddr != address(0), "kBTC address required");
 
-        _log("=== DEPLOYING VAULTS ===");
-        _log("Network:", config.network);
+        logExecutionStart();
 
         vm.startBroadcast(config.roles.admin);
 

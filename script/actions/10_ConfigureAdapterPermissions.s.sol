@@ -135,12 +135,31 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
             if (walletUSDCAddr == address(0)) walletUSDCAddr = existing.contracts.WalletUSDC;
         }
 
+        // Populate existing for logging
+        existing.contracts.kRegistry = registryAddr;
+        existing.contracts.kMinterAdapterUSDC = kMinterAdapterUSDCAddr;
+        existing.contracts.kMinterAdapterWBTC = kMinterAdapterWBTCAddr;
+        existing.contracts.dnVaultAdapterUSDC = dnVaultAdapterUSDCAddr;
+        existing.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
+        existing.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
+        existing.contracts.betaVaultAdapter = betaVaultAdapterAddr;
+        existing.contracts.ERC7540USDC = erc7540USDCAddr;
+        existing.contracts.ERC7540WBTC = erc7540WBTCAddr;
+        existing.contracts.WalletUSDC = walletUSDCAddr;
+
+        // Log script header and configuration
+        logScriptHeader("10_ConfigureAdapterPermissions");
+        logRoles(config);
+        logAssets(config);
+        logExternalTargets(config);
+        logParameterCheckerConfig(config);
+        logDependencies(existing);
+        logBroadcaster(config.roles.admin);
+
         // Validate required contracts
         require(registryAddr != address(0), "kRegistry address required");
 
-        _log("=== CONFIGURING ADAPTER PERMISSIONS ===");
-        _log("Network:", config.network);
-        _log("");
+        logExecutionStart();
 
         vm.startBroadcast(config.roles.admin);
 

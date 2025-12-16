@@ -26,7 +26,13 @@ contract DeployRegistryScript is Script, DeploymentManager {
         // Read network configuration from JSON
         NetworkConfig memory config = readNetworkConfig();
         validateConfig(config);
-        logConfig(config);
+
+        // Log script header and configuration
+        logScriptHeader("01_DeployRegistry");
+        logRoles(config);
+        logAssets(config);
+        logBroadcaster(config.roles.owner);
+        logExecutionStart();
 
         vm.startBroadcast(config.roles.owner);
 

@@ -19,18 +19,30 @@ contract DeployTokensScript is Script, DeploymentManager {
     function run(bool writeToJson, address registryAddr) public returns (TokenDeployment memory deployment) {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        DeploymentOutput memory existing;
 
         // If registry not provided, read from JSON (for real deployments)
         if (registryAddr == address(0)) {
-            DeploymentOutput memory existing = readDeploymentOutput();
+            existing = readDeploymentOutput();
             registryAddr = existing.contracts.kRegistry;
         }
+
+        // Populate existing for logging
+        existing.contracts.kRegistry = registryAddr;
+
+        // Log script header and configuration
+        logScriptHeader("05_DeployTokens");
+        logRoles(config);
+        logAssets(config);
+        logKTokenConfig(config.kUSD, "kUSD");
+        logKTokenConfig(config.kBTC, "kBTC");
+        logDependencies(existing);
+        logBroadcaster(config.roles.admin);
 
         // Validate required contracts
         require(registryAddr != address(0), "kRegistry address required");
 
-        _log("=== KTOKEN DEPLOYMENT ===");
-        _log("Network:", config.network);
+        logExecutionStart();
 
         vm.startBroadcast(config.roles.admin);
 

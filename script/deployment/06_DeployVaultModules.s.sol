@@ -17,8 +17,11 @@ contract DeployVaultModulesScript is Script, DeploymentManager {
     function run(bool writeToJson) public returns (VaultModulesDeployment memory deployment) {
         NetworkConfig memory config = readNetworkConfig();
 
-        _log("=== DEPLOYING VAULT MODULES ===");
-        _log("Network:", config.network);
+        // Log script header and configuration
+        logScriptHeader("06_DeployVaultModules");
+        logRoles(config);
+        logBroadcaster(config.roles.admin);
+        logExecutionStart();
 
         vm.startBroadcast(config.roles.admin);
 
