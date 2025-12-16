@@ -10,7 +10,8 @@ import {
 } from "kam/src/errors/Errors.sol";
 
 /// @title kBaseRoles
-/// @notice Foundation contract providing essential shared functionality and registry integration for all KAM protocol
+/// @notice Foundation contract providing role-based access control for the KAM protocol.
+/// @dev Extends Solady's OptimizedOwnableRoles for gas-efficient role management using ERC-7201 storage.
 contract kBaseRoles is OptimizedOwnableRoles {
     /* //////////////////////////////////////////////////////////////
                               ROLES

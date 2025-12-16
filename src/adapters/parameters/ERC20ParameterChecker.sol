@@ -35,7 +35,7 @@ contract ERC20ParameterChecker is IParametersChecker {
     mapping(address token => uint256 maxSingleTransfer) private _maxSingleTransfer;
 
     /// @notice Mapping of amount transferred per block for each token
-    mapping(address token => mapping(uint256 => uint256)) private _amountTransferedPerBlock;
+    mapping(address token => mapping(uint256 => uint256)) private _amountTransferredPerBlock;
 
     /// @notice Emitted when a receiver's allowance status is updated
     /// @param token The token address
@@ -120,12 +120,12 @@ contract ERC20ParameterChecker is IParametersChecker {
     {
         if (_selector == ERC20.transfer.selector) {
             (address _to, uint256 _amount) = abi.decode(_params, (address, uint256));
-            uint256 _blockAmount = _amountTransferedPerBlock[_token][block.number] += _amount;
+            uint256 _blockAmount = _amountTransferredPerBlock[_token][block.number] += _amount;
             require(_blockAmount <= maxSingleTransfer(_token), PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
             require(isAllowedReceiver(_token, _to), PARAMETERCHECKER_RECEIVER_NOT_ALLOWED);
         } else if (_selector == ERC20.transferFrom.selector) {
             (address _from, address _to, uint256 _amount) = abi.decode(_params, (address, address, uint256));
-            uint256 _blockAmount = _amountTransferedPerBlock[_token][block.number] += _amount;
+            uint256 _blockAmount = _amountTransferredPerBlock[_token][block.number] += _amount;
             require(_blockAmount <= maxSingleTransfer(_token), PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
             require(isAllowedReceiver(_token, _to), PARAMETERCHECKER_RECEIVER_NOT_ALLOWED);
             require(isAllowedSource(_token, _from), PARAMETERCHECKER_SOURCE_NOT_ALLOWED);
