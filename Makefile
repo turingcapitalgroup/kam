@@ -3,7 +3,7 @@
 -include .env
 export
 
-.PHONY: help deploy-mainnet deploy-sepolia deploy-localhost config-mainnet config-sepolia config-localhost deploy-all config-all deploy-mock-assets verify-mainnet verify-sepolia verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage
+.PHONY: help deploy-mainnet deploy-mainnet-dry-run deploy-sepolia deploy-sepolia-dry-run deploy-localhost deploy-localhost-dry-run config-mainnet config-mainnet-dry-run config-sepolia config-sepolia-dry-run config-localhost config-localhost-dry-run deploy-all config-all deploy-mock-assets verify-mainnet verify-sepolia verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage
 
 # Default target
 help:
@@ -11,18 +11,24 @@ help:
 	@echo "================================="
 	@echo ""
 	@echo "Deploy contracts (00-08):"
-	@echo "make deploy-mainnet     - Deploy to mainnet"
-	@echo "make deploy-sepolia     - Deploy to Sepolia testnet"
-	@echo "make deploy-localhost   - Deploy to localhost"
+	@echo "make deploy-mainnet          - Deploy to mainnet"
+	@echo "make deploy-mainnet-dry-run  - Simulate deployment to mainnet (no broadcast)"
+	@echo "make deploy-sepolia          - Deploy to Sepolia testnet"
+	@echo "make deploy-sepolia-dry-run  - Simulate deployment to Sepolia (no broadcast)"
+	@echo "make deploy-localhost        - Deploy to localhost"
+	@echo "make deploy-localhost-dry-run- Simulate deployment to localhost (no broadcast)"
 	@echo ""
 	@echo "Configure protocol (09-10):"
-	@echo "make config-mainnet     - Configure on mainnet"
-	@echo "make config-sepolia     - Configure on Sepolia testnet"
-	@echo "make config-localhost   - Configure on localhost"
+	@echo "make config-mainnet          - Configure on mainnet"
+	@echo "make config-mainnet-dry-run  - Simulate configuration on mainnet (no broadcast)"
+	@echo "make config-sepolia          - Configure on Sepolia testnet"
+	@echo "make config-sepolia-dry-run  - Simulate configuration on Sepolia (no broadcast)"
+	@echo "make config-localhost        - Configure on localhost"
+	@echo "make config-localhost-dry-run- Simulate configuration on localhost (no broadcast)"
 	@echo ""
 	@echo "Verify contracts on Etherscan:"
-	@echo "make verify-mainnet     - Verify contracts on mainnet Etherscan"
-	@echo "make verify-sepolia     - Verify contracts on Sepolia Etherscan"
+	@echo "make verify-mainnet          - Verify contracts on mainnet Etherscan"
+	@echo "make verify-sepolia          - Verify contracts on Sepolia Etherscan"
 	@echo ""
 	@echo "Other commands:"
 	@echo "make verify             - Check deployment files exist"
@@ -46,30 +52,56 @@ help:
 # Network-specific deployments
 deploy-mainnet:
 	@echo "🔴 Deploying to MAINNET..."
-	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow --verify --etherscan-api-key ${ETHERSCAN_MAINNET_KEY}"
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+
+deploy-mainnet-dry-run:
+	@echo "🔴 [DRY-RUN] Simulating deployment to MAINNET..."
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
 
 deploy-sepolia:
 	@echo "🟡 Deploying to SEPOLIA..."
 	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS}	--slow"
 	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS}	--slow"
 
+deploy-sepolia-dry-run:
+	@echo "🟡 [DRY-RUN] Simulating deployment to SEPOLIA..."
+	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+
 deploy-localhost:
 	@echo "🟢 Deploying to LOCALHOST..."
 	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
 	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
 
+deploy-localhost-dry-run:
+	@echo "🟢 [DRY-RUN] Simulating deployment to LOCALHOST..."
+	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
+
 # Network-specific configurations
 config-mainnet:
 	@echo "🔴 Configuring on MAINNET..."
-	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow --verify --etherscan-api-key ${ETHERSCAN_MAINNET_KEY}"
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+
+config-mainnet-dry-run:
+	@echo "🔴 [DRY-RUN] Simulating configuration on MAINNET..."
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
 
 config-sepolia:
 	@echo "🟡 Configuring on SEPOLIA..."
 	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS}	--slow"
 
+config-sepolia-dry-run:
+	@echo "🟡 [DRY-RUN] Simulating configuration on SEPOLIA..."
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+
 config-localhost:
 	@echo "🟢 Configuring on LOCALHOST..."
 	@$(MAKE) config-all FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
+
+config-localhost-dry-run:
+	@echo "🟢 [DRY-RUN] Simulating configuration on LOCALHOST..."
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
 
 # Etherscan verification (mainnet)
 verify-mainnet:
