@@ -105,11 +105,11 @@ contract ERC20ParameterChecker is IParametersChecker {
         emit MaxSingleTransferUpdated(_token, _max);
     }
 
-    /// @notice Authorizes an adapter call based on parameters
+    /// @notice Validates an adapter call based on parameters, reverting if invalid
     /// @param _token The token address
     /// @param _selector The function selector
     /// @param _params The encoded function parameters
-    function authorizeAdapterCall(
+    function validateAdapterCall(
         address,
         /* _adapter */
         address _token,

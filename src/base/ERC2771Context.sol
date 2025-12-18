@@ -58,9 +58,10 @@ abstract contract ERC2771Context {
 
     /// @notice Indicates whether any particular address is the trusted forwarder.
     /// @param forwarder wallet address
-    /// @return isTrusted wether is a trusted forwarder or not.
-    function isTrustedForwarder(address forwarder) public view virtual returns (bool isTrusted) {
-        return forwarder == trustedForwarder();
+    /// @return isTrusted whether is a trusted forwarder or not.
+    function isTrustedForwarder(address forwarder) public view virtual returns (bool) {
+        address _trustedForwarder = trustedForwarder();
+        return _trustedForwarder != address(0) && forwarder == _trustedForwarder;
     }
 
     /// @dev Override for `msg.sender`. Defaults to the original `msg.sender` whenever

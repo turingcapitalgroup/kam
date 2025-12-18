@@ -18,15 +18,15 @@ error ParametersCheckerInvalidBlockAmount();
 error ParametersCheckerInvalidFrom();
 
 /// @title IParametersChecker
-/// @notice Interface for parameter validation contracts used in adapter call authorization.
+/// @notice Interface for parameter validation contracts used in adapter call validation.
 /// @dev Implementations validate call parameters to ensure adapter operations are safe and authorized.
 interface IParametersChecker {
-    /// @notice Validates and authorizes an adapter call with specific parameters.
+    /// @notice Validates an adapter call with specific parameters, reverting if invalid.
     /// @param adapter The adapter address making the call.
     /// @param target The target contract address.
     /// @param selector The function selector being called.
     /// @param params The encoded function parameters.
-    function authorizeAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params) external;
+    function validateAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params) external;
 }
 
 /// @title IAdapterGuardian
@@ -85,11 +85,11 @@ interface IAdapterGuardian {
                           VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Check if an adapter is authorized to call a specific function on a target
+    /// @notice Validates if an adapter can call a specific function on a target, reverting if not allowed
     /// @param target The target contract address
     /// @param selector The function selector
     /// @param params The function parameters
-    function authorizeAdapterCall(address target, bytes4 selector, bytes calldata params) external;
+    function validateAdapterCall(address target, bytes4 selector, bytes calldata params) external;
 
     /// @notice Check if a selector is allowed for an adapter
     /// @param adapter The adapter address

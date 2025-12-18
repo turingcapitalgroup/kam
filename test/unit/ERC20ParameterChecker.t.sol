@@ -172,10 +172,10 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                    AUTHORIZEADAPTERCALL - TRANSFER
+                    VALIDATEADAPTERCALL - TRANSFER
     //////////////////////////////////////////////////////////////*/
 
-    function test_AuthorizeAdapterCall_Transfer_Success() public {
+    function test_ValidateAdapterCall_Transfer_Success() public {
         uint256 _amount = 100 * _1_USDC;
         uint256 _maxAmount = 1000 * _1_USDC;
 
@@ -185,10 +185,10 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
         checker.setAllowedReceiver(testToken, testReceiver, true);
 
         bytes memory _params = abi.encode(testReceiver, _amount);
-        checker.authorizeAdapterCall(testAdapter, testToken, ERC20.transfer.selector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, ERC20.transfer.selector, _params);
     }
 
-    function test_AuthorizeAdapterCall_Transfer_Require_Below_Max_Amount() public {
+    function test_ValidateAdapterCall_Transfer_Require_Below_Max_Amount() public {
         uint256 _amount = 1000 * _1_USDC;
         uint256 _maxAmount = 100 * _1_USDC;
 
@@ -197,10 +197,10 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testReceiver, _amount);
         vm.expectRevert(bytes(PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
-        checker.authorizeAdapterCall(testAdapter, testToken, ERC20.transfer.selector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, ERC20.transfer.selector, _params);
     }
 
-    function test_AuthorizeAdapterCall_Transfer_Require_Allowed_Receiver() public {
+    function test_ValidateAdapterCall_Transfer_Require_Allowed_Receiver() public {
         uint256 _amount = 100 * _1_USDC;
         uint256 _maxAmount = 1000 * _1_USDC;
 
@@ -209,14 +209,14 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testReceiver, _amount);
         vm.expectRevert(bytes(PARAMETERCHECKER_RECEIVER_NOT_ALLOWED));
-        checker.authorizeAdapterCall(testAdapter, testToken, ERC20.transfer.selector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, ERC20.transfer.selector, _params);
     }
 
     /* //////////////////////////////////////////////////////////////
-                AUTHORIZEADAPTERCALL - TRANSFERFROM
+                VALIDATEADAPTERCALL - TRANSFERFROM
     //////////////////////////////////////////////////////////////*/
 
-    function test_AuthorizeAdapterCall_TransferFrom_Success() public {
+    function test_ValidateAdapterCall_TransferFrom_Success() public {
         uint256 _amount = 100 * _1_USDC;
         uint256 _maxAmount = 1000 * _1_USDC;
 
@@ -228,10 +228,10 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
         checker.setAllowedSource(testToken, testSource, true);
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
-        checker.authorizeAdapterCall(testAdapter, testToken, ERC20.transferFrom.selector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, ERC20.transferFrom.selector, _params);
     }
 
-    function test_AuthorizeAdapterCall_TransferFrom_Require_Below_Max_Amount() public {
+    function test_ValidateAdapterCall_TransferFrom_Require_Below_Max_Amount() public {
         uint256 _amount = 1000 * _1_USDC;
         uint256 _maxAmount = 100 * _1_USDC;
 
@@ -240,10 +240,10 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
         vm.expectRevert(bytes(PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
-        checker.authorizeAdapterCall(testAdapter, testToken, ERC20.transferFrom.selector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, ERC20.transferFrom.selector, _params);
     }
 
-    function test_AuthorizeAdapterCall_TransferFrom_Require_Allowed_Receiver() public {
+    function test_ValidateAdapterCall_TransferFrom_Require_Allowed_Receiver() public {
         uint256 _amount = 100 * _1_USDC;
         uint256 _maxAmount = 1000 * _1_USDC;
 
@@ -252,10 +252,10 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
         vm.expectRevert(bytes(PARAMETERCHECKER_RECEIVER_NOT_ALLOWED));
-        checker.authorizeAdapterCall(testAdapter, testToken, ERC20.transferFrom.selector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, ERC20.transferFrom.selector, _params);
     }
 
-    function test_AuthorizeAdapterCall_TransferFrom_Require_Allowed_Source() public {
+    function test_ValidateAdapterCall_TransferFrom_Require_Allowed_Source() public {
         uint256 _amount = 100 * _1_USDC;
         uint256 _maxAmount = 1000 * _1_USDC;
 
@@ -266,41 +266,41 @@ contract ERC20ParameterCheckerTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
         vm.expectRevert(bytes(PARAMETERCHECKER_SOURCE_NOT_ALLOWED));
-        checker.authorizeAdapterCall(testAdapter, testToken, ERC20.transferFrom.selector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, ERC20.transferFrom.selector, _params);
     }
 
     /* //////////////////////////////////////////////////////////////
-                AUTHORIZEADAPTERCALL - APPROVE
+                VALIDATEADAPTERCALL - APPROVE
     //////////////////////////////////////////////////////////////*/
 
-    function test_AuthorizeAdapterCall_Approve_Success() public {
+    function test_ValidateAdapterCall_Approve_Success() public {
         uint256 _amount = 100 * _1_USDC;
 
         vm.prank(users.admin);
         checker.setAllowedSpender(testToken, testSpender, true);
 
         bytes memory _params = abi.encode(testSpender, _amount);
-        checker.authorizeAdapterCall(testAdapter, testToken, ERC20.approve.selector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, ERC20.approve.selector, _params);
     }
 
-    function test_AuthorizeAdapterCall_Approve_Require_Allowed_Spender() public {
+    function test_ValidateAdapterCall_Approve_Require_Allowed_Spender() public {
         uint256 _amount = 100 * _1_USDC;
 
         bytes memory _params = abi.encode(testSpender, _amount);
         vm.expectRevert(bytes(PARAMETERCHECKER_SPENDER_NOT_ALLOWED));
-        checker.authorizeAdapterCall(testAdapter, testToken, ERC20.approve.selector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, ERC20.approve.selector, _params);
     }
 
     /* //////////////////////////////////////////////////////////////
-                AUTHORIZEADAPTERCALL - INVALID SELECTOR
+                VALIDATEADAPTERCALL - INVALID SELECTOR
     //////////////////////////////////////////////////////////////*/
 
-    function test_AuthorizeAdapterCall_Require_Valid_Selector() public {
+    function test_ValidateAdapterCall_Require_Valid_Selector() public {
         bytes4 _invalidSelector = bytes4(keccak256("invalidFunction()"));
         bytes memory _params = "";
 
         vm.expectRevert(bytes(PARAMETERCHECKER_SELECTOR_NOT_ALLOWED));
-        checker.authorizeAdapterCall(testAdapter, testToken, _invalidSelector, _params);
+        checker.validateAdapterCall(testAdapter, testToken, _invalidSelector, _params);
     }
 
     /* //////////////////////////////////////////////////////////////

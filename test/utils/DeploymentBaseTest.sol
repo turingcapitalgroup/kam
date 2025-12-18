@@ -40,6 +40,7 @@ import { DeployTokensScript } from "kam/script/deployment/05_DeployTokens.s.sol"
 import { DeployVaultModulesScript } from "kam/script/deployment/06_DeployVaultModules.s.sol";
 import { DeployVaultsScript } from "kam/script/deployment/07_DeployVaults.s.sol";
 import { DeployAdaptersScript } from "kam/script/deployment/08_DeployAdapters.s.sol";
+import { DeployInsuranceAccountScript } from "kam/script/deployment/12_DeployInsuranceAccount.s.sol";
 
 // Deployment manager for reading addresses
 import { DeploymentManager } from "kam/script/utils/DeploymentManager.sol";
@@ -70,6 +71,9 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
     VaultAdapter public BETHAVaultAdapterUSDC;
     VaultAdapter public vaultAdapter6;
     VaultAdapter public vaultAdapterImpl;
+
+    // Insurance
+    address public insuranceSmartAccount;
 
     MockERC7540 public erc7540USDC;
     MockERC7540 public erc7540WBTC;
@@ -216,6 +220,12 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             vaultsDeploy.betaVault
         );
 
+        // Deploy insurance smart account
+        DeployInsuranceAccountScript insuranceScript = new DeployInsuranceAccountScript();
+        insuranceScript.setVerbose(false);
+        DeployInsuranceAccountScript.InsuranceDeployment memory insuranceDeploy =
+            insuranceScript.run(false, registryDeploy.registry, address(0), address(0));
+
         factory = ERC1967Factory(registryDeploy.factory);
         registryImpl = kRegistry(payable(registryDeploy.registryImpl));
         registry = kRegistry(payable(registryDeploy.registry));
@@ -242,6 +252,8 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         DNVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.dnVaultAdapterUSDC));
         ALPHAVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.alphaVaultAdapter));
         BETHAVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.betaVaultAdapter));
+
+        insuranceSmartAccount = insuranceDeploy.insuranceSmartAccount;
 
         erc7540USDC = MockERC7540(mocks.ERC7540USDC);
         erc7540WBTC = MockERC7540(mocks.ERC7540WBTC);
@@ -282,6 +294,7 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         vm.label(address(BETHAVaultAdapterUSDC), "BETHAVaultAdapterUSDC");
         vm.label(address(vaultAdapterImpl), "VaultAdapterImpl");
         vm.label(address(wallet), "Wallet");
+        vm.label(insuranceSmartAccount, "InsuranceSmartAccount");
     }
 
     /// @dev Set up additional roles for testing (scripts handle main roles)

@@ -187,6 +187,9 @@ abstract contract DeploymentManager is Script {
         address WalletUSDC;
         address WalletWBTC;
         address erc20ParameterChecker;
+        address minimalSmartAccountImpl;
+        address minimalSmartAccountFactory;
+        address insuranceSmartAccount;
     }
 
     function getCurrentNetwork() internal view returns (string memory) {
@@ -518,6 +521,15 @@ abstract contract DeploymentManager is Script {
         if (json.keyExists(".contracts.erc20ParameterChecker")) {
             output.contracts.erc20ParameterChecker = json.readAddress(".contracts.erc20ParameterChecker");
         }
+        if (json.keyExists(".contracts.minimalSmartAccountImpl")) {
+            output.contracts.minimalSmartAccountImpl = json.readAddress(".contracts.minimalSmartAccountImpl");
+        }
+        if (json.keyExists(".contracts.minimalSmartAccountFactory")) {
+            output.contracts.minimalSmartAccountFactory = json.readAddress(".contracts.minimalSmartAccountFactory");
+        }
+        if (json.keyExists(".contracts.insuranceSmartAccount")) {
+            output.contracts.insuranceSmartAccount = json.readAddress(".contracts.insuranceSmartAccount");
+        }
 
         return output;
     }
@@ -589,6 +601,12 @@ abstract contract DeploymentManager is Script {
             output.contracts.WalletUSDC = contractAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("erc20ParameterChecker"))) {
             output.contracts.erc20ParameterChecker = contractAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("minimalSmartAccountImpl"))) {
+            output.contracts.minimalSmartAccountImpl = contractAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("minimalSmartAccountFactory"))) {
+            output.contracts.minimalSmartAccountFactory = contractAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("insuranceSmartAccount"))) {
+            output.contracts.insuranceSmartAccount = contractAddress;
         }
 
         string memory json = _serializeDeploymentOutput(output);
@@ -633,7 +651,16 @@ abstract contract DeploymentManager is Script {
         json = string.concat(json, '"ERC7540WBTC":"', vm.toString(output.contracts.ERC7540WBTC), '",');
         json = string.concat(json, '"WalletUSDC":"', vm.toString(output.contracts.WalletUSDC), '",');
         json =
-            string.concat(json, '"erc20ParameterChecker":"', vm.toString(output.contracts.erc20ParameterChecker), '"');
+            string.concat(json, '"erc20ParameterChecker":"', vm.toString(output.contracts.erc20ParameterChecker), '",');
+        json = string.concat(
+            json, '"minimalSmartAccountImpl":"', vm.toString(output.contracts.minimalSmartAccountImpl), '",'
+        );
+        json = string.concat(
+            json, '"minimalSmartAccountFactory":"', vm.toString(output.contracts.minimalSmartAccountFactory), '",'
+        );
+        json = string.concat(
+            json, '"insuranceSmartAccount":"', vm.toString(output.contracts.insuranceSmartAccount), '"'
+        );
         json = string.concat(json, "}}");
 
         return json;

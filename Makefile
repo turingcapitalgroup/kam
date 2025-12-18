@@ -43,6 +43,7 @@ help:
 	@echo "make deploy-modules     - Deploy vault modules (06)"
 	@echo "make deploy-vaults      - Deploy vaults (07)"
 	@echo "make deploy-adapters    - Deploy adapters (08)"
+	@echo "make deploy-insurance   - Deploy insurance smart account (12)"
 	@echo ""
 	@echo "Individual configuration steps (script/actions/):"
 	@echo "make configure          - Configure protocol (09)"
@@ -166,7 +167,7 @@ verify-sepolia:
 	@echo "✅ Sepolia verification complete!"
 
 # Complete deployment sequence (deploys contracts only)
-deploy-all: deploy-core setup-singletons deploy-tokens deploy-modules deploy-vaults deploy-adapters format-output
+deploy-all: deploy-core setup-singletons deploy-tokens deploy-modules deploy-vaults deploy-adapters deploy-insurance format-output
 	@echo "✅ Protocol deployment finished!"
 
 # Complete configuration sequence (configures deployed contracts)
@@ -222,6 +223,11 @@ deploy-vaults:
 deploy-adapters:
 	@echo "🔌 Deploying adapters..."
 	forge script script/deployment/08_DeployAdapters.s.sol --sig "run()" $(FORGE_ARGS)
+
+# Insurance (12)
+deploy-insurance:
+	@echo "🛡️  Deploying insurance smart account..."
+	forge script script/deployment/12_DeployInsuranceAccount.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Final configuration (09) - in actions folder
 configure:

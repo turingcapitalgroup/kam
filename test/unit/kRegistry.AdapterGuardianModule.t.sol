@@ -145,21 +145,21 @@ contract kRegistryAdapterGuardianModuleTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                    AUTHORIZEADAPTERCALL
+                    VALIDATEADAPTERCALL
     //////////////////////////////////////////////////////////////*/
 
-    function test_AuthorizeAdapterCall_Success() public {
+    function test_ValidateAdapterCall_Success() public {
         vm.prank(users.admin);
         guardianModule.setAdapterAllowedSelector(testAdapter, testTarget, TEST_TARGET_TYPE, testSelector, true);
 
         vm.prank(testAdapter);
-        guardianModule.authorizeAdapterCall(testTarget, testSelector, "");
+        guardianModule.validateAdapterCall(testTarget, testSelector, "");
     }
 
-    function test_AuthorizeAdapterCall_Require_Selector_Allowed() public {
+    function test_ValidateAdapterCall_Require_Selector_Allowed() public {
         vm.prank(testAdapter);
         vm.expectRevert(bytes(GUARDIANMODULE_NOT_ALLOWED));
-        guardianModule.authorizeAdapterCall(testTarget, testSelector, "");
+        guardianModule.validateAdapterCall(testTarget, testSelector, "");
     }
 
     /* //////////////////////////////////////////////////////////////

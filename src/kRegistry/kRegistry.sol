@@ -64,6 +64,9 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         /// @dev Insurance fee in basis points (100 = 1%, max 10000 = 100%)
         /// Portion of protocol profits allocated to insurance
         uint16 insuranceBps;
+        /// @dev Global pause flag for protocol-wide emergency stop
+        /// When true, all kBase-inheriting contracts are paused
+        bool globalPaused;
         /// @dev Set of all protocol-supported underlying assets (e.g., USDC, WBTC)
         /// Used to validate assets before operations and maintain a whitelist
         OptimizedAddressEnumerableSetLib.AddressSet supportedAssets;
@@ -247,6 +250,20 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         kRegistryStorage storage $ = _getkRegistryStorage();
         $.insuranceBps = _insuranceBps;
         emit InsuranceBpsSet(_insuranceBps);
+    }
+
+    /// @inheritdoc IRegistry
+    function setGlobalPause(bool _paused) external {
+        _checkEmergencyAdmin(msg.sender);
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        $.globalPaused = _paused;
+        emit GlobalPauseSet(_paused);
+    }
+
+    /// @inheritdoc IRegistry
+    function isGlobalPaused() external view returns (bool) {
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        return $.globalPaused;
     }
 
     /// @inheritdoc IRegistry
@@ -532,7 +549,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     }
 
     /// @inheritdoc IRegistry
-    function getFeeConfig()
+    function getSettlementConfig()
         external
         view
         returns (address treasury, address insurance, uint16 treasuryBps, uint16 insuranceBps)

@@ -129,7 +129,7 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdapterGuardian
-    function authorizeAdapterCall(address _target, bytes4 _selector, bytes calldata _params) external {
+    function validateAdapterCall(address _target, bytes4 _selector, bytes calldata _params) external {
         AdapterGuardianModuleStorage storage $ = _getAdapterGuardianModuleStorage();
 
         address _adapter = msg.sender;
@@ -138,7 +138,7 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
         address _checker = $.adapterParametersChecker[_adapter][_target][_selector];
         if (_checker == address(0)) return;
 
-        IParametersChecker(_checker).authorizeAdapterCall(_adapter, _target, _selector, _params);
+        IParametersChecker(_checker).validateAdapterCall(_adapter, _target, _selector, _params);
     }
 
     /// @inheritdoc IAdapterGuardian
@@ -188,7 +188,7 @@ contract AdapterGuardianModule is IAdapterGuardian, IModule, kBaseRoles {
         bytes4[] memory moduleSelectors = new bytes4[](7);
         moduleSelectors[0] = this.setAdapterAllowedSelector.selector;
         moduleSelectors[1] = this.setAdapterParametersChecker.selector;
-        moduleSelectors[2] = this.authorizeAdapterCall.selector;
+        moduleSelectors[2] = this.validateAdapterCall.selector;
         moduleSelectors[3] = this.isAdapterSelectorAllowed.selector;
         moduleSelectors[4] = this.getAdapterParametersChecker.selector;
         moduleSelectors[5] = this.getAdapterTargets.selector;

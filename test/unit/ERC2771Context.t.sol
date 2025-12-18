@@ -491,8 +491,7 @@ contract ERC2771ContextTest is BaseVaultTest {
 
         assertEq(vault.trustedForwarder(), address(0), "Trusted forwarder should be disabled");
         assertFalse(vault.isTrustedForwarder(newForwarder), "Old forwarder should no longer be trusted");
-        // Note: isTrustedForwarder(address(0)) returns true when forwarder is address(0)
-        // This is expected since address(0) == address(0), but address(0) can't send transactions
+        assertFalse(vault.isTrustedForwarder(address(0)), "Address 0 despite allowed should return false");
     }
 
     function test_SetTrustedForwarder_EmitsEvent() public {

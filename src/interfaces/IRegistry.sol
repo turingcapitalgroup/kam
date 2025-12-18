@@ -92,6 +92,10 @@ interface IRegistry is IVersioned {
     /// @param insuranceBps The new insurance fee in basis points
     event InsuranceBpsSet(uint16 insuranceBps);
 
+    /// @notice Emitted when the global pause state is updated
+    /// @param paused The new global pause state
+    event GlobalPauseSet(bool paused);
+
     /// @notice Emitted when a hurdle rate is set for an asset
     /// @param asset The asset receiving the hurdle rate
     /// @param hurdleRate The hurdle rate in basis points
@@ -391,13 +395,22 @@ interface IRegistry is IVersioned {
     /// @return The insurance fee in basis points
     function getInsuranceBps() external view returns (uint16);
 
+    /// @notice Sets the global pause state for the entire protocol
+    /// @dev Only callable by emergency admin. When true, all protocol operations are blocked.
+    /// @param paused_ The new global pause state
+    function setGlobalPause(bool paused_) external;
+
+    /// @notice Returns true if the protocol is globally paused
+    /// @return paused The current global pause state
+    function isGlobalPaused() external view returns (bool paused);
+
     /// @notice Gets all fee configuration in a single call
     /// @dev Optimized getter for external contracts needing full fee config
     /// @return treasury The treasury address
     /// @return insurance The insurance address
     /// @return treasuryBps The treasury fee in basis points
     /// @return insuranceBps The insurance fee in basis points
-    function getFeeConfig()
+    function getSettlementConfig()
         external
         view
         returns (address treasury, address insurance, uint16 treasuryBps, uint16 insuranceBps);

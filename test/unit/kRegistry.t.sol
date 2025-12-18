@@ -786,8 +786,10 @@ contract kRegistryTest is DeploymentBaseTest {
         registry.setInsurance(address(0));
     }
 
-    function test_GetInsurance_Returns_Zero_When_Not_Set() public view {
-        assertEq(registry.getInsurance(), address(0));
+    function test_GetInsurance_Returns_Deployed_Address() public view {
+        // Insurance is deployed during setup via DeployInsuranceAccountScript
+        assertNotEq(registry.getInsurance(), address(0));
+        assertEq(registry.getInsurance(), insuranceSmartAccount);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -884,7 +886,7 @@ contract kRegistryTest is DeploymentBaseTest {
                         FEE CONFIG GETTER
     //////////////////////////////////////////////////////////////*/
 
-    function test_GetFeeConfig_Returns_All_Values() public {
+    function test_getSettlementConfig_Returns_All_Values() public {
         address _newInsurance = makeAddr("NewInsurance");
         uint16 _treasuryBps = 1000;
         uint16 _insuranceBps = 500;
@@ -895,7 +897,7 @@ contract kRegistryTest is DeploymentBaseTest {
         registry.setInsuranceBps(_insuranceBps);
         vm.stopPrank();
 
-        (address _treasury, address _insurance, uint16 _tBps, uint16 _iBps) = registry.getFeeConfig();
+        (address _treasury, address _insurance, uint16 _tBps, uint16 _iBps) = registry.getSettlementConfig();
 
         assertEq(_treasury, users.treasury);
         assertEq(_insurance, _newInsurance);
@@ -903,11 +905,12 @@ contract kRegistryTest is DeploymentBaseTest {
         assertEq(_iBps, _insuranceBps);
     }
 
-    function test_GetFeeConfig_Returns_Defaults_When_Not_Set() public view {
-        (address _treasury, address _insurance, uint16 _treasuryBps, uint16 _insuranceBps) = registry.getFeeConfig();
+    function test_getSettlementConfig_Returns_Defaults_When_Not_Set() public view {
+        (address _treasury, address _insurance, uint16 _treasuryBps, uint16 _insuranceBps) =
+            registry.getSettlementConfig();
 
         assertEq(_treasury, users.treasury); // Set in initialize
-        assertEq(_insurance, address(0)); // Not set
+        assertEq(_insurance, insuranceSmartAccount); // Set during deployment via DeployInsuranceAccountScript
         assertEq(_treasuryBps, 0); // Not set
         assertEq(_insuranceBps, 0); // Not set
     }
@@ -941,5 +944,59 @@ contract kRegistryTest is DeploymentBaseTest {
         registry.setInsurance(_insurance);
 
         assertEq(registry.getInsurance(), _insurance);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        GLOBAL PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    function test_SetGlobalPause_Success() public {
+        assertFalse(registry.isGlobalPaused());
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        assertTrue(registry.isGlobalPaused());
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(false);
+
+        assertFalse(registry.isGlobalPaused());
+    }
+
+    function test_SetGlobalPause_EmitsEvent() public {
+        vm.prank(users.emergencyAdmin);
+        vm.expectEmit(false, false, false, true);
+        emit IRegistry.GlobalPauseSet(true);
+        registry.setGlobalPause(true);
+
+        vm.prank(users.emergencyAdmin);
+        vm.expectEmit(false, false, false, true);
+        emit IRegistry.GlobalPauseSet(false);
+        registry.setGlobalPause(false);
+    }
+
+    function test_SetGlobalPause_Require_Only_EmergencyAdmin() public {
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setGlobalPause(true);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setGlobalPause(true);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setGlobalPause(true);
+
+        vm.prank(users.bob);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setGlobalPause(true);
+
+        assertFalse(registry.isGlobalPaused());
+    }
+
+    function test_IsGlobalPaused_InitialValue() public view {
+        assertFalse(registry.isGlobalPaused());
     }
 }
