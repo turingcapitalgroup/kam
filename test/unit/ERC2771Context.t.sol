@@ -6,7 +6,7 @@ import { _1_USDC } from "../utils/Constants.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
-import { ERC2771Context } from "kam/src/base/ERC2771Context.sol";
+import { IERC2771 } from "kam/src/interfaces/IERC2771.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 
 import { VAULTCLAIMS_NOT_BENEFICIARY } from "kam/src/errors/Errors.sol";
@@ -496,9 +496,10 @@ contract ERC2771ContextTest is BaseVaultTest {
 
     function test_SetTrustedForwarder_EmitsEvent() public {
         address newForwarder = makeAddr("newForwarder");
+        address oldForwarder = vault.trustedForwarder();
 
-        vm.expectEmit(true, false, false, false);
-        emit ERC2771Context.TrustedForwarderSet(newForwarder);
+        vm.expectEmit(true, true, false, false);
+        emit IERC2771.TrustedForwarderSet(oldForwarder, newForwarder);
 
         vm.prank(users.owner);
         vault.setTrustedForwarder(newForwarder);

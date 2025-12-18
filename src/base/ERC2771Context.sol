@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import { IERC2771 } from "kam/src/interfaces/IERC2771.sol";
+
 /// @title ERC2771Context
 /// @notice Context variant with ERC-2771 support for meta-transactions.
 /// @dev Context variant with ERC-2771 support.
@@ -14,7 +16,7 @@ pragma solidity 0.8.30;
 /// WARNING: The usage of `delegatecall` in this contract is dangerous and may result in context corruption.
 /// Any forwarded request to this contract triggering a `delegatecall` to itself will result in an invalid {_msgSender}
 /// recovery
-abstract contract ERC2771Context {
+abstract contract ERC2771Context is IERC2771 {
     // keccak256(abi.encode(uint256(keccak256("erc2771.context")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 internal constant ERC2771_CONTEXT_STORAGE_LOCATION =
         0x4b8f1be850ba8944bb65aafc52e97e45326b89aafdae45bf4d91f44bccce2a00;
@@ -22,10 +24,6 @@ abstract contract ERC2771Context {
     struct ERC2771ContextStorage {
         address trustedForwarder;
     }
-
-    /// @notice Emitted when the trusted forwarder is updated
-    /// @param forwarder The new trusted forwarder address (address(0) to disable)
-    event TrustedForwarderSet(address indexed forwarder);
 
     function _getERC2771ContextStorage() private pure returns (ERC2771ContextStorage storage $) {
         assembly {
@@ -46,8 +44,9 @@ abstract contract ERC2771Context {
     /// @param trustedForwarder_ The new trusted forwarder address (address(0) to disable)
     function _setTrustedForwarder(address trustedForwarder_) internal virtual {
         ERC2771ContextStorage storage $ = _getERC2771ContextStorage();
+        address _oldForwarder = $.trustedForwarder;
         $.trustedForwarder = trustedForwarder_;
-        emit TrustedForwarderSet(trustedForwarder_);
+        emit TrustedForwarderSet(_oldForwarder, trustedForwarder_);
     }
 
     /// @notice Returns the address of the trusted forwarder.

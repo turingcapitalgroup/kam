@@ -45,12 +45,11 @@ contract DeployInsuranceAccountScript is Script, DeploymentManager {
         NetworkConfig memory config = readNetworkConfig();
         DeploymentOutput memory existing;
 
-        // If addresses not provided, read from JSON (for real deployments)
-        if (registryAddr == address(0) || existingImplAddr == address(0) || existingFactoryAddr == address(0)) {
+        // Only read registry from JSON if not provided
+        // impl/factory are always deployed fresh if zero (not read from JSON)
+        if (registryAddr == address(0)) {
             existing = readDeploymentOutput();
-            if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
-            if (existingImplAddr == address(0)) existingImplAddr = existing.contracts.minimalSmartAccountImpl;
-            if (existingFactoryAddr == address(0)) existingFactoryAddr = existing.contracts.minimalSmartAccountFactory;
+            registryAddr = existing.contracts.kRegistry;
         }
 
         // Populate existing for logging
