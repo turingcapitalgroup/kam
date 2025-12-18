@@ -54,6 +54,6 @@ interface IkStakingVault is IVault, IVaultReader {
 
     /// @notice Sets or disables the trusted forwarder for meta-transactions
     /// @dev Only callable by owner. Set to address(0) to disable meta-transactions (kill switch).
-    /// @param _trustedForwarder The new trusted forwarder address (address(0) to disable)
+    /// @param trustedForwarder_ The new trusted forwarder address (address(0) to disable)
     function setTrustedForwarder(address trustedForwarder_) external;
 }
