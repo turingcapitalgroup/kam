@@ -8,7 +8,8 @@
     "guardian": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
     "relayer": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
     "institution": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
-    "treasury": "0x976EA74026E726554dB657fA54763abd0C3a0aa9"
+    "treasury": "0x976EA74026E726554dB657fA54763abd0C3a0aa9",
+    "insurance": "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955"
   },
   "assets": {
     "USDC": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
@@ -84,7 +85,9 @@
     "hurdleRate": {
       "USDC": 500,
       "WBTC": 500
-    }
+    },
+    "treasuryBps": 1000,
+    "insuranceBps": 500
   },
   "assetRouter": {
     "settlementCooldown": 0,

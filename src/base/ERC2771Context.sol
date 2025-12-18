@@ -23,6 +23,10 @@ abstract contract ERC2771Context {
         address trustedForwarder;
     }
 
+    /// @notice Emitted when the trusted forwarder is updated
+    /// @param forwarder The new trusted forwarder address (address(0) to disable)
+    event TrustedForwarderSet(address indexed forwarder);
+
     function _getERC2771ContextStorage() private pure returns (ERC2771ContextStorage storage $) {
         assembly {
             $.slot := 0x4b8f1be850ba8944bb65aafc52e97e45326b89aafdae45bf4d91f44bccce2a00
@@ -36,6 +40,14 @@ abstract contract ERC2771Context {
     function _initializeContext(address trustedForwarder_) internal {
         ERC2771ContextStorage storage $ = _getERC2771ContextStorage();
         $.trustedForwarder = trustedForwarder_;
+    }
+
+    /// @dev Sets or disables the trusted forwarder for meta-transactions
+    /// @param trustedForwarder_ The new trusted forwarder address (address(0) to disable)
+    function _setTrustedForwarder(address trustedForwarder_) internal virtual {
+        ERC2771ContextStorage storage $ = _getERC2771ContextStorage();
+        $.trustedForwarder = trustedForwarder_;
+        emit TrustedForwarderSet(trustedForwarder_);
     }
 
     /// @notice Returns the address of the trusted forwarder.

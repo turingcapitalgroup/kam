@@ -55,6 +55,15 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// Uses the diamond storage pattern to prevent storage collisions in upgradeable contracts.
     /// @custom:storage-location erc7201:kam.storage.kRegistry
     struct kRegistryStorage {
+        /// @dev Protocol insurance address for insurance fee collection
+        /// Receives protocol insurance fees for coverage reserves
+        address insurance;
+        /// @dev Treasury fee in basis points (100 = 1%, max 10000 = 100%)
+        /// Portion of protocol profits allocated to treasury
+        uint16 treasuryBps;
+        /// @dev Insurance fee in basis points (100 = 1%, max 10000 = 100%)
+        /// Portion of protocol profits allocated to insurance
+        uint16 insuranceBps;
         /// @dev Set of all protocol-supported underlying assets (e.g., USDC, WBTC)
         /// Used to validate assets before operations and maintain a whitelist
         OptimizedAddressEnumerableSetLib.AddressSet supportedAssets;
@@ -211,6 +220,33 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         _checkAddressNotZero(_treasury);
         $.treasury = _treasury;
         emit TreasurySet(_treasury);
+    }
+
+    /// @inheritdoc IRegistry
+    function setInsurance(address _insurance) external payable {
+        _checkAdmin(msg.sender);
+        _checkAddressNotZero(_insurance);
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        $.insurance = _insurance;
+        emit InsuranceSet(_insurance);
+    }
+
+    /// @inheritdoc IRegistry
+    function setTreasuryBps(uint16 _treasuryBps) external payable {
+        _checkAdmin(msg.sender);
+        require(_treasuryBps <= MAX_BPS, KREGISTRY_FEE_EXCEEDS_MAXIMUM);
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        $.treasuryBps = _treasuryBps;
+        emit TreasuryBpsSet(_treasuryBps);
+    }
+
+    /// @inheritdoc IRegistry
+    function setInsuranceBps(uint16 _insuranceBps) external payable {
+        _checkAdmin(msg.sender);
+        require(_insuranceBps <= MAX_BPS, KREGISTRY_FEE_EXCEEDS_MAXIMUM);
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        $.insuranceBps = _insuranceBps;
+        emit InsuranceBpsSet(_insuranceBps);
     }
 
     /// @inheritdoc IRegistry
@@ -478,6 +514,31 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     function getTreasury() external view returns (address) {
         kRegistryStorage storage $ = _getkRegistryStorage();
         return $.treasury;
+    }
+
+    /// @inheritdoc IRegistry
+    function getInsurance() external view returns (address) {
+        return _getkRegistryStorage().insurance;
+    }
+
+    /// @inheritdoc IRegistry
+    function getTreasuryBps() external view returns (uint16) {
+        return _getkRegistryStorage().treasuryBps;
+    }
+
+    /// @inheritdoc IRegistry
+    function getInsuranceBps() external view returns (uint16) {
+        return _getkRegistryStorage().insuranceBps;
+    }
+
+    /// @inheritdoc IRegistry
+    function getFeeConfig()
+        external
+        view
+        returns (address treasury, address insurance, uint16 treasuryBps, uint16 insuranceBps)
+    {
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        return ($.treasury, $.insurance, $.treasuryBps, $.insuranceBps);
     }
 
     /// @inheritdoc IRegistry

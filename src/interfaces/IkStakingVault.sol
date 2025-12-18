@@ -45,4 +45,15 @@ interface IkStakingVault is IVault, IVaultReader {
 
     /// @notice Transfers tokens from sender to recipient using the allowance mechanism
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
+
+    /// @notice Returns the address of the trusted forwarder for meta-transactions
+    function trustedForwarder() external view returns (address);
+
+    /// @notice Indicates whether any particular address is the trusted forwarder
+    function isTrustedForwarder(address forwarder) external view returns (bool);
+
+    /// @notice Sets or disables the trusted forwarder for meta-transactions
+    /// @dev Only callable by owner. Set to address(0) to disable meta-transactions (kill switch).
+    /// @param _trustedForwarder The new trusted forwarder address (address(0) to disable)
+    function setTrustedForwarder(address trustedForwarder_) external;
 }

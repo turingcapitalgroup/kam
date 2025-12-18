@@ -578,6 +578,12 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _setPaused(_paused);
     }
 
+    /// @inheritdoc IkStakingVault
+    function setTrustedForwarder(address _trustedForwarder) external {
+        _checkOwner();
+        _setTrustedForwarder(_trustedForwarder);
+    }
+
     /// @notice Authorize upgrade (only owner can upgrade)
     /// @dev This allows upgrading the main contract while keeping modules separate
     function _authorizeUpgrade(address _newImplementation) internal view override {

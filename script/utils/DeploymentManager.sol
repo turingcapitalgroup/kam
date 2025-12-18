@@ -43,6 +43,7 @@ abstract contract DeploymentManager is Script {
         address relayer;
         address institution;
         address treasury;
+        address insurance;
     }
 
     struct AssetAddresses {
@@ -82,6 +83,8 @@ abstract contract DeploymentManager is Script {
 
     struct RegistryConfig {
         HurdleRateConfig hurdleRate;
+        uint16 treasuryBps;
+        uint16 insuranceBps;
     }
 
     struct HurdleRateConfig {
@@ -235,6 +238,7 @@ abstract contract DeploymentManager is Script {
         config.roles.relayer = json.readAddress(".roles.relayer");
         config.roles.institution = json.readAddress(".roles.institution");
         config.roles.treasury = json.readAddress(".roles.treasury");
+        config.roles.insurance = json.readAddress(".roles.insurance");
 
         // Parse asset addresses
         config.assets.USDC = json.readAddress(".assets.USDC");
@@ -269,6 +273,8 @@ abstract contract DeploymentManager is Script {
         // Parse registry config
         config.registry.hurdleRate.USDC = uint16(json.readUint(".registry.hurdleRate.USDC"));
         config.registry.hurdleRate.WBTC = uint16(json.readUint(".registry.hurdleRate.WBTC"));
+        config.registry.treasuryBps = uint16(json.readUint(".registry.treasuryBps"));
+        config.registry.insuranceBps = uint16(json.readUint(".registry.insuranceBps"));
 
         // Parse asset router config
         config.assetRouter.settlementCooldown = json.readUint(".assetRouter.settlementCooldown");
@@ -641,6 +647,7 @@ abstract contract DeploymentManager is Script {
         require(config.roles.relayer != address(0), "Missing relayer address");
         require(config.roles.institution != address(0), "Missing institution address");
         require(config.roles.treasury != address(0), "Missing treasury address");
+        require(config.roles.insurance != address(0), "Missing insurance address");
         require(config.assets.USDC != address(0), "Missing USDC address");
         require(config.assets.WBTC != address(0), "Missing WBTC address");
     }
@@ -682,6 +689,7 @@ abstract contract DeploymentManager is Script {
         console.log("Relayer:", config.roles.relayer);
         console.log("Institution:", config.roles.institution);
         console.log("Treasury:", config.roles.treasury);
+        console.log("Insurance:", config.roles.insurance);
         console.log("USDC:", config.assets.USDC);
         console.log("WBTC:", config.assets.WBTC);
         console.log("Settlement Cooldown:", config.assetRouter.settlementCooldown);
@@ -728,6 +736,7 @@ abstract contract DeploymentManager is Script {
         console.log("Relayer:          ", config.roles.relayer);
         console.log("Institution:      ", config.roles.institution);
         console.log("Treasury:         ", config.roles.treasury);
+        console.log("Insurance:        ", config.roles.insurance);
         console.log("");
     }
 
@@ -800,6 +809,8 @@ abstract contract DeploymentManager is Script {
         console.log("--- REGISTRY CONFIG ---");
         console.log("Hurdle Rate USDC: ", config.registry.hurdleRate.USDC);
         console.log("Hurdle Rate WBTC: ", config.registry.hurdleRate.WBTC);
+        console.log("Treasury BPS:     ", config.registry.treasuryBps);
+        console.log("Insurance BPS:    ", config.registry.insuranceBps);
         console.log("");
     }
 
