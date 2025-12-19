@@ -1,5 +1,5 @@
 # OptimizedSafeCastLib
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/vendor/solady/utils/OptimizedSafeCastLib.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/vendor/solady/utils/OptimizedSafeCastLib.sol)
 
 **Authors:**
 Originally by Solady (https://github.com/vectorized/solady/blob/main/src/utils/SafeCastLib.sol), Modified from OpenZeppelin

@@ -1,8 +1,12 @@
 # IVaultAdapter
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IVaultAdapter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/interfaces/IVaultAdapter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+
+Interface for vault adapters that manage external protocol integrations for yield generation.
+
+Provides standardized methods for pausing, asset rescue, and total assets tracking across adapters.
 
 
 ## Functions
@@ -27,32 +31,6 @@ function setPaused(bool paused_) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`paused_`|`bool`|The desired pause state (true = halt operations, false = resume normal operation)|
-
-
-### rescueAssets
-
-Rescues accidentally sent assets (ETH or ERC20 tokens) preventing permanent loss of funds
-
-This function implements a critical safety mechanism for recovering tokens or ETH that become stuck
-in the contract through user error or airdrops. The rescue process: (1) Validates admin authorization to
-prevent unauthorized fund extraction, (2) Ensures recipient address is valid to prevent burning funds,
-(3) For ETH rescue (asset_=address(0)): validates balance sufficiency and uses low-level call for transfer,
-(4) For ERC20 rescue: critically checks the token is NOT a registered protocol asset (USDC, WBTC, etc.) to
-protect user deposits and protocol integrity, then validates balance and uses SafeTransferLib for secure
-transfer. The distinction between ETH and ERC20 handling accounts for their different transfer mechanisms.
-Protocol assets are explicitly blocked from rescue to prevent admin abuse and maintain user trust.
-
-
-```solidity
-function rescueAssets(address asset_, address to_, uint256 amount_) external payable;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`asset_`|`address`|The asset to rescue (use address(0) for native ETH, otherwise ERC20 token address)|
-|`to_`|`address`|The recipient address that will receive the rescued assets (cannot be zero address)|
-|`amount_`|`uint256`|The quantity to rescue (must not exceed available balance)|
 
 
 ### setTotalAssets
@@ -142,45 +120,6 @@ event Paused(bool paused_);
 |Name|Type|Description|
 |----|----|-----------|
 |`paused_`|`bool`|The new pause state (true = operations halted, false = normal operation)|
-
-### RescuedAssets
-Emitted when ERC20 tokens are rescued from the contract to prevent permanent loss
-
-This rescue mechanism is restricted to non-protocol assets only - registered assets (USDC, WBTC, etc.)
-cannot be rescued to protect user funds and maintain protocol integrity. Typically used to recover
-accidentally sent tokens or airdrops. Only admin role can execute rescues as a security measure.
-
-
-```solidity
-event RescuedAssets(address indexed asset_, address indexed to_, uint256 amount_);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`asset_`|`address`|The ERC20 token address being rescued (must not be a registered protocol asset)|
-|`to_`|`address`|The recipient address receiving the rescued tokens (cannot be zero address)|
-|`amount_`|`uint256`|The quantity of tokens rescued (must not exceed contract balance)|
-
-### RescuedETH
-Emitted when native ETH is rescued from the contract to recover stuck funds
-
-ETH rescue is separate from ERC20 rescue due to different transfer mechanisms. This prevents
-ETH from being permanently locked if sent to the contract accidentally. Uses low-level call for
-ETH transfer with proper success checking. Only admin role authorized for security.
-
-
-```solidity
-event RescuedETH(address indexed to_, uint256 amount_);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`to_`|`address`|The recipient address receiving the rescued ETH (cannot be zero address)|
-|`amount_`|`uint256`|The quantity of ETH rescued in wei (must not exceed contract balance)|
 
 ### TotalAssetsUpdated
 Emitted when total assets are updated

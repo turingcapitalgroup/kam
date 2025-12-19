@@ -1,5 +1,5 @@
 # MultiFacetProxy
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/base/MultiFacetProxy.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/base/MultiFacetProxy.sol)
 
 **Inherits:**
 [Proxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md)

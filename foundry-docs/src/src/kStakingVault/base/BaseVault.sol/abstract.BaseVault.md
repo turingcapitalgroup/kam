@@ -1,5 +1,5 @@
 # BaseVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kStakingVault/base/BaseVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kStakingVault/base/BaseVault.sol)
 
 **Inherits:**
 [ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
@@ -20,24 +20,6 @@ while reducing code duplication and ensuring consistent behavior across the vaul
 
 
 ## State Variables
-### K_ASSET_ROUTER
-kAssetRouter key
-
-
-```solidity
-bytes32 internal constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER")
-```
-
-
-### K_MINTER
-kMinter key
-
-
-```solidity
-bytes32 internal constant K_MINTER = keccak256("K_MINTER")
-```
-
-
 ### DECIMALS_MASK
 Bitmask and shift constants for module configuration
 
@@ -749,20 +731,22 @@ struct BaseVaultStorage {
     //3
     uint256 currentBatch;
     //4
-    bytes32 currentBatchId;
+    uint256 requestCounter;
     //5
-    address registry;
+    bytes32 currentBatchId;
     //6
-    address receiverImplementation;
+    address registry;
     //7
-    address underlyingAsset;
+    address receiverImplementation;
     //8
-    address kToken;
+    address underlyingAsset;
     //9
-    uint128 maxTotalAssets;
+    address kToken;
     //10
-    string name;
+    uint128 maxTotalAssets;
     //11
+    string name;
+    //12
     string symbol;
     mapping(bytes32 => BaseVaultTypes.BatchInfo) batches;
     mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;

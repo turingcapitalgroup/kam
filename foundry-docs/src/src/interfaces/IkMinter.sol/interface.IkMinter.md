@@ -1,5 +1,5 @@
 # IkMinter
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IkMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/interfaces/IkMinter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -425,6 +425,21 @@ function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
 |`isClosed_`|`bool`|the state of the given batchId|
 
 
+### receiverImplementation
+
+Returns the receiver implementation address used to clone batch receivers
+
+
+```solidity
+function receiverImplementation() external view returns (address);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The address of the receiver implementation contract|
+
+
 ## Events
 ### ContractInitialized
 Emitted when the kMinter contract is initialized
@@ -501,23 +516,6 @@ event Burned(
 |`recipient`|`address`|The address that received the assets|
 |`amount`|`uint256`|The amount sent to the recipient|
 |`batchId`|`bytes32`|The batchId related to the transaction|
-
-### Cancelled
-Emitted when a pending redemption request is cancelled before batch closure
-
-
-```solidity
-event Cancelled(bytes32 indexed requestId, address user, uint256 amount, bytes32 batchId);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`requestId`|`bytes32`|The unique identifier of the cancelled redemption request|
-|`user`|`address`|The address of the user requesting the cancellation|
-|`amount`|`uint256`||
-|`batchId`|`bytes32`||
 
 ### BatchCreated
 

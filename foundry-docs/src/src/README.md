@@ -3,6 +3,7 @@
 # Contents
 - [adapters](/src/adapters)
 - [base](/src/base)
+- [constants](/src/constants)
 - [errors](/src/errors)
 - [interfaces](/src/interfaces)
 - [kRegistry](/src/kRegistry)

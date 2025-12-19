@@ -1,8 +1,8 @@
 # kToken
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kToken.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kToken.sol)
 
 **Inherits:**
-[IkToken](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkToken.sol/interface.IkToken.md), [ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedOwnableRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [Multicallable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Multicallable.sol/abstract.Multicallable.md), [ERC3009](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC3009.sol/abstract.ERC3009.md)
+[IkToken](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkToken.sol/interface.IkToken.md), [ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedOwnableRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [Multicallable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Multicallable.sol/abstract.Multicallable.md), [ERC3009](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC3009.sol/abstract.ERC3009.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md)
 
 ERC20 representation of underlying assets with guaranteed 1:1 backing in the KAM protocol
 
@@ -43,63 +43,55 @@ uint256 public constant MINTER_ROLE = _ROLE_2
 ```
 
 
-### _isPaused
-Emergency pause state flag for halting all token operations during crises
-
-When true, prevents all transfers, minting, and burning through _beforeTokenTransfer hook
-
+### KTOKEN_STORAGE_LOCATION
 
 ```solidity
-bool _isPaused
-```
-
-
-### _name
-Human-readable name of the kToken (e.g., "KAM USDC")
-
-Stored privately to override ERC20 default implementation with custom naming
-
-
-```solidity
-string private _name
-```
-
-
-### _symbol
-Trading symbol of the kToken (e.g., "kUSDC")
-
-Stored privately to provide consistent protocol naming convention
-
-
-```solidity
-string private _symbol
-```
-
-
-### _decimals
-Number of decimal places for the kToken, matching the underlying asset
-
-Critical for maintaining 1:1 exchange rates with underlying assets
-
-
-```solidity
-uint8 private _decimals
+bytes32 private constant KTOKEN_STORAGE_LOCATION =
+    0x16bd9563685e3cbcdc4b78929edb0548ee39d4c92d391b8a20b1f73a439d0800
 ```
 
 
 ## Functions
+### _getkTokenStorage
+
+Retrieves the kToken storage struct from its designated storage slot
+
+Uses ERC-7201 namespaced storage pattern to access the storage struct at a deterministic location.
+This approach prevents storage collisions in upgradeable contracts and allows safe addition of new
+storage variables in future upgrades without affecting existing storage layout.
+
+
+```solidity
+function _getkTokenStorage() private pure returns (kTokenStorage storage $);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`$`|`kTokenStorage`|The kTokenStorage struct reference for state modifications|
+
+
 ### constructor
 
-Deploys and initializes a new kToken with specified parameters and role assignments
+Disables initializers to prevent implementation contract initialization
 
-This constructor is called by kRegistry during asset registration to create the kToken wrapper.
+
+```solidity
+constructor() ;
+```
+
+### initialize
+
+Initializes the kToken contract with specified parameters and role assignments
+
+This function is called during deployment to set up the kToken wrapper.
 The process establishes: (1) ownership hierarchy with owner at the top, (2) role assignments for protocol
 operations, (3) token metadata matching the underlying asset. The decimals parameter is particularly
 important as it must match the underlying asset to maintain accurate 1:1 exchange rates.
 
 
 ```solidity
-constructor(
+function initialize(
     address _owner,
     address _admin,
     address _emergencyAdmin,
@@ -107,7 +99,9 @@ constructor(
     string memory _nameValue,
     string memory _symbolValue,
     uint8 _decimalsValue
-) ;
+)
+    external
+    initializer;
 ```
 **Parameters**
 
@@ -622,4 +616,49 @@ function _beforeTokenTransfer(address _from, address _to, uint256 _amount) inter
 |`_to`|`address`|The destination address (address(0) for burning operations)|
 |`_amount`|`uint256`|The quantity of tokens being transferred/minted/burned|
 
+
+### _authorizeUpgrade
+
+Authorizes contract upgrades
+
+Only callable by contract owner
+
+
+```solidity
+function _authorizeUpgrade(address _newImplementation) internal view override;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_newImplementation`|`address`|New implementation address|
+
+
+## Structs
+### kTokenStorage
+Core storage structure for kToken using ERC-7201 namespaced storage pattern
+
+This structure maintains all token state including metadata and pause status.
+Uses the diamond storage pattern to prevent storage collisions in upgradeable contracts.
+
+**Note:**
+storage-location: erc7201:kam.storage.kToken
+
+
+```solidity
+struct kTokenStorage {
+    /// @dev Emergency pause state flag for halting all token operations during crises
+    /// When true, prevents all transfers, minting, and burning through _beforeTokenTransfer hook
+    bool isPaused;
+    /// @dev Human-readable name of the kToken (e.g., "KAM USDC")
+    /// Stored to override ERC20 default implementation with custom naming
+    string name;
+    /// @dev Trading symbol of the kToken (e.g., "kUSDC")
+    /// Stored to provide consistent protocol naming convention
+    string symbol;
+    /// @dev Number of decimal places for the kToken, matching the underlying asset
+    /// Critical for maintaining 1:1 exchange rates with underlying assets
+    uint8 decimals;
+}
+```
 

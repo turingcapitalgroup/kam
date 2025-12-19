@@ -1,5 +1,5 @@
 # kMinter
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kMinter.sol)
 
 **Inherits:**
 [IkMinter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
@@ -413,6 +413,21 @@ function isClosed(bytes32 _batchId) external view returns (bool _isClosed);
 |Name|Type|Description|
 |----|----|-----------|
 |`_isClosed`|`bool`|isClosed_ the state of the given batchId|
+
+
+### receiverImplementation
+
+Returns the receiver implementation address used to clone batch receivers
+
+
+```solidity
+function receiverImplementation() external view returns (address);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The address of the receiver implementation contract|
 
 
 ### _checkNotPaused
