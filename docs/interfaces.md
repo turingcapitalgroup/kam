@@ -112,7 +112,19 @@ Central registry managing protocol contracts, supported assets, vault registrati
 - `getAdapter(address vault, address asset)` - Returns adapter for a given vault-asset combination
 - `removeAdapter(address vault, address asset, address adapter)` - Removes adapter registration
 - `isAdapterRegistered(address vault, address asset, address adapter)` - Validates adapter registration status
-- `isAdapterSelectorAllowed(address adapter, address target, bytes4 selector)` - Validates if adapter can call target/selector (via AdapterGuardianModule)
+- `isSelectorAllowed(address executor, address target, bytes4 selector)` - Validates if executor can call target/selector (via ExecutionGuardianModule)
+
+**Treasury & Insurance Configuration**
+
+- `setTreasury(address treasury_)` - Sets the treasury address (ADMIN_ROLE required)
+- `getTreasury()` - Returns the treasury address
+- `setTreasuryBps(uint16 treasuryBps_)` - Sets treasury allocation in basis points (ADMIN_ROLE required)
+- `getTreasuryBps()` - Returns treasury allocation in basis points
+- `setInsurance(address insurance_)` - Sets the insurance fund address for depeg protection reserves (ADMIN_ROLE required)
+- `getInsurance()` - Returns the insurance fund address
+- `setInsuranceBps(uint16 insuranceBps_)` - Sets insurance allocation from kMinter yields in basis points (ADMIN_ROLE required)
+- `getInsuranceBps()` - Returns insurance allocation in basis points
+- `getSettlementConfig()` - Returns settlement configuration (treasury, insurance, treasuryBps, insuranceBps)
 
 **Treasury & Insurance Configuration**
 
@@ -314,7 +326,7 @@ Interface for vault adapter contracts that manage external strategy integrations
 
 **Core Operations**
 
-- `execute(address target, bytes calldata data, uint256 value)` - Executes permissioned calls to external contracts (MANAGER_ROLE required, validated via registry.isAdapterSelectorAllowed())
+- `execute(address target, bytes calldata data, uint256 value)` - Executes permissioned calls to external contracts (MANAGER_ROLE required, validated via registry.authorizeCall())
 - `setTotalAssets(uint256 totalAssets_)` - Updates the last recorded total assets for accounting (kAssetRouter only)
 - `totalAssets()` - Returns current total assets under management (virtual balance)
 - `pull(address asset, uint256 amount)` - Transfers assets to kAssetRouter (kAssetRouter only)
@@ -322,7 +334,31 @@ Interface for vault adapter contracts that manage external strategy integrations
 **Emergency Functions**
 
 - `setPaused(bool paused_)` - Emergency pause mechanism for risk management (EMERGENCY_ADMIN_ROLE required)
-- `rescueAssets(address asset_, address to_, uint256 amount_)` - Recovers accidentally sent tokens (ADMIN_ROLE required, non-protocol assets only)
+
+## Module Interfaces
+
+### IExecutionGuardian
+
+Interface for managing executor permissions and security controls. Part of the kRegistry module system that validates executor calls to external protocols.
+
+**Permission Management**
+
+- `setAllowedSelector(address executor, address target, uint8 targetType, bytes4 selector, bool allowed)` - Configures which function selectors an executor can call on a target contract (ADMIN_ROLE required)
+- `setExecutionValidator(address executor, address target, bytes4 selector, address validator)` - Sets an execution validator contract for specific executor-target-selector combinations (ADMIN_ROLE required)
+
+**Validation Functions**
+
+- `authorizeCall(address target, bytes4 selector, bytes calldata params)` - Validates if the calling executor can execute a specific call, reverting if not allowed. Called by VaultAdapter before external protocol interactions.
+- `isSelectorAllowed(address executor, address target, bytes4 selector)` - Checks if a specific selector is allowed for an executor-target pair
+- `getExecutionValidator(address executor, address target, bytes4 selector)` - Returns the execution validator contract for a given combination
+- `getExecutorTargets(address executor)` - Returns all target contracts registered for an executor
+- `getTargetType(address target)` - Returns the type classification of a target contract
+
+### IExecutionValidator
+
+Interface for execution validation contracts used in executor call validation. Implementations validate call parameters to ensure executor operations are safe and authorized.
+
+- `authorizeCall(address executor, address target, bytes4 selector, bytes calldata params)` - Validates parameters for an executor call, reverting if invalid
 
 ## Module Interfaces
 
