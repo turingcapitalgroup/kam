@@ -14,7 +14,7 @@ import { IExecutionValidator } from "kam/src/interfaces/modules/IExecutionGuardi
 /// @notice Lightweight registry for cross-chain metaWallet adapter validation
 /// @dev Simplified version of kRegistry for deployment on chains where the full KAM protocol is not deployed.
 /// Provides adapter permission management and call validation for SmartAdapterAccount contracts.
-contract kRemoteRegistry is IkRemoteRegistry, IVersioned, Initializable, UUPSUpgradeable, Ownable {
+contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ownable {
     using OptimizedAddressEnumerableSetLib for OptimizedAddressEnumerableSetLib.AddressSet;
 
     /* //////////////////////////////////////////////////////////////
