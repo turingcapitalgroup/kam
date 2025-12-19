@@ -72,7 +72,6 @@ The KAM Protocol implements a comprehensive role-based access control system usi
   - `kToken.setPaused()` - Pause token operations
   - `VaultAdapter.setPaused()` - Pause adapter operations
   - `kRegistry.rescueAssets()` - Emergency asset recovery
-  - `VaultAdapter.rescueAssets()` - Emergency adapter asset recovery
 
 ### GUARDIAN_ROLE
 
@@ -139,7 +138,7 @@ The KAM Protocol implements a comprehensive role-based access control system usi
   - Coordinate with external protocols following permission model
 - **Key Functions**:
   - `VaultAdapter.execute()` - Execute calls to whitelisted targets/selectors (only function using MANAGER_ROLE)
-- **Note**: Execution is restricted by `isAdapterSelectorAllowed()` checks enforced by registry
+- **Note**: Execution is restricted by `authorizeCall()` checks enforced by registry's ExecutionGuardianModule
 
 ## Role Usage Flow Diagrams
 
@@ -333,7 +332,7 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │• execute() - Execute permissioned calls to external         ││
 │  │  protocols (only function using MANAGER_ROLE)               ││
-│  │  - Validates via registry.isAdapterSelectorAllowed()        ││
+│  │  - Validates via registry.authorizeCall()                   ││
 │  │  - Only whitelisted target/selector combinations allowed    ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
@@ -342,11 +341,6 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  │• setTotalAssets() - Set total assets for accounting         ││
 │  │• pull() - Transfer assets to kAssetRouter                   ││
 │  │  (only kAssetRouter can call these functions)               ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                 │
-│  ADMIN_ROLE Functions:                                          │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │• rescueAssets() - Emergency asset recovery                  ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 │  EMERGENCY_ADMIN_ROLE Functions:                                │
