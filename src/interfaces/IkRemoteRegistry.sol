@@ -25,25 +25,6 @@ interface IkRemoteRegistry is IVersioned {
     event ExecutionValidatorSet(address indexed executor, address indexed target, bytes4 selector, address validator);
 
     /* //////////////////////////////////////////////////////////////
-                                ERRORS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Thrown when an executor call is not allowed
-    error REMOTEREGISTRY_NOT_ALLOWED();
-
-    /// @notice Thrown when a zero address is provided
-    error REMOTEREGISTRY_ZERO_ADDRESS();
-
-    /// @notice Thrown when a zero selector is provided
-    error REMOTEREGISTRY_ZERO_SELECTOR();
-
-    /// @notice Thrown when trying to set a selector that is already set to the same value
-    error REMOTEREGISTRY_SELECTOR_ALREADY_SET();
-
-    /// @notice Thrown when trying to set an execution validator for a selector that is not allowed
-    error REMOTEREGISTRY_SELECTOR_NOT_FOUND();
-
-    /* //////////////////////////////////////////////////////////////
                     EXECUTOR PERMISSION FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 

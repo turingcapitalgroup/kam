@@ -6,6 +6,13 @@ import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/
 import { Initializable } from "solady/utils/Initializable.sol";
 import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
+import {
+    KREMOTEREGISTRY_NOT_ALLOWED,
+    KREMOTEREGISTRY_SELECTOR_ALREADY_SET,
+    KREMOTEREGISTRY_SELECTOR_NOT_FOUND,
+    KREMOTEREGISTRY_ZERO_ADDRESS,
+    KREMOTEREGISTRY_ZERO_SELECTOR
+} from "kam/src/errors/Errors.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRemoteRegistry } from "kam/src/interfaces/IkRemoteRegistry.sol";
 import { IExecutionValidator } from "kam/src/interfaces/modules/IExecutionGuardian.sol";
@@ -35,7 +42,7 @@ contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ow
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.kRemoteRegistry")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant KREMOTEREGISTRY_STORAGE_LOCATION =
-        0x8b7e3a3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7081920a1b2c3d4e00;
+        0x5d8ebd8f1fb26a20d7fa1193e66eb27e5baad0de2f7a4be3a9e2aa2a868ccf00;
 
     /// @notice Retrieves the kRemoteRegistry storage struct from its designated storage slot
     /// @return $ The kRemoteRegistryStorage struct reference
@@ -61,7 +68,7 @@ contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ow
     /// @notice Initializes the registry with an owner
     /// @param _owner The owner address who can configure the registry
     function initialize(address _owner) external initializer {
-        if (_owner == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
+        require(_owner != address(0), KREMOTEREGISTRY_ZERO_ADDRESS);
         _initializeOwner(_owner);
     }
 
@@ -79,17 +86,15 @@ contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ow
         external
         onlyOwner
     {
-        if (_executor == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
-        if (_target == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
-        if (_selector == bytes4(0)) revert REMOTEREGISTRY_ZERO_SELECTOR();
+        require(_executor != address(0), KREMOTEREGISTRY_ZERO_ADDRESS);
+        require(_target != address(0), KREMOTEREGISTRY_ZERO_ADDRESS);
+        require(_selector != bytes4(0), KREMOTEREGISTRY_ZERO_SELECTOR);
 
         kRemoteRegistryStorage storage $ = _getkRemoteRegistryStorage();
 
         // Check if trying to set to the same value
         bool _currentlyAllowed = $.executorAllowedSelectors[_executor][_target][_selector];
-        if (_currentlyAllowed && _allowed) {
-            revert REMOTEREGISTRY_SELECTOR_ALREADY_SET();
-        }
+        require(!(_currentlyAllowed && _allowed), KREMOTEREGISTRY_SELECTOR_ALREADY_SET);
 
         $.executorAllowedSelectors[_executor][_target][_selector] = _allowed;
 
@@ -115,15 +120,13 @@ contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ow
         external
         onlyOwner
     {
-        if (_executor == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
-        if (_target == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
+        require(_executor != address(0), KREMOTEREGISTRY_ZERO_ADDRESS);
+        require(_target != address(0), KREMOTEREGISTRY_ZERO_ADDRESS);
 
         kRemoteRegistryStorage storage $ = _getkRemoteRegistryStorage();
 
         // Selector must be allowed before setting an execution validator
-        if (!$.executorAllowedSelectors[_executor][_target][_selector]) {
-            revert REMOTEREGISTRY_SELECTOR_NOT_FOUND();
-        }
+        require($.executorAllowedSelectors[_executor][_target][_selector], KREMOTEREGISTRY_SELECTOR_NOT_FOUND);
 
         $.executionValidator[_executor][_target][_selector] = _validator;
         emit ExecutionValidatorSet(_executor, _target, _selector, _validator);
@@ -149,9 +152,7 @@ contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ow
         address _executor = msg.sender;
 
         // Check if selector is allowed
-        if (!$.executorAllowedSelectors[_executor][_target][_selector]) {
-            revert REMOTEREGISTRY_NOT_ALLOWED();
-        }
+        require($.executorAllowedSelectors[_executor][_target][_selector], KREMOTEREGISTRY_NOT_ALLOWED);
 
         // If an execution validator is set, validate parameters
         address _validator = $.executionValidator[_executor][_target][_selector];
@@ -192,7 +193,7 @@ contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ow
     /// @param _newImplementation New implementation address
     function _authorizeUpgrade(address _newImplementation) internal view override {
         _checkOwner();
-        if (_newImplementation == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
+        require(_newImplementation != address(0), KREMOTEREGISTRY_ZERO_ADDRESS);
     }
 
     /* //////////////////////////////////////////////////////////////

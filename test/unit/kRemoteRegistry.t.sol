@@ -4,6 +4,13 @@ pragma solidity 0.8.30;
 import { Test } from "forge-std/Test.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
+import {
+    KREMOTEREGISTRY_NOT_ALLOWED,
+    KREMOTEREGISTRY_SELECTOR_ALREADY_SET,
+    KREMOTEREGISTRY_SELECTOR_NOT_FOUND,
+    KREMOTEREGISTRY_ZERO_ADDRESS,
+    KREMOTEREGISTRY_ZERO_SELECTOR
+} from "kam/src/errors/Errors.sol";
 import { IkRemoteRegistry } from "kam/src/interfaces/IkRemoteRegistry.sol";
 import { kRemoteRegistry } from "kam/src/kRegistry/kRemoteRegistry.sol";
 
@@ -50,7 +57,7 @@ contract kRemoteRegistryTest is Test {
         kRemoteRegistry impl = new kRemoteRegistry();
         bytes memory initData = abi.encodeCall(kRemoteRegistry.initialize, (address(0)));
 
-        vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_ADDRESS.selector);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
         factory.deployAndCall(address(impl), address(this), initData);
     }
 
@@ -88,19 +95,19 @@ contract kRemoteRegistryTest is Test {
 
     function test_SetAllowedSelector_Require_Not_Zero_Executor() public {
         vm.prank(owner);
-        vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_ADDRESS.selector);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
         registry.setAllowedSelector(address(0), target, testSelector, true);
     }
 
     function test_SetAllowedSelector_Require_Not_Zero_Target() public {
         vm.prank(owner);
-        vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_ADDRESS.selector);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
         registry.setAllowedSelector(executor, address(0), testSelector, true);
     }
 
     function test_SetAllowedSelector_Require_Not_Zero_Selector() public {
         vm.prank(owner);
-        vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_SELECTOR.selector);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_SELECTOR));
         registry.setAllowedSelector(executor, target, bytes4(0), true);
     }
 
@@ -109,7 +116,7 @@ contract kRemoteRegistryTest is Test {
         registry.setAllowedSelector(executor, target, testSelector, true);
 
         vm.prank(owner);
-        vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_SELECTOR_ALREADY_SET.selector);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_SELECTOR_ALREADY_SET));
         registry.setAllowedSelector(executor, target, testSelector, true);
     }
 
@@ -153,19 +160,19 @@ contract kRemoteRegistryTest is Test {
 
     function test_SetExecutionValidator_Require_Not_Zero_Executor() public {
         vm.prank(owner);
-        vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_ADDRESS.selector);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
         registry.setExecutionValidator(address(0), target, testSelector, executionValidator);
     }
 
     function test_SetExecutionValidator_Require_Not_Zero_Target() public {
         vm.prank(owner);
-        vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_ADDRESS.selector);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
         registry.setExecutionValidator(executor, address(0), testSelector, executionValidator);
     }
 
     function test_SetExecutionValidator_Require_Selector_Allowed() public {
         vm.prank(owner);
-        vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_SELECTOR_NOT_FOUND.selector);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_SELECTOR_NOT_FOUND));
         registry.setExecutionValidator(executor, target, testSelector, executionValidator);
     }
 
@@ -198,7 +205,7 @@ contract kRemoteRegistryTest is Test {
 
     function test_AuthorizeCall_Require_Selector_Allowed() public {
         vm.prank(executor);
-        vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_NOT_ALLOWED.selector);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_NOT_ALLOWED));
         registry.authorizeCall(target, testSelector, "");
     }
 

@@ -1,22 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-/// @dev ExecutionValidator Errors - Custom errors for parameter validation in executor calls.
-error ExecutionValidatorZeroAddress();
-error ExecutionValidatorZeroAmount();
-error ExecutionValidatorInvalidToken();
-error ExecutionValidatorInvalidReceiver();
-error ExecutionValidatorInvalidSpender();
-error ExecutionValidatorInvalidMax();
-error ExecutionValidatorInvalidExecutor();
-error ExecutionValidatorInvalidSelector();
-error ExecutionValidatorInvalidParams();
-error ExecutionValidatorUnauthorizedCaller();
-error ExecutionValidatorTransferFailed();
-error ExecutionValidatorInvalidAmount();
-error ExecutionValidatorInvalidBlockAmount();
-error ExecutionValidatorInvalidFrom();
-
 /// @title IExecutionValidator
 /// @notice Interface for parameter validation contracts used in executor call validation.
 /// @dev Implementations validate call parameters to ensure executor operations are safe and authorized.

@@ -6,11 +6,9 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import {
     VAULTADAPTER_IS_PAUSED,
-    VAULTADAPTER_TRANSFER_FAILED,
     VAULTADAPTER_WRONG_ASSET,
     VAULTADAPTER_WRONG_ROLE,
-    VAULTADAPTER_ZERO_ADDRESS,
-    VAULTADAPTER_ZERO_AMOUNT
+    VAULTADAPTER_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
 
 import { SmartAdapterAccount } from "kam/src/adapters/SmartAdapterAccount.sol";
@@ -79,29 +77,6 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
         VaultAdapterStorage storage $ = _getVaultAdapterStorage();
         $.paused = _paused;
         emit Paused(_paused);
-    }
-
-    /// @inheritdoc IVaultAdapter
-    function rescueAssets(address _asset, address _to, uint256 _amount) external payable {
-        _checkAdmin(msg.sender);
-        _checkZeroAddress(_to);
-
-        if (_asset == address(0)) {
-            // Rescue ETH
-            require(_amount != 0 && _amount <= address(this).balance, VAULTADAPTER_ZERO_AMOUNT);
-
-            (bool _success,) = _to.call{ value: _amount }("");
-            require(_success, VAULTADAPTER_TRANSFER_FAILED);
-
-            emit RescuedETH(_to, _amount);
-        } else {
-            // Rescue ERC20 tokens
-            _checkAssetNotRegistered(_asset);
-            require(_amount > 0 && _amount <= _asset.balanceOf(address(this)), VAULTADAPTER_ZERO_AMOUNT);
-
-            _asset.safeTransfer(_to, _amount);
-            emit RescuedAssets(_asset, _to, _amount);
-        }
     }
 
     /* ///////////////////////////////////////////////////////////////
