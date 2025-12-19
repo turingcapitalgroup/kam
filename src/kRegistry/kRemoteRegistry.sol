@@ -8,8 +8,7 @@ import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkRemoteRegistry } from "kam/src/interfaces/IkRemoteRegistry.sol";
-import { IParametersChecker } from "kam/src/interfaces/modules/IAdapterGuardian.sol";
-import { IRegistry } from "minimal-smart-account/interfaces/IRegistry.sol";
+import { IExecutionValidator } from "kam/src/interfaces/modules/IExecutionGuardian.sol";
 
 /// @title kRemoteRegistry
 /// @notice Lightweight registry for cross-chain metaWallet adapter validation
@@ -23,15 +22,15 @@ contract kRemoteRegistry is IkRemoteRegistry, IVersioned, Initializable, UUPSUpg
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Storage structure for kRemoteRegistry using ERC-7201 namespaced storage pattern
-    /// @dev This structure maintains adapter permissions
+    /// @dev This structure maintains executor permissions
     /// @custom:storage-location erc7201:kam.storage.kRemoteRegistry
     struct kRemoteRegistryStorage {
-        /// @dev Maps adapter => target => selector => allowed
-        mapping(address => mapping(address => mapping(bytes4 => bool))) adapterAllowedSelectors;
-        /// @dev Maps adapter => target => selector => parameter checker
-        mapping(address => mapping(address => mapping(bytes4 => address))) adapterParametersChecker;
-        /// @dev Tracks all targets for each adapter for enumeration
-        mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) adapterTargets;
+        /// @dev Maps executor => target => selector => allowed
+        mapping(address => mapping(address => mapping(bytes4 => bool))) executorAllowedSelectors;
+        /// @dev Maps executor => target => selector => execution validator
+        mapping(address => mapping(address => mapping(bytes4 => address))) executionValidator;
+        /// @dev Tracks all targets for each executor for enumeration
+        mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) executorTargets;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.kRemoteRegistry")) - 1)) & ~bytes32(uint256(0xff))
@@ -67,12 +66,12 @@ contract kRemoteRegistry is IkRemoteRegistry, IVersioned, Initializable, UUPSUpg
     }
 
     /* //////////////////////////////////////////////////////////////
-                    ADAPTER PERMISSION FUNCTIONS
+                    EXECUTOR PERMISSION FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IkRemoteRegistry
-    function setAdapterAllowedSelector(
-        address _adapter,
+    function setAllowedSelector(
+        address _executor,
         address _target,
         bytes4 _selector,
         bool _allowed
@@ -80,91 +79,95 @@ contract kRemoteRegistry is IkRemoteRegistry, IVersioned, Initializable, UUPSUpg
         external
         onlyOwner
     {
-        if (_adapter == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
+        if (_executor == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
         if (_target == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
         if (_selector == bytes4(0)) revert REMOTEREGISTRY_ZERO_SELECTOR();
 
         kRemoteRegistryStorage storage $ = _getkRemoteRegistryStorage();
 
         // Check if trying to set to the same value
-        bool _currentlyAllowed = $.adapterAllowedSelectors[_adapter][_target][_selector];
+        bool _currentlyAllowed = $.executorAllowedSelectors[_executor][_target][_selector];
         if (_currentlyAllowed && _allowed) {
             revert REMOTEREGISTRY_SELECTOR_ALREADY_SET();
         }
 
-        $.adapterAllowedSelectors[_adapter][_target][_selector] = _allowed;
+        $.executorAllowedSelectors[_executor][_target][_selector] = _allowed;
 
         // Update target tracking
         if (_allowed) {
-            $.adapterTargets[_adapter].add(_target);
+            $.executorTargets[_executor].add(_target);
         } else {
-            $.adapterTargets[_adapter].remove(_target);
-            // Also remove any parameter checker when disabling
-            delete $.adapterParametersChecker[_adapter][_target][_selector];
+            $.executorTargets[_executor].remove(_target);
+            // Also remove any execution validator when disabling
+            delete $.executionValidator[_executor][_target][_selector];
         }
 
-        emit SelectorAllowed(_adapter, _target, _selector, _allowed);
+        emit SelectorAllowed(_executor, _target, _selector, _allowed);
     }
 
     /// @inheritdoc IkRemoteRegistry
-    function setAdapterParametersChecker(
-        address _adapter,
+    function setExecutionValidator(
+        address _executor,
         address _target,
         bytes4 _selector,
-        address _checker
+        address _validator
     )
         external
         onlyOwner
     {
-        if (_adapter == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
+        if (_executor == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
         if (_target == address(0)) revert REMOTEREGISTRY_ZERO_ADDRESS();
 
         kRemoteRegistryStorage storage $ = _getkRemoteRegistryStorage();
 
-        // Selector must be allowed before setting a parameter checker
-        if (!$.adapterAllowedSelectors[_adapter][_target][_selector]) {
+        // Selector must be allowed before setting an execution validator
+        if (!$.executorAllowedSelectors[_executor][_target][_selector]) {
             revert REMOTEREGISTRY_SELECTOR_NOT_FOUND();
         }
 
-        $.adapterParametersChecker[_adapter][_target][_selector] = _checker;
-        emit ParametersCheckerSet(_adapter, _target, _selector, _checker);
+        $.executionValidator[_executor][_target][_selector] = _validator;
+        emit ExecutionValidatorSet(_executor, _target, _selector, _validator);
     }
 
     /* //////////////////////////////////////////////////////////////
                         VALIDATION FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IRegistry
-    function validateAdapterCall(address _target, bytes4 _selector, bytes calldata _params) external {
+    /// @inheritdoc IkRemoteRegistry
+    function authorizeCall(address _target, bytes4 _selector, bytes calldata _params) external {
+        _authorizeCall(_target, _selector, _params);
+    }
+
+    /// @notice Internal function to validate if an executor can call a specific function on a target
+    /// @param _target The target contract address
+    /// @param _selector The function selector
+    /// @param _params The function parameters
+    function _authorizeCall(address _target, bytes4 _selector, bytes calldata _params) internal {
         kRemoteRegistryStorage storage $ = _getkRemoteRegistryStorage();
 
-        // msg.sender is the adapter being validated
-        address _adapter = msg.sender;
+        // msg.sender is the executor being validated
+        address _executor = msg.sender;
 
         // Check if selector is allowed
-        if (!$.adapterAllowedSelectors[_adapter][_target][_selector]) {
+        if (!$.executorAllowedSelectors[_executor][_target][_selector]) {
             revert REMOTEREGISTRY_NOT_ALLOWED();
         }
 
-        // If a parameter checker is set, validate parameters
-        address _checker = $.adapterParametersChecker[_adapter][_target][_selector];
-        if (_checker != address(0)) {
-            IParametersChecker(_checker).validateAdapterCall(_adapter, _target, _selector, _params);
+        // If an execution validator is set, validate parameters
+        address _validator = $.executionValidator[_executor][_target][_selector];
+        if (_validator != address(0)) {
+            IExecutionValidator(_validator).authorizeCall(_executor, _target, _selector, _params);
         }
     }
 
-    /// @inheritdoc IRegistry
-    function isAdapterSelectorAllowed(address _adapter, address _target, bytes4 _selector)
-        external
-        view
-        returns (bool)
-    {
-        return _getkRemoteRegistryStorage().adapterAllowedSelectors[_adapter][_target][_selector];
+    /// @inheritdoc IkRemoteRegistry
+    function isSelectorAllowed(address _executor, address _target, bytes4 _selector) external view returns (bool) {
+        return _getkRemoteRegistryStorage().executorAllowedSelectors[_executor][_target][_selector];
     }
 
     /// @inheritdoc IkRemoteRegistry
-    function getAdapterParametersChecker(
-        address _adapter,
+    function getExecutionValidator(
+        address _executor,
         address _target,
         bytes4 _selector
     )
@@ -172,12 +175,12 @@ contract kRemoteRegistry is IkRemoteRegistry, IVersioned, Initializable, UUPSUpg
         view
         returns (address)
     {
-        return _getkRemoteRegistryStorage().adapterParametersChecker[_adapter][_target][_selector];
+        return _getkRemoteRegistryStorage().executionValidator[_executor][_target][_selector];
     }
 
     /// @inheritdoc IkRemoteRegistry
-    function getAdapterTargets(address _adapter) external view returns (address[] memory) {
-        return _getkRemoteRegistryStorage().adapterTargets[_adapter].values();
+    function getExecutorTargets(address _executor) external view returns (address[] memory) {
+        return _getkRemoteRegistryStorage().executorTargets[_executor].values();
     }
 
     /* //////////////////////////////////////////////////////////////

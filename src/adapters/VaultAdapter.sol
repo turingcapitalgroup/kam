@@ -174,7 +174,7 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
     function _checkVaultCanCallSelector(address _target, bytes4 _selector) internal view {
         require(
             IkRegistry(address(_getMinimalAccountStorage().registry))
-                .isAdapterSelectorAllowed(address(this), _target, _selector)
+                .isSelectorAllowed(address(this), _target, _selector)
         );
     }
 

@@ -29,7 +29,7 @@ import { IRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 // Scripts
 import { ConfigureProtocolScript } from "kam/script/actions/09_ConfigureProtocol.s.sol";
-import { ConfigureAdapterPermissionsScript } from "kam/script/actions/10_ConfigureAdapterPermissions.s.sol";
+import { ConfigureExecutorPermissionsScript } from "kam/script/actions/10_ConfigureExecutorPermissions.s.sol";
 import { RegisterModulesScript } from "kam/script/actions/11_RegisterVaultModules.s.sol";
 import { DeployMockAssetsScript } from "kam/script/deployment/00_DeployMockAssets.s.sol";
 import { DeployRegistryScript } from "kam/script/deployment/01_DeployRegistry.s.sol";
@@ -194,9 +194,9 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             adaptersDeploy.kMinterAdapterWBTC
         );
 
-        ConfigureAdapterPermissionsScript adapterPermissionsScript = new ConfigureAdapterPermissionsScript();
-        adapterPermissionsScript.setVerbose(false);
-        adapterPermissionsScript.run(
+        ConfigureExecutorPermissionsScript executorPermissionsScript = new ConfigureExecutorPermissionsScript();
+        executorPermissionsScript.setVerbose(false);
+        executorPermissionsScript.run(
             false,
             registryDeploy.registry,
             adaptersDeploy.kMinterAdapterUSDC,

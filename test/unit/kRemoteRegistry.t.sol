@@ -12,18 +12,18 @@ contract kRemoteRegistryTest is Test {
     ERC1967Factory public factory;
 
     address public owner;
-    address public adapter;
+    address public executor;
     address public target;
-    address public paramChecker;
+    address public executionValidator;
     address public alice;
 
     bytes4 public testSelector;
 
     function setUp() public {
         owner = makeAddr("Owner");
-        adapter = makeAddr("Adapter");
+        executor = makeAddr("Executor");
         target = makeAddr("Target");
-        paramChecker = makeAddr("ParameterChecker");
+        executionValidator = makeAddr("ExecutionValidator");
         alice = makeAddr("Alice");
 
         testSelector = bytes4(keccak256("testFunction()"));
@@ -55,189 +55,189 @@ contract kRemoteRegistryTest is Test {
     }
 
     /* //////////////////////////////////////////////////////////////
-                    ADAPTER ALLOWED SELECTOR
+                    EXECUTOR ALLOWED SELECTOR
     //////////////////////////////////////////////////////////////*/
 
-    function test_SetAdapterAllowedSelector_Success() public {
+    function test_SetAllowedSelector_Success() public {
         vm.prank(owner);
         vm.expectEmit(true, true, true, true);
-        emit IkRemoteRegistry.SelectorAllowed(adapter, target, testSelector, true);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        emit IkRemoteRegistry.SelectorAllowed(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
-        assertTrue(registry.isAdapterSelectorAllowed(adapter, target, testSelector));
+        assertTrue(registry.isSelectorAllowed(executor, target, testSelector));
     }
 
-    function test_SetAdapterAllowedSelector_Disallow_Success() public {
+    function test_SetAllowedSelector_Disallow_Success() public {
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
-        assertTrue(registry.isAdapterSelectorAllowed(adapter, target, testSelector));
+        registry.setAllowedSelector(executor, target, testSelector, true);
+        assertTrue(registry.isSelectorAllowed(executor, target, testSelector));
 
         vm.prank(owner);
         vm.expectEmit(true, true, true, true);
-        emit IkRemoteRegistry.SelectorAllowed(adapter, target, testSelector, false);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, false);
+        emit IkRemoteRegistry.SelectorAllowed(executor, target, testSelector, false);
+        registry.setAllowedSelector(executor, target, testSelector, false);
 
-        assertFalse(registry.isAdapterSelectorAllowed(adapter, target, testSelector));
+        assertFalse(registry.isSelectorAllowed(executor, target, testSelector));
     }
 
-    function test_SetAdapterAllowedSelector_Require_Owner() public {
+    function test_SetAllowedSelector_Require_Owner() public {
         vm.prank(alice);
         vm.expectRevert();
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
     }
 
-    function test_SetAdapterAllowedSelector_Require_Not_Zero_Adapter() public {
+    function test_SetAllowedSelector_Require_Not_Zero_Executor() public {
         vm.prank(owner);
         vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_ADDRESS.selector);
-        registry.setAdapterAllowedSelector(address(0), target, testSelector, true);
+        registry.setAllowedSelector(address(0), target, testSelector, true);
     }
 
-    function test_SetAdapterAllowedSelector_Require_Not_Zero_Target() public {
+    function test_SetAllowedSelector_Require_Not_Zero_Target() public {
         vm.prank(owner);
         vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_ADDRESS.selector);
-        registry.setAdapterAllowedSelector(adapter, address(0), testSelector, true);
+        registry.setAllowedSelector(executor, address(0), testSelector, true);
     }
 
-    function test_SetAdapterAllowedSelector_Require_Not_Zero_Selector() public {
+    function test_SetAllowedSelector_Require_Not_Zero_Selector() public {
         vm.prank(owner);
         vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_SELECTOR.selector);
-        registry.setAdapterAllowedSelector(adapter, target, bytes4(0), true);
+        registry.setAllowedSelector(executor, target, bytes4(0), true);
     }
 
-    function test_SetAdapterAllowedSelector_Require_Not_Already_Set() public {
+    function test_SetAllowedSelector_Require_Not_Already_Set() public {
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
         vm.prank(owner);
         vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_SELECTOR_ALREADY_SET.selector);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
     }
 
     /* //////////////////////////////////////////////////////////////
-                    ADAPTER PARAMETERS CHECKER
+                    EXECUTION VALIDATOR
     //////////////////////////////////////////////////////////////*/
 
-    function test_SetAdapterParametersChecker_Success() public {
+    function test_SetExecutionValidator_Success() public {
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
         vm.prank(owner);
         vm.expectEmit(true, true, true, true);
-        emit IkRemoteRegistry.ParametersCheckerSet(adapter, target, testSelector, paramChecker);
-        registry.setAdapterParametersChecker(adapter, target, testSelector, paramChecker);
+        emit IkRemoteRegistry.ExecutionValidatorSet(executor, target, testSelector, executionValidator);
+        registry.setExecutionValidator(executor, target, testSelector, executionValidator);
 
-        assertEq(registry.getAdapterParametersChecker(adapter, target, testSelector), paramChecker);
+        assertEq(registry.getExecutionValidator(executor, target, testSelector), executionValidator);
     }
 
-    function test_SetAdapterParametersChecker_Remove_Success() public {
+    function test_SetExecutionValidator_Remove_Success() public {
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
         vm.prank(owner);
-        registry.setAdapterParametersChecker(adapter, target, testSelector, paramChecker);
-        assertEq(registry.getAdapterParametersChecker(adapter, target, testSelector), paramChecker);
+        registry.setExecutionValidator(executor, target, testSelector, executionValidator);
+        assertEq(registry.getExecutionValidator(executor, target, testSelector), executionValidator);
 
         vm.prank(owner);
-        registry.setAdapterParametersChecker(adapter, target, testSelector, address(0));
-        assertEq(registry.getAdapterParametersChecker(adapter, target, testSelector), address(0));
+        registry.setExecutionValidator(executor, target, testSelector, address(0));
+        assertEq(registry.getExecutionValidator(executor, target, testSelector), address(0));
     }
 
-    function test_SetAdapterParametersChecker_Require_Owner() public {
+    function test_SetExecutionValidator_Require_Owner() public {
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
         vm.prank(alice);
         vm.expectRevert();
-        registry.setAdapterParametersChecker(adapter, target, testSelector, paramChecker);
+        registry.setExecutionValidator(executor, target, testSelector, executionValidator);
     }
 
-    function test_SetAdapterParametersChecker_Require_Not_Zero_Adapter() public {
+    function test_SetExecutionValidator_Require_Not_Zero_Executor() public {
         vm.prank(owner);
         vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_ADDRESS.selector);
-        registry.setAdapterParametersChecker(address(0), target, testSelector, paramChecker);
+        registry.setExecutionValidator(address(0), target, testSelector, executionValidator);
     }
 
-    function test_SetAdapterParametersChecker_Require_Not_Zero_Target() public {
+    function test_SetExecutionValidator_Require_Not_Zero_Target() public {
         vm.prank(owner);
         vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_ZERO_ADDRESS.selector);
-        registry.setAdapterParametersChecker(adapter, address(0), testSelector, paramChecker);
+        registry.setExecutionValidator(executor, address(0), testSelector, executionValidator);
     }
 
-    function test_SetAdapterParametersChecker_Require_Selector_Allowed() public {
+    function test_SetExecutionValidator_Require_Selector_Allowed() public {
         vm.prank(owner);
         vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_SELECTOR_NOT_FOUND.selector);
-        registry.setAdapterParametersChecker(adapter, target, testSelector, paramChecker);
+        registry.setExecutionValidator(executor, target, testSelector, executionValidator);
     }
 
-    function test_SetAdapterParametersChecker_Removed_When_Selector_Disallowed() public {
+    function test_SetExecutionValidator_Removed_When_Selector_Disallowed() public {
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
         vm.prank(owner);
-        registry.setAdapterParametersChecker(adapter, target, testSelector, paramChecker);
-        assertEq(registry.getAdapterParametersChecker(adapter, target, testSelector), paramChecker);
+        registry.setExecutionValidator(executor, target, testSelector, executionValidator);
+        assertEq(registry.getExecutionValidator(executor, target, testSelector), executionValidator);
 
-        // Disallow selector - should also remove parameter checker
+        // Disallow selector - should also remove execution validator
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, false);
+        registry.setAllowedSelector(executor, target, testSelector, false);
 
-        assertEq(registry.getAdapterParametersChecker(adapter, target, testSelector), address(0));
+        assertEq(registry.getExecutionValidator(executor, target, testSelector), address(0));
     }
 
     /* //////////////////////////////////////////////////////////////
-                    VALIDATE ADAPTER CALL
+                    AUTHORIZE CALL
     //////////////////////////////////////////////////////////////*/
 
-    function test_ValidateAdapterCall_Success() public {
+    function test_AuthorizeCall_Success() public {
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
-        vm.prank(adapter);
-        registry.validateAdapterCall(target, testSelector, "");
+        vm.prank(executor);
+        registry.authorizeCall(target, testSelector, "");
     }
 
-    function test_ValidateAdapterCall_Require_Selector_Allowed() public {
-        vm.prank(adapter);
+    function test_AuthorizeCall_Require_Selector_Allowed() public {
+        vm.prank(executor);
         vm.expectRevert(IkRemoteRegistry.REMOTEREGISTRY_NOT_ALLOWED.selector);
-        registry.validateAdapterCall(target, testSelector, "");
+        registry.authorizeCall(target, testSelector, "");
     }
 
     /* //////////////////////////////////////////////////////////////
                         VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function test_IsAdapterSelectorAllowed() public {
-        assertFalse(registry.isAdapterSelectorAllowed(adapter, target, testSelector));
+    function test_IsSelectorAllowed() public {
+        assertFalse(registry.isSelectorAllowed(executor, target, testSelector));
 
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
-        assertTrue(registry.isAdapterSelectorAllowed(adapter, target, testSelector));
+        assertTrue(registry.isSelectorAllowed(executor, target, testSelector));
     }
 
-    function test_GetAdapterTargets() public {
-        address[] memory _targets = registry.getAdapterTargets(adapter);
+    function test_GetExecutorTargets() public {
+        address[] memory _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 0);
 
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
-        _targets = registry.getAdapterTargets(adapter);
+        _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 1);
         assertEq(_targets[0], target);
     }
 
-    function test_GetAdapterTargets_Multiple() public {
+    function test_GetExecutorTargets_Multiple() public {
         address target2 = makeAddr("Target2");
         bytes4 selector2 = bytes4(keccak256("testFunction2()"));
 
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target2, selector2, true);
+        registry.setAllowedSelector(executor, target2, selector2, true);
 
-        address[] memory _targets = registry.getAdapterTargets(adapter);
+        address[] memory _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 2);
 
         bool hasTarget1;
@@ -251,17 +251,17 @@ contract kRemoteRegistryTest is Test {
         assertTrue(hasTarget2);
     }
 
-    function test_GetAdapterTargets_Removed_When_Disallowed() public {
+    function test_GetExecutorTargets_Removed_When_Disallowed() public {
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, testSelector, true);
 
-        address[] memory _targets = registry.getAdapterTargets(adapter);
+        address[] memory _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 1);
 
         vm.prank(owner);
-        registry.setAdapterAllowedSelector(adapter, target, testSelector, false);
+        registry.setAllowedSelector(executor, target, testSelector, false);
 
-        _targets = registry.getAdapterTargets(adapter);
+        _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 0);
     }
 
