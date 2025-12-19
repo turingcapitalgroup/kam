@@ -26,11 +26,7 @@ jobs:
       - name: Show Forge version
         run: |
           forge --version
-      
-      - name: Configure Git for private dependencies
-        run: |
-          git config --global url."https://${{ secrets.SOLDEER_GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
-      
+
       - name: Install dependencies
         env: 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,10 +53,6 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Configure Git for private dependencies
-        run: |
-          git config --global url."https://${{ secrets.SOLDEER_GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Install dependencies
         run: |
