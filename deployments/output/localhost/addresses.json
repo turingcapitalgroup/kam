@@ -1,7 +1,7 @@
 {
   "chainId": 31337,
   "network": "localhost",
-  "timestamp": 1765877804,
+  "timestamp": 1766148586,
   "contracts": {
     "ERC1967Factory": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
     "kRegistryImpl": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
@@ -14,7 +14,7 @@
     "kBTC": "0x1E01182454073691d6190FC0F977cB7D646981E1",
     "kStakingVaultImpl": "0xE6E340D132b5f46d1e472DebcD681B2aBc16e57E",
     "readerModule": "0x67d269191c92Caf3cD7723F116c85e6E9bf55933",
-    "adapterGuardianModule": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
+    "adapterGuardianModule": "0x0000000000000000000000000000000000000000",
     "kTokenFactory": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
     "dnVaultUSDC": "0x436932D6361Db21CbDf440A39046093a1C12D2B4",
     "dnVaultWBTC": "0x235B28c74f19083a5CAce20C506513417a90BE29",
@@ -30,6 +30,9 @@
     "ERC7540USDC": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
     "ERC7540WBTC": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
     "WalletUSDC": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-    "erc20ParameterChecker": "0x5081a39b8A5f0E35a8D959395a630b68B74Dd30f"
+    "erc20ParameterChecker": "0x0000000000000000000000000000000000000000",
+    "minimalSmartAccountImpl": "0x99bbA657f2BbC93c02D617f8bA121cB8Fc104Acf",
+    "minimalSmartAccountFactory": "0xc01dF5eC79b8C7A21f6213301de2Ea959a2f1CDc",
+    "insuranceSmartAccount": "0x0e7FEed30A1B1E36e817Ed964151090c6D70d815"
   }
 }

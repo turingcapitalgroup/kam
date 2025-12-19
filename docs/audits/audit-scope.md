@@ -31,9 +31,9 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 ├── src
 │   ├── adapters/
 │   │   ├── parameters/
-│   │   │   └── ERC20ParameterChecker.sol  ✅ Parameter validation utilities
-│   │   ├── SmartAdapterAccount.sol        ✅ Modular adapter account base
-│   │   └── VaultAdapter.sol               ✅ External protocol adapter
+│   │   │   └── ERC20ExecutionValidator.sol ✅ Execution parameter validation
+│   │   ├── SmartAdapterAccount.sol         ✅ Modular adapter account base
+│   │   └── VaultAdapter.sol                ✅ External protocol adapter
 │   ├── base/
 │   │   ├── ERC2771Context.sol             ✅ Meta-transaction support
 │   │   ├── ERC3009.sol                    ✅ ERC-3009 transfer with auth
@@ -43,7 +43,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 │   ├── kRegistry/
 │   │   ├── kRegistry.sol                  ✅ Protocol configuration registry
 │   │   └── modules/
-│   │       └── AdapterGuardianModule.sol  ✅ Adapter security module
+│   │       └── ExecutionGuardianModule.sol ✅ Executor permission security module
 │   ├── kStakingVault/
 │   │   ├── base/
 │   │   │   └── BaseVault.sol              ✅ Vault foundation logic
@@ -65,6 +65,8 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 ├── src
 │   ├── errors/                       ❌ Error definitions only
 │   ├── interfaces/                   ❌ Interface definitions (as requested)
+│   ├── kRegistry/
+│   │   └── kRemoteRegistry.sol       ❌ Cross-chain registry (separate deployment)
 │   └── vendor/                       ❌ External dependencies (as requested)
 │       ├── openzeppelin/             ❌ OpenZeppelin library implementations
 │       ├── solady/                   ❌ Solady optimized library implementations
@@ -76,6 +78,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 - **Interfaces** (`src/interfaces/`): Interface definitions without implementation logic
 - **Vendor Dependencies** (`src/vendor/`): External library implementations (OpenZeppelin, Solady, Uniswap)
 - **Error Definitions** (`src/errors/`): Pure error constant definitions only
+- **kRemoteRegistry**: Lightweight cross-chain registry for remote chain deployments where the full KAM protocol is not deployed. Separate audit scope.
 - **Test Contracts**: All test, mock, and script files
 - **External Dependencies**: Imported libraries and protocol integrations
 
@@ -84,6 +87,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 - Interfaces contain no executable logic and serve as API definitions
 - Vendor code represents well-tested implementations audited separately by their respective teams
 - Error definitions are purely declarative constants with no logic
+- kRemoteRegistry is a simplified, standalone registry for cross-chain executor validation, deployed separately from main protocol
 - Focus remains on custom KAM protocol implementation logic
 
 ## Core Protocol Components
@@ -253,7 +257,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 **Execution Workflow**:
 
 1. **Permission Validation**: Manager (MANAGER_ROLE) calls `execute(target, data, value)` on adapter
-2. **Registry Check**: SmartAdapterAccount validates via `registry.isAdapterSelectorAllowed(adapter, target, selector)`
+2. **Registry Check**: SmartAdapterAccount validates via `registry.authorizeCall(target, selector, params)` which checks executor permissions
 3. **External Call**: If approved, adapter executes call to external protocol
 4. **Virtual Balance Update**: During settlement, kAssetRouter calls `setTotalAssets()` to update accounting
 
@@ -372,7 +376,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
    - Role hierarchy and permission enforcement across all contracts
    - MANAGER_ROLE adapter execution and target/selector validation
    - Emergency pause mechanisms and recovery procedures
-   - Adapter permission system via AdapterGuardianModule
+   - Executor permission system via ExecutionGuardianModule
 
 6. **Adapter Architecture** (`VaultAdapter.sol`, `SmartAdapterAccount.sol`)
    - kMinter Adapter as central hub for ALL physical asset movements

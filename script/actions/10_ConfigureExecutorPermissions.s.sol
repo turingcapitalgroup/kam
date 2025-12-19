@@ -3,19 +3,19 @@ pragma solidity ^0.8.20;
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { Script } from "forge-std/Script.sol";
-import { ERC20ParameterChecker } from "kam/src/adapters/parameters/ERC20ParameterChecker.sol";
+import { ERC20ExecutionValidator } from "kam/src/adapters/parameters/ERC20ExecutionValidator.sol";
 
 import { IERC7540 } from "kam/src/interfaces/IERC7540.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
-contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
-    struct AdapterPermissionsDeployment {
-        address erc20ParameterChecker;
+contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
+    struct ExecutorPermissionsDeployment {
+        address erc20ExecutionValidator;
     }
 
-    function configureAdapterPermissions(
+    function configureExecutorPermissions(
         IkRegistry registry,
-        address adapter,
+        address executor,
         address vault,
         address asset,
         bool isKMinterAdapter
@@ -26,9 +26,9 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         bytes4 transferSelector = IERC7540.transfer.selector;
         bytes4 transferFromSelector = IERC7540.transferFrom.selector;
 
-        registry.setAdapterAllowedSelector(adapter, vault, 0, approveSelector, true);
-        registry.setAdapterAllowedSelector(adapter, vault, 0, transferSelector, true);
-        registry.setAdapterAllowedSelector(adapter, vault, 0, transferFromSelector, true);
+        registry.setAllowedSelector(executor, vault, 0, approveSelector, true);
+        registry.setAllowedSelector(executor, vault, 0, transferSelector, true);
+        registry.setAllowedSelector(executor, vault, 0, transferFromSelector, true);
 
         if (isKMinterAdapter) {
             bytes4 requestDepositSelector = IERC7540.requestDeposit.selector;
@@ -36,21 +36,21 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
             bytes4 requestRedeemSelector = IERC7540.requestRedeem.selector;
             bytes4 redeemSelector = IERC7540.redeem.selector;
 
-            registry.setAdapterAllowedSelector(adapter, vault, 0, requestDepositSelector, true);
-            registry.setAdapterAllowedSelector(adapter, vault, 0, depositSelector, true);
-            registry.setAdapterAllowedSelector(adapter, vault, 0, requestRedeemSelector, true);
-            registry.setAdapterAllowedSelector(adapter, vault, 0, redeemSelector, true);
+            registry.setAllowedSelector(executor, vault, 0, requestDepositSelector, true);
+            registry.setAllowedSelector(executor, vault, 0, depositSelector, true);
+            registry.setAllowedSelector(executor, vault, 0, requestRedeemSelector, true);
+            registry.setAllowedSelector(executor, vault, 0, redeemSelector, true);
 
-            registry.setAdapterAllowedSelector(adapter, asset, 0, transferSelector, true);
-            registry.setAdapterAllowedSelector(adapter, asset, 0, approveSelector, true);
-            registry.setAdapterAllowedSelector(adapter, asset, 0, transferFromSelector, true);
+            registry.setAllowedSelector(executor, asset, 0, transferSelector, true);
+            registry.setAllowedSelector(executor, asset, 0, approveSelector, true);
+            registry.setAllowedSelector(executor, asset, 0, transferFromSelector, true);
         }
     }
 
-    // Helper function to configure custodial adapter permissions (targetType = 1)
-    function configureCustodialAdapterPermissions(
+    // Helper function to configure custodial executor permissions (targetType = 1)
+    function configureCustodialExecutorPermissions(
         IkRegistry registry,
-        address adapter,
+        address executor,
         address custodialAddress
     )
         internal
@@ -58,15 +58,15 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         bytes4 approveSelector = IERC7540.approve.selector;
         bytes4 transferSelector = IERC7540.transfer.selector;
 
-        registry.setAdapterAllowedSelector(adapter, custodialAddress, 1, transferSelector, true);
-        registry.setAdapterAllowedSelector(adapter, custodialAddress, 1, approveSelector, true);
+        registry.setAllowedSelector(executor, custodialAddress, 1, transferSelector, true);
+        registry.setAllowedSelector(executor, custodialAddress, 1, approveSelector, true);
     }
 
-    function configureParameterChecker(
+    function configureExecutionValidator(
         IkRegistry registry,
-        address adapter,
+        address executor,
         address target,
-        address paramChecker,
+        address validator,
         bool isTransferFrom
     )
         internal
@@ -74,16 +74,16 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         bytes4 transferSelector = IERC7540.transfer.selector;
         bytes4 approveSelector = IERC7540.approve.selector;
 
-        registry.setAdapterParametersChecker(adapter, target, transferSelector, paramChecker);
-        registry.setAdapterParametersChecker(adapter, target, approveSelector, paramChecker);
+        registry.setExecutionValidator(executor, target, transferSelector, validator);
+        registry.setExecutionValidator(executor, target, approveSelector, validator);
 
         if (isTransferFrom) {
             bytes4 transferFromSelector = IERC7540.transferFrom.selector;
-            registry.setAdapterParametersChecker(adapter, target, transferFromSelector, paramChecker);
+            registry.setExecutionValidator(executor, target, transferFromSelector, validator);
         }
     }
 
-    /// @notice Configure adapter permissions and deploy parameter checker
+    /// @notice Configure executor permissions and deploy execution validator
     /// @param writeToJson Whether to write deployed addresses to JSON (true for real deployments, false for tests)
     /// @param registryAddr Address of kRegistry
     /// @param kMinterAdapterUSDCAddr Address of kMinterAdapterUSDC
@@ -109,7 +109,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         address walletUSDCAddr
     )
         public
-        returns (AdapterPermissionsDeployment memory deployment)
+        returns (ExecutorPermissionsDeployment memory deployment)
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
@@ -148,7 +148,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         existing.contracts.WalletUSDC = walletUSDCAddr;
 
         // Log script header and configuration
-        logScriptHeader("10_ConfigureAdapterPermissions");
+        logScriptHeader("10_ConfigureExecutorPermissions");
         logRoles(config);
         logAssets(config);
         logExternalTargets(config);
@@ -165,37 +165,37 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
 
         IkRegistry registry = IkRegistry(payable(registryAddr));
 
-        // Deploy ERC20 parameters checker
-        ERC20ParameterChecker erc20ParameterChecker = new ERC20ParameterChecker(registryAddr);
-        _log("Deployed ERC20ParameterChecker at:", address(erc20ParameterChecker));
+        // Deploy ERC20 execution validator
+        ERC20ExecutionValidator erc20ExecutionValidator = new ERC20ExecutionValidator(registryAddr);
+        _log("Deployed ERC20ExecutionValidator at:", address(erc20ExecutionValidator));
 
         // Get addresses from config
         address usdc = config.assets.USDC;
         address wbtc = config.assets.WBTC;
 
         _log("");
-        _log("1. Configuring Adapter permissions...");
-        configureAdapterPermissions(registry, kMinterAdapterUSDCAddr, erc7540USDCAddr, usdc, true);
-        configureAdapterPermissions(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, wbtc, true);
-        configureAdapterPermissions(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, usdc, false);
-        configureAdapterPermissions(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, wbtc, false);
-        configureCustodialAdapterPermissions(registry, alphaVaultAdapterAddr, walletUSDCAddr);
-        configureCustodialAdapterPermissions(registry, betaVaultAdapterAddr, walletUSDCAddr);
+        _log("1. Configuring Executor permissions...");
+        configureExecutorPermissions(registry, kMinterAdapterUSDCAddr, erc7540USDCAddr, usdc, true);
+        configureExecutorPermissions(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, wbtc, true);
+        configureExecutorPermissions(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, usdc, false);
+        configureExecutorPermissions(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, wbtc, false);
+        configureCustodialExecutorPermissions(registry, alphaVaultAdapterAddr, walletUSDCAddr);
+        configureCustodialExecutorPermissions(registry, betaVaultAdapterAddr, walletUSDCAddr);
 
         _log("");
-        _log("2. Configuring parameter checkers...");
-        address paramChecker = address(erc20ParameterChecker);
-        configureParameterChecker(registry, kMinterAdapterUSDCAddr, usdc, paramChecker, true);
-        configureParameterChecker(registry, kMinterAdapterWBTCAddr, wbtc, paramChecker, true);
-        configureParameterChecker(registry, kMinterAdapterUSDCAddr, erc7540USDCAddr, paramChecker, true);
-        configureParameterChecker(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, paramChecker, true);
-        configureParameterChecker(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, paramChecker, false);
-        configureParameterChecker(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, paramChecker, false);
-        configureParameterChecker(registry, alphaVaultAdapterAddr, walletUSDCAddr, paramChecker, false);
-        configureParameterChecker(registry, betaVaultAdapterAddr, walletUSDCAddr, paramChecker, false);
+        _log("2. Configuring execution validators...");
+        address validator = address(erc20ExecutionValidator);
+        configureExecutionValidator(registry, kMinterAdapterUSDCAddr, usdc, validator, true);
+        configureExecutionValidator(registry, kMinterAdapterWBTCAddr, wbtc, validator, true);
+        configureExecutionValidator(registry, kMinterAdapterUSDCAddr, erc7540USDCAddr, validator, true);
+        configureExecutionValidator(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, validator, true);
+        configureExecutionValidator(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, validator, false);
+        configureExecutionValidator(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, validator, false);
+        configureExecutionValidator(registry, alphaVaultAdapterAddr, walletUSDCAddr, validator, false);
+        configureExecutionValidator(registry, betaVaultAdapterAddr, walletUSDCAddr, validator, false);
 
         _log("");
-        _log("3. Configuring parameter checker permissions from config...");
+        _log("3. Configuring execution validator permissions from config...");
 
         // Create a temporary DeploymentOutput struct for _resolveAddress helper
         existing.contracts.kMinterAdapterUSDC = kMinterAdapterUSDCAddr;
@@ -209,44 +209,46 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         existing.contracts.WalletUSDC = walletUSDCAddr;
 
         // Set allowed receivers from config
-        _configureAllowedReceivers(erc20ParameterChecker, config, existing, usdc, erc7540USDCAddr, walletUSDCAddr);
+        _configureAllowedReceivers(erc20ExecutionValidator, config, existing, usdc, erc7540USDCAddr, walletUSDCAddr);
 
         // Set allowed sources from config
-        _configureAllowedSources(erc20ParameterChecker, config, existing, erc7540USDCAddr, erc7540WBTCAddr);
+        _configureAllowedSources(erc20ExecutionValidator, config, existing, erc7540USDCAddr, erc7540WBTCAddr);
 
         // Set allowed spenders from config
-        _configureAllowedSpenders(erc20ParameterChecker, config, existing, usdc, wbtc, erc7540USDCAddr, erc7540WBTCAddr);
+        _configureAllowedSpenders(
+            erc20ExecutionValidator, config, existing, usdc, wbtc, erc7540USDCAddr, erc7540WBTCAddr
+        );
 
         // Set max transfer limits from config
         _log("   - Set max transfer limits");
-        erc20ParameterChecker.setMaxSingleTransfer(usdc, config.parameterChecker.maxSingleTransfer.USDC);
-        erc20ParameterChecker.setMaxSingleTransfer(wbtc, config.parameterChecker.maxSingleTransfer.WBTC);
-        erc20ParameterChecker.setMaxSingleTransfer(
+        erc20ExecutionValidator.setMaxSingleTransfer(usdc, config.parameterChecker.maxSingleTransfer.USDC);
+        erc20ExecutionValidator.setMaxSingleTransfer(wbtc, config.parameterChecker.maxSingleTransfer.WBTC);
+        erc20ExecutionValidator.setMaxSingleTransfer(
             erc7540USDCAddr, config.parameterChecker.maxSingleTransfer.ERC7540USDC
         );
-        erc20ParameterChecker.setMaxSingleTransfer(
+        erc20ExecutionValidator.setMaxSingleTransfer(
             erc7540WBTCAddr, config.parameterChecker.maxSingleTransfer.ERC7540WBTC
         );
 
         vm.stopBroadcast();
 
         // Populate return struct
-        deployment = AdapterPermissionsDeployment({ erc20ParameterChecker: address(erc20ParameterChecker) });
+        deployment = ExecutorPermissionsDeployment({ erc20ExecutionValidator: address(erc20ExecutionValidator) });
 
         // Write to JSON only if requested (for real deployments)
         if (writeToJson) {
-            writeContractAddress("erc20ParameterChecker", address(erc20ParameterChecker));
+            writeContractAddress("erc20ExecutionValidator", address(erc20ExecutionValidator));
         }
 
         _log("");
         _log("=======================================");
-        _log("Adapter permissions configuration complete!");
+        _log("Executor permissions configuration complete!");
 
         return deployment;
     }
 
     /// @notice Convenience wrapper for real deployments (reads addresses from JSON)
-    function run() public returns (AdapterPermissionsDeployment memory) {
+    function run() public returns (ExecutorPermissionsDeployment memory) {
         return run(
             true,
             address(0),
@@ -263,7 +265,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
     }
 
     function _configureAllowedReceivers(
-        ERC20ParameterChecker checker,
+        ERC20ExecutionValidator validator,
         NetworkConfig memory config,
         DeploymentOutput memory existing,
         address usdc,
@@ -278,7 +280,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.USDC.length; i++) {
             address receiver = _resolveAddress(config.parameterChecker.allowedReceivers.USDC[i], config, existing);
             if (receiver != address(0)) {
-                checker.setAllowedReceiver(usdc, receiver, true);
+                validator.setAllowedReceiver(usdc, receiver, true);
             }
         }
 
@@ -286,7 +288,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.WBTC.length; i++) {
             address receiver = _resolveAddress(config.parameterChecker.allowedReceivers.WBTC[i], config, existing);
             if (receiver != address(0)) {
-                checker.setAllowedReceiver(config.assets.WBTC, receiver, true);
+                validator.setAllowedReceiver(config.assets.WBTC, receiver, true);
             }
         }
 
@@ -295,7 +297,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
             address receiver =
                 _resolveAddress(config.parameterChecker.allowedReceivers.ERC7540USDC[i], config, existing);
             if (receiver != address(0)) {
-                checker.setAllowedReceiver(usdcVault, receiver, true);
+                validator.setAllowedReceiver(usdcVault, receiver, true);
             }
         }
 
@@ -304,13 +306,13 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
             address receiver =
                 _resolveAddress(config.parameterChecker.allowedReceivers.ERC7540WBTC[i], config, existing);
             if (receiver != address(0)) {
-                checker.setAllowedReceiver(existing.contracts.ERC7540WBTC, receiver, true);
+                validator.setAllowedReceiver(existing.contracts.ERC7540WBTC, receiver, true);
             }
         }
     }
 
     function _configureAllowedSources(
-        ERC20ParameterChecker checker,
+        ERC20ExecutionValidator validator,
         NetworkConfig memory config,
         DeploymentOutput memory existing,
         address usdcVault,
@@ -324,7 +326,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         for (uint256 i = 0; i < config.parameterChecker.allowedSources.ERC7540USDC.length; i++) {
             address source = _resolveAddress(config.parameterChecker.allowedSources.ERC7540USDC[i], config, existing);
             if (source != address(0)) {
-                checker.setAllowedSource(usdcVault, source, true);
+                validator.setAllowedSource(usdcVault, source, true);
             }
         }
 
@@ -332,13 +334,13 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         for (uint256 i = 0; i < config.parameterChecker.allowedSources.ERC7540WBTC.length; i++) {
             address source = _resolveAddress(config.parameterChecker.allowedSources.ERC7540WBTC[i], config, existing);
             if (source != address(0)) {
-                checker.setAllowedSource(wbtcVault, source, true);
+                validator.setAllowedSource(wbtcVault, source, true);
             }
         }
     }
 
     function _configureAllowedSpenders(
-        ERC20ParameterChecker checker,
+        ERC20ExecutionValidator validator,
         NetworkConfig memory config,
         DeploymentOutput memory existing,
         address usdc,
@@ -354,7 +356,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         for (uint256 i = 0; i < config.parameterChecker.allowedSpenders.USDC.length; i++) {
             address spender = _resolveAddress(config.parameterChecker.allowedSpenders.USDC[i], config, existing);
             if (spender != address(0)) {
-                checker.setAllowedSpender(usdc, spender, true);
+                validator.setAllowedSpender(usdc, spender, true);
             }
         }
 
@@ -362,7 +364,7 @@ contract ConfigureAdapterPermissionsScript is Script, DeploymentManager {
         for (uint256 i = 0; i < config.parameterChecker.allowedSpenders.WBTC.length; i++) {
             address spender = _resolveAddress(config.parameterChecker.allowedSpenders.WBTC[i], config, existing);
             if (spender != address(0)) {
-                checker.setAllowedSpender(wbtc, spender, true);
+                validator.setAllowedSpender(wbtc, spender, true);
             }
         }
     }

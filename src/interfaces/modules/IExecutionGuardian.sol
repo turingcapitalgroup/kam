@@ -1,65 +1,49 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-/// @dev ParametersChecker Errors - Custom errors for parameter validation in adapter calls.
-error ParametersCheckerZeroAddress();
-error ParametersCheckerZeroAmount();
-error ParametersCheckerInvalidToken();
-error ParametersCheckerInvalidReceiver();
-error ParametersCheckerInvalidSpender();
-error ParametersCheckerInvalidMax();
-error ParametersCheckerInvalidAdapter();
-error ParametersCheckerInvalidSelector();
-error ParametersCheckerInvalidParams();
-error ParametersCheckerUnauthorizedCaller();
-error ParametersCheckerTransferFailed();
-error ParametersCheckerInvalidAmount();
-error ParametersCheckerInvalidBlockAmount();
-error ParametersCheckerInvalidFrom();
-
-/// @title IParametersChecker
-/// @notice Interface for parameter validation contracts used in adapter call authorization.
-/// @dev Implementations validate call parameters to ensure adapter operations are safe and authorized.
-interface IParametersChecker {
-    /// @notice Validates and authorizes an adapter call with specific parameters.
-    /// @param adapter The adapter address making the call.
+/// @title IExecutionValidator
+/// @notice Interface for parameter validation contracts used in executor call validation.
+/// @dev Implementations validate call parameters to ensure executor operations are safe and authorized.
+interface IExecutionValidator {
+    /// @notice Validates an executor call with specific parameters, reverting if invalid.
+    /// @param executor The executor address making the call.
     /// @param target The target contract address.
     /// @param selector The function selector being called.
     /// @param params The encoded function parameters.
-    function authorizeAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params) external;
+    function authorizeCall(address executor, address target, bytes4 selector, bytes calldata params) external;
 }
 
-/// @title IAdapterGuardian
-/// @notice Interface for managing adapter permissions and security controls.
-/// @dev Controls which functions adapters can call on target contracts with optional parameter validation.
-interface IAdapterGuardian {
+/// @title IExecutionGuardian
+/// @notice Interface for managing executor permissions and security controls.
+/// @dev Controls which functions executors can call on target contracts with optional parameter validation.
+interface IExecutionGuardian {
     /* //////////////////////////////////////////////////////////////
                               EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Emitted when an adapter is registered or unregistered
-    event AdapterRegistered(address indexed adapter, bool registered);
+    /// @notice Emitted when an executor is registered or unregistered
+    event ExecutorRegistered(address indexed executor, bool registered);
 
-    /// @notice Emitted when a selector is allowed or disallowed for an adapter
-    event SelectorAllowed(address indexed adapter, address indexed target, bytes4 indexed selector, bool allowed);
+    /// @notice Emitted when a selector is allowed or disallowed for an executor
+    event SelectorAllowed(address indexed executor, address indexed target, bytes4 indexed selector, bool allowed);
 
-    /// @notice Emitted when a parameter checker is set for an adapter selector
-    event ParametersCheckerSet(
-        address indexed adapter, address indexed target, bytes4 indexed selector, address parametersChecker
+    /// @notice Emitted when an execution validator is set for an executor selector
+    event ExecutionValidatorSet(
+        address indexed executor, address indexed target, bytes4 indexed selector, address executionValidator
     );
 
     /* //////////////////////////////////////////////////////////////
                               MANAGEMENT
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Set whether a selector is allowed for an adapter on a target contract
-    /// @param adapter The adapter address
+    /// @notice Set whether a selector is allowed for an executor on a target contract
+    /// @param executor The executor address
     /// @param target The target contract address
     /// @param selector The function selector
     /// @param isAllowed Whether the selector is allowed
     /// @dev Only callable by ADMIN_ROLE
-    function setAdapterAllowedSelector(
-        address adapter,
+    function setAllowedSelector(
+        address executor,
         address target,
         uint8 targetType_,
         bytes4 selector,
@@ -67,17 +51,17 @@ interface IAdapterGuardian {
     )
         external;
 
-    /// @notice Set a parameter checker for an adapter selector
-    /// @param adapter The adapter address
+    /// @notice Set an execution validator for an executor selector
+    /// @param executor The executor address
     /// @param target The target contract address
     /// @param selector The function selector
-    /// @param parametersChecker The parameter checker contract address (0x0 to remove)
+    /// @param executionValidator The execution validator contract address (0x0 to remove)
     /// @dev Only callable by ADMIN_ROLE
-    function setAdapterParametersChecker(
-        address adapter,
+    function setExecutionValidator(
+        address executor,
         address target,
         bytes4 selector,
-        address parametersChecker
+        address executionValidator
     )
         external;
 
@@ -85,41 +69,34 @@ interface IAdapterGuardian {
                           VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Check if an adapter is authorized to call a specific function on a target
+    /// @notice Validates if an executor can call a specific function on a target, reverting if not allowed
     /// @param target The target contract address
     /// @param selector The function selector
     /// @param params The function parameters
-    function authorizeAdapterCall(address target, bytes4 selector, bytes calldata params) external;
+    function authorizeCall(address target, bytes4 selector, bytes calldata params) external;
 
-    /// @notice Check if a selector is allowed for an adapter
-    /// @param adapter The adapter address
+    /// @notice Check if a selector is allowed for an executor
+    /// @param executor The executor address
     /// @param target The target contract address
     /// @param selector The function selector
     /// @return Whether the selector is allowed
-    function isAdapterSelectorAllowed(address adapter, address target, bytes4 selector) external view returns (bool);
+    function isSelectorAllowed(address executor, address target, bytes4 selector) external view returns (bool);
 
-    /// @notice Get the parameter checker for an adapter selector
-    /// @param adapter The adapter address
+    /// @notice Get the execution validator for an executor selector
+    /// @param executor The executor address
     /// @param target The target contract address
     /// @param selector The function selector
-    /// @return The parameter checker address (address(0) if none)
-    function getAdapterParametersChecker(
-        address adapter,
-        address target,
-        bytes4 selector
-    )
-        external
-        view
-        returns (address);
+    /// @return The execution validator address (address(0) if none)
+    function getExecutionValidator(address executor, address target, bytes4 selector) external view returns (address);
 
-    /// @notice Get the allowed targed to execute a transaction with
-    /// @param adapter the adapter to get the targets from
-    /// @return targets an array of possible targes used by the adapter
-    function getAdapterTargets(address adapter) external view returns (address[] memory targets);
+    /// @notice Get the allowed targets to execute a transaction with
+    /// @param executor the executor to get the targets from
+    /// @return targets an array of possible targets used by the executor
+    function getExecutorTargets(address executor) external view returns (address[] memory targets);
 
-    /// @notice Gets the type of an target
+    /// @notice Gets the type of a target
     /// @param target The target address to check the type of
-    /// @return type An array of allowed target addresses for the adapter
+    /// @return type An array of allowed target addresses for the executor
     function getTargetType(address target) external view returns (uint8);
 
     enum TargetType {

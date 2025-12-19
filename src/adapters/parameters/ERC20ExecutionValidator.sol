@@ -4,21 +4,21 @@ pragma solidity 0.8.30;
 import { ERC20 } from "solady/tokens/ERC20.sol";
 
 import {
-    PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER,
-    PARAMETERCHECKER_NOT_ALLOWED,
-    PARAMETERCHECKER_RECEIVER_NOT_ALLOWED,
-    PARAMETERCHECKER_SELECTOR_NOT_ALLOWED,
-    PARAMETERCHECKER_SOURCE_NOT_ALLOWED,
-    PARAMETERCHECKER_SPENDER_NOT_ALLOWED
+    EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER,
+    EXECUTIONVALIDATOR_NOT_ALLOWED,
+    EXECUTIONVALIDATOR_RECEIVER_NOT_ALLOWED,
+    EXECUTIONVALIDATOR_SELECTOR_NOT_ALLOWED,
+    EXECUTIONVALIDATOR_SOURCE_NOT_ALLOWED,
+    EXECUTIONVALIDATOR_SPENDER_NOT_ALLOWED
 } from "kam/src/errors/Errors.sol";
 
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
-import { IParametersChecker } from "kam/src/interfaces/modules/IAdapterGuardian.sol";
+import { IExecutionValidator } from "kam/src/interfaces/modules/IExecutionGuardian.sol";
 
-/// @title ERC20ParameterChecker
+/// @title ERC20ExecutionValidator
 /// @notice A contract that checks parameters for ERC20 token operations
-/// @dev Implements IParametersChecker to authorize adapter calls for ERC20 tokens
-contract ERC20ParameterChecker is IParametersChecker {
+/// @dev Implements IExecutionValidator to authorize executor calls for ERC20 tokens
+contract ERC20ExecutionValidator is IExecutionValidator {
     /// @notice The registry contract reference
     IkRegistry public immutable registry;
 
@@ -60,7 +60,7 @@ contract ERC20ParameterChecker is IParametersChecker {
     /// @param maxAmount The maximum amount allowed
     event MaxSingleTransferUpdated(address indexed token, uint256 maxAmount);
 
-    /// @notice Constructs the ERC20ParameterChecker
+    /// @notice Constructs the ERC20ExecutionValidator
     /// @param _registry The address of the registry contract
     constructor(address _registry) {
         registry = IkRegistry(_registry);
@@ -105,13 +105,13 @@ contract ERC20ParameterChecker is IParametersChecker {
         emit MaxSingleTransferUpdated(_token, _max);
     }
 
-    /// @notice Authorizes an adapter call based on parameters
+    /// @notice Validates an executor call based on parameters, reverting if invalid
     /// @param _token The token address
     /// @param _selector The function selector
     /// @param _params The encoded function parameters
-    function authorizeAdapterCall(
+    function authorizeCall(
         address,
-        /* _adapter */
+        /* _executor */
         address _token,
         bytes4 _selector,
         bytes calldata _params
@@ -121,19 +121,19 @@ contract ERC20ParameterChecker is IParametersChecker {
         if (_selector == ERC20.transfer.selector) {
             (address _to, uint256 _amount) = abi.decode(_params, (address, uint256));
             uint256 _blockAmount = _amountTransferredPerBlock[_token][block.number] += _amount;
-            require(_blockAmount <= maxSingleTransfer(_token), PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
-            require(isAllowedReceiver(_token, _to), PARAMETERCHECKER_RECEIVER_NOT_ALLOWED);
+            require(_blockAmount <= maxSingleTransfer(_token), EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
+            require(isAllowedReceiver(_token, _to), EXECUTIONVALIDATOR_RECEIVER_NOT_ALLOWED);
         } else if (_selector == ERC20.transferFrom.selector) {
             (address _from, address _to, uint256 _amount) = abi.decode(_params, (address, address, uint256));
             uint256 _blockAmount = _amountTransferredPerBlock[_token][block.number] += _amount;
-            require(_blockAmount <= maxSingleTransfer(_token), PARAMETERCHECKER_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
-            require(isAllowedReceiver(_token, _to), PARAMETERCHECKER_RECEIVER_NOT_ALLOWED);
-            require(isAllowedSource(_token, _from), PARAMETERCHECKER_SOURCE_NOT_ALLOWED);
+            require(_blockAmount <= maxSingleTransfer(_token), EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER);
+            require(isAllowedReceiver(_token, _to), EXECUTIONVALIDATOR_RECEIVER_NOT_ALLOWED);
+            require(isAllowedSource(_token, _from), EXECUTIONVALIDATOR_SOURCE_NOT_ALLOWED);
         } else if (_selector == ERC20.approve.selector) {
             (address _spender,) = abi.decode(_params, (address, uint256));
-            require(isAllowedSpender(_token, _spender), PARAMETERCHECKER_SPENDER_NOT_ALLOWED);
+            require(isAllowedSpender(_token, _spender), EXECUTIONVALIDATOR_SPENDER_NOT_ALLOWED);
         } else {
-            revert(PARAMETERCHECKER_SELECTOR_NOT_ALLOWED);
+            revert(EXECUTIONVALIDATOR_SELECTOR_NOT_ALLOWED);
         }
     }
 
@@ -172,6 +172,6 @@ contract ERC20ParameterChecker is IParametersChecker {
     /// @param _admin The address to check
     /// @dev Reverts if the address is not an admin
     function _checkAdmin(address _admin) private view {
-        require(registry.isAdmin(_admin), PARAMETERCHECKER_NOT_ALLOWED);
+        require(registry.isAdmin(_admin), EXECUTIONVALIDATOR_NOT_ALLOWED);
     }
 }

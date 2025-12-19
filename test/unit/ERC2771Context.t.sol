@@ -6,10 +6,12 @@ import { _1_USDC } from "../utils/Constants.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
+import { IERC2771 } from "kam/src/interfaces/IERC2771.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 
 import { VAULTCLAIMS_NOT_BENEFICIARY } from "kam/src/errors/Errors.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/kStakingVault.sol";
+import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
 
 contract ERC2771ContextTest is BaseVaultTest {
     using SafeTransferLib for address;
@@ -446,6 +448,136 @@ contract ERC2771ContextTest is BaseVaultTest {
         assertEq(kTokenBalanceAfter - kTokenBalanceBefore, 1000 * _1_USDC, "Alice should receive kTokens back");
 
         assertEq(vault.balanceOf(address(vault)), 0, "Vault should have no more staked tokens");
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                    TRUSTED FORWARDER SETTER TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_SetTrustedForwarder_Success() public {
+        address newForwarder = makeAddr("newForwarder");
+
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(newForwarder);
+
+        assertEq(vault.trustedForwarder(), newForwarder, "Trusted forwarder should be updated");
+        assertTrue(vault.isTrustedForwarder(newForwarder), "New forwarder should be trusted");
+    }
+
+    function test_SetTrustedForwarder_Require_Only_Owner() public {
+        address newForwarder = makeAddr("newForwarder");
+
+        // Non-owner should revert
+        vm.prank(users.alice);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        vault.setTrustedForwarder(newForwarder);
+
+        // Another non-owner should also revert
+        vm.prank(users.bob);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        vault.setTrustedForwarder(newForwarder);
+    }
+
+    function test_SetTrustedForwarder_DisableWithZeroAddress() public {
+        // First set a forwarder
+        address newForwarder = makeAddr("newForwarder");
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(newForwarder);
+        assertEq(vault.trustedForwarder(), newForwarder);
+
+        // Now disable by setting to address(0)
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(address(0));
+
+        assertEq(vault.trustedForwarder(), address(0), "Trusted forwarder should be disabled");
+        assertFalse(vault.isTrustedForwarder(newForwarder), "Old forwarder should no longer be trusted");
+        assertFalse(vault.isTrustedForwarder(address(0)), "Address 0 despite allowed should return false");
+    }
+
+    function test_SetTrustedForwarder_EmitsEvent() public {
+        address newForwarder = makeAddr("newForwarder");
+        address oldForwarder = vault.trustedForwarder();
+
+        vm.expectEmit(true, true, false, false);
+        emit IERC2771.TrustedForwarderSet(oldForwarder, newForwarder);
+
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(newForwarder);
+    }
+
+    function test_SetTrustedForwarder_EnableAfterDisable() public {
+        address forwarder1 = makeAddr("forwarder1");
+        address forwarder2 = makeAddr("forwarder2");
+
+        // Set initial forwarder
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(forwarder1);
+        assertEq(vault.trustedForwarder(), forwarder1);
+
+        // Disable (kill switch)
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(address(0));
+        assertEq(vault.trustedForwarder(), address(0));
+
+        // Re-enable with different forwarder
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(forwarder2);
+        assertEq(vault.trustedForwarder(), forwarder2);
+        assertTrue(vault.isTrustedForwarder(forwarder2));
+        assertFalse(vault.isTrustedForwarder(forwarder1));
+    }
+
+    function test_SetTrustedForwarder_ForwardedCallsWork() public {
+        // Set a new trusted forwarder
+        address newForwarder = makeAddr("newForwarder");
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(newForwarder);
+
+        // Setup: Mint kTokens to Alice
+        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        // Test: Forward a call through the new forwarder
+        bytes memory callData = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
+
+        vm.prank(newForwarder);
+        (bool success, bytes memory returnData) = address(vault).call(_appendSender(callData, users.alice));
+        require(success, "Forwarded call failed");
+
+        bytes32 requestId = abi.decode(returnData, (bytes32));
+        BaseVaultTypes.StakeRequest memory req = vault.getStakeRequest(requestId);
+        assertEq(req.user, users.alice, "User should be Alice");
+    }
+
+    function test_SetTrustedForwarder_OldForwarderIgnored() public {
+        address oldForwarder = makeAddr("oldForwarder");
+        address newForwarder = makeAddr("newForwarder");
+
+        // Set initial forwarder
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(oldForwarder);
+
+        // Change to new forwarder
+        vm.prank(users.owner);
+        vault.setTrustedForwarder(newForwarder);
+
+        // Setup: Mint kTokens to Alice
+        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        // Try to forward through old forwarder - should fail because _msgSender()
+        // will return oldForwarder (not Alice from appended data)
+        bytes memory callData = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
+
+        vm.prank(oldForwarder);
+        (bool success,) = address(vault).call(_appendSender(callData, users.alice));
+
+        // Should fail because oldForwarder is no longer trusted
+        assertFalse(success, "Call from old forwarder should fail");
     }
 
     /* //////////////////////////////////////////////////////////////

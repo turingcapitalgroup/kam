@@ -578,6 +578,14 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _setPaused(_paused);
     }
 
+    /// @notice Sets or disables the trusted forwarder for meta-transactions
+    /// @dev Only callable by owner. Set to address(0) to disable meta-transactions (kill switch).
+    /// @param _trustedForwarder The new trusted forwarder address (address(0) to disable)
+    function setTrustedForwarder(address _trustedForwarder) external {
+        _checkOwner();
+        _setTrustedForwarder(_trustedForwarder);
+    }
+
     /// @notice Authorize upgrade (only owner can upgrade)
     /// @dev This allows upgrading the main contract while keeping modules separate
     function _authorizeUpgrade(address _newImplementation) internal view override {
