@@ -1,5 +1,5 @@
 # kAssetRouter
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kAssetRouter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kAssetRouter.sol)
 
 **Inherits:**
 [IkAssetRouter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.IkAssetRouter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
@@ -466,10 +466,23 @@ function canExecuteProposal(bytes32 _proposalId) external view returns (bool _ca
 
 ### getSettlementCooldown
 
+Gets the current security cooldown period for settlement proposals
+
+The cooldown period determines how long proposals must wait before execution.
+This security mechanism allows guardians to verify yield calculations and prevents
+immediate execution of potentially malicious or incorrect proposals. Critical for
+maintaining protocol integrity during yield distribution processes.
+
 
 ```solidity
 function getSettlementCooldown() external view returns (uint256);
 ```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|cooldown The current cooldown period in seconds|
+
 
 ### getMaxAllowedDelta
 
@@ -761,6 +774,52 @@ function getRequestedShares(address _vault, bytes32 _batchId) external view retu
 |`<none>`|`uint256`|The total amount of shares requested for redemption in this batch|
 
 
+### isProposalExecuted
+
+Checks if a specific proposal has been executed
+
+Used to verify whether a settlement proposal has already been processed
+
+
+```solidity
+function isProposalExecuted(bytes32 _proposalId) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_proposalId`|`bytes32`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if the proposal has been executed, false otherwise|
+
+
+### isBatchIdRegistered
+
+Checks if a specific batch ID has been registered in the router
+
+Used to verify whether a batch ID exists in the protocol's tracking system
+
+
+```solidity
+function isBatchIdRegistered(bytes32 _batchId) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_batchId`|`bytes32`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if the batch ID is registered, false otherwise|
+
+
 ### _authorizeUpgrade
 
 Authorize contract upgrade
@@ -778,7 +837,7 @@ function _authorizeUpgrade(address _newImplementation) internal view override;
 
 ### receive
 
-Receive ETH (for gas refunds, etc.)
+Receive ETH ()
 
 
 ```solidity

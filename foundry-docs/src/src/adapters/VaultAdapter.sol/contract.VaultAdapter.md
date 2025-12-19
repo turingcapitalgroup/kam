@@ -1,8 +1,13 @@
 # VaultAdapter
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/adapters/VaultAdapter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/adapters/VaultAdapter.sol)
 
 **Inherits:**
 [SmartAdapterAccount](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/adapters/SmartAdapterAccount.sol/contract.SmartAdapterAccount.md), [IVaultAdapter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md)
+
+Protocol adapter enabling secure interaction with external DeFi protocols for yield generation.
+
+Extends SmartAdapterAccount with KAM-specific functionality including total assets tracking,
+asset rescue capabilities, and kAssetRouter integration for settlement coordination.
 
 
 ## State Variables
@@ -11,19 +16,6 @@
 ```solidity
 bytes32 private constant VAULTADAPTER_STORAGE_LOCATION =
     0xf3245d0f4654bfd28a91ebbd673859481bdc20aeda8fc19798f835927d79aa00
-```
-
-
-### K_ASSET_ROUTER
-Registry lookup key for the kAssetRouter singleton contract
-
-This hash is used to retrieve the kAssetRouter address from the registry's contract mapping.
-kAssetRouter coordinates all asset movements and settlements, making it a critical dependency
-for vaults and other protocol components. The hash-based lookup enables dynamic upgrades.
-
-
-```solidity
-bytes32 internal constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER")
 ```
 
 
@@ -77,32 +69,6 @@ function setPaused(bool _paused) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`_paused`|`bool`||
-
-
-### rescueAssets
-
-Rescues accidentally sent assets (ETH or ERC20 tokens) preventing permanent loss of funds
-
-This function implements a critical safety mechanism for recovering tokens or ETH that become stuck
-in the contract through user error or airdrops. The rescue process: (1) Validates admin authorization to
-prevent unauthorized fund extraction, (2) Ensures recipient address is valid to prevent burning funds,
-(3) For ETH rescue (asset_=address(0)): validates balance sufficiency and uses low-level call for transfer,
-(4) For ERC20 rescue: critically checks the token is NOT a registered protocol asset (USDC, WBTC, etc.) to
-protect user deposits and protocol integrity, then validates balance and uses SafeTransferLib for secure
-transfer. The distinction between ETH and ERC20 handling accounts for their different transfer mechanisms.
-Protocol assets are explicitly blocked from rescue to prevent admin abuse and maintain user trust.
-
-
-```solidity
-function rescueAssets(address _asset, address _to, uint256 _amount) external payable;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_asset`|`address`||
-|`_to`|`address`||
-|`_amount`|`uint256`||
 
 
 ### _authorizeExecute

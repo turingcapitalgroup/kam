@@ -1,8 +1,13 @@
 # IRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/interfaces/IRegistry.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+
+Core protocol registry interface for managing assets, vaults, adapters, and access control.
+
+Central configuration hub that maintains all protocol state including singleton contracts, vault mappings,
+and role-based permissions.
 
 
 ## Functions
@@ -782,6 +787,163 @@ function setTreasury(address treasury_) external payable;
 |`treasury_`|`address`|The new treasury address|
 
 
+### setInsurance
+
+Sets the insurance address
+
+Insurance receives protocol insurance fees. Only callable by ADMIN_ROLE.
+
+
+```solidity
+function setInsurance(address insurance_) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`insurance_`|`address`|The new insurance address|
+
+
+### setTreasuryBps
+
+Sets the treasury fee in basis points
+
+Treasury fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+
+
+```solidity
+function setTreasuryBps(uint16 treasuryBps_) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`treasuryBps_`|`uint16`|The new treasury fee in basis points (max 10000 = 100%)|
+
+
+### setInsuranceBps
+
+Sets the insurance fee in basis points
+
+Insurance fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+
+
+```solidity
+function setInsuranceBps(uint16 insuranceBps_) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`insuranceBps_`|`uint16`|The new insurance fee in basis points (max 10000 = 100%)|
+
+
+### getInsurance
+
+Gets the insurance address
+
+Insurance receives protocol insurance fees.
+
+
+```solidity
+function getInsurance() external view returns (address);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The insurance address|
+
+
+### getTreasuryBps
+
+Gets the treasury fee in basis points
+
+Returns the treasury fee percentage (10000 = 100%)
+
+
+```solidity
+function getTreasuryBps() external view returns (uint16);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint16`|The treasury fee in basis points|
+
+
+### getInsuranceBps
+
+Gets the insurance fee in basis points
+
+Returns the insurance fee percentage (10000 = 100%)
+
+
+```solidity
+function getInsuranceBps() external view returns (uint16);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint16`|The insurance fee in basis points|
+
+
+### setGlobalPause
+
+Sets the global pause state for the entire protocol
+
+Only callable by emergency admin. When true, all protocol operations are blocked.
+
+
+```solidity
+function setGlobalPause(bool paused_) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`paused_`|`bool`|The new global pause state|
+
+
+### isGlobalPaused
+
+Returns true if the protocol is globally paused
+
+
+```solidity
+function isGlobalPaused() external view returns (bool paused);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`paused`|`bool`|The current global pause state|
+
+
+### getSettlementConfig
+
+Gets all fee configuration in a single call
+
+Optimized getter for external contracts needing full fee config
+
+
+```solidity
+function getSettlementConfig()
+    external
+    view
+    returns (address treasury, address insurance, uint16 treasuryBps, uint16 insuranceBps);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`treasury`|`address`|The treasury address|
+|`insurance`|`address`|The insurance address|
+|`treasuryBps`|`uint16`|The treasury fee in basis points|
+|`insuranceBps`|`uint16`|The insurance fee in basis points|
+
+
 ### setAssetBatchLimits
 
 Sets maximum mint and redeem amounts per batch for an asset
@@ -1045,6 +1207,62 @@ event TreasurySet(address indexed treasury);
 |Name|Type|Description|
 |----|----|-----------|
 |`treasury`|`address`|The new treasury address|
+
+### InsuranceSet
+Emitted when the insurance address is updated
+
+
+```solidity
+event InsuranceSet(address indexed insurance);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`insurance`|`address`|The new insurance address|
+
+### TreasuryBpsSet
+Emitted when the treasury fee is updated
+
+
+```solidity
+event TreasuryBpsSet(uint16 treasuryBps);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`treasuryBps`|`uint16`|The new treasury fee in basis points|
+
+### InsuranceBpsSet
+Emitted when the insurance fee is updated
+
+
+```solidity
+event InsuranceBpsSet(uint16 insuranceBps);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`insuranceBps`|`uint16`|The new insurance fee in basis points|
+
+### GlobalPauseSet
+Emitted when the global pause state is updated
+
+
+```solidity
+event GlobalPauseSet(bool paused);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`paused`|`bool`|The new global pause state|
 
 ### HurdleRateSet
 Emitted when a hurdle rate is set for an asset

@@ -1,4 +1,4 @@
 
 
 # Contents
-- [ERC20ParameterChecker](ERC20ParameterChecker.sol/contract.ERC20ParameterChecker.md)
+- [ERC20ExecutionValidator](ERC20ExecutionValidator.sol/contract.ERC20ExecutionValidator.md)

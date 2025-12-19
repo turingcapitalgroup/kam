@@ -1,5 +1,5 @@
 # kRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kRegistry/kRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kRegistry/kRegistry.sol)
 
 **Inherits:**
 [IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
@@ -19,58 +19,6 @@ pattern and ERC-7201 namespaced storage to ensure future extensibility while mai
 
 
 ## State Variables
-### K_MINTER
-kMinter key
-
-
-```solidity
-bytes32 public constant K_MINTER = keccak256("K_MINTER")
-```
-
-
-### K_ASSET_ROUTER
-kAssetRouter key
-
-
-```solidity
-bytes32 public constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER")
-```
-
-
-### K_TOKEN_FACTORY
-
-```solidity
-bytes32 public constant K_TOKEN_FACTORY = keccak256("K_TOKEN_FACTORY")
-```
-
-
-### USDC
-USDC key
-
-
-```solidity
-bytes32 public constant USDC = keccak256("USDC")
-```
-
-
-### WBTC
-WBTC key
-
-
-```solidity
-bytes32 public constant WBTC = keccak256("WBTC")
-```
-
-
-### MAX_BPS
-Maximum basis points (100%)
-
-
-```solidity
-uint256 constant MAX_BPS = 10_000
-```
-
-
 ### KREGISTRY_STORAGE_LOCATION
 
 ```solidity
@@ -256,6 +204,89 @@ function setTreasury(address _treasury) external payable;
 |Name|Type|Description|
 |----|----|-----------|
 |`_treasury`|`address`||
+
+
+### setInsurance
+
+Sets the insurance address
+
+Insurance receives protocol insurance fees. Only callable by ADMIN_ROLE.
+
+
+```solidity
+function setInsurance(address _insurance) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_insurance`|`address`||
+
+
+### setTreasuryBps
+
+Sets the treasury fee in basis points
+
+Treasury fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+
+
+```solidity
+function setTreasuryBps(uint16 _treasuryBps) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_treasuryBps`|`uint16`||
+
+
+### setInsuranceBps
+
+Sets the insurance fee in basis points
+
+Insurance fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+
+
+```solidity
+function setInsuranceBps(uint16 _insuranceBps) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_insuranceBps`|`uint16`||
+
+
+### setGlobalPause
+
+Sets the global pause state for the entire protocol
+
+Only callable by emergency admin. When true, all protocol operations are blocked.
+
+
+```solidity
+function setGlobalPause(bool _paused) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_paused`|`bool`||
+
+
+### isGlobalPaused
+
+Returns true if the protocol is globally paused
+
+
+```solidity
+function isGlobalPaused() external view returns (bool);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|paused The current global pause state|
 
 
 ### setHurdleRate
@@ -583,6 +614,80 @@ function getTreasury() external view returns (address);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`address`|The treasury address|
+
+
+### getInsurance
+
+Gets the insurance address
+
+Insurance receives protocol insurance fees.
+
+
+```solidity
+function getInsurance() external view returns (address);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The insurance address|
+
+
+### getTreasuryBps
+
+Gets the treasury fee in basis points
+
+Returns the treasury fee percentage (10000 = 100%)
+
+
+```solidity
+function getTreasuryBps() external view returns (uint16);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint16`|The treasury fee in basis points|
+
+
+### getInsuranceBps
+
+Gets the insurance fee in basis points
+
+Returns the insurance fee percentage (10000 = 100%)
+
+
+```solidity
+function getInsuranceBps() external view returns (uint16);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint16`|The insurance fee in basis points|
+
+
+### getSettlementConfig
+
+Gets all fee configuration in a single call
+
+Optimized getter for external contracts needing full fee config
+
+
+```solidity
+function getSettlementConfig()
+    external
+    view
+    returns (address treasury, address insurance, uint16 treasuryBps, uint16 insuranceBps);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`treasury`|`address`|The treasury address|
+|`insurance`|`address`|The insurance address|
+|`treasuryBps`|`uint16`|The treasury fee in basis points|
+|`insuranceBps`|`uint16`|The insurance fee in basis points|
 
 
 ### getCoreContracts
@@ -1029,6 +1134,24 @@ function _checkVaultRegistered(address _vault) private view;
 |`_vault`|`address`|The vault address to validate|
 
 
+### _checkString
+
+Validates that a string is not empty
+
+Reverts with KREGISTRY_EMPTY_STRING if the string has zero length.
+Used to ensure token names and symbols are properly defined during asset registration.
+
+
+```solidity
+function _checkString(string memory _str) private pure;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_str`|`string`|The string to validate|
+
+
 ### _tryGetAssetDecimals
 
 Helper function to get the decimals of the underlying asset.
@@ -1144,6 +1267,18 @@ storage-location: erc7201:kam.storage.kRegistry
 
 ```solidity
 struct kRegistryStorage {
+    /// @dev Protocol insurance address for insurance fee collection
+    /// Receives protocol insurance fees for coverage reserves
+    address insurance;
+    /// @dev Treasury fee in basis points (100 = 1%, max 10000 = 100%)
+    /// Portion of protocol profits allocated to treasury
+    uint16 treasuryBps;
+    /// @dev Insurance fee in basis points (100 = 1%, max 10000 = 100%)
+    /// Portion of protocol profits allocated to insurance
+    uint16 insuranceBps;
+    /// @dev Global pause flag for protocol-wide emergency stop
+    /// When true, all kBase-inheriting contracts are paused
+    bool globalPaused;
     /// @dev Set of all protocol-supported underlying assets (e.g., USDC, WBTC)
     /// Used to validate assets before operations and maintain a whitelist
     OptimizedAddressEnumerableSetLib.AddressSet supportedAssets;

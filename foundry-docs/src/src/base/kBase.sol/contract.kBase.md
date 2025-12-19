@@ -1,5 +1,5 @@
 # kBase
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/base/kBase.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/base/kBase.sol)
 
 **Inherits:**
 [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md)
@@ -22,32 +22,6 @@ upgradeable.
 
 
 ## State Variables
-### K_MINTER
-Registry lookup key for the kMinter singleton contract
-
-This hash is used to retrieve the kMinter address from the registry's contract mapping.
-kMinter handles institutional minting/redemption flows, so many contracts need to identify it
-for access control and routing decisions. The hash ensures consistent lookups across the protocol.
-
-
-```solidity
-bytes32 internal constant K_MINTER = keccak256("K_MINTER")
-```
-
-
-### K_ASSET_ROUTER
-Registry lookup key for the kAssetRouter singleton contract
-
-This hash is used to retrieve the kAssetRouter address from the registry's contract mapping.
-kAssetRouter coordinates all asset movements and settlements, making it a critical dependency
-for vaults and other protocol components. The hash-based lookup enables dynamic upgrades.
-
-
-```solidity
-bytes32 internal constant K_ASSET_ROUTER = keccak256("K_ASSET_ROUTER")
-```
-
-
 ### KBASE_STORAGE_LOCATION
 ERC-7201 storage location calculated as: keccak256(abi.encode(uint256(keccak256("kam.storage.kBase")) - 1))
 & ~bytes32(uint256(0xff))
@@ -460,6 +434,7 @@ Checks if the contract is currently in emergency pause state
 
 Used by inheriting contracts to halt operations during emergencies. When paused, state-changing
 functions should revert while view functions remain accessible for protocol monitoring.
+Checks both local contract pause AND global registry pause (OR logic).
 
 
 ```solidity
@@ -469,7 +444,7 @@ function _isPaused() internal view returns (bool);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`bool`|Whether the contract is currently paused|
+|`<none>`|`bool`|Whether the contract is currently paused (local OR global)|
 
 
 ### _isKMinter

@@ -1,10 +1,12 @@
 # kBaseRoles
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/base/kBaseRoles.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/base/kBaseRoles.sol)
 
 **Inherits:**
 [OptimizedOwnableRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md)
 
-Foundation contract providing essential shared functionality and registry integration for all KAM protocol
+Foundation contract providing role-based access control for the KAM protocol.
+
+Extends Solady's OptimizedOwnableRoles for gas-efficient role management using ERC-7201 storage.
 
 
 ## State Variables

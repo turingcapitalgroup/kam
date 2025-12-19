@@ -1,5 +1,10 @@
 # ERC2771Context
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/base/ERC2771Context.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/base/ERC2771Context.sol)
+
+**Inherits:**
+[IERC2771](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md)
+
+Context variant with ERC-2771 support for meta-transactions.
 
 Context variant with ERC-2771 support.
 WARNING: Avoid using this pattern in contracts that rely on a specific calldata length as they'll
@@ -40,6 +45,21 @@ NOTE: The trusted forwarder can be replaced by overriding [trustedForwarder](//U
 function _initializeContext(address trustedForwarder_) internal;
 ```
 
+### _setTrustedForwarder
+
+Sets or disables the trusted forwarder for meta-transactions
+
+
+```solidity
+function _setTrustedForwarder(address trustedForwarder_) internal virtual;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`trustedForwarder_`|`address`|The new trusted forwarder address (address(0) to disable)|
+
+
 ### trustedForwarder
 
 Returns the address of the trusted forwarder.
@@ -61,7 +81,7 @@ Indicates whether any particular address is the trusted forwarder.
 
 
 ```solidity
-function isTrustedForwarder(address forwarder) public view virtual returns (bool isTrusted);
+function isTrustedForwarder(address forwarder) public view virtual returns (bool);
 ```
 **Parameters**
 
@@ -73,7 +93,7 @@ function isTrustedForwarder(address forwarder) public view virtual returns (bool
 
 |Name|Type|Description|
 |----|----|-----------|
-|`isTrusted`|`bool`|wether is a trusted forwarder or not.|
+|`<none>`|`bool`|isTrusted whether is a trusted forwarder or not.|
 
 
 ### _msgSender

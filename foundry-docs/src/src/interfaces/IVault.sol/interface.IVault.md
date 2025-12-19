@@ -1,8 +1,8 @@
 # IVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/interfaces/IVault.sol)
 
 **Inherits:**
-[IVaultBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
+[IERC2771](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVaultBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
 
 Core interface for retail staking operations enabling kToken holders to earn yield through vault strategies
 
@@ -124,6 +124,23 @@ function setMaxTotalAssets(uint128 maxTotalAssets_) external;
 |`maxTotalAssets_`|`uint128`|Maximum total assets|
 
 
+### setTrustedForwarder
+
+Sets or disables the trusted forwarder for meta-transactions
+
+Only callable by admin. Set to address(0) to disable meta-transactions.
+
+
+```solidity
+function setTrustedForwarder(address trustedForwarder_) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`trustedForwarder_`|`address`|The new trusted forwarder address (address(0) to disable)|
+
+
 ## Events
 ### BatchCreated
 
@@ -240,12 +257,12 @@ event HardHurdleRateSet(bool isHard);
 |----|----|-----------|
 |`isHard`|`bool`|True for hard hurdle, false for soft hurdle|
 
-### FeesAssesed
+### FeesAssessed
 Emitted when fees are charged to the vault
 
 
 ```solidity
-event FeesAssesed(uint256 managementFees, uint256 performanceFees);
+event FeesAssessed(uint256 managementFees, uint256 performanceFees);
 ```
 
 **Parameters**

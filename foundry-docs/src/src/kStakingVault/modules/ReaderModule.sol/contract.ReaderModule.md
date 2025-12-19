@@ -1,5 +1,5 @@
 # ReaderModule
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kStakingVault/modules/ReaderModule.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kStakingVault/modules/ReaderModule.sol)
 
 **Inherits:**
 [BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [IVaultReader](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IVaultReader.sol/interface.IVaultReader.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md)
@@ -8,15 +8,6 @@ Contains all the public getters for the Staking Vault
 
 
 ## State Variables
-### MAX_BPS
-Maximum basis points
-
-
-```solidity
-uint256 constant MAX_BPS = 10_000
-```
-
-
 ### SECS_PER_YEAR
 Number of seconds in a year
 
@@ -673,6 +664,36 @@ function getUnstakeRequest(bytes32 _requestId)
 |Name|Type|Description|
 |----|----|-----------|
 |`unstakeRequest`|`BaseVaultTypes.UnstakeRequest`|The unstake request struct containing all request details|
+
+
+### maxTotalAssets
+
+Returns the maximum total assets (TVL cap) allowed in the vault
+
+
+```solidity
+function maxTotalAssets() external view returns (uint128);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint128`|The maximum total assets in underlying token terms|
+
+
+### receiverImplementation
+
+Returns the receiver implementation address used to clone batch receivers
+
+
+```solidity
+function receiverImplementation() external view returns (address);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The address of the receiver implementation contract|
 
 
 ### contractName

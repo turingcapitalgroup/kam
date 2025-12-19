@@ -1,5 +1,5 @@
 # IVaultReader
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/modules/IVaultReader.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/interfaces/modules/IVaultReader.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -661,5 +661,35 @@ function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
 |Name|Type|Description|
 |----|----|-----------|
 |`isClosed_`|`bool`|the state of the given batchId|
+
+
+### maxTotalAssets
+
+Returns the maximum total assets (TVL cap) allowed in the vault
+
+
+```solidity
+function maxTotalAssets() external view returns (uint128);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint128`|The maximum total assets in underlying token terms|
+
+
+### receiverImplementation
+
+Returns the receiver implementation address used to clone batch receivers
+
+
+```solidity
+function receiverImplementation() external view returns (address);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The address of the receiver implementation contract|
 
 

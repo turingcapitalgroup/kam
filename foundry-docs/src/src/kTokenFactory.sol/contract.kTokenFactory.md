@@ -1,25 +1,41 @@
 # kTokenFactory
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kTokenFactory.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kTokenFactory.sol)
 
 **Inherits:**
 [IkTokenFactory](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkTokenFactory.sol/interface.IkTokenFactory.md)
 
-Factory contract for deploying kToken instances
+Factory contract for deploying upgradeable kToken instances using UUPS proxy pattern
 
 This factory contract handles the deployment of kToken contracts for the KAM protocol.
 It provides a centralized way to create kTokens with consistent initialization parameters.
-The factory follows best practices: (1) Simple deployment pattern without CREATE2 for flexibility,
-(2) Input validation to ensure all required parameters are non-zero, (3) Event emission for
-off-chain tracking of deployments, (4) Returns the deployed contract address for immediate use.
-The factory is designed to be called by kRegistry during asset registration, ensuring all kTokens
-are created through a standardized process.
+The factory follows best practices: (1) Deploys kToken implementation once for gas efficiency,
+(2) Uses a pre-deployed ERC1967Factory shared across the protocol to prevent frontrunning,
+(3) Input validation to ensure all required parameters are non-zero, (4) Event emission for
+off-chain tracking of deployments, (5) Returns the deployed proxy address for immediate use.
+The factory is designed to be called by kRegistry during asset registration, ensuring all
+kTokens are created through a standardized process. By using a pre-deployed factory instead
+of deploying a new one, we save gas and maintain consistency across the protocol.
 
 
 ## State Variables
 ### registry
 
 ```solidity
-address immutable registry
+address public immutable registry
+```
+
+
+### implementation
+
+```solidity
+address public immutable implementation
+```
+
+
+### proxyFactory
+
+```solidity
+ERC1967Factory public immutable proxyFactory
 ```
 
 
@@ -28,18 +44,28 @@ address immutable registry
 
 Constructor for kTokenFactory
 
-No initialization required as this is a simple factory contract
+Deploys the kToken implementation once and uses the provided proxy factory.
+This approach saves gas by reusing the same implementation for all kTokens and
+using a pre-deployed factory shared across the protocol.
 
 
 ```solidity
-constructor(address _registry) ;
+constructor(address _registry, address _proxyFactory) ;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_registry`|`address`|The kRegistry address that will be authorized to deploy kTokens|
+|`_proxyFactory`|`address`|The pre-deployed ERC1967Factory address for proxy deployments|
+
 
 ### deployKToken
 
 Deploys a new kToken contract
 
-Deploys a kToken with the specified parameters and returns its address
+Uses ERC1967Factory.deployAndCall to atomically deploy proxy and initialize it,
+preventing frontrunning attacks where an attacker could call initialize before the legitimate deployer.
 
 
 ```solidity

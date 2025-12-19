@@ -1,5 +1,5 @@
 # kStakingVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/kStakingVault/kStakingVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kStakingVault/kStakingVault.sol)
 
 **Inherits:**
 [IVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
@@ -623,6 +623,23 @@ function setPaused(bool _paused) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`_paused`|`bool`||
+
+
+### setTrustedForwarder
+
+Sets or disables the trusted forwarder for meta-transactions
+
+Only callable by owner. Set to address(0) to disable meta-transactions (kill switch).
+
+
+```solidity
+function setTrustedForwarder(address _trustedForwarder) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_trustedForwarder`|`address`|The new trusted forwarder address (address(0) to disable)|
 
 
 ### _authorizeUpgrade

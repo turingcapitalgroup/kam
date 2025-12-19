@@ -1,5 +1,5 @@
 # IkAssetRouter
-[Git Source](https://github.com/VerisLabs/KAM/blob/ddc923527fe0cf34e1d2f0806081690065082061/src/interfaces/IkAssetRouter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/interfaces/IkAssetRouter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -517,7 +517,68 @@ function virtualBalance(address vault, address asset) external view returns (uin
 |`<none>`|`uint256`|balance The total virtual asset balance across all vault adapters|
 
 
+### isProposalExecuted
+
+Checks if a specific proposal has been executed
+
+Used to verify whether a settlement proposal has already been processed
+
+
+```solidity
+function isProposalExecuted(bytes32 proposalId) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`proposalId`|`bytes32`|The unique identifier of the proposal to check|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if the proposal has been executed, false otherwise|
+
+
+### isBatchIdRegistered
+
+Checks if a specific batch ID has been registered in the router
+
+Used to verify whether a batch ID exists in the protocol's tracking system
+
+
+```solidity
+function isBatchIdRegistered(bytes32 batchId) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`batchId`|`bytes32`|The batch identifier to check|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if the batch ID is registered, false otherwise|
+
+
 ## Events
+### TotalAssetsSet
+Emitted when the kAssetRouter contract is initialized with registry configuration
+
+
+```solidity
+event TotalAssetsSet(address indexed adapter, uint256 totalAssets);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`adapter`|`address`|The address of the adapter that was updated|
+|`totalAssets`|`uint256`|the totalAssets used as param to update|
+
 ### ContractInitialized
 Emitted when the kAssetRouter contract is initialized with registry configuration
 
@@ -569,7 +630,7 @@ event AssetsRequestPulled(address indexed vault, address indexed asset, uint256 
 |`asset`|`address`|The underlying asset address being requested for redemption|
 |`amount`|`uint256`|The quantity of assets requested for redemption|
 
-### AssetsTransfered
+### AssetsTransferred
 Emitted when assets are transferred between kStakingVaults for optimal allocation
 
 This is a virtual transfer for accounting purposes - actual assets may remain in the same
@@ -577,7 +638,7 @@ physical location while vault balances are updated to reflect the new allocation
 
 
 ```solidity
-event AssetsTransfered(
+event AssetsTransferred(
     address indexed sourceVault, address indexed targetVault, address indexed asset, uint256 amount
 );
 ```
