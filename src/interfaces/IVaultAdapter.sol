@@ -22,23 +22,6 @@ interface IVaultAdapter is IVersioned {
     /// @param paused_ The new pause state (true = operations halted, false = normal operation)
     event Paused(bool paused_);
 
-    /// @notice Emitted when ERC20 tokens are rescued from the contract to prevent permanent loss
-    /// @dev This rescue mechanism is restricted to non-protocol assets only - registered assets (USDC, WBTC, etc.)
-    /// cannot be rescued to protect user funds and maintain protocol integrity. Typically used to recover
-    /// accidentally sent tokens or airdrops. Only admin role can execute rescues as a security measure.
-    /// @param asset_ The ERC20 token address being rescued (must not be a registered protocol asset)
-    /// @param to_ The recipient address receiving the rescued tokens (cannot be zero address)
-    /// @param amount_ The quantity of tokens rescued (must not exceed contract balance)
-    event RescuedAssets(address indexed asset_, address indexed to_, uint256 amount_);
-
-    /// @notice Emitted when native ETH is rescued from the contract to recover stuck funds
-    /// @dev ETH rescue is separate from ERC20 rescue due to different transfer mechanisms. This prevents
-    /// ETH from being permanently locked if sent to the contract accidentally. Uses low-level call for
-    /// ETH transfer with proper success checking. Only admin role authorized for security.
-    /// @param to_ The recipient address receiving the rescued ETH (cannot be zero address)
-    /// @param amount_ The quantity of ETH rescued in wei (must not exceed contract balance)
-    event RescuedETH(address indexed to_, uint256 amount_);
-
     /// @notice Emitted when total assets are updated
     /// @param oldTotalAssets The previous total assets value
     /// @param newTotalAssets The new total assets value
@@ -58,20 +41,6 @@ interface IVaultAdapter is IVersioned {
     /// respect the pause state. The external visibility with role check prevents unauthorized pause manipulation.
     /// @param paused_ The desired pause state (true = halt operations, false = resume normal operation)
     function setPaused(bool paused_) external;
-
-    /// @notice Rescues accidentally sent assets (ETH or ERC20 tokens) preventing permanent loss of funds
-    /// @dev This function implements a critical safety mechanism for recovering tokens or ETH that become stuck
-    /// in the contract through user error or airdrops. The rescue process: (1) Validates admin authorization to
-    /// prevent unauthorized fund extraction, (2) Ensures recipient address is valid to prevent burning funds,
-    /// (3) For ETH rescue (asset_=address(0)): validates balance sufficiency and uses low-level call for transfer,
-    /// (4) For ERC20 rescue: critically checks the token is NOT a registered protocol asset (USDC, WBTC, etc.) to
-    /// protect user deposits and protocol integrity, then validates balance and uses SafeTransferLib for secure
-    /// transfer. The distinction between ETH and ERC20 handling accounts for their different transfer mechanisms.
-    /// Protocol assets are explicitly blocked from rescue to prevent admin abuse and maintain user trust.
-    /// @param asset_ The asset to rescue (use address(0) for native ETH, otherwise ERC20 token address)
-    /// @param to_ The recipient address that will receive the rescued assets (cannot be zero address)
-    /// @param amount_ The quantity to rescue (must not exceed available balance)
-    function rescueAssets(address asset_, address to_, uint256 amount_) external payable;
 
     /// @notice Sets the last recorded total assets for vault accounting and performance tracking
     /// @dev This function allows the admin to update the lastTotalAssets variable, which is

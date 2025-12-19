@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import { IVault } from "./IVault.sol";
-import { IVaultReader } from "./modules/IVaultReader.sol";
+import { IVault } from "kam/src/interfaces/IVault.sol";
+import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 
 /// @title IkStakingVault
 /// @notice Comprehensive interface combining retail staking operations with ERC20 share tokens and vault state reading

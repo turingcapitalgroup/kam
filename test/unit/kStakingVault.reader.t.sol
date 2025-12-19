@@ -8,15 +8,9 @@ import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMath
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
-import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
-import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 
-import {
-    KSTAKINGVAULT_NOT_INITIALIZED,
-    KSTAKINGVAULT_VAULT_CLOSED,
-    KSTAKINGVAULT_VAULT_SETTLED
-} from "kam/src/errors/Errors.sol";
+import { KSTAKINGVAULT_VAULT_CLOSED, KSTAKINGVAULT_VAULT_SETTLED } from "kam/src/errors/Errors.sol";
 
 /// @title kStakingVaultReaderTest
 /// @notice Unit tests for all VaultReader (ReaderModule) functions
@@ -108,13 +102,13 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         assertGt(lastCharged, 0);
     }
 
-    function test_nextManagementFeeTimestamp_ReturnsEndOfMonth() public {
+    function test_nextManagementFeeTimestamp_ReturnsEndOfMonth() public view {
         uint256 nextTimestamp = vault.nextManagementFeeTimestamp();
         // Should be in the future or at end of current month
         assertGt(nextTimestamp, 0);
     }
 
-    function test_nextPerformanceFeeTimestamp_ReturnsQuarterEnd() public {
+    function test_nextPerformanceFeeTimestamp_ReturnsQuarterEnd() public view {
         uint256 nextTimestamp = vault.nextPerformanceFeeTimestamp();
         // Should be in the future (quarterly)
         assertGt(nextTimestamp, 0);
@@ -232,13 +226,13 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         // Check the settled batch
         // Note: getCurrentBatchInfo returns info about the CURRENT batch (which is new after settlement)
         // We need to check the old batch
-        (address batchReceiver, bool oldClosed, bool oldSettled,,,,,) = vault.getBatchIdInfo(batchId);
+        (, bool oldClosed, bool oldSettled,,,,,) = vault.getBatchIdInfo(batchId);
         assertTrue(oldClosed);
         assertTrue(oldSettled);
     }
 
     function test_getCurrentBatchInfo_ReturnsAllFields() public view {
-        (bytes32 batchId, address batchReceiver, bool isClosed, bool isSettled) = vault.getCurrentBatchInfo();
+        (bytes32 batchId,, bool isClosed, bool isSettled) = vault.getCurrentBatchInfo();
 
         assertNotEq(batchId, bytes32(0));
         // Receiver may be zero if not created yet
@@ -267,13 +261,12 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         _executeBatchSettlement(address(vault), batchId, totalAssetsVal);
 
         (
-            address batchReceiver,
+            ,
             bool isClosed,
             bool isSettled,
             uint256 sharePrice_,
             uint256 netSharePrice_,
-            uint256 totalAssets_,
-            uint256 totalNetAssets_,
+            uint256 totalAssets_,,
             uint256 totalSupply_
         ) = vault.getBatchIdInfo(batchId);
 
@@ -545,7 +538,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
                         VAULT CONFIGURATION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_maxTotalAssets_ReturnsConfiguredMax() public {
+    function test_maxTotalAssets_ReturnsConfiguredMax() public view {
         uint128 maxAssets = vault.maxTotalAssets();
         // Should be set to some value during deployment
         assertGt(maxAssets, 0);
@@ -584,7 +577,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
                         INTEGRATION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_allReaderFunctions_WorkThroughVaultProxy() public {
+    function test_allReaderFunctions_WorkThroughVaultProxy() public view {
         // This test verifies that all reader functions work when called through the vault
         // (i.e., the module is properly registered)
 
@@ -638,7 +631,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         vault.contractVersion();
     }
 
-    function test_readerFunctions_WorkOnAllVaults() public {
+    function test_readerFunctions_WorkOnAllVaults() public view {
         // Test that reader module is registered on all vault types
         IkStakingVault[] memory vaults = new IkStakingVault[](3);
         vaults[0] = dnVault;

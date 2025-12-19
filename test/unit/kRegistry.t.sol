@@ -748,4 +748,255 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.removeFunctions(_testSelectors);
     }
+
+    /* //////////////////////////////////////////////////////////////
+                        INSURANCE ADDRESS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_SetInsurance_Success() public {
+        address _newInsurance = makeAddr("NewInsurance");
+
+        vm.prank(users.admin);
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.InsuranceSet(_newInsurance);
+        registry.setInsurance(_newInsurance);
+
+        assertEq(registry.getInsurance(), _newInsurance);
+    }
+
+    function test_SetInsurance_Require_Only_Admin() public {
+        address _newInsurance = makeAddr("NewInsurance");
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setInsurance(_newInsurance);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setInsurance(_newInsurance);
+
+        vm.prank(users.bob);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setInsurance(_newInsurance);
+    }
+
+    function test_SetInsurance_Require_Not_Zero_Address() public {
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.setInsurance(address(0));
+    }
+
+    function test_GetInsurance_Returns_Deployed_Address() public view {
+        // Insurance is deployed during setup via DeployInsuranceAccountScript
+        assertNotEq(registry.getInsurance(), address(0));
+        assertEq(registry.getInsurance(), insuranceSmartAccount);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        TREASURY BPS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_SetTreasuryBps_Success() public {
+        uint16 _treasuryBps = 1000; // 10%
+
+        vm.prank(users.admin);
+        vm.expectEmit(false, false, false, true);
+        emit IRegistry.TreasuryBpsSet(_treasuryBps);
+        registry.setTreasuryBps(_treasuryBps);
+
+        assertEq(registry.getTreasuryBps(), _treasuryBps);
+    }
+
+    function test_SetTreasuryBps_Require_Only_Admin() public {
+        uint16 _treasuryBps = 1000;
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setTreasuryBps(_treasuryBps);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setTreasuryBps(_treasuryBps);
+    }
+
+    function test_SetTreasuryBps_Require_Not_Exceed_Maximum() public {
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_FEE_EXCEEDS_MAXIMUM));
+        registry.setTreasuryBps(uint16(MAX_BPS + 1));
+    }
+
+    function test_SetTreasuryBps_At_Maximum() public {
+        vm.prank(users.admin);
+        registry.setTreasuryBps(uint16(MAX_BPS));
+        assertEq(registry.getTreasuryBps(), uint16(MAX_BPS));
+    }
+
+    function test_SetTreasuryBps_At_Zero() public {
+        vm.prank(users.admin);
+        registry.setTreasuryBps(0);
+        assertEq(registry.getTreasuryBps(), 0);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        INSURANCE BPS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_SetInsuranceBps_Success() public {
+        uint16 _insuranceBps = 500; // 5%
+
+        vm.prank(users.admin);
+        vm.expectEmit(false, false, false, true);
+        emit IRegistry.InsuranceBpsSet(_insuranceBps);
+        registry.setInsuranceBps(_insuranceBps);
+
+        assertEq(registry.getInsuranceBps(), _insuranceBps);
+    }
+
+    function test_SetInsuranceBps_Require_Only_Admin() public {
+        uint16 _insuranceBps = 500;
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setInsuranceBps(_insuranceBps);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setInsuranceBps(_insuranceBps);
+    }
+
+    function test_SetInsuranceBps_Require_Not_Exceed_Maximum() public {
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_FEE_EXCEEDS_MAXIMUM));
+        registry.setInsuranceBps(uint16(MAX_BPS + 1));
+    }
+
+    function test_SetInsuranceBps_At_Maximum() public {
+        vm.prank(users.admin);
+        registry.setInsuranceBps(uint16(MAX_BPS));
+        assertEq(registry.getInsuranceBps(), uint16(MAX_BPS));
+    }
+
+    function test_SetInsuranceBps_At_Zero() public {
+        vm.prank(users.admin);
+        registry.setInsuranceBps(0);
+        assertEq(registry.getInsuranceBps(), 0);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        FEE CONFIG GETTER
+    //////////////////////////////////////////////////////////////*/
+
+    function test_getSettlementConfig_Returns_All_Values() public {
+        address _newInsurance = makeAddr("NewInsurance");
+        uint16 _treasuryBps = 1000;
+        uint16 _insuranceBps = 500;
+
+        vm.startPrank(users.admin);
+        registry.setInsurance(_newInsurance);
+        registry.setTreasuryBps(_treasuryBps);
+        registry.setInsuranceBps(_insuranceBps);
+        vm.stopPrank();
+
+        (address _treasury, address _insurance, uint16 _tBps, uint16 _iBps) = registry.getSettlementConfig();
+
+        assertEq(_treasury, users.treasury);
+        assertEq(_insurance, _newInsurance);
+        assertEq(_tBps, _treasuryBps);
+        assertEq(_iBps, _insuranceBps);
+    }
+
+    function test_getSettlementConfig_Returns_Defaults_When_Not_Set() public view {
+        (address _treasury, address _insurance, uint16 _treasuryBps, uint16 _insuranceBps) =
+            registry.getSettlementConfig();
+
+        assertEq(_treasury, users.treasury); // Set in initialize
+        assertEq(_insurance, insuranceSmartAccount); // Set during deployment via DeployInsuranceAccountScript
+        assertEq(_treasuryBps, 0); // Not set
+        assertEq(_insuranceBps, 0); // Not set
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        FUZZ TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function testFuzz_SetTreasuryBps_ValidRange(uint16 _bps) public {
+        _bps = uint16(bound(_bps, 0, MAX_BPS));
+
+        vm.prank(users.admin);
+        registry.setTreasuryBps(_bps);
+
+        assertEq(registry.getTreasuryBps(), _bps);
+    }
+
+    function testFuzz_SetInsuranceBps_ValidRange(uint16 _bps) public {
+        _bps = uint16(bound(_bps, 0, MAX_BPS));
+
+        vm.prank(users.admin);
+        registry.setInsuranceBps(_bps);
+
+        assertEq(registry.getInsuranceBps(), _bps);
+    }
+
+    function testFuzz_SetInsurance_AnyNonZeroAddress(address _insurance) public {
+        vm.assume(_insurance != address(0));
+
+        vm.prank(users.admin);
+        registry.setInsurance(_insurance);
+
+        assertEq(registry.getInsurance(), _insurance);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        GLOBAL PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    function test_SetGlobalPause_Success() public {
+        assertFalse(registry.isGlobalPaused());
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        assertTrue(registry.isGlobalPaused());
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(false);
+
+        assertFalse(registry.isGlobalPaused());
+    }
+
+    function test_SetGlobalPause_EmitsEvent() public {
+        vm.prank(users.emergencyAdmin);
+        vm.expectEmit(false, false, false, true);
+        emit IRegistry.GlobalPauseSet(true);
+        registry.setGlobalPause(true);
+
+        vm.prank(users.emergencyAdmin);
+        vm.expectEmit(false, false, false, true);
+        emit IRegistry.GlobalPauseSet(false);
+        registry.setGlobalPause(false);
+    }
+
+    function test_SetGlobalPause_Require_Only_EmergencyAdmin() public {
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setGlobalPause(true);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setGlobalPause(true);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setGlobalPause(true);
+
+        vm.prank(users.bob);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setGlobalPause(true);
+
+        assertFalse(registry.isGlobalPaused());
+    }
+
+    function test_IsGlobalPaused_InitialValue() public view {
+        assertFalse(registry.isGlobalPaused());
+    }
 }

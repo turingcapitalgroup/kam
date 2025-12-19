@@ -114,6 +114,18 @@ Central registry managing protocol contracts, supported assets, vault registrati
 - `isAdapterRegistered(address vault, address asset, address adapter)` - Validates adapter registration status
 - `isAdapterSelectorAllowed(address adapter, address target, bytes4 selector)` - Validates if adapter can call target/selector (via AdapterGuardianModule)
 
+**Treasury & Insurance Configuration**
+
+- `setTreasury(address treasury_)` - Sets the treasury address (ADMIN_ROLE required)
+- `getTreasury()` - Returns the treasury address
+- `setTreasuryBps(uint16 treasuryBps_)` - Sets treasury allocation in basis points (ADMIN_ROLE required)
+- `getTreasuryBps()` - Returns treasury allocation in basis points
+- `setInsurance(address insurance_)` - Sets the insurance fund address for depeg protection reserves (ADMIN_ROLE required)
+- `getInsurance()` - Returns the insurance fund address
+- `setInsuranceBps(uint16 insuranceBps_)` - Sets insurance allocation from kMinter yields in basis points (ADMIN_ROLE required)
+- `getInsuranceBps()` - Returns insurance allocation in basis points
+- `getSettlementConfig()` - Returns settlement configuration (treasury, insurance, treasuryBps, insuranceBps)
+
 **Role Management**
 
 - `isAdmin(address user)` - Checks admin role
@@ -153,6 +165,12 @@ Comprehensive interface combining retail staking operations with ERC20 share tok
 - `totalSupply()`, `balanceOf(address)` - Supply and balance queries
 - `transfer()`, `approve()`, `transferFrom()` - Standard ERC20 transfers
 - `allowance()` - Approval queries
+
+**Meta-Transaction Support (ERC2771)**
+
+- `trustedForwarder()` - Returns the current trusted forwarder address for meta-transactions
+- `setTrustedForwarder(address trustedForwarder_)` - Sets the trusted forwarder address (ADMIN_ROLE required, address(0) to disable)
+- `isTrustedForwarder(address forwarder)` - Checks if an address is the trusted forwarder
 
 ### IVault
 
@@ -305,6 +323,31 @@ Interface for vault adapter contracts that manage external strategy integrations
 
 - `setPaused(bool paused_)` - Emergency pause mechanism for risk management (EMERGENCY_ADMIN_ROLE required)
 - `rescueAssets(address asset_, address to_, uint256 amount_)` - Recovers accidentally sent tokens (ADMIN_ROLE required, non-protocol assets only)
+
+## Module Interfaces
+
+### IAdapterGuardian
+
+Interface for managing adapter permissions and security controls. Part of the kRegistry module system that validates adapter calls to external protocols.
+
+**Permission Management**
+
+- `setAdapterAllowedSelector(address adapter, address target, uint8 targetType, bytes4 selector, bool allowed)` - Configures which function selectors an adapter can call on a target contract (ADMIN_ROLE required)
+- `setAdapterParametersChecker(address adapter, address target, bytes4 selector, address parametersChecker)` - Sets a parameter validation contract for specific adapter-target-selector combinations (ADMIN_ROLE required)
+
+**Validation Functions**
+
+- `validateAdapterCall(address target, bytes4 selector, bytes calldata params)` - Validates if the calling adapter can execute a specific call, reverting if not allowed. Called by VaultAdapter before external protocol interactions.
+- `isAdapterSelectorAllowed(address adapter, address target, bytes4 selector)` - Checks if a specific selector is allowed for an adapter-target pair
+- `getAdapterParametersChecker(address adapter, address target, bytes4 selector)` - Returns the parameter checker contract for a given combination
+- `getAdapterTargets(address adapter)` - Returns all target contracts registered for an adapter
+- `getTargetType(address target)` - Returns the type classification of a target contract
+
+### IParametersChecker
+
+Interface for parameter validation contracts used in adapter call validation. Implementations validate call parameters to ensure adapter operations are safe.
+
+- `validateAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params)` - Validates parameters for an adapter call, reverting if invalid
 
 ## Utility Interfaces
 

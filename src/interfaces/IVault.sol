@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import { IERC2771 } from "./IERC2771.sol";
 import { IVaultBatch } from "./IVaultBatch.sol";
 import { IVaultClaim } from "./IVaultClaim.sol";
 import { IVaultFees } from "./IVaultFees.sol";
@@ -17,7 +18,7 @@ import { IVaultFees } from "./IVaultFees.sol";
 /// system for gas-efficient operations, and automated yield distribution through share price appreciation rather
 /// than token rebasing. This approach maintains compatibility with existing DeFi infrastructure while providing
 /// transparent yield accrual for retail participants.
-interface IVault is IVaultBatch, IVaultClaim, IVaultFees {
+interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     /* //////////////////////////////////////////////////////////////
                               EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -177,4 +178,9 @@ interface IVault is IVaultBatch, IVaultClaim, IVaultFees {
     /// @notice Sets the maximum total assets
     /// @param maxTotalAssets_ Maximum total assets
     function setMaxTotalAssets(uint128 maxTotalAssets_) external;
+
+    /// @notice Sets or disables the trusted forwarder for meta-transactions
+    /// @dev Only callable by admin. Set to address(0) to disable meta-transactions.
+    /// @param trustedForwarder_ The new trusted forwarder address (address(0) to disable)
+    function setTrustedForwarder(address trustedForwarder_) external;
 }

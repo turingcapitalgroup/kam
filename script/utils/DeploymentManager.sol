@@ -43,6 +43,7 @@ abstract contract DeploymentManager is Script {
         address relayer;
         address institution;
         address treasury;
+        address insurance;
     }
 
     struct AssetAddresses {
@@ -82,6 +83,8 @@ abstract contract DeploymentManager is Script {
 
     struct RegistryConfig {
         HurdleRateConfig hurdleRate;
+        uint16 treasuryBps;
+        uint16 insuranceBps;
     }
 
     struct HurdleRateConfig {
@@ -184,6 +187,9 @@ abstract contract DeploymentManager is Script {
         address WalletUSDC;
         address WalletWBTC;
         address erc20ParameterChecker;
+        address minimalSmartAccountImpl;
+        address minimalSmartAccountFactory;
+        address insuranceSmartAccount;
     }
 
     function getCurrentNetwork() internal view returns (string memory) {
@@ -235,6 +241,7 @@ abstract contract DeploymentManager is Script {
         config.roles.relayer = json.readAddress(".roles.relayer");
         config.roles.institution = json.readAddress(".roles.institution");
         config.roles.treasury = json.readAddress(".roles.treasury");
+        config.roles.insurance = json.readAddress(".roles.insurance");
 
         // Parse asset addresses
         config.assets.USDC = json.readAddress(".assets.USDC");
@@ -269,6 +276,8 @@ abstract contract DeploymentManager is Script {
         // Parse registry config
         config.registry.hurdleRate.USDC = uint16(json.readUint(".registry.hurdleRate.USDC"));
         config.registry.hurdleRate.WBTC = uint16(json.readUint(".registry.hurdleRate.WBTC"));
+        config.registry.treasuryBps = uint16(json.readUint(".registry.treasuryBps"));
+        config.registry.insuranceBps = uint16(json.readUint(".registry.insuranceBps"));
 
         // Parse asset router config
         config.assetRouter.settlementCooldown = json.readUint(".assetRouter.settlementCooldown");
@@ -512,6 +521,15 @@ abstract contract DeploymentManager is Script {
         if (json.keyExists(".contracts.erc20ParameterChecker")) {
             output.contracts.erc20ParameterChecker = json.readAddress(".contracts.erc20ParameterChecker");
         }
+        if (json.keyExists(".contracts.minimalSmartAccountImpl")) {
+            output.contracts.minimalSmartAccountImpl = json.readAddress(".contracts.minimalSmartAccountImpl");
+        }
+        if (json.keyExists(".contracts.minimalSmartAccountFactory")) {
+            output.contracts.minimalSmartAccountFactory = json.readAddress(".contracts.minimalSmartAccountFactory");
+        }
+        if (json.keyExists(".contracts.insuranceSmartAccount")) {
+            output.contracts.insuranceSmartAccount = json.readAddress(".contracts.insuranceSmartAccount");
+        }
 
         return output;
     }
@@ -583,6 +601,12 @@ abstract contract DeploymentManager is Script {
             output.contracts.WalletUSDC = contractAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("erc20ParameterChecker"))) {
             output.contracts.erc20ParameterChecker = contractAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("minimalSmartAccountImpl"))) {
+            output.contracts.minimalSmartAccountImpl = contractAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("minimalSmartAccountFactory"))) {
+            output.contracts.minimalSmartAccountFactory = contractAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("insuranceSmartAccount"))) {
+            output.contracts.insuranceSmartAccount = contractAddress;
         }
 
         string memory json = _serializeDeploymentOutput(output);
@@ -627,7 +651,16 @@ abstract contract DeploymentManager is Script {
         json = string.concat(json, '"ERC7540WBTC":"', vm.toString(output.contracts.ERC7540WBTC), '",');
         json = string.concat(json, '"WalletUSDC":"', vm.toString(output.contracts.WalletUSDC), '",');
         json =
-            string.concat(json, '"erc20ParameterChecker":"', vm.toString(output.contracts.erc20ParameterChecker), '"');
+            string.concat(json, '"erc20ParameterChecker":"', vm.toString(output.contracts.erc20ParameterChecker), '",');
+        json = string.concat(
+            json, '"minimalSmartAccountImpl":"', vm.toString(output.contracts.minimalSmartAccountImpl), '",'
+        );
+        json = string.concat(
+            json, '"minimalSmartAccountFactory":"', vm.toString(output.contracts.minimalSmartAccountFactory), '",'
+        );
+        json = string.concat(
+            json, '"insuranceSmartAccount":"', vm.toString(output.contracts.insuranceSmartAccount), '"'
+        );
         json = string.concat(json, "}}");
 
         return json;
@@ -641,6 +674,7 @@ abstract contract DeploymentManager is Script {
         require(config.roles.relayer != address(0), "Missing relayer address");
         require(config.roles.institution != address(0), "Missing institution address");
         require(config.roles.treasury != address(0), "Missing treasury address");
+        require(config.roles.insurance != address(0), "Missing insurance address");
         require(config.assets.USDC != address(0), "Missing USDC address");
         require(config.assets.WBTC != address(0), "Missing WBTC address");
     }
@@ -682,6 +716,7 @@ abstract contract DeploymentManager is Script {
         console.log("Relayer:", config.roles.relayer);
         console.log("Institution:", config.roles.institution);
         console.log("Treasury:", config.roles.treasury);
+        console.log("Insurance:", config.roles.insurance);
         console.log("USDC:", config.assets.USDC);
         console.log("WBTC:", config.assets.WBTC);
         console.log("Settlement Cooldown:", config.assetRouter.settlementCooldown);
@@ -728,6 +763,7 @@ abstract contract DeploymentManager is Script {
         console.log("Relayer:          ", config.roles.relayer);
         console.log("Institution:      ", config.roles.institution);
         console.log("Treasury:         ", config.roles.treasury);
+        console.log("Insurance:        ", config.roles.insurance);
         console.log("");
     }
 
@@ -800,6 +836,8 @@ abstract contract DeploymentManager is Script {
         console.log("--- REGISTRY CONFIG ---");
         console.log("Hurdle Rate USDC: ", config.registry.hurdleRate.USDC);
         console.log("Hurdle Rate WBTC: ", config.registry.hurdleRate.WBTC);
+        console.log("Treasury BPS:     ", config.registry.treasuryBps);
+        console.log("Insurance BPS:    ", config.registry.insuranceBps);
         console.log("");
     }
 

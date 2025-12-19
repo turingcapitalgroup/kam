@@ -8,7 +8,8 @@
         "guardian": "0x11D5E7dBA0658cAE21BEAA6a1719975cB233A81E",
         "relayer": "0x11D5E7dBA0658cAE21BEAA6a1719975cB233A81E",
         "institution": "0x11D5E7dBA0658cAE21BEAA6a1719975cB233A81E",
-        "treasury": "0x11D5E7dBA0658cAE21BEAA6a1719975cB233A81E"
+        "treasury": "0x11D5E7dBA0658cAE21BEAA6a1719975cB233A81E",
+        "insurance": "0x11D5E7dBA0658cAE21BEAA6a1719975cB233A81E"
     },
     "assets": {
         "USDC": "0x028B671ED42278312764195434B21f87Ef8DB422",
@@ -59,7 +60,7 @@
             "maxTotalAssets": 20000000000,
             "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
             "maxWithdrawPerBatch": 2000000000,
-      "trustedForwarder": "0x0000000000000000000000000000000000000000"
+            "trustedForwarder": "0x0000000000000000000000000000000000000000"
         },
         "alphaVault": {
             "name": "KAM Alpha Vault USD",
@@ -88,7 +89,9 @@
         "hurdleRate": {
             "USDC": 500,
             "WBTC": 500
-        }
+        },
+        "treasuryBps": 1000,
+        "insuranceBps": 500
     },
     "assetRouter": {
         "settlementCooldown": 0,

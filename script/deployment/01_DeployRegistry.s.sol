@@ -7,7 +7,7 @@ import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
-import { AdapterGuardianModule } from "kam/src/kRegistry/modules/AdapterGuardianModule.sol";
+import { ExecutionGuardianModule } from "kam/src/kRegistry/modules/ExecutionGuardianModule.sol";
 import { kTokenFactory } from "kam/src/kTokenFactory.sol";
 
 contract DeployRegistryScript is Script, DeploymentManager {
@@ -15,7 +15,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
         address factory;
         address registryImpl;
         address registry;
-        address adapterGuardianModule;
+        address executionGuardianModule;
         address kTokenFactory;
     }
 
@@ -60,13 +60,13 @@ contract DeployRegistryScript is Script, DeploymentManager {
         // Deploy kTokenFactory with registry and factory (registry will call deployKToken)
         kTokenFactory tokenFactory = new kTokenFactory(registryProxy, address(factory));
 
-        // Deploy AdapterGuardianModule (facet implementation)
-        AdapterGuardianModule adapterGuardianModule = new AdapterGuardianModule();
+        // Deploy ExecutionGuardianModule (facet implementation)
+        ExecutionGuardianModule executionGuardianModule = new ExecutionGuardianModule();
 
-        // Add AdapterGuardianModule functions to kRegistry
+        // Add ExecutionGuardianModule functions to kRegistry
         kRegistry registry = kRegistry(payable(registryProxy));
-        bytes4[] memory adapterSelectors = adapterGuardianModule.selectors();
-        registry.addFunctions(adapterSelectors, address(adapterGuardianModule), false);
+        bytes4[] memory executionSelectors = executionGuardianModule.selectors();
+        registry.addFunctions(executionSelectors, address(executionGuardianModule), false);
 
         vm.stopBroadcast();
 
@@ -74,7 +74,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
         _log("ERC1967Factory deployed at:", address(factory));
         _log("kRegistry implementation deployed at:", address(registryImpl));
         _log("kRegistry proxy deployed at:", registryProxy);
-        _log("AdapterGuardianModule deployed at:", address(adapterGuardianModule));
+        _log("ExecutionGuardianModule deployed at:", address(executionGuardianModule));
         _log("kTokenFactory deployed at:", address(tokenFactory));
         _log("Network:", config.network);
         _log("Chain ID:", config.chainId);
@@ -83,7 +83,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
             factory: address(factory),
             registryImpl: address(registryImpl),
             registry: registryProxy,
-            adapterGuardianModule: address(adapterGuardianModule),
+            executionGuardianModule: address(executionGuardianModule),
             kTokenFactory: address(tokenFactory)
         });
 
@@ -92,7 +92,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
             writeContractAddress("ERC1967Factory", address(factory));
             writeContractAddress("kRegistryImpl", address(registryImpl));
             writeContractAddress("kRegistry", registryProxy);
-            writeContractAddress("AdapterGuardianModule", address(adapterGuardianModule));
+            writeContractAddress("ExecutionGuardianModule", address(executionGuardianModule));
             writeContractAddress("kTokenFactory", address(tokenFactory));
         }
 

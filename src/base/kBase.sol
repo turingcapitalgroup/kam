@@ -326,11 +326,12 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// @notice Checks if the contract is currently in emergency pause state
     /// @dev Used by inheriting contracts to halt operations during emergencies. When paused, state-changing
     /// functions should revert while view functions remain accessible for protocol monitoring.
-    /// @return Whether the contract is currently paused
+    /// Checks both local contract pause AND global registry pause (OR logic).
+    /// @return Whether the contract is currently paused (local OR global)
     function _isPaused() internal view returns (bool) {
         kBaseStorage storage $ = _getBaseStorage();
         require($.initialized, KBASE_NOT_INITIALIZED);
-        return $.paused;
+        return $.paused || _registry().isGlobalPaused();
     }
 
     /// @notice Checks if an address is the kMinter contract

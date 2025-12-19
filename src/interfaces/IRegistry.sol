@@ -80,6 +80,22 @@ interface IRegistry is IVersioned {
     /// @param treasury The new treasury address
     event TreasurySet(address indexed treasury);
 
+    /// @notice Emitted when the insurance address is updated
+    /// @param insurance The new insurance address
+    event InsuranceSet(address indexed insurance);
+
+    /// @notice Emitted when the treasury fee is updated
+    /// @param treasuryBps The new treasury fee in basis points
+    event TreasuryBpsSet(uint16 treasuryBps);
+
+    /// @notice Emitted when the insurance fee is updated
+    /// @param insuranceBps The new insurance fee in basis points
+    event InsuranceBpsSet(uint16 insuranceBps);
+
+    /// @notice Emitted when the global pause state is updated
+    /// @param paused The new global pause state
+    event GlobalPauseSet(bool paused);
+
     /// @notice Emitted when a hurdle rate is set for an asset
     /// @param asset The asset receiving the hurdle rate
     /// @param hurdleRate The hurdle rate in basis points
@@ -348,6 +364,56 @@ interface IRegistry is IVersioned {
     /// @dev Treasury receives protocol fees and serves as emergency fund holder. Only callable by ADMIN_ROLE.
     /// @param treasury_ The new treasury address
     function setTreasury(address treasury_) external payable;
+
+    /// @notice Sets the insurance address
+    /// @dev Insurance receives protocol insurance fees. Only callable by ADMIN_ROLE.
+    /// @param insurance_ The new insurance address
+    function setInsurance(address insurance_) external payable;
+
+    /// @notice Sets the treasury fee in basis points
+    /// @dev Treasury fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+    /// @param treasuryBps_ The new treasury fee in basis points (max 10000 = 100%)
+    function setTreasuryBps(uint16 treasuryBps_) external payable;
+
+    /// @notice Sets the insurance fee in basis points
+    /// @dev Insurance fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+    /// @param insuranceBps_ The new insurance fee in basis points (max 10000 = 100%)
+    function setInsuranceBps(uint16 insuranceBps_) external payable;
+
+    /// @notice Gets the insurance address
+    /// @dev Insurance receives protocol insurance fees.
+    /// @return The insurance address
+    function getInsurance() external view returns (address);
+
+    /// @notice Gets the treasury fee in basis points
+    /// @dev Returns the treasury fee percentage (10000 = 100%)
+    /// @return The treasury fee in basis points
+    function getTreasuryBps() external view returns (uint16);
+
+    /// @notice Gets the insurance fee in basis points
+    /// @dev Returns the insurance fee percentage (10000 = 100%)
+    /// @return The insurance fee in basis points
+    function getInsuranceBps() external view returns (uint16);
+
+    /// @notice Sets the global pause state for the entire protocol
+    /// @dev Only callable by emergency admin. When true, all protocol operations are blocked.
+    /// @param paused_ The new global pause state
+    function setGlobalPause(bool paused_) external;
+
+    /// @notice Returns true if the protocol is globally paused
+    /// @return paused The current global pause state
+    function isGlobalPaused() external view returns (bool paused);
+
+    /// @notice Gets all fee configuration in a single call
+    /// @dev Optimized getter for external contracts needing full fee config
+    /// @return treasury The treasury address
+    /// @return insurance The insurance address
+    /// @return treasuryBps The treasury fee in basis points
+    /// @return insuranceBps The insurance fee in basis points
+    function getSettlementConfig()
+        external
+        view
+        returns (address treasury, address insurance, uint16 treasuryBps, uint16 insuranceBps);
 
     /// @notice Sets maximum mint and redeem amounts per batch for an asset
     /// @dev Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume assets.
