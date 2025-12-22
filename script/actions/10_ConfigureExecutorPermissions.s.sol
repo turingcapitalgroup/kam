@@ -13,6 +13,10 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         address erc20ExecutionValidator;
     }
 
+    // Asset addresses (can be overridden for tests)
+    address internal _usdc;
+    address internal _wbtc;
+
     function configureExecutorPermissions(
         IkRegistry registry,
         address executor,
@@ -95,6 +99,8 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
     /// @param erc7540USDCAddr Address of ERC7540USDC mock vault
     /// @param erc7540WBTCAddr Address of ERC7540WBTC mock vault
     /// @param walletUSDCAddr Address of WalletUSDC mock
+    /// @param usdcAddr Address of USDC asset (if zero, reads from JSON)
+    /// @param wbtcAddr Address of WBTC asset (if zero, reads from JSON)
     function run(
         bool writeToJson,
         address registryAddr,
@@ -106,7 +112,9 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         address betaVaultAdapterAddr,
         address erc7540USDCAddr,
         address erc7540WBTCAddr,
-        address walletUSDCAddr
+        address walletUSDCAddr,
+        address usdcAddr,
+        address wbtcAddr
     )
         public
         returns (ExecutorPermissionsDeployment memory deployment)
@@ -114,6 +122,10 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
         DeploymentOutput memory existing;
+
+        // Use provided asset addresses or fall back to config
+        _usdc = usdcAddr != address(0) ? usdcAddr : config.assets.USDC;
+        _wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
 
         // If any address is zero, read from JSON (for real deployments)
         if (
@@ -169,9 +181,9 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         ERC20ExecutionValidator erc20ExecutionValidator = new ERC20ExecutionValidator(registryAddr);
         _log("Deployed ERC20ExecutionValidator at:", address(erc20ExecutionValidator));
 
-        // Get addresses from config
-        address usdc = config.assets.USDC;
-        address wbtc = config.assets.WBTC;
+        // Get asset addresses
+        address usdc = _usdc;
+        address wbtc = _wbtc;
 
         _log("");
         _log("1. Configuring Executor permissions...");
@@ -247,10 +259,46 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         return deployment;
     }
 
+    /// @notice Wrapper for backward compatibility (11 args)
+    function run(
+        bool writeToJson,
+        address registryAddr,
+        address kMinterAdapterUSDCAddr,
+        address kMinterAdapterWBTCAddr,
+        address dnVaultAdapterUSDCAddr,
+        address dnVaultAdapterWBTCAddr,
+        address alphaVaultAdapterAddr,
+        address betaVaultAdapterAddr,
+        address erc7540USDCAddr,
+        address erc7540WBTCAddr,
+        address walletUSDCAddr
+    )
+        public
+        returns (ExecutorPermissionsDeployment memory)
+    {
+        return run(
+            writeToJson,
+            registryAddr,
+            kMinterAdapterUSDCAddr,
+            kMinterAdapterWBTCAddr,
+            dnVaultAdapterUSDCAddr,
+            dnVaultAdapterWBTCAddr,
+            alphaVaultAdapterAddr,
+            betaVaultAdapterAddr,
+            erc7540USDCAddr,
+            erc7540WBTCAddr,
+            walletUSDCAddr,
+            address(0),
+            address(0)
+        );
+    }
+
     /// @notice Convenience wrapper for real deployments (reads addresses from JSON)
     function run() public returns (ExecutorPermissionsDeployment memory) {
         return run(
             true,
+            address(0),
+            address(0),
             address(0),
             address(0),
             address(0),
@@ -288,7 +336,7 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.WBTC.length; i++) {
             address receiver = _resolveAddress(config.parameterChecker.allowedReceivers.WBTC[i], config, existing);
             if (receiver != address(0)) {
-                validator.setAllowedReceiver(config.assets.WBTC, receiver, true);
+                validator.setAllowedReceiver(_wbtc, receiver, true);
             }
         }
 
