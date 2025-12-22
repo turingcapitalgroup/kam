@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.30;
 
 // External Libraries
 import { LibCall } from "minimal-smart-account/vendor/LibCall.sol";
