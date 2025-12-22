@@ -448,12 +448,6 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         require(_isInstitution(_user), KMINTER_WRONG_ROLE);
     }
 
-    /// @notice Check if caller is an admin
-    /// @param _user Address to check
-    function _checkAdmin(address _user) private view {
-        require(_isAdmin(_user), KMINTER_WRONG_ROLE);
-    }
-
     /// @notice Check if caller is a relayer
     /// @param _user Address to check
     function _checkRelayer(address _user) private view {

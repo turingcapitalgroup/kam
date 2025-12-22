@@ -10,7 +10,6 @@ import {
     KBASE_ASSET_NOT_SUPPORTED,
     KBASE_CONTRACT_NOT_FOUND,
     KBASE_INVALID_REGISTRY,
-    KBASE_INVALID_VAULT,
     KBASE_NOT_INITIALIZED,
     KBASE_TRANSFER_FAILED,
     KBASE_WRONG_ASSET,
@@ -19,7 +18,6 @@ import {
     KBASE_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
-import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 
 /// @title kBase
 /// @notice Foundation contract providing essential shared functionality and registry integration for all KAM protocol
@@ -213,24 +211,6 @@ contract kBase is OptimizedReentrancyGuardTransient {
                           GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Gets the current batch ID for a given vault
-    /// @param _vault The vault address
-    /// @return _batchId The current batch ID
-    /// @dev Reverts if vault not registered
-    function _getBatchId(address _vault) internal view returns (bytes32 _batchId) {
-        return IkStakingVault(_vault).getBatchId();
-    }
-
-    /// @notice Gets the current batch receiver for a given batchId
-    /// @param _vault The vault address
-    /// @param _batchId The batch ID
-    /// @return _batchReceiver The address of the batchReceiver where tokens will be sent
-    /// @dev Reverts if vault not registered
-    function _getBatchReceiver(address _vault, bytes32 _batchId) internal view returns (address _batchReceiver) {
-        _batchReceiver = IkStakingVault(_vault).getBatchReceiver(_batchId);
-        require(_batchReceiver != address(0), KBASE_ZERO_ADDRESS);
-    }
-
     /// @notice Gets the kMinter singleton contract address
     /// @return _minter The kMinter contract address
     /// @dev Reverts if kMinter not set in registry
@@ -254,24 +234,6 @@ contract kBase is OptimizedReentrancyGuardTransient {
     function _getKTokenForAsset(address _asset) internal view returns (address _kToken) {
         _kToken = _registry().assetToKToken(_asset);
         require(_kToken != address(0), KBASE_ASSET_NOT_SUPPORTED);
-    }
-
-    /// @notice Gets the asset managed by a vault
-    /// @param _vault The vault address
-    /// @return _assets The asset address managed by the vault
-    /// @dev Reverts if vault not registered
-    function _getVaultAssets(address _vault) internal view returns (address[] memory _assets) {
-        _assets = _registry().getVaultAssets(_vault);
-        require(_assets.length > 0, KBASE_INVALID_VAULT);
-    }
-
-    /// @notice Gets the DN vault address for a given asset
-    /// @param _asset The asset address
-    /// @return _vault The corresponding DN vault address
-    /// @dev Reverts if asset not supported
-    function _getDNVaultByAsset(address _asset) internal view returns (address _vault) {
-        _vault = _registry().getVaultByAssetAndType(_asset, uint8(IRegistry.VaultType.DN));
-        require(_vault != address(0), KBASE_INVALID_VAULT);
     }
 
     /* //////////////////////////////////////////////////////////////

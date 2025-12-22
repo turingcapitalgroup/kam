@@ -6,7 +6,6 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import {
     VAULTADAPTER_IS_PAUSED,
-    VAULTADAPTER_SELECTOR_NOT_ALLOWED,
     VAULTADAPTER_WRONG_ASSET,
     VAULTADAPTER_WRONG_ROLE,
     VAULTADAPTER_ZERO_ADDRESS
