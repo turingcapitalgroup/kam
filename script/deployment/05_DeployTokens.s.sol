@@ -15,8 +15,18 @@ contract DeployTokensScript is Script, DeploymentManager {
     /// @notice Deploy kTokens via registry
     /// @param writeToJson If true, writes addresses to JSON (for real deployments)
     /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
+    /// @param usdcAddr Address of USDC asset (if zero, reads from JSON)
+    /// @param wbtcAddr Address of WBTC asset (if zero, reads from JSON)
     /// @return deployment Struct containing deployed token addresses
-    function run(bool writeToJson, address registryAddr) public returns (TokenDeployment memory deployment) {
+    function run(
+        bool writeToJson,
+        address registryAddr,
+        address usdcAddr,
+        address wbtcAddr
+    )
+        public
+        returns (TokenDeployment memory deployment)
+    {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
         DeploymentOutput memory existing;
@@ -26,6 +36,10 @@ contract DeployTokensScript is Script, DeploymentManager {
             existing = readDeploymentOutput();
             registryAddr = existing.contracts.kRegistry;
         }
+
+        // Use provided asset addresses or fall back to config
+        address usdc = usdcAddr != address(0) ? usdcAddr : config.assets.USDC;
+        address wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
 
         // Populate existing for logging
         existing.contracts.kRegistry = registryAddr;
@@ -59,7 +73,7 @@ contract DeployTokensScript is Script, DeploymentManager {
         address kUSDAddress = registry.registerAsset(
             config.kUSD.name,
             config.kUSD.symbol,
-            config.assets.USDC,
+            usdc,
             config.kUSD.maxMintPerBatch,
             config.kUSD.maxRedeemPerBatch,
             config.roles.emergencyAdmin
@@ -76,7 +90,7 @@ contract DeployTokensScript is Script, DeploymentManager {
         address kBTCAddress = registry.registerAsset(
             config.kBTC.name,
             config.kBTC.symbol,
-            config.assets.WBTC,
+            wbtc,
             config.kBTC.maxMintPerBatch,
             config.kBTC.maxRedeemPerBatch,
             config.roles.emergencyAdmin
@@ -103,8 +117,13 @@ contract DeployTokensScript is Script, DeploymentManager {
         return deployment;
     }
 
+    /// @notice Wrapper for tests that only need to pass registry (assets from JSON)
+    function run(bool writeToJson, address registryAddr) public returns (TokenDeployment memory) {
+        return run(writeToJson, registryAddr, address(0), address(0));
+    }
+
     /// @notice Convenience wrapper for real deployments (writes to JSON, reads dependencies from JSON)
     function run() public returns (TokenDeployment memory) {
-        return run(true, address(0));
+        return run(true, address(0), address(0), address(0));
     }
 }

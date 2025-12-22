@@ -148,7 +148,8 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
         // Deploy kTokens
         DeployTokensScript tokensScript = new DeployTokensScript();
         tokensScript.setVerbose(false);
-        DeployTokensScript.TokenDeployment memory tokenDeploy = tokensScript.run(false, registryDeploy.registry);
+        DeployTokensScript.TokenDeployment memory tokenDeploy =
+            tokensScript.run(false, registryDeploy.registry, mocks.USDC, mocks.WBTC);
 
         // Deploy vault modules
         DeployVaultModulesScript modulesScript = new DeployVaultModulesScript();
@@ -164,7 +165,9 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             registryDeploy.registry,
             modulesDeploy.readerModule,
             tokenDeploy.kUSD,
-            tokenDeploy.kBTC
+            tokenDeploy.kBTC,
+            mocks.USDC,
+            mocks.WBTC
         );
 
         // Deploy adapters
@@ -191,7 +194,9 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             adaptersDeploy.alphaVaultAdapter,
             adaptersDeploy.betaVaultAdapter,
             adaptersDeploy.kMinterAdapterUSDC,
-            adaptersDeploy.kMinterAdapterWBTC
+            adaptersDeploy.kMinterAdapterWBTC,
+            mocks.USDC,
+            mocks.WBTC
         );
 
         ConfigureExecutorPermissionsScript executorPermissionsScript = new ConfigureExecutorPermissionsScript();
@@ -207,7 +212,9 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
             adaptersDeploy.betaVaultAdapter,
             mocks.ERC7540USDC,
             mocks.ERC7540WBTC,
-            mocks.WalletUSDC
+            mocks.WalletUSDC,
+            mocks.USDC,
+            mocks.WBTC
         );
 
         RegisterModulesScript registerModulesScript = new RegisterModulesScript();
