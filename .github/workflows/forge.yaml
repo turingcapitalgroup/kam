@@ -40,6 +40,10 @@ jobs:
         env:
           RPC_MAINNET: ${{ secrets.RPC_MAINNET }}
 
+      - name: Forge Tests
+        run: |
+          forge test
+
   deploy-abis:
     name: Deploy ABIs
     runs-on: ubuntu-latest
