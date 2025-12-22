@@ -6,6 +6,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import {
     VAULTADAPTER_IS_PAUSED,
+    VAULTADAPTER_SELECTOR_NOT_ALLOWED,
     VAULTADAPTER_WRONG_ASSET,
     VAULTADAPTER_WRONG_ROLE,
     VAULTADAPTER_ZERO_ADDRESS
@@ -149,7 +150,8 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
     function _checkVaultCanCallSelector(address _target, bytes4 _selector) internal view {
         require(
             IkRegistry(address(_getMinimalAccountStorage().registry))
-                .isSelectorAllowed(address(this), _target, _selector)
+                .isSelectorAllowed(address(this), _target, _selector),
+            VAULTADAPTER_SELECTOR_NOT_ALLOWED
         );
     }
 
