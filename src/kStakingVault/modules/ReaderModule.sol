@@ -25,6 +25,8 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
 
     /// @notice Number of seconds in a year
     uint256 constant SECS_PER_YEAR = 31_556_952;
+    /// @notice Number of months in a year
+    uint256 constant MONTHS_PER_YEAR = 12;
 
     /// GENERAL
     /// @inheritdoc IVaultReader
@@ -157,9 +159,9 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
         uint256 _targetYear = _year;
 
         // Handle year overflow
-        if (_targetMonth > 12) {
-            _targetYear += (_targetMonth - 1) / 12;
-            _targetMonth = ((_targetMonth - 1) % 12) + 1;
+        if (_targetMonth > MONTHS_PER_YEAR) {
+            _targetYear += (_targetMonth - 1) / MONTHS_PER_YEAR;
+            _targetMonth = ((_targetMonth - 1) % MONTHS_PER_YEAR) + 1;
         }
 
         // Get the last day of the target month
@@ -187,7 +189,7 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
         uint256 _targetYear = _year;
 
         // Handle year overflow
-        if (_targetMonth > 12) {
+        if (_targetMonth > MONTHS_PER_YEAR) {
             _targetYear += 1;
             _targetMonth = 1;
         }

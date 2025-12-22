@@ -140,19 +140,6 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
         require(msg.sender == _router, VAULTADAPTER_WRONG_ROLE);
     }
 
-    /// @notice Validates that a vault can call a specific selector on a target
-    /// @dev This function enforces the new vault-specific permission model where each vault
-    /// has granular permissions for specific functions on specific targets. This replaces
-    /// the old global allowedTargets approach with better security isolation.
-    /// @param _target The target contract to be called
-    /// @param _selector The function selector being called
-    function _checkVaultCanCallSelector(address _target, bytes4 _selector) internal view {
-        require(
-            IkRegistry(address(_getMinimalAccountStorage().registry))
-                .isSelectorAllowed(address(this), _target, _selector)
-        );
-    }
-
     /// @notice Reverts if its a zero address
     /// @param _addr Address to check
     function _checkZeroAddress(address _addr) internal pure {

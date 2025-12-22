@@ -1,5 +1,5 @@
 # ExecutionGuardianModule
-[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kRegistry/modules/ExecutionGuardianModule.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kRegistry/modules/ExecutionGuardianModule.sol)
 
 **Inherits:**
 [IExecutionGuardian](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)

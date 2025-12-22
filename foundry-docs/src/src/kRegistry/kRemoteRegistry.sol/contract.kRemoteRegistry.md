@@ -1,5 +1,5 @@
 # kRemoteRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kRegistry/kRemoteRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kRegistry/kRemoteRegistry.sol)
 
 **Inherits:**
 [IkRemoteRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkRemoteRegistry.sol/interface.IkRemoteRegistry.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)

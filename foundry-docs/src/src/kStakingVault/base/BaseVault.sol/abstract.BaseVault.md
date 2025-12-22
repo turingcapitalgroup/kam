@@ -1,5 +1,5 @@
 # BaseVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/6a1b6d509ce3835558278e8d1f43531aed3b9112/src/kStakingVault/base/BaseVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kStakingVault/base/BaseVault.sol)
 
 **Inherits:**
 [ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
