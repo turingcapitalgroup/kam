@@ -3,7 +3,7 @@
 -include .env
 export
 
-.PHONY: help deploy-mainnet deploy-mainnet-dry-run deploy-sepolia deploy-sepolia-dry-run deploy-localhost deploy-localhost-dry-run config-mainnet config-mainnet-dry-run config-sepolia config-sepolia-dry-run config-localhost config-localhost-dry-run deploy-all config-all deploy-mock-assets verify-mainnet verify-sepolia verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage
+.PHONY: help deploy-mainnet deploy-mainnet-dry-run deploy-sepolia deploy-sepolia-dry-run deploy-localhost deploy-localhost-dry-run config-mainnet config-mainnet-dry-run config-sepolia config-sepolia-dry-run config-localhost config-localhost-dry-run deploy-all config-all deploy-mock-assets verify-mainnet verify-sepolia verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage gas-estimations
 
 # Default target
 help:
@@ -34,6 +34,7 @@ help:
 	@echo "make verify             - Check deployment files exist"
 	@echo "make clean              - Clean localhost deployment files"
 	@echo "make clean-all          - Clean ALL deployment files (DANGER)"
+	@echo "make gas-estimations    - Generate gas report with USD cost estimates"
 	@echo ""
 	@echo "Individual deployment steps (script/deployment/):"
 	@echo "make deploy-mock-assets - Deploy mock assets for testnets (00)"
@@ -263,6 +264,10 @@ test:
 
 coverage:
 	forge coverage
+
+gas-estimations:
+	@echo "⛽ Generating gas estimations with USD costs..."
+	@bash gas-estimations.sh
 
 compile:
 	@$(MAKE) check-selectors

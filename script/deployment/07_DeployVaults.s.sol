@@ -22,6 +22,10 @@ contract DeployVaultsScript is Script, DeploymentManager {
     NetworkConfig config;
     DeploymentOutput existing;
 
+    // Asset addresses (can be overridden for tests)
+    address internal _usdc;
+    address internal _wbtc;
+
     /// @notice Deploy staking vaults
     /// @param writeToJson If true, writes addresses to JSON (for real deployments)
     /// @param factoryAddr Address of ERC1967Factory (if zero, reads from JSON)
@@ -29,6 +33,8 @@ contract DeployVaultsScript is Script, DeploymentManager {
     /// @param readerModuleAddr Address of ReaderModule (if zero, reads from JSON)
     /// @param kUSDAddr Address of kUSD (if zero, reads from JSON)
     /// @param kBTCAddr Address of kBTC (if zero, reads from JSON)
+    /// @param usdcAddr Address of USDC asset (if zero, reads from JSON)
+    /// @param wbtcAddr Address of WBTC asset (if zero, reads from JSON)
     /// @return deployment Struct containing deployed vault addresses
     function run(
         bool writeToJson,
@@ -36,7 +42,9 @@ contract DeployVaultsScript is Script, DeploymentManager {
         address registryAddr,
         address readerModuleAddr,
         address kUSDAddr,
-        address kBTCAddr
+        address kBTCAddr,
+        address usdcAddr,
+        address wbtcAddr
     )
         public
         returns (VaultsDeployment memory deployment)
@@ -56,6 +64,10 @@ contract DeployVaultsScript is Script, DeploymentManager {
             if (kUSDAddr == address(0)) kUSDAddr = existing.contracts.kUSD;
             if (kBTCAddr == address(0)) kBTCAddr = existing.contracts.kBTC;
         }
+
+        // Use provided asset addresses or fall back to config
+        _usdc = usdcAddr != address(0) ? usdcAddr : config.assets.USDC;
+        _wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
 
         // Populate existing struct with provided addresses (for helper methods)
         existing.contracts.ERC1967Factory = factoryAddr;
@@ -157,9 +169,24 @@ contract DeployVaultsScript is Script, DeploymentManager {
         return deployment;
     }
 
+    /// @notice Wrapper for backward compatibility (6 args)
+    function run(
+        bool writeToJson,
+        address factoryAddr,
+        address registryAddr,
+        address readerModuleAddr,
+        address kUSDAddr,
+        address kBTCAddr
+    )
+        public
+        returns (VaultsDeployment memory)
+    {
+        return run(writeToJson, factoryAddr, registryAddr, readerModuleAddr, kUSDAddr, kBTCAddr, address(0), address(0));
+    }
+
     /// @notice Convenience wrapper for real deployments (writes to JSON, reads dependencies from JSON)
     function run() public returns (VaultsDeployment memory) {
-        return run(true, address(0), address(0), address(0), address(0), address(0));
+        return run(true, address(0), address(0), address(0), address(0), address(0), address(0), address(0));
     }
 
     function _deployDNVaultUSDC() internal returns (address) {
@@ -180,7 +207,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                     config.dnVaultUSDC.name,
                     config.dnVaultUSDC.symbol,
                     config.dnVaultUSDC.decimals,
-                    config.assets.USDC, // Uses USDC as underlying asset
+                    _usdc, // Uses USDC as underlying asset
                     config.dnVaultUSDC.maxTotalAssets,
                     config.dnVaultUSDC.trustedForwarder
                 )
@@ -206,7 +233,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                     config.dnVaultWBTC.name,
                     config.dnVaultWBTC.symbol,
                     config.dnVaultWBTC.decimals,
-                    config.assets.WBTC, // Uses WBTC as underlying asset
+                    _wbtc, // Uses WBTC as underlying asset
                     config.dnVaultWBTC.maxTotalAssets,
                     config.dnVaultWBTC.trustedForwarder
                 )
@@ -232,7 +259,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                     config.alphaVault.name,
                     config.alphaVault.symbol,
                     config.alphaVault.decimals,
-                    config.assets.USDC, // Uses USDC as underlying asset
+                    _usdc, // Uses USDC as underlying asset
                     config.alphaVault.maxTotalAssets,
                     config.alphaVault.trustedForwarder
                 )
@@ -258,7 +285,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                     config.betaVault.name,
                     config.betaVault.symbol,
                     config.betaVault.decimals,
-                    config.assets.USDC, // Uses USDC as underlying asset
+                    _usdc, // Uses USDC as underlying asset
                     config.betaVault.maxTotalAssets,
                     config.betaVault.trustedForwarder
                 )

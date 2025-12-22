@@ -9,23 +9,12 @@ import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { kToken } from "kam/src/kToken.sol";
 
 contract ConfigureProtocolScript is Script, DeploymentManager {
+    // Asset addresses (can be overridden for tests)
+    address internal _usdc;
+    address internal _wbtc;
+
     /// @notice Configure protocol (register vaults, adapters, grant roles) - NO NEW DEPLOYS
     /// @dev This script only configures existing contracts, doesn't deploy anything new
-    /// @param registryAddr Address of kRegistry
-    /// @param minterAddr Address of kMinter
-    /// @param assetRouterAddr Address of kAssetRouter
-    /// @param kUSDAddr Address of kUSD
-    /// @param kBTCAddr Address of kBTC
-    /// @param dnVaultUSDCAddr Address of dnVaultUSDC
-    /// @param dnVaultWBTCAddr Address of dnVaultWBTC
-    /// @param alphaVaultAddr Address of alphaVault
-    /// @param betaVaultAddr Address of betaVault
-    /// @param dnVaultAdapterUSDCAddr Address of dnVaultAdapterUSDC
-    /// @param dnVaultAdapterWBTCAddr Address of dnVaultAdapterWBTC
-    /// @param alphaVaultAdapterAddr Address of alphaVaultAdapter
-    /// @param betaVaultAdapterAddr Address of betaVaultAdapter
-    /// @param minterAdapterUSDCAddr Address of kMinterAdapterUSDC
-    /// @param minterAdapterWBTCAddr Address of kMinterAdapterWBTC
     function run(
         address registryAddr,
         address minterAddr,
@@ -41,13 +30,19 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         address alphaVaultAdapterAddr,
         address betaVaultAdapterAddr,
         address minterAdapterUSDCAddr,
-        address minterAdapterWBTCAddr
+        address minterAdapterWBTCAddr,
+        address usdcAddr,
+        address wbtcAddr
     )
         public
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
         DeploymentOutput memory existing;
+
+        // Use provided asset addresses or fall back to config
+        _usdc = usdcAddr != address(0) ? usdcAddr : config.assets.USDC;
+        _wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
 
         // If any address is zero, read from JSON (for real deployments)
         if (
@@ -131,23 +126,23 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         _log("1. Registering vaults with kRegistry...");
 
         // Register kMinter as MINTER vault type for both assets
-        registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, config.assets.USDC);
+        registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, _usdc);
         _log("   - Registered kMinter as MINTER vault for USDC");
-        registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, config.assets.WBTC);
+        registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, _wbtc);
         _log("   - Registered kMinter as MINTER vault for WBTC");
 
         // Register DN Vaults
-        registry.registerVault(dnVaultUSDCAddr, IRegistry.VaultType.DN, config.assets.USDC);
+        registry.registerVault(dnVaultUSDCAddr, IRegistry.VaultType.DN, _usdc);
         _log("   - Registered DN Vault USDC as DN vault for USDC");
-        registry.registerVault(dnVaultWBTCAddr, IRegistry.VaultType.DN, config.assets.WBTC);
+        registry.registerVault(dnVaultWBTCAddr, IRegistry.VaultType.DN, _wbtc);
         _log("   - Registered DN Vault WBTC as DN vault for WBTC");
 
         // Register Alpha Vault as ALPHA vault type
-        registry.registerVault(alphaVaultAddr, IRegistry.VaultType.ALPHA, config.assets.USDC);
+        registry.registerVault(alphaVaultAddr, IRegistry.VaultType.ALPHA, _usdc);
         _log("   - Registered Alpha Vault as ALPHA vault for USDC");
 
         // Register Beta Vault as BETA vault type
-        registry.registerVault(betaVaultAddr, IRegistry.VaultType.BETA, config.assets.USDC);
+        registry.registerVault(betaVaultAddr, IRegistry.VaultType.BETA, _usdc);
         _log("   - Registered Beta Vault as BETA vault for USDC");
 
         // Set asset batch limits
@@ -168,30 +163,30 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         _log("2. Setting hurdle rates for assets...");
 
         // Set hurdle rates from config
-        registry.setHurdleRate(config.assets.USDC, config.registry.hurdleRate.USDC);
+        registry.setHurdleRate(_usdc, config.registry.hurdleRate.USDC);
         _log("   - Set hurdle rate for USDC:", config.registry.hurdleRate.USDC);
-        registry.setHurdleRate(config.assets.WBTC, config.registry.hurdleRate.WBTC);
+        registry.setHurdleRate(_wbtc, config.registry.hurdleRate.WBTC);
         _log("   - Set hurdle rate for WBTC:", config.registry.hurdleRate.WBTC);
 
         _log("");
         _log("3. Registering adapters with vaults...");
 
         // Register adapters for kMinter
-        registry.registerAdapter(minterAddr, config.assets.USDC, minterAdapterUSDCAddr);
+        registry.registerAdapter(minterAddr, _usdc, minterAdapterUSDCAddr);
         _log("   - Registered kMinter USDC Adapter for kMinter");
-        registry.registerAdapter(minterAddr, config.assets.WBTC, minterAdapterWBTCAddr);
+        registry.registerAdapter(minterAddr, _wbtc, minterAdapterWBTCAddr);
         _log("   - Registered kMinter WBTC Adapter for kMinter");
 
         // Register adapters for DN vaults
-        registry.registerAdapter(dnVaultUSDCAddr, config.assets.USDC, dnVaultAdapterUSDCAddr);
+        registry.registerAdapter(dnVaultUSDCAddr, _usdc, dnVaultAdapterUSDCAddr);
         _log("   - Registered DN Vault USDC Adapter for DN Vault USDC");
-        registry.registerAdapter(dnVaultWBTCAddr, config.assets.WBTC, dnVaultAdapterWBTCAddr);
+        registry.registerAdapter(dnVaultWBTCAddr, _wbtc, dnVaultAdapterWBTCAddr);
         _log("   - Registered DN Vault WBTC Adapter for DN Vault WBTC");
 
         // Register adapters for Alpha and Beta vaults
-        registry.registerAdapter(alphaVaultAddr, config.assets.USDC, alphaVaultAdapterAddr);
+        registry.registerAdapter(alphaVaultAddr, _usdc, alphaVaultAdapterAddr);
         _log("   - Registered Alpha Vault Adapter for Alpha Vault");
-        registry.registerAdapter(betaVaultAddr, config.assets.USDC, betaVaultAdapterAddr);
+        registry.registerAdapter(betaVaultAddr, _usdc, betaVaultAdapterAddr);
         _log("   - Registered Beta Vault Adapter for Beta Vault");
 
         _log("");
@@ -223,9 +218,52 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         _log("All roles granted");
     }
 
+    /// @notice Wrapper for backward compatibility (15 args)
+    function run(
+        address registryAddr,
+        address minterAddr,
+        address assetRouterAddr,
+        address kUSDAddr,
+        address kBTCAddr,
+        address dnVaultUSDCAddr,
+        address dnVaultWBTCAddr,
+        address alphaVaultAddr,
+        address betaVaultAddr,
+        address dnVaultAdapterUSDCAddr,
+        address dnVaultAdapterWBTCAddr,
+        address alphaVaultAdapterAddr,
+        address betaVaultAdapterAddr,
+        address minterAdapterUSDCAddr,
+        address minterAdapterWBTCAddr
+    )
+        public
+    {
+        run(
+            registryAddr,
+            minterAddr,
+            assetRouterAddr,
+            kUSDAddr,
+            kBTCAddr,
+            dnVaultUSDCAddr,
+            dnVaultWBTCAddr,
+            alphaVaultAddr,
+            betaVaultAddr,
+            dnVaultAdapterUSDCAddr,
+            dnVaultAdapterWBTCAddr,
+            alphaVaultAdapterAddr,
+            betaVaultAdapterAddr,
+            minterAdapterUSDCAddr,
+            minterAdapterWBTCAddr,
+            address(0),
+            address(0)
+        );
+    }
+
     /// @notice Convenience wrapper for real deployments (reads all addresses from JSON)
     function run() public {
         run(
+            address(0),
+            address(0),
             address(0),
             address(0),
             address(0),
