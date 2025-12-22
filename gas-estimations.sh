@@ -6,7 +6,7 @@
 # Force C locale for consistent number formatting (use . as decimal separator)
 export LC_ALL=C
 
-OUTPUT_FILE=".gas-estimations"
+OUTPUT_FILE=".gas-estimations.md"
 TEMP_FILE=$(mktemp)
 
 # Colors
