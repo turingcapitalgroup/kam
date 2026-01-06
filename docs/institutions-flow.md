@@ -223,10 +223,12 @@ Request Status Flow:
 │PENDING      │ ── Initial state when requestBurn() is called
 └──────┬──────┘
        │
-       ▼
-┌─────────────┐
-│SETTLED      │ ── After batch settlement is executed
-└──────┬──────┘
+       ├──────────────────────────┐
+       │                          │
+       ▼                          ▼
+┌─────────────┐            ┌─────────────┐
+│SETTLED      │            │CANCELED     │ ── Via cancelBurnRequest() before batch closes
+└──────┬──────┘            └─────────────┘   (returns escrowed kTokens to user)
        │
        ▼
 ┌─────────────┐
@@ -261,7 +263,6 @@ Request Status Flow:
 │  │• createNewBatch() - Create new batch for asset              │ │
 │  │• closeBatch() - Stop accepting new requests                 │ │
 │  │• settleBatch() - Mark batch as settled after processing     │ │
-│  │• createBatchReceiver() - Deploy distributor per batch       │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────-─┘
 ```

@@ -14,16 +14,19 @@ import {
     KBASE_WRONG_ROLE,
     KBASE_ZERO_ADDRESS,
     KBASE_ZERO_AMOUNT,
+    KMINTER_BATCH_CLOSED,
     KMINTER_BATCH_MINT_REACHED,
     KMINTER_BATCH_NOT_SETTLED,
+    KMINTER_BATCH_NOT_VALID,
     KMINTER_BATCH_REDEEM_REACHED,
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
+    KMINTER_REQUEST_NOT_PENDING,
     KMINTER_UNAUTHORIZED,
-    KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
-    KMINTER_ZERO_AMOUNT
+    KMINTER_ZERO_AMOUNT,
+    KREGISTRY_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
@@ -71,6 +74,17 @@ contract kMinterTest is DeploymentBaseTest {
         kMinter newMinterImpl = new kMinter();
 
         bytes memory initData = abi.encodeCall(kMinter.initialize, (address(0), users.admin));
+
+        ERC1967Factory factory = new ERC1967Factory();
+
+        vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
+        factory.deployAndCall(address(newMinterImpl), users.admin, initData);
+    }
+
+    function test_Initialize_Require_Owner_Not_Zero_Address() public {
+        kMinter newMinterImpl = new kMinter();
+
+        bytes memory initData = abi.encodeCall(kMinter.initialize, (address(registry), ZERO_ADDRESS));
 
         ERC1967Factory factory = new ERC1967Factory();
 
@@ -135,7 +149,7 @@ contract kMinterTest is DeploymentBaseTest {
         address invalidAsset = address(0x347474);
 
         vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_WRONG_ASSET));
+        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
         minter.mint(invalidAsset, users.institution, MINT_AMOUNT);
     }
 
@@ -189,6 +203,10 @@ contract kMinterTest is DeploymentBaseTest {
         assertEq(kUSD.balanceOf(_minter), REQUEST_AMOUNT);
 
         assertEq(minter.getRequestCounter(), 1);
+
+        // Verify batch receiver was created during requestBurn
+        address _batchReceiver = minter.getBatchReceiver(_batchId);
+        assertTrue(_batchReceiver != address(0));
     }
 
     function test_RequestBurn_Require_Not_Paused() public {
@@ -215,7 +233,7 @@ contract kMinterTest is DeploymentBaseTest {
         address invalidAsset = address(0x347474);
 
         vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_WRONG_ASSET));
+        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
         minter.requestBurn(invalidAsset, users.institution, REQUEST_AMOUNT);
     }
 
@@ -336,6 +354,141 @@ contract kMinterTest is DeploymentBaseTest {
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_BATCH_NOT_SETTLED));
         minter.burn(_requestId);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        CANCEL BURN REQUEST
+    //////////////////////////////////////////////////////////////*/
+
+    function test_CancelBurnRequest_Success() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+
+        // Create a request without settling
+        address _kToken = registry.assetToKToken(USDC);
+        vm.prank(users.institution);
+        IkToken(_kToken).approve(_minter, REQUEST_AMOUNT);
+
+        vm.prank(users.institution);
+        bytes32 _requestId = minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        uint256 _kTokenBalanceBefore = kUSD.balanceOf(users.institution);
+        bytes32 _batchId = minter.getBatchId(USDC);
+
+        // Cancel the request
+        vm.prank(users.institution);
+        vm.expectEmit(true, true, false, true);
+        emit IkMinter.BurnRequestCanceled(_requestId, users.institution, REQUEST_AMOUNT, _batchId);
+        minter.cancelBurnRequest(_requestId);
+
+        // Verify kTokens returned to user
+        assertEq(kUSD.balanceOf(users.institution), _kTokenBalanceBefore + REQUEST_AMOUNT);
+
+        // Verify request status is CANCELED
+        IkMinter.BurnRequest memory _request = minter.getBurnRequest(_requestId);
+        assertEq(uint256(_request.status), uint256(IkMinter.RequestStatus.CANCELED));
+
+        // Verify request removed from user's set
+        bytes32[] memory _userRequests = minter.getUserRequests(users.institution);
+        assertEq(_userRequests.length, 0);
+    }
+
+    function test_CancelBurnRequest_Require_Not_Paused() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+
+        address _kToken = registry.assetToKToken(USDC);
+        vm.prank(users.institution);
+        IkToken(_kToken).approve(_minter, REQUEST_AMOUNT);
+
+        vm.prank(users.institution);
+        bytes32 _requestId = minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        vm.prank(users.emergencyAdmin);
+        minter.setPaused(true);
+
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
+        minter.cancelBurnRequest(_requestId);
+    }
+
+    function test_CancelBurnRequest_Require_Only_Institution() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+
+        address _kToken = registry.assetToKToken(USDC);
+        vm.prank(users.institution);
+        IkToken(_kToken).approve(_minter, REQUEST_AMOUNT);
+
+        vm.prank(users.institution);
+        bytes32 _requestId = minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.cancelBurnRequest(_requestId);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
+        minter.cancelBurnRequest(_requestId);
+    }
+
+    function test_CancelBurnRequest_Require_User_Is_Owner() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+
+        address _kToken = registry.assetToKToken(USDC);
+        vm.prank(users.institution);
+        IkToken(_kToken).approve(_minter, REQUEST_AMOUNT);
+
+        vm.prank(users.institution);
+        bytes32 _requestId = minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        // Different institution cannot cancel another institution's request
+        vm.prank(users.institution2);
+        vm.expectRevert(bytes(KMINTER_UNAUTHORIZED));
+        minter.cancelBurnRequest(_requestId);
+    }
+
+    function test_CancelBurnRequest_Require_Valid_RequestId() public {
+        bytes32 invalidRequestId = keccak256("Banana");
+
+        // Invalid request ID will have user = address(0), so authorization check fails first
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_UNAUTHORIZED));
+        minter.cancelBurnRequest(invalidRequestId);
+    }
+
+    function test_CancelBurnRequest_Require_Status_Pending() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+        _requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        bytes32[] memory _requestIds = minter.getUserRequests(users.institution);
+
+        // Burn the request first (this settles and burns)
+        vm.prank(users.institution);
+        minter.burn(_requestIds[0]);
+
+        // Try to cancel already burned request
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_REQUEST_NOT_PENDING));
+        minter.cancelBurnRequest(_requestIds[0]);
+    }
+
+    function test_CancelBurnRequest_Require_Batch_Not_Closed() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+
+        address _kToken = registry.assetToKToken(USDC);
+        vm.prank(users.institution);
+        IkToken(_kToken).approve(_minter, REQUEST_AMOUNT);
+
+        vm.prank(users.institution);
+        bytes32 _requestId = minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        // Close the batch
+        bytes32 _batchId = minter.getBatchId(USDC);
+        vm.prank(users.relayer);
+        minter.closeBatch(_batchId, true);
+
+        // Try to cancel after batch is closed
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_BATCH_CLOSED));
+        minter.cancelBurnRequest(_requestId);
     }
 
     /* //////////////////////////////////////////////////////////////

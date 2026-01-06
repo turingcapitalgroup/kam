@@ -13,12 +13,13 @@ The institutional gateway for minting and burning kTokens. Implements a push-pul
 - `mint(address asset, address to, uint256 amount)` - Creates new kTokens by accepting underlying asset deposits in a 1:1 ratio
 - `requestBurn(address asset, address to, uint256 amount)` - Initiates burn process by escrowing kTokens and creating batch burn request
 - `burn(bytes32 requestId)` - Executes burn for a request in a settled batch, burning kTokens and transferring assets
+- `cancelBurnRequest(bytes32 requestId)` - Cancels a pending burn request, returning escrowed kTokens to user
 
 **Request Management**
 
 - Generates unique request IDs using hash function with multiple entropy sources
 - Maintains per-asset batch tracking with `currentBatchIds[asset]` and `assetBatchCounters[asset]`
-- Supports request status tracking (PENDING, REDEEMED)
+- Supports request status tracking (PENDING, REDEEMED, CANCELED)
 - Integrates with batch settlement system for asset distribution via BatchReceiver contracts
 - Manages batch lifecycle: create, close, settle, and BatchReceiver deployment
 
@@ -27,7 +28,6 @@ The institutional gateway for minting and burning kTokens. Implements a push-pul
 - `createNewBatch(address asset_)` - Creates new batch for asset and returns batch ID (RELAYER_ROLE or registry)
 - `closeBatch(bytes32 _batchId, bool _create)` - Closes batch to prevent new requests, optionally creates new batch (RELAYER_ROLE required)
 - `settleBatch(bytes32 _batchId)` - Marks batch as settled after processing (kAssetRouter only)
-- `createBatchReceiver(bytes32 _batchId)` - Deploys BatchReceiver contract for asset distribution (kAssetRouter only)
 - `getBatchId(address asset_)` - Returns current active batch ID for an asset
 - `getCurrentBatchNumber(address asset_)` - Returns current batch number counter for an asset
 - `hasActiveBatch(address asset_)` - Checks if asset has an active batch
@@ -49,6 +49,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 
 - `kAssetPush(address asset, uint256 amount, bytes32 batchId)` - Records incoming asset flows from caller to virtual balance
 - `kAssetRequestPull(address asset, uint256 amount, bytes32 batchId)` - Stages outgoing asset requests from caller's virtual balance
+- `kAssetCancelPull(address asset, uint256 amount, bytes32 batchId)` - Decrements requested amount when burn request is cancelled (kMinter only)
 - `kSharesRequestPush(address vault, uint256 amount, bytes32 batchId)` - Records incoming share flows for unstaking
 - `kSharesRequestPull(address vault, uint256 amount, bytes32 batchId)` - Records outgoing share flows for staking
 
@@ -272,14 +273,13 @@ Minimal proxy contract that holds and distributes settled assets for batch redem
 
 **Asset Distribution**
 
-- `pullAssets(address receiver, uint256 amount, bytes32 batchId)` - Transfers assets from contract to specified receiver
-- Only callable by kMinter with proper batch ID validation
-- `rescueAssets(address asset)` - Rescues stuck assets (not protocol assets)
+- `pullAssets(address receiver, uint256 amount)` - Transfers assets from contract to specified receiver (kMinter only)
+- `rescueAssets(address asset, address to, uint256 amount)` - Rescues stuck assets not designated for batch settlement (kMinter only)
 
 **Access Control**
 
 - Immutable kMinter address set at construction for security
-- Batch ID validation prevents cross-batch asset distribution
+- Only kMinter can interact with receiver contracts
 
 ## Token Interfaces
 

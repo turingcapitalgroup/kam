@@ -90,7 +90,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         mapping(address => mapping(uint8 vaultType => address)) assetToVault;
         /// @dev Maps vault addresses to sets of assets they manage
         /// Supports multi-asset vaults (e.g., kMinter managing multiple assets)
-        mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) vaultAsset;
+        mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) vaultAssets;
         /// @dev Reverse lookup: maps assets to all vaults that support them
         /// Enables finding all vaults that can handle a specific asset
         mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) vaultsByAsset;
@@ -398,7 +398,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         require(_isKMinter || !_alreadyRegistered, KREGISTRY_ALREADY_REGISTERED);
 
         // Associate vault with the asset it manages
-        $.vaultAsset[_vault].add(_asset);
+        $.vaultAssets[_vault].add(_asset);
 
         // Set as primary vault for this asset-type combination
         $.assetToVault[_asset][_vaultType] = _vault;
@@ -429,7 +429,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
         kRegistryStorage storage $ = _getkRegistryStorage();
 
-        address[] memory _assets = $.vaultAsset[_vault].values();
+        address[] memory _assets = $.vaultAssets[_vault].values();
         uint8 _vaultTypeValue = $.vaultType[_vault];
 
         // Remove vault from all asset mappings
@@ -437,7 +437,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
             address _asset = _assets[i];
             delete $.assetToVault[_asset][_vaultTypeValue];
             $.vaultsByAsset[_asset].remove(_vault);
-            $.vaultAsset[_vault].remove(_asset);
+            $.vaultAssets[_vault].remove(_asset);
         }
 
         delete $.vaultType[_vault];
@@ -653,8 +653,8 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// @inheritdoc IRegistry
     function getVaultAssets(address _vault) external view returns (address[] memory) {
         kRegistryStorage storage $ = _getkRegistryStorage();
-        require($.vaultAsset[_vault].values().length > 0, KREGISTRY_ZERO_ADDRESS);
-        return $.vaultAsset[_vault].values();
+        require($.vaultAssets[_vault].values().length > 0, KREGISTRY_ZERO_ADDRESS);
+        return $.vaultAssets[_vault].values();
     }
 
     /// @inheritdoc IRegistry

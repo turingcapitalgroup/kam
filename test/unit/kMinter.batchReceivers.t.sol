@@ -1,59 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { _1_WBTC } from "../utils/Constants.sol";
+import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
-import { KBATCHRECEIVER_ZERO_ADDRESS, KMINTER_WRONG_ROLE, KMINTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
-import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
+import { KMINTER_WRONG_ROLE, KMINTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
+import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 contract kMinterBatchReceiversTest is DeploymentBaseTest {
     address USDC;
     address WBTC;
-    address router;
+    address _minter;
+
+    uint256 internal constant MINT_AMOUNT = 100_000 * _1_USDC;
+    uint256 internal constant REQUEST_AMOUNT = 50_000 * _1_USDC;
 
     function setUp() public override {
         DeploymentBaseTest.setUp();
 
         USDC = address(mockUSDC);
         WBTC = address(mockWBTC);
-        router = address(assetRouter);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                          CREATE BATCH RECEIVER
-    //////////////////////////////////////////////////////////////*/
-
-    function test_CreateBatchReceiver_Success() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        vm.prank(router);
-        vm.expectEmit(false, true, false, true);
-        emit IkMinter.BatchReceiverCreated(address(0), _batchId);
-        address _receiver = minter.createBatchReceiver(_batchId);
-
-        IkBatchReceiver batchReceiver = IkBatchReceiver(_receiver);
-        assertTrue(address(minter) == batchReceiver.K_MINTER());
-        assertTrue(address(USDC) == batchReceiver.asset());
-        assertTrue(_batchId == batchReceiver.batchId());
-    }
-
-    function test_CreateBatchReceiver_Require_AssetRouter() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
-        minter.createBatchReceiver(_batchId);
-
-        vm.prank(users.admin);
-        vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
-        minter.createBatchReceiver(_batchId);
-    }
-
-    function test_CreateBatchReceiver_Require_Valid_BatchId() public {
-        bytes32 _batchId = keccak256("Banana");
-        vm.prank(router);
-        vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
-        // reverts on asset being address 0 from the $.batches[_batchId].asset;
-        minter.createBatchReceiver(_batchId);
+        _minter = address(minter);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -121,8 +88,32 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
                                 PRIVATE
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Creates a batch receiver by going through the requestBurn flow
     function _createBatchReceiver(bytes32 _batchId) private returns (address _receiver) {
-        vm.prank(router);
-        _receiver = minter.createBatchReceiver(_batchId);
+        // Mint kTokens first
+        mockUSDC.mint(users.institution, MINT_AMOUNT);
+        vm.prank(users.institution);
+        mockUSDC.approve(_minter, MINT_AMOUNT);
+        vm.prank(users.institution);
+        minter.mint(USDC, users.institution, MINT_AMOUNT);
+
+        // Close and settle the mint batch
+        vm.prank(users.relayer);
+        minter.closeBatch(_batchId, true);
+        vm.prank(users.admin);
+        assetRouter.setSettlementCooldown(0);
+        vm.prank(users.relayer);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0, 0, 0);
+        assetRouter.executeSettleBatch(_proposalId);
+
+        // Now request burn - this creates the batch receiver
+        bytes32 _newBatchId = minter.getBatchId(USDC);
+        address _kToken = registry.assetToKToken(USDC);
+        vm.prank(users.institution);
+        IkToken(_kToken).approve(_minter, REQUEST_AMOUNT);
+        vm.prank(users.institution);
+        minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        _receiver = minter.getBatchReceiver(_newBatchId);
     }
 }

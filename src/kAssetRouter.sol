@@ -193,6 +193,23 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         _unlockReentrant();
     }
 
+    /// @inheritdoc IkAssetRouter
+    function kAssetCancelPull(address _asset, uint256 _amount, bytes32 _batchId) external payable {
+        _lockReentrant();
+        _checkPaused();
+        _checkAmountNotZero(_amount);
+        address _kMinter = msg.sender;
+        _checkKMinter(_kMinter);
+
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+
+        // Decrement the requested amount in the batch for kMinter
+        $.vaultBatchBalances[_kMinter][_batchId].requested -= _amount.toUint128();
+
+        emit AssetsRequestCanceled(_kMinter, _asset, _amount);
+        _unlockReentrant();
+    }
+
     /* //////////////////////////////////////////////////////////////
                             kSTAKING VAULT FUNCTIONS
     //////////////////////////////////////////////////////////////*/

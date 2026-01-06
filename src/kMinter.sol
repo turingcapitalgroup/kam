@@ -23,8 +23,8 @@ import {
     KMINTER_INSUFFICIENT_BALANCE,
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
+    KMINTER_REQUEST_NOT_PENDING,
     KMINTER_UNAUTHORIZED,
-    KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
     KMINTER_ZERO_AMOUNT
@@ -71,7 +71,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         address receiverImplementation;
         /// @dev Tracks total assets locked in pending redemption requests per asset
         mapping(address => uint256) totalLockedAssets;
-        /// @dev Tracks total assets locked in pending redemption requests per asset
+        /// @dev Maps request IDs to their corresponding burn request data
         mapping(bytes32 => BurnRequest) burnRequests;
         /// @dev Maps user addresses to their set of redemption request IDs for efficient lookup
         /// Enables quick retrieval of all requests associated with a specific user
@@ -113,6 +113,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
     /// @param _owner Initial owner fo the contract
     function initialize(address _registry, address _owner) external initializer {
         require(_registry != address(0), KMINTER_ZERO_ADDRESS);
+        require(_owner != address(0), KMINTER_ZERO_ADDRESS);
         __kBase_init(_registry);
         _initializeOwner(_owner);
 
@@ -131,19 +132,19 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         _lockReentrant();
         _checkNotPaused();
         _checkInstitution(msg.sender);
-        _checkValidAsset(_asset);
-
         _checkAmountNotZero(_amount);
         _checkAddressNotZero(_to);
 
+        // _getKTokenForAsset reverts with KBASE_ASSET_NOT_SUPPORTED if asset is invalid
         address _kToken = _getKTokenForAsset(_asset);
 
-        bytes32 _batchId = _currentBatchId(_asset);
-        if (_batchId == bytes32(0)) {
+        kMinterStorage storage $ = _getkMinterStorage();
+
+        bytes32 _batchId = $.currentBatchIds[_asset];
+        // Create new batch if none exists or current batch is closed
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) {
             _batchId = _createNewBatch(_asset);
         }
-
-        kMinterStorage storage $ = _getkMinterStorage();
 
         // Make sure we dont exceed the max mint per batch
         require(
@@ -172,25 +173,29 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         _lockReentrant();
         _checkNotPaused();
         _checkInstitution(msg.sender);
-        _checkValidAsset(_asset);
         _checkAmountNotZero(_amount);
         _checkAddressNotZero(_to);
 
+        // _getKTokenForAsset reverts with KBASE_ASSET_NOT_SUPPORTED if asset is invalid
         address _kToken = _getKTokenForAsset(_asset);
         require(_kToken.balanceOf(msg.sender) >= _amount, KMINTER_INSUFFICIENT_BALANCE);
 
-        // Generate unique request ID using recipient, amount, timestamp and counter for uniqueness
-        _requestId = _createBurnRequestId(_to, _amount, block.timestamp);
-
-        bytes32 _batchId = _currentBatchId(_asset);
-
         kMinterStorage storage $ = _getkMinterStorage();
 
-        // Make sure we dont exceed the max burn per batch
+        bytes32 _batchId = $.currentBatchIds[_asset];
+        // Create new batch if none exists or current batch is closed
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) {
+            _batchId = _createNewBatch(_asset);
+        }
+
+        // Check cap before creating request ID to save gas if cap reached
         require(
             ($.batches[_batchId].burnedInBatch += _amount.toUint128()) <= _registry().getMaxBurnPerBatch(_asset),
             KMINTER_BATCH_REDEEM_REACHED
         );
+
+        // Generate unique request ID using recipient, amount, timestamp and counter for uniqueness
+        _requestId = _createBurnRequestId(_to, _amount, block.timestamp);
 
         address _receiver = _createBatchReceiver(_batchId);
         _checkAddressNotZero(_receiver);
@@ -258,11 +263,54 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         address _kToken = _getKTokenForAsset(_asset);
         IkToken(_kToken).burn(address(this), _amount);
 
-        // Pull assets from batch receiver - will revert if batch not settled
-        kBatchReceiver(_batchReceiver).pullAssets(_recipient, _amount, _batchId);
+        // Pull assets from batch receiver
+        kBatchReceiver(_batchReceiver).pullAssets(_recipient, _amount);
 
         _unlockReentrant();
         emit Burned(_requestId, _batchReceiver, _kToken, _recipient, _amount, _batchId);
+    }
+
+    /// @inheritdoc IkMinter
+    function cancelBurnRequest(bytes32 _requestId) external payable {
+        _lockReentrant();
+        _checkNotPaused();
+        _checkInstitution(msg.sender);
+
+        kMinterStorage storage $ = _getkMinterStorage();
+        BurnRequest storage _burnRequest = $.burnRequests[_requestId];
+
+        // Validate caller is the request creator
+        require(msg.sender == _burnRequest.user, KMINTER_UNAUTHORIZED);
+
+        // Validate request is in PENDING status
+        require(_burnRequest.status == RequestStatus.PENDING, KMINTER_REQUEST_NOT_PENDING);
+
+        uint256 _amount = _burnRequest.amount;
+        address _asset = _burnRequest.asset;
+        bytes32 _batchId = _burnRequest.batchId;
+
+        // Validate batch exists and is not closed
+        require(_batchId != bytes32(0), KMINTER_BATCH_NOT_VALID);
+        require(!$.batches[_batchId].isClosed, KMINTER_BATCH_CLOSED);
+
+        // Remove from user's request set
+        require($.userRequests[msg.sender].remove(_requestId), KMINTER_REQUEST_NOT_FOUND);
+
+        // Update request status to CANCELED
+        _burnRequest.status = RequestStatus.CANCELED;
+
+        // Decrement burnedInBatch to free up the requested amount
+        $.batches[_batchId].burnedInBatch -= _amount.toUint128();
+
+        // Return escrowed kTokens to user
+        address _kToken = _getKTokenForAsset(_asset);
+        _kToken.safeTransfer(msg.sender, _amount);
+
+        // Update router accounting - decrement requested amount
+        IkAssetRouter(_getKAssetRouter()).kAssetCancelPull(_asset, _amount, _batchId);
+
+        _unlockReentrant();
+        emit BurnRequestCanceled(_requestId, msg.sender, _amount, _batchId);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -288,9 +336,10 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
 
         _batch.isClosed = true;
 
-        bytes32 _newBatchId = _batchId;
         if (_create) {
-            _newBatchId = _createNewBatch(_batchAsset); // Create new batch for same asset
+            _createNewBatch(_batchAsset); // Create new batch for same asset
+        } else {
+            $.currentBatchIds[_batchAsset] = bytes32(0); // Bytes(0), reverts on mint/requestBurn
         }
 
         emit BatchClosed(_batchId);
@@ -307,16 +356,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         emit BatchSettled(_batchId);
     }
 
-    /// @inheritdoc IkMinter
-    function createBatchReceiver(bytes32 _batchId) external returns (address) {
-        _lockReentrant();
-        _checkRouter(msg.sender);
-        address _receiver = _createBatchReceiver(_batchId);
-        _unlockReentrant();
-        return _receiver;
-    }
-
-    /// @notice Creates a batch receiver for the specified batch (unchanged functionality)
+    /// @notice Creates a batch receiver for the specified batch
     function _createBatchReceiver(bytes32 _batchId) internal returns (address) {
         kMinterStorage storage $ = _getkMinterStorage();
         address _receiver = $.batches[_batchId].batchReceiver;
@@ -459,12 +499,6 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
     function _checkRouter(address _user) private view {
         address _kAssetRouter = _registry().getContractById(K_ASSET_ROUTER);
         require(_user == _kAssetRouter, KMINTER_WRONG_ROLE);
-    }
-
-    /// @notice Check if asset is valid/supported
-    /// @param _asset Asset address to check
-    function _checkValidAsset(address _asset) private view {
-        require(_isAsset(_asset), KMINTER_WRONG_ASSET);
     }
 
     /// @notice Check if amount is not zero

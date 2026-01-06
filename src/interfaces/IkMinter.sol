@@ -19,7 +19,9 @@ interface IkMinter is IVersioned {
         /// @dev Request has been created and tokens are held in escrow, awaiting batch settlement
         PENDING,
         /// @dev Request has been successfully executed and underlying assets have been distributed
-        REDEEMED
+        REDEEMED,
+        /// @dev Request has been canceled by the user before batch closure
+        CANCELED
     }
 
     /// @notice Contains all information related to a redemption request
@@ -99,6 +101,13 @@ interface IkMinter is IVersioned {
         bytes32 batchId
     );
 
+    /// @notice Emitted when a burn request is canceled before batch closure
+    /// @param requestId The unique identifier of the canceled request
+    /// @param user The address that canceled the request
+    /// @param amount The amount of kTokens returned to the user
+    /// @param batchId The batch the request was removed from
+    event BurnRequestCanceled(bytes32 indexed requestId, address indexed user, uint256 amount, bytes32 batchId);
+
     // VaultBatches Events
     // / @notice Emitted when a new batch is created
     // / @param asset The asset in which the batch will be created
@@ -168,6 +177,15 @@ interface IkMinter is IVersioned {
     /// @param requestId The unique identifier of the redemption request to execute (obtained from requestBurn)
     function burn(bytes32 requestId) external payable;
 
+    /// @notice Cancels a pending burn request before the batch is closed
+    /// @dev Allows users to recover their escrowed kTokens if they change their mind or need liquidity before batch
+    /// settlement. The cancellation process involves: (1) validating the request exists and belongs to caller,
+    /// (2) ensuring the batch is not closed or settled, (3) returning escrowed kTokens to the user, (4) updating
+    /// router accounting to decrement requested amount, (5) freeing batch limit capacity. This function will revert
+    /// if the batch has already been closed, as the settlement process has been committed at that point.
+    /// @param requestId The unique identifier of the burn request to cancel
+    function cancelBurnRequest(bytes32 requestId) external payable;
+
     /// @notice Creates a new batch for a specific asset
     /// @param asset_ The asset for which to create a new batch
     /// @return The batch ID of the newly created batch
@@ -181,11 +199,6 @@ interface IkMinter is IVersioned {
     /// @notice Marks a batch as settled after processing
     /// @param _batchId The batch ID to settle
     function settleBatch(bytes32 _batchId) external;
-
-    /// @notice Creates a batch receiver contract for a specific batch
-    /// @param _batchId The batch ID to create a receiver for
-    /// @return The address of the created batch receiver
-    function createBatchReceiver(bytes32 _batchId) external returns (address);
 
     /// @notice Get the current active batch ID for a specific asset
     /// @param asset_ The asset to query

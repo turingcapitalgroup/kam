@@ -69,7 +69,7 @@ contract kMinterBatchesTest is DeploymentBaseTest {
         assertTrue(isActive != true);
 
         bytes32 newBatchId = minter.getBatchId(USDC);
-        assertTrue(_batchId == newBatchId);
+        assertTrue(newBatchId == bytes32(0));
     }
 
     function test_CloseBatch_With_Batch_Creation_Success() public {
