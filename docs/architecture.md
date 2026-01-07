@@ -112,15 +112,15 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
 
 **Settlement Proposal Mechanism**: The kAssetRouter implements a secure two-phase settlement:
 
-1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets_)` providing only the current total assets from external strategies. The kAssetRouter contract automatically calculates:
+1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, chargeManagementFees, chargePerformanceFees)` providing the current total assets from external strategies and fee charging flags. The kAssetRouter contract automatically calculates:
    - `netted` = deposited - requested amounts from batch balances
    - `lastTotalAssets` = current virtual balance via `adapter.totalAssets()`
    - `totalAssetsAdjusted` = totalAssets_ - netted
    - `yield` = totalAssetsAdjusted - lastTotalAssets
    - `profit` = whether yield is positive or negative
-   - Applies yield tolerance check (rejects if yield exceeds configured percentage)
+   - Emits `YieldExceedsMaxDeltaWarning` if yield exceeds configured threshold (warning only, does not revert)
 
-2. **Cooldown Phase**: Mandatory waiting period (configurable 0-24 hours, default 1 hour) where guardians can `cancelProposal()`. **Yield Tolerance**: Proposals are automatically rejected if yield deviation exceeds configured threshold (default 10%, max 50% in basis points).
+2. **Cooldown Phase**: Mandatory waiting period (configurable 0-24 hours, default 1 hour) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds configured threshold (default 10%, max 50% in basis points), a warning event is emitted. Guardians must monitor for these warnings and cancel suspicious proposals during the cooldown window.
 
 3. **Execution Phase**: After cooldown, anyone calls `executeSettleBatch()` to complete settlement
 
@@ -506,7 +506,7 @@ The two-phase commit system provides multiple safeguards:
 
 - Mandatory cooldown period (1hr default, max 1 day)
 - Guardian-only proposal cancellation during cooldown
-- Yield tolerance validation (default 10% max deviation)
+- Yield tolerance warning system (emits event if yield exceeds 10% max deviation, guardians must cancel)
 - On-chain validation of all settlement parameters
 
 ### Emergency Controls
@@ -526,7 +526,7 @@ The protocol implements a multi-layered emergency response system with global pa
 3. **Settled**: Batch marked settled after kAssetRouter processes settlement
 4. **BatchReceiver Created**: kMinter creates BatchReceiver via `_createBatchReceiver()` using clone pattern
 
-**BatchReceiver Creation**: kMinter creates BatchReceiver contracts for **redemption distribution only**. These are deployed using `OptimizedLibClone.clone()` from the implementation created during initialization. BatchReceivers are created automatically during the first redemption request for a batch, or can be created explicitly by kAssetRouter during settlement preparation.
+**BatchReceiver Creation**: kMinter creates BatchReceiver contracts for **redemption distribution only**. These are deployed using `OptimizedLibClone.clone()` from the implementation created during initialization. BatchReceivers are created automatically during the first redemption request (`requestBurn()`) for a batch.
 
 ### kStakingVault Batch Architecture
 

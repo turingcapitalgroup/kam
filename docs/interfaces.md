@@ -55,7 +55,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 
 **Settlement Operations**
 
-- `proposeSettleBatch(address asset, address vault, bytes32 batchId, uint256 totalAssets, uint64 lastFeesChargedManagement, uint64 lastFeesChargedPerformance)` - Creates timelock settlement proposal with automatic yield calculations (RELAYER_ROLE required)
+- `proposeSettleBatch(address asset, address vault, bytes32 batchId, uint256 totalAssets, bool chargeManagementFees, bool chargePerformanceFees)` - Creates timelock settlement proposal with automatic yield calculations (RELAYER_ROLE required)
 - `executeSettleBatch(bytes32 proposalId)` - Executes approved settlement after cooldown using proposal ID (anyone can call after cooldown)
 - `cancelProposal(bytes32 proposalId)` - Cancels settlement proposals during cooldown period (GUARDIAN_ROLE required)
 
@@ -75,7 +75,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `getSettlementProposal(bytes32 proposalId)` - Retrieves complete VaultSettlementProposal struct with all details
 - `canExecuteProposal(bytes32 proposalId)` - Checks execution readiness and returns boolean result with descriptive reason
 - `getSettlementCooldown()` - Gets current cooldown period in seconds before proposals can be executed
-- `getMaxAllowedDelta()` - Gets current yield tolerance threshold in basis points for proposal validation
+- `getMaxAllowedDelta()` - Gets current yield tolerance threshold in basis points (exceeding emits warning event)
 - `virtualBalance(address vault, address asset)` - Returns virtual asset balance from vault's adapter
 
 ### IkRegistry
@@ -91,13 +91,14 @@ Central registry managing protocol contracts, supported assets, vault registrati
 **Asset Management**
 
 - `registerAsset(string name, string symbol, address asset, uint256 maxMintPerBatch, uint256 maxRedeemPerBatch, address emergencyAdmin)` - Deploys new kToken and establishes asset support with batch limits
+- `removeAsset(address asset)` - Removes asset from protocol (requires no vaults using the asset, ADMIN_ROLE required)
 - `assetToKToken(address asset)` - Maps underlying assets to their kToken representations
 - `getAllAssets()` - Returns all protocol-supported assets
 - `isAsset(address asset)` - Checks if asset is supported by the protocol
-- `setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 maxRedeemPerBatch_)` - Sets maximum amounts per batch
+- `setAssetBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_)` - Sets maximum amounts per batch for asset or vault
 - `getMaxMintPerBatch(address asset)` - Returns maximum mint amount per batch for an asset
 - `getMaxBurnPerBatch(address asset)` - Returns maximum burn amount per batch for an asset
-- `setHurdleRate(address asset, uint16 hurdleRate)` - Sets performance threshold for an asset
+- `setHurdleRate(address asset, uint16 hurdleRate)` - Sets performance threshold for an asset (0 = no minimum threshold)
 - `getHurdleRate(address asset)` - Returns hurdle rate for an asset in basis points
 
 **Vault Registry**
@@ -114,18 +115,6 @@ Central registry managing protocol contracts, supported assets, vault registrati
 - `removeAdapter(address vault, address asset, address adapter)` - Removes adapter registration
 - `isAdapterRegistered(address vault, address asset, address adapter)` - Validates adapter registration status
 - `isSelectorAllowed(address executor, address target, bytes4 selector)` - Validates if executor can call target/selector (via ExecutionGuardianModule)
-
-**Treasury & Insurance Configuration**
-
-- `setTreasury(address treasury_)` - Sets the treasury address (ADMIN_ROLE required)
-- `getTreasury()` - Returns the treasury address
-- `setTreasuryBps(uint16 treasuryBps_)` - Sets treasury allocation in basis points (ADMIN_ROLE required)
-- `getTreasuryBps()` - Returns treasury allocation in basis points
-- `setInsurance(address insurance_)` - Sets the insurance fund address for depeg protection reserves (ADMIN_ROLE required)
-- `getInsurance()` - Returns the insurance fund address
-- `setInsuranceBps(uint16 insuranceBps_)` - Sets insurance allocation from kMinter yields in basis points (ADMIN_ROLE required)
-- `getInsuranceBps()` - Returns insurance allocation in basis points
-- `getSettlementConfig()` - Returns settlement configuration (treasury, insurance, treasuryBps, insuranceBps)
 
 **Treasury & Insurance Configuration**
 

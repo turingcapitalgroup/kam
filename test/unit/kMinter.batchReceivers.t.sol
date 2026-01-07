@@ -4,7 +4,6 @@ pragma solidity 0.8.30;
 import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import { KMINTER_WRONG_ROLE, KMINTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
-import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 contract kMinterBatchReceiversTest is DeploymentBaseTest {
@@ -103,7 +102,7 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         vm.prank(users.admin);
         assetRouter.setSettlementCooldown(0);
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0, false, false);
         assetRouter.executeSettleBatch(_proposalId);
 
         // Now request burn - this creates the batch receiver

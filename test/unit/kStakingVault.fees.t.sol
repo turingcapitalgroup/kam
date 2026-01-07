@@ -289,12 +289,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         bytes32 proposalId = assetRouter.proposeSettleBatch(
-            tokens.usdc,
-            address(vault),
-            batchId,
-            vault.totalAssets() + yieldAmount,
-            uint64(block.timestamp - 1),
-            uint64(block.timestamp - 1)
+            tokens.usdc, address(vault), batchId, vault.totalAssets() + yieldAmount, true, true
         );
 
         assetRouter.executeSettleBatch(proposalId);
@@ -317,12 +312,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vm.startPrank(users.relayer);
         vault.closeBatch(batchId, true);
         bytes32 proposalId = assetRouter.proposeSettleBatch(
-            tokens.usdc,
-            address(vault),
-            batchId,
-            vault.totalAssets() - lossAmount,
-            uint64(block.timestamp - 1),
-            uint64(block.timestamp - 1)
+            tokens.usdc, address(vault), batchId, vault.totalAssets() - lossAmount, true, true
         );
 
         assetRouter.executeSettleBatch(proposalId);
@@ -681,12 +671,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         bytes32 proposalId = assetRouter.proposeSettleBatch(
-            tokens.usdc,
-            address(vault),
-            batchId,
-            vault.totalAssets() + yieldAmount,
-            uint64(block.timestamp - 1),
-            uint64(block.timestamp - 1)
+            tokens.usdc, address(vault), batchId, vault.totalAssets() + yieldAmount, true, true
         );
 
         // The watermark update happens during settlement when notifyFeesCharged is called

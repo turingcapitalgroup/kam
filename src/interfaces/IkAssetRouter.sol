@@ -57,10 +57,10 @@ interface IkAssetRouter is IVersioned {
         int256 yield;
         /// @dev Timestamp after which this proposal can be executed (cooldown protection)
         uint64 executeAfter;
-        /// @dev Timestamp of last management fee charged
-        uint64 lastFeesChargedManagement;
-        /// @dev Timestamp of last performance fee charged
-        uint64 lastFeesChargedPerformance;
+        /// @dev Flag indicating whether management fees should be charged in this settlement
+        bool chargeManagementFees;
+        /// @dev Flag indicating whether performance fees should be charged in this settlement
+        bool chargePerformanceFees;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -181,8 +181,8 @@ interface IkAssetRouter is IVersioned {
     /// @param netted Net amount of new deposits/redemptions in this batch
     /// @param yield Absolute yield amount generated in this batch
     /// @param executeAfter Timestamp after which the proposal can be executed
-    /// @param lastFeesChargedManagement Last management fees charged
-    /// @param lastFeesChargedPerformance Last performance fees charged
+    /// @param chargeManagementFees Whether management fees should be charged
+    /// @param chargePerformanceFees Whether performance fees should be charged
     event SettlementProposed(
         bytes32 indexed proposalId,
         address indexed vault,
@@ -191,8 +191,8 @@ interface IkAssetRouter is IVersioned {
         int256 netted,
         int256 yield,
         uint256 executeAfter,
-        uint256 lastFeesChargedManagement,
-        uint256 lastFeesChargedPerformance
+        bool chargeManagementFees,
+        bool chargePerformanceFees
     );
 
     /// @notice Emitted when a settlement proposal is successfully executed
@@ -348,15 +348,15 @@ interface IkAssetRouter is IVersioned {
     /// @param vault The DN vault address where yield was generated
     /// @param batchId The batch identifier for this settlement period
     /// @param totalAssets Total asset value in the vault after yield generation/loss
-    /// @param lastFeesChargedManagement Last management fees charged
-    /// @param lastFeesChargedPerformance Last performance fees charged
+    /// @param chargeManagementFees Whether to charge management fees in this settlement
+    /// @param chargePerformanceFees Whether to charge performance fees in this settlement
     function proposeSettleBatch(
         address asset,
         address vault,
         bytes32 batchId,
         uint256 totalAssets,
-        uint64 lastFeesChargedManagement,
-        uint64 lastFeesChargedPerformance
+        bool chargeManagementFees,
+        bool chargePerformanceFees
     )
         external
         payable

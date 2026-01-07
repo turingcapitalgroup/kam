@@ -9,12 +9,13 @@ import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 import {
     KREGISTRY_ADAPTER_ALREADY_SET,
     KREGISTRY_ALREADY_REGISTERED,
+    KREGISTRY_ASSET_IN_USE,
     KREGISTRY_ASSET_NOT_SUPPORTED,
     KREGISTRY_EMPTY_STRING,
     KREGISTRY_FEE_EXCEEDS_MAXIMUM,
     KREGISTRY_INVALID_ADAPTER,
-    KREGISTRY_KTOKEN_ALREADY_SET,
     KREGISTRY_TRANSFER_FAILED,
+    KREGISTRY_VAULT_TYPE_ASSIGNED,
     KREGISTRY_WRONG_ASSET,
     KREGISTRY_ZERO_ADDRESS,
     KREGISTRY_ZERO_AMOUNT
@@ -100,9 +101,6 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         /// @dev Maps vaults to their registered external protocol adapters
         /// Enables yield strategies through DeFi protocol integrations
         mapping(address => mapping(address => address)) vaultAdaptersByAsset;
-        /// @dev Tracks whether an adapter address is registered in the protocol
-        /// Used for validation and security checks on adapter operations
-        mapping(address => bool) registeredAdapters;
         /// @dev Maps assets to their hurdle rates in basis points (100 = 1%)
         /// Defines minimum performance thresholds for yield distribution
         mapping(address => uint16) assetHurdleRate;
@@ -270,6 +268,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     function setHurdleRate(address _asset, uint16 _hurdleRate) external payable {
         _checkAdmin(msg.sender);
         // Ensure hurdle rate doesn't exceed 100% (10,000 basis points)
+        // Note: A hurdle rate of 0 is valid - it means performance fees apply to all positive yield
         require(_hurdleRate <= MAX_BPS, KREGISTRY_FEE_EXCEEDS_MAXIMUM);
 
         kRegistryStorage storage $ = _getkRegistryStorage();
@@ -308,14 +307,20 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRegistry
-    function setAssetBatchLimits(address _asset, uint256 _maxMintPerBatch, uint256 _maxBurnPerBatch) external payable {
+    function setAssetBatchLimits(address _target, uint256 _maxMintPerBatch, uint256 _maxBurnPerBatch) external payable {
         _checkAdmin(msg.sender);
-
+        // Note: Zero values are valid and will disable minting/burning for the target
+        // Large values (e.g., type(uint128).max) effectively remove the limit
+        // Target can be either a registered asset (for kMinter) or a registered vault (for kStakingVault)
         kRegistryStorage storage $ = _getkRegistryStorage();
-        $.maxMintPerBatch[_asset] = _maxMintPerBatch;
-        $.maxBurnPerBatch[_asset] = _maxBurnPerBatch;
+        bool _isAsset = $.supportedAssets.contains(_target);
+        bool _isVault = $.allVaults.contains(_target);
+        require(_isAsset || _isVault, KREGISTRY_ASSET_NOT_SUPPORTED);
 
-        emit AssetBatchLimitsUpdated(_asset, _maxMintPerBatch, _maxBurnPerBatch);
+        $.maxMintPerBatch[_target] = _maxMintPerBatch;
+        $.maxBurnPerBatch[_target] = _maxBurnPerBatch;
+
+        emit AssetBatchLimitsUpdated(_target, _maxMintPerBatch, _maxBurnPerBatch);
     }
 
     /// @inheritdoc IRegistry
@@ -357,11 +362,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         (bool _success, uint8 _decimals) = _tryGetAssetDecimals(_asset);
         require(_success, KREGISTRY_WRONG_ASSET);
 
-        // Ensure no kToken exists for this asset yet
-        address _kToken = $.assetToKToken[_asset];
-        require(_kToken == address(0), KREGISTRY_KTOKEN_ALREADY_SET);
-
-        _kToken = IkTokenFactory(_factory)
+        address _kToken = IkTokenFactory(_factory)
             .deployKToken(owner(), msg.sender, _emergencyAdmin, _minter, _name, _symbol, _decimals);
 
         $.maxMintPerBatch[_asset] = _maxMintPerBatch;
@@ -374,6 +375,25 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         emit KTokenDeployed(_kToken, _name, _symbol, _decimals);
 
         return _kToken;
+    }
+
+    /// @inheritdoc IRegistry
+    function removeAsset(address _asset) external payable {
+        _checkAdmin(msg.sender);
+        _checkAssetRegistered(_asset);
+
+        kRegistryStorage storage $ = _getkRegistryStorage();
+
+        // Cannot remove asset if vaults still reference it
+        require($.vaultsByAsset[_asset].length() == 0, KREGISTRY_ASSET_IN_USE);
+
+        $.supportedAssets.remove(_asset);
+        delete $.maxMintPerBatch[_asset];
+        delete $.maxBurnPerBatch[_asset];
+        delete $.assetToKToken[_asset];
+        delete $.assetHurdleRate[_asset];
+
+        emit AssetRemoved(_asset);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -396,6 +416,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         // Check if vault is already registered (before making state changes)
         // Allow kMinter to be registered multiple times for different assets
         require(_isKMinter || !_alreadyRegistered, KREGISTRY_ALREADY_REGISTERED);
+
+        // Prevent silent overwriting of vault-type assignments
+        // Use removeVault() first if replacing an existing vault
+        require($.assetToVault[_asset][_vaultType] == address(0), KREGISTRY_VAULT_TYPE_ASSIGNED);
 
         // Associate vault with the asset it manages
         $.vaultAssets[_vault].add(_asset);
@@ -435,6 +459,14 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         // Remove vault from all asset mappings
         for (uint256 i; i < _assets.length; i++) {
             address _asset = _assets[i];
+
+            // Clean up adapter mapping for this vault-asset pair
+            address _adapter = $.vaultAdaptersByAsset[_vault][_asset];
+            if (_adapter != address(0)) {
+                delete $.vaultAdaptersByAsset[_vault][_asset];
+                emit AdapterRemoved(_vault, _asset, _adapter);
+            }
+
             delete $.assetToVault[_asset][_vaultTypeValue];
             $.vaultsByAsset[_asset].remove(_vault);
             $.vaultAssets[_vault].remove(_asset);
@@ -454,12 +486,19 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     function registerAdapter(address _vault, address _asset, address _adapter) external payable {
         _checkAdmin(msg.sender);
         _checkAddressNotZero(_vault);
+        _checkAddressNotZero(_asset);
         require(_adapter != address(0), KREGISTRY_INVALID_ADAPTER);
 
         kRegistryStorage storage $ = _getkRegistryStorage();
 
+        // Ensure asset is registered in the protocol
+        _checkAssetRegistered(_asset);
+
         // Ensure vault exists in protocol before adding adapter
         if ($.singletonContracts[K_MINTER] != _vault) _checkVaultRegistered(_vault);
+
+        // Ensure vault supports this asset
+        require($.vaultAssets[_vault].contains(_asset), KREGISTRY_ASSET_NOT_SUPPORTED);
 
         require($.vaultAdaptersByAsset[_vault][_asset] == address(0), KREGISTRY_ADAPTER_ALREADY_SET);
 

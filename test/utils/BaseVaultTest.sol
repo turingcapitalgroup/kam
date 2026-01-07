@@ -57,8 +57,8 @@ contract BaseVaultTest is DeploymentBaseTest {
             // casting to 'uint256' is safe because we're doing arithmetic on int256 values
             // forge-lint: disable-next-line(unsafe-typecast)
             profit > 0 ? lastTotalAssets + uint256(profit) : lastTotalAssets - uint256(profit),
-            0,
-            0
+            false,
+            false
         );
 
         vm.prank(users.relayer);
@@ -116,7 +116,8 @@ contract BaseVaultTest is DeploymentBaseTest {
 
     function _executeBatchSettlement(address vaultAddress, bytes32 batchId, uint256 totalAssets) internal {
         vm.prank(users.relayer);
-        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, vaultAddress, batchId, totalAssets, 0, 0);
+        bytes32 proposalId =
+            assetRouter.proposeSettleBatch(tokens.usdc, vaultAddress, batchId, totalAssets, false, false);
 
         // Wait for cooldown period(0 for testing)
         assetRouter.executeSettleBatch(proposalId);

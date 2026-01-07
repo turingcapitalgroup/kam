@@ -17,7 +17,6 @@ import {
     KMINTER_BATCH_CLOSED,
     KMINTER_BATCH_MINT_REACHED,
     KMINTER_BATCH_NOT_SETTLED,
-    KMINTER_BATCH_NOT_VALID,
     KMINTER_BATCH_REDEEM_REACHED,
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
@@ -705,7 +704,7 @@ contract kMinterTest is DeploymentBaseTest {
         assetRouter.setSettlementCooldown(0);
 
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, 0, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, 0, false, false);
         assetRouter.executeSettleBatch(_proposalId);
     }
 
@@ -726,7 +725,7 @@ contract kMinterTest is DeploymentBaseTest {
 
         uint256 _totalAssets = IkToken(_kToken).totalSupply();
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, _totalAssets, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, _totalAssets, false, false);
         assetRouter.executeSettleBatch(_proposalId);
     }
 }

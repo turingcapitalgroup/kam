@@ -430,8 +430,8 @@ contract kStakingVaultHandler is BaseHandler {
             netted,
             yieldAmount,
             block.timestamp + kStakingVault_assetRouter.getSettlementCooldown(),
-            uint64(lastFeesChargedPerformance_),
-            uint64(lastFeesChargedManagement_)
+            lastFeesChargedManagement_ != 0,
+            lastFeesChargedPerformance_ != 0
         );
 
         bytes32 proposalId = kStakingVault_assetRouter.proposeSettleBatch(
@@ -439,8 +439,8 @@ contract kStakingVaultHandler is BaseHandler {
             address(kStakingVault_vault),
             batchId,
             newTotalAssets,
-            uint64(lastFeesChargedPerformance_),
-            uint64(lastFeesChargedManagement_)
+            lastFeesChargedManagement_ != 0,
+            lastFeesChargedPerformance_ != 0
         );
         vm.stopPrank();
         kStakingVault_pendingSettlementProposals.add(proposalId);

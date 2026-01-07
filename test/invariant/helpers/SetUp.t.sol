@@ -158,7 +158,8 @@ abstract contract SetUp is StdInvariant, DeploymentBaseTest {
 
         minter.closeBatch(batchId, true);
 
-        bytes32 proposalId = assetRouter.proposeSettleBatch(token, address(minter), batchId, lastTotalAssets, 0, 0);
+        bytes32 proposalId =
+            assetRouter.proposeSettleBatch(token, address(minter), batchId, lastTotalAssets, false, false);
         assetRouter.executeSettleBatch(proposalId);
         vm.stopPrank();
         if (useMinter) {

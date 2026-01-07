@@ -7,9 +7,11 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import {
     KREGISTRY_ADAPTER_ALREADY_SET,
     KREGISTRY_ALREADY_REGISTERED,
+    KREGISTRY_ASSET_IN_USE,
     KREGISTRY_ASSET_NOT_SUPPORTED,
     KREGISTRY_EMPTY_STRING,
     KREGISTRY_INVALID_ADAPTER,
+    KREGISTRY_VAULT_TYPE_ASSIGNED,
     KREGISTRY_WRONG_ASSET,
     KREGISTRY_ZERO_ADDRESS,
     KROLESBASE_WRONG_ROLE,
@@ -156,6 +158,118 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         vm.stopPrank();
     }
 
+    function test_RemoveAsset_Success() public {
+        _registerAsset();
+
+        // Verify asset is registered
+        assertTrue(registry.isAsset(TEST_ASSET));
+        assertNotEq(registry.assetToKToken(TEST_ASSET), address(0));
+
+        vm.prank(users.admin);
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.AssetRemoved(TEST_ASSET);
+        registry.removeAsset(TEST_ASSET);
+
+        // Verify asset is removed
+        assertFalse(registry.isAsset(TEST_ASSET));
+
+        // assetToKToken should revert for removed asset
+        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
+        registry.assetToKToken(TEST_ASSET);
+
+        // getMaxMintPerBatch should return 0 (storage deleted)
+        assertEq(registry.getMaxMintPerBatch(TEST_ASSET), 0);
+        assertEq(registry.getMaxBurnPerBatch(TEST_ASSET), 0);
+    }
+
+    function test_RemoveAsset_Require_Only_Admin() public {
+        _registerAsset();
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.removeAsset(TEST_ASSET);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.removeAsset(TEST_ASSET);
+
+        vm.prank(users.emergencyAdmin);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.removeAsset(TEST_ASSET);
+    }
+
+    function test_RemoveAsset_Require_Asset_Registered() public {
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
+        registry.removeAsset(TEST_ASSET);
+    }
+
+    function test_RemoveAsset_Require_No_Vaults_Using_Asset() public {
+        _registerAsset();
+        _registerVault();
+
+        // Try to remove asset while vault still uses it
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_ASSET_IN_USE));
+        registry.removeAsset(TEST_ASSET);
+    }
+
+    function test_RemoveAsset_Success_After_Vault_Removed() public {
+        _registerAsset();
+        _registerVault();
+
+        // Remove vault first
+        vm.prank(users.admin);
+        registry.removeVault(TEST_VAULT);
+
+        // Now asset can be removed
+        vm.prank(users.admin);
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.AssetRemoved(TEST_ASSET);
+        registry.removeAsset(TEST_ASSET);
+
+        assertFalse(registry.isAsset(TEST_ASSET));
+    }
+
+    function test_RemoveAsset_Clears_HurdleRate() public {
+        _registerAsset();
+
+        // Set hurdle rate
+        vm.prank(users.admin);
+        registry.setHurdleRate(TEST_ASSET, 500); // 5%
+
+        assertEq(registry.getHurdleRate(TEST_ASSET), 500);
+
+        // Remove asset
+        vm.prank(users.admin);
+        registry.removeAsset(TEST_ASSET);
+
+        // getHurdleRate should revert since asset is no longer registered
+        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
+        registry.getHurdleRate(TEST_ASSET);
+    }
+
+    function test_RemoveAsset_Allows_ReRegistration() public {
+        _registerAsset();
+
+        address _originalKToken = registry.assetToKToken(TEST_ASSET);
+
+        // Remove asset
+        vm.prank(users.admin);
+        registry.removeAsset(TEST_ASSET);
+
+        // Re-register same asset
+        vm.prank(users.admin);
+        address _newKToken = registry.registerAsset(
+            "New Token", "NTK", TEST_ASSET, type(uint256).max, type(uint256).max, users.emergencyAdmin
+        );
+
+        assertTrue(registry.isAsset(TEST_ASSET));
+        // New kToken should be deployed (different from original)
+        assertNotEq(_newKToken, _originalKToken);
+        assertEq(registry.assetToKToken(TEST_ASSET), _newKToken);
+    }
+
     /* //////////////////////////////////////////////////////////////
                         VAULT MANAGEMENT
     //////////////////////////////////////////////////////////////*/
@@ -252,6 +366,58 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         registry.getVaultAssets(_minter);
     }
 
+    function test_RemoveVault_CleansUpAdapterMappings() public {
+        _registerAsset();
+        _registerVault();
+
+        // Register an adapter for the vault-asset pair
+        vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+
+        // Verify adapter is registered
+        assertTrue(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER));
+        assertEq(registry.getAdapter(TEST_VAULT, TEST_ASSET), TEST_ADAPTER);
+
+        // Remove the vault - should also clean up adapter
+        vm.prank(users.admin);
+        vm.expectEmit(true, true, true, true);
+        emit IRegistry.AdapterRemoved(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.VaultRemoved(TEST_VAULT);
+        registry.removeVault(TEST_VAULT);
+
+        // Verify adapter is cleaned up
+        assertFalse(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER));
+
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.getAdapter(TEST_VAULT, TEST_ASSET);
+    }
+
+    function test_RemoveVault_AllowsReRegistrationWithAdapter() public {
+        _registerAsset();
+        _registerVault();
+
+        // Register an adapter
+        vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+
+        // Remove the vault
+        vm.prank(users.admin);
+        registry.removeVault(TEST_VAULT);
+
+        // Re-register the vault
+        vm.prank(users.admin);
+        registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
+
+        // Should be able to register adapter again (previously would fail with KREGISTRY_ADAPTER_ALREADY_SET)
+        address newAdapter = makeAddr("NEW_ADAPTER");
+        vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, newAdapter);
+
+        assertTrue(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, newAdapter));
+        assertEq(registry.getAdapter(TEST_VAULT, TEST_ASSET), newAdapter);
+    }
+
     function test_RemoveVault_Require_Only_Admin() public {
         address _dnVault = address(dnVault);
 
@@ -268,6 +434,53 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
         registry.registerVault(TEST_VAULT, IRegistry.VaultType.BETA, TEST_ASSET);
+    }
+
+    function test_RegisterVault_Require_VaultType_Not_Assigned() public {
+        _registerAsset();
+        _registerVault(); // Registers TEST_VAULT as ALPHA for TEST_ASSET
+
+        // Try to register a different vault with the same type for the same asset
+        address anotherVault = makeAddr("ANOTHER_VAULT");
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_VAULT_TYPE_ASSIGNED));
+        registry.registerVault(anotherVault, IRegistry.VaultType.ALPHA, TEST_ASSET);
+
+        // Verify original vault is still the primary
+        assertEq(registry.getVaultByAssetAndType(TEST_ASSET, uint8(IRegistry.VaultType.ALPHA)), TEST_VAULT);
+    }
+
+    function test_RegisterVault_Allows_Different_VaultType_Same_Asset() public {
+        _registerAsset();
+        _registerVault(); // Registers TEST_VAULT as ALPHA
+
+        // Should be able to register another vault with a different type
+        address betaVault = makeAddr("BETA_VAULT");
+
+        vm.prank(users.admin);
+        registry.registerVault(betaVault, IRegistry.VaultType.BETA, TEST_ASSET);
+
+        // Both vaults should be accessible
+        assertEq(registry.getVaultByAssetAndType(TEST_ASSET, uint8(IRegistry.VaultType.ALPHA)), TEST_VAULT);
+        assertEq(registry.getVaultByAssetAndType(TEST_ASSET, uint8(IRegistry.VaultType.BETA)), betaVault);
+    }
+
+    function test_RegisterVault_Allows_After_RemoveVault() public {
+        _registerAsset();
+        _registerVault(); // Registers TEST_VAULT as ALPHA
+
+        // Remove the vault
+        vm.prank(users.admin);
+        registry.removeVault(TEST_VAULT);
+
+        // Now should be able to register a new vault with the same type
+        address newVault = makeAddr("NEW_VAULT");
+
+        vm.prank(users.admin);
+        registry.registerVault(newVault, IRegistry.VaultType.ALPHA, TEST_ASSET);
+
+        assertEq(registry.getVaultByAssetAndType(TEST_ASSET, uint8(IRegistry.VaultType.ALPHA)), newVault);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -303,15 +516,59 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
     }
 
     function test_RegisterAdapter_Require_Address_Not_Zero() public {
-        vm.prank(users.admin);
+        _registerAsset();
+        _registerVault();
+
+        vm.startPrank(users.admin);
+
+        // Test zero vault address
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.registerAdapter(address(0), TEST_ASSET, TEST_ADAPTER);
+
+        // Test zero asset address
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.registerAdapter(TEST_VAULT, address(0), TEST_ADAPTER);
+
+        // Test zero adapter address
         vm.expectRevert(bytes(KREGISTRY_INVALID_ADAPTER));
         registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(0));
+
+        vm.stopPrank();
     }
 
-    function test_RegisterAdapter_Require_Registered_Vault() public {
+    function test_RegisterAdapter_Require_Registered_Asset() public {
+        // Asset not registered - should fail
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
         registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+    }
+
+    function test_RegisterAdapter_Require_Registered_Vault() public {
+        _registerAsset();
+        // Vault not registered - should fail
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+    }
+
+    function test_RegisterAdapter_Require_Vault_Supports_Asset() public {
+        _registerAsset();
+        _registerVault();
+
+        // Register a second asset
+        MockERC20 secondToken = new MockERC20("Second Token", "STK", 6);
+        address secondAsset = address(secondToken);
+
+        vm.startPrank(users.admin);
+        registry.registerAsset(
+            "Second kToken", "sKTK", secondAsset, type(uint256).max, type(uint256).max, users.emergencyAdmin
+        );
+
+        // Try to register adapter for TEST_VAULT with secondAsset (vault doesn't support this asset)
+        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
+        registry.registerAdapter(TEST_VAULT, secondAsset, TEST_ADAPTER);
+
+        vm.stopPrank();
     }
 
     function test_RegisterAdapter_Require_Adapter_Not_Set() public {

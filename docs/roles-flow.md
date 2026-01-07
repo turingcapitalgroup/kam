@@ -271,8 +271,7 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  kAssetRouter-Only Functions (Contract-based Access):           │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │• settleBatch() - Mark batch as settled after processing     ││
-│  │• createBatchReceiver() - Deploy BatchReceiver for batch     ││
-│  │  (only kAssetRouter can call these functions)               ││
+│  │  (only kAssetRouter can call this function)                 ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘

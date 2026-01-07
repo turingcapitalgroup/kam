@@ -122,6 +122,8 @@ string constant KREGISTRY_SELECTOR_ALREADY_SET = "R11";
 string constant KREGISTRY_SELECTOR_NOT_FOUND = "R12";
 string constant KREGISTRY_KTOKEN_ALREADY_SET = "R13";
 string constant KREGISTRY_EMPTY_STRING = "R14";
+string constant KREGISTRY_ASSET_IN_USE = "R15";
+string constant KREGISTRY_VAULT_TYPE_ASSIGNED = "R16";
 
 string constant GUARDIANMODULE_UNAUTHORIZED = "GM1";
 string constant GUARDIANMODULE_NOT_ALLOWED = "GM2";
@@ -151,6 +153,7 @@ string constant KSTAKINGVAULT_ZERO_AMOUNT = "SV9";
 string constant KSTAKINGVAULT_BATCH_LIMIT_REACHED = "SV10";
 string constant KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED = "SV11";
 string constant KSTAKINGVAULT_BATCH_NOT_VALID = "SV12";
+string constant KSTAKINGVAULT_DEPOSIT_TOO_SMALL = "SV13";
 
 // kToken Errors
 string constant KTOKEN_IS_PAUSED = "T1";

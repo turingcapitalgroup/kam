@@ -414,8 +414,8 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         uint256 shares = vault.convertToSharesWithTotals(assets, totalAssets, totalSupply);
 
-        // With 1:1 ratio, should return same amount
-        assertEq(shares, assets);
+        // With 1:1 ratio, should return approximately same amount (tiny rounding from offset)
+        assertApproxEqAbs(shares, assets, 100); // Small tolerance for offset rounding
     }
 
     function test_convertToAssetsWithTotals_PureFunction() public view {
@@ -425,8 +425,8 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         uint256 assets = vault.convertToAssetsWithTotals(shares, totalAssets, totalSupply);
 
-        // With 1:1 ratio, should return same amount
-        assertEq(assets, shares);
+        // With 1:1 ratio, should return approximately same amount (tiny rounding from offset)
+        assertApproxEqAbs(assets, shares, 100); // Small tolerance for offset rounding
     }
 
     function test_convertToSharesWithTotals_HandlesZeroTotalSupply() public view {
@@ -436,7 +436,8 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         uint256 shares = vault.convertToSharesWithTotals(assets, totalAssets, totalSupply);
 
-        // When total supply is 0, should return the assets amount
+        // With (1e6, 1e6) pattern, first depositor gets 1:1 shares
+        // shares = assets * (0 + 1e6) / (0 + 1e6) = assets
         assertEq(shares, assets);
     }
 

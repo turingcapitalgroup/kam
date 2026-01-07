@@ -182,12 +182,12 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         _checkAmountNotZero(_amount);
         address _kMinter = msg.sender;
         _checkKMinter(_kMinter);
-        _checkSufficientVirtualBalance(_kMinter, _asset, _amount);
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
 
-        // Account the withdrawal requset in the batch for kMinter
-        $.vaultBatchBalances[_kMinter][_batchId].requested += _amount.toUint128();
+        // Increment first, then validate cumulative total doesn't exceed virtual balance
+        uint256 _totalRequested = $.vaultBatchBalances[_kMinter][_batchId].requested += _amount.toUint128();
+        _checkSufficientVirtualBalance(_kMinter, _asset, _totalRequested);
 
         emit AssetsRequestPulled(_kMinter, _asset, _amount);
         _unlockReentrant();
@@ -282,8 +282,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _vault,
         bytes32 _batchId,
         uint256 _totalAssets,
-        uint64 _lastFeesChargedManagement,
-        uint64 _lastFeesChargedPerformance
+        bool _chargeManagementFees,
+        bool _chargePerformanceFees
     )
         external
         payable
@@ -366,8 +366,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             netted: _netted,
             yield: _yield,
             executeAfter: _executeAfter.toUint64(),
-            lastFeesChargedManagement: _lastFeesChargedManagement,
-            lastFeesChargedPerformance: _lastFeesChargedPerformance
+            chargeManagementFees: _chargeManagementFees,
+            chargePerformanceFees: _chargePerformanceFees
         });
 
         emit SettlementProposed(
@@ -378,8 +378,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _netted,
             _yield,
             _executeAfter,
-            _lastFeesChargedManagement,
-            _lastFeesChargedPerformance
+            _chargeManagementFees,
+            _chargePerformanceFees
         );
         _unlockReentrant();
     }
@@ -502,13 +502,13 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
             emit TotalAssetsSet(address(_adapter), _totalAssets);
 
-            // If global fees were charged in the batch, notify the vault to udpate share price
-            if (_proposal.lastFeesChargedManagement != 0) {
-                IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
+            // If fees should be charged in this settlement, notify the vault to update share price
+            if (_proposal.chargeManagementFees) {
+                IkStakingVault(_vault).notifyManagementFeesCharged(uint64(block.timestamp));
             }
 
-            if (_proposal.lastFeesChargedPerformance != 0) {
-                IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
+            if (_proposal.chargePerformanceFees) {
+                IkStakingVault(_vault).notifyPerformanceFeesCharged(uint64(block.timestamp));
             }
 
             // Mark batch as settled in the vault

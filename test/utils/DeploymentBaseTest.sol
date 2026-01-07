@@ -42,12 +42,10 @@ import { DeployVaultsScript } from "kam/script/deployment/07_DeployVaults.s.sol"
 import { DeployAdaptersScript } from "kam/script/deployment/08_DeployAdapters.s.sol";
 import { DeployInsuranceAccountScript } from "kam/script/deployment/12_DeployInsuranceAccount.s.sol";
 
-// Deployment manager for reading addresses
-import { DeploymentManager } from "kam/script/utils/DeploymentManager.sol";
 import { MockERC7540 } from "kam/test/mocks/MockERC7540.sol";
 import { MockWallet } from "kam/test/mocks/MockWallet.sol";
 
-contract DeploymentBaseTest is BaseTest, DeploymentManager {
+contract DeploymentBaseTest is BaseTest {
     // Core protocol contracts (proxied)
     ERC1967Factory public factory;
     kRegistry public registry;
@@ -109,171 +107,179 @@ contract DeploymentBaseTest is BaseTest, DeploymentManager {
                         SETUP & DEPLOYMENT
     //////////////////////////////////////////////////////////////*/
 
+    // Temporary storage structs to pass data between helper functions (avoids stack too deep)
+    DeployMockAssetsScript.MockAssets internal _mocks;
+    DeployRegistryScript.RegistryDeployment internal _registryDeploy;
+    DeployMinterScript.MinterDeployment internal _minterDeploy;
+    DeployAssetRouterScript.AssetRouterDeployment internal _assetRouterDeploy;
+    DeployTokensScript.TokenDeployment internal _tokenDeploy;
+    DeployVaultModulesScript.VaultModulesDeployment internal _modulesDeploy;
+    DeployVaultsScript.VaultsDeployment internal _vaultsDeploy;
+    DeployAdaptersScript.AdaptersDeployment internal _adaptersDeploy;
+
     function setUp() public virtual override {
         utils = new Utilities();
         _createUsers();
 
-        // Disable verbose logging for tests
+        _deployMockAssets();
+        _deployCoreContracts();
+        _deployVaultsAndAdapters();
+        _configureProtocol();
+        _assignContractReferences();
+
+        _labelContracts();
+        _setupRoles();
+        _fundUsers();
+    }
+
+    function _deployMockAssets() internal {
         DeployMockAssetsScript mockAssetsScript = new DeployMockAssetsScript();
         mockAssetsScript.setVerbose(false);
-        DeployMockAssetsScript.MockAssets memory mocks = mockAssetsScript.run(false);
-
-        _setupAssets(mocks.USDC, mocks.WBTC);
-
+        _mocks = mockAssetsScript.run(false);
+        _setupAssets(_mocks.USDC, _mocks.WBTC);
         _labelAddresses();
+    }
 
-        // Now deploy protocol contracts (all with verbose=false)
+    function _deployCoreContracts() internal {
         DeployRegistryScript registryScript = new DeployRegistryScript();
         registryScript.setVerbose(false);
-        DeployRegistryScript.RegistryDeployment memory registryDeploy = registryScript.run(false);
+        _registryDeploy = registryScript.run(false);
 
-        // Deploy minter and asset router, passing factory and registry addresses
         DeployMinterScript minterScript = new DeployMinterScript();
         minterScript.setVerbose(false);
-        DeployMinterScript.MinterDeployment memory minterDeploy =
-            minterScript.run(false, registryDeploy.factory, registryDeploy.registry);
+        _minterDeploy = minterScript.run(false, _registryDeploy.factory, _registryDeploy.registry);
 
         DeployAssetRouterScript assetRouterScript = new DeployAssetRouterScript();
         assetRouterScript.setVerbose(false);
-        DeployAssetRouterScript.AssetRouterDeployment memory assetRouterDeploy =
-            assetRouterScript.run(false, registryDeploy.factory, registryDeploy.registry);
+        _assetRouterDeploy = assetRouterScript.run(false, _registryDeploy.factory, _registryDeploy.registry);
 
-        // Register singletons (no JSON read/write in tests)
         RegisterSingletonsScript singletonsScript = new RegisterSingletonsScript();
         singletonsScript.setVerbose(false);
         singletonsScript.run(
-            registryDeploy.registry, assetRouterDeploy.assetRouter, minterDeploy.minter, registryDeploy.kTokenFactory
+            _registryDeploy.registry,
+            _assetRouterDeploy.assetRouter,
+            _minterDeploy.minter,
+            _registryDeploy.kTokenFactory
         );
 
-        // Deploy kTokens
         DeployTokensScript tokensScript = new DeployTokensScript();
         tokensScript.setVerbose(false);
-        DeployTokensScript.TokenDeployment memory tokenDeploy =
-            tokensScript.run(false, registryDeploy.registry, mocks.USDC, mocks.WBTC);
+        _tokenDeploy = tokensScript.run(false, _registryDeploy.registry, _mocks.USDC, _mocks.WBTC);
+    }
 
-        // Deploy vault modules
+    function _deployVaultsAndAdapters() internal {
         DeployVaultModulesScript modulesScript = new DeployVaultModulesScript();
         modulesScript.setVerbose(false);
-        DeployVaultModulesScript.VaultModulesDeployment memory modulesDeploy = modulesScript.run(false);
+        _modulesDeploy = modulesScript.run(false);
 
-        // Deploy vaults
         DeployVaultsScript vaultsScript = new DeployVaultsScript();
         vaultsScript.setVerbose(false);
-        DeployVaultsScript.VaultsDeployment memory vaultsDeploy = vaultsScript.run(
+        _vaultsDeploy = vaultsScript.run(
             false,
-            registryDeploy.factory,
-            registryDeploy.registry,
-            modulesDeploy.readerModule,
-            tokenDeploy.kUSD,
-            tokenDeploy.kBTC,
-            mocks.USDC,
-            mocks.WBTC
+            _registryDeploy.factory,
+            _registryDeploy.registry,
+            _modulesDeploy.readerModule,
+            _tokenDeploy.kUSD,
+            _tokenDeploy.kBTC,
+            _mocks.USDC,
+            _mocks.WBTC
         );
 
-        // Deploy adapters
         DeployAdaptersScript adaptersScript = new DeployAdaptersScript();
         adaptersScript.setVerbose(false);
-        DeployAdaptersScript.AdaptersDeployment memory adaptersDeploy =
-            adaptersScript.run(false, registryDeploy.factory, registryDeploy.registry);
+        _adaptersDeploy = adaptersScript.run(false, _registryDeploy.factory, _registryDeploy.registry);
+    }
 
-        // Configure protocol
+    function _configureProtocol() internal {
         ConfigureProtocolScript configProtocolScript = new ConfigureProtocolScript();
         configProtocolScript.setVerbose(false);
         configProtocolScript.run(
-            registryDeploy.registry,
-            minterDeploy.minter,
-            assetRouterDeploy.assetRouter,
-            tokenDeploy.kUSD,
-            tokenDeploy.kBTC,
-            vaultsDeploy.dnVaultUSDC,
-            vaultsDeploy.dnVaultWBTC,
-            vaultsDeploy.alphaVault,
-            vaultsDeploy.betaVault,
-            adaptersDeploy.dnVaultAdapterUSDC,
-            adaptersDeploy.dnVaultAdapterWBTC,
-            adaptersDeploy.alphaVaultAdapter,
-            adaptersDeploy.betaVaultAdapter,
-            adaptersDeploy.kMinterAdapterUSDC,
-            adaptersDeploy.kMinterAdapterWBTC,
-            mocks.USDC,
-            mocks.WBTC
+            _registryDeploy.registry,
+            _minterDeploy.minter,
+            _assetRouterDeploy.assetRouter,
+            _tokenDeploy.kUSD,
+            _tokenDeploy.kBTC,
+            _vaultsDeploy.dnVaultUSDC,
+            _vaultsDeploy.dnVaultWBTC,
+            _vaultsDeploy.alphaVault,
+            _vaultsDeploy.betaVault,
+            _adaptersDeploy.dnVaultAdapterUSDC,
+            _adaptersDeploy.dnVaultAdapterWBTC,
+            _adaptersDeploy.alphaVaultAdapter,
+            _adaptersDeploy.betaVaultAdapter,
+            _adaptersDeploy.kMinterAdapterUSDC,
+            _adaptersDeploy.kMinterAdapterWBTC,
+            _mocks.USDC,
+            _mocks.WBTC
         );
 
         ConfigureExecutorPermissionsScript executorPermissionsScript = new ConfigureExecutorPermissionsScript();
         executorPermissionsScript.setVerbose(false);
         executorPermissionsScript.run(
             false,
-            registryDeploy.registry,
-            adaptersDeploy.kMinterAdapterUSDC,
-            adaptersDeploy.kMinterAdapterWBTC,
-            adaptersDeploy.dnVaultAdapterUSDC,
-            adaptersDeploy.dnVaultAdapterWBTC,
-            adaptersDeploy.alphaVaultAdapter,
-            adaptersDeploy.betaVaultAdapter,
-            mocks.ERC7540USDC,
-            mocks.ERC7540WBTC,
-            mocks.WalletUSDC,
-            mocks.USDC,
-            mocks.WBTC
+            _registryDeploy.registry,
+            _adaptersDeploy.kMinterAdapterUSDC,
+            _adaptersDeploy.kMinterAdapterWBTC,
+            _adaptersDeploy.dnVaultAdapterUSDC,
+            _adaptersDeploy.dnVaultAdapterWBTC,
+            _adaptersDeploy.alphaVaultAdapter,
+            _adaptersDeploy.betaVaultAdapter,
+            _mocks.ERC7540USDC,
+            _mocks.ERC7540WBTC,
+            _mocks.WalletUSDC,
+            _mocks.USDC,
+            _mocks.WBTC
         );
 
         RegisterModulesScript registerModulesScript = new RegisterModulesScript();
         registerModulesScript.setVerbose(false);
         registerModulesScript.run(
-            modulesDeploy.readerModule,
-            vaultsDeploy.dnVaultUSDC,
-            vaultsDeploy.dnVaultWBTC,
-            vaultsDeploy.alphaVault,
-            vaultsDeploy.betaVault
+            _modulesDeploy.readerModule,
+            _vaultsDeploy.dnVaultUSDC,
+            _vaultsDeploy.dnVaultWBTC,
+            _vaultsDeploy.alphaVault,
+            _vaultsDeploy.betaVault
         );
 
-        // Deploy insurance smart account
         DeployInsuranceAccountScript insuranceScript = new DeployInsuranceAccountScript();
         insuranceScript.setVerbose(false);
         DeployInsuranceAccountScript.InsuranceDeployment memory insuranceDeploy =
-            insuranceScript.run(false, registryDeploy.registry, address(0), address(0));
-
-        factory = ERC1967Factory(registryDeploy.factory);
-        registryImpl = kRegistry(payable(registryDeploy.registryImpl));
-        registry = kRegistry(payable(registryDeploy.registry));
-
-        minterImpl = kMinter(payable(minterDeploy.minterImpl));
-        minter = kMinter(payable(minterDeploy.minter));
-
-        assetRouterImpl = kAssetRouter(payable(assetRouterDeploy.assetRouterImpl));
-        assetRouter = kAssetRouter(payable(assetRouterDeploy.assetRouter));
-
-        kUSD = kToken(payable(tokenDeploy.kUSD));
-        kBTC = kToken(payable(tokenDeploy.kBTC));
-
-        readerModule = ReaderModule(modulesDeploy.readerModule);
-
-        stakingVaultImpl = kStakingVault(payable(vaultsDeploy.stakingVaultImpl));
-        dnVault = IkStakingVault(payable(vaultsDeploy.dnVaultUSDC));
-        alphaVault = IkStakingVault(payable(vaultsDeploy.alphaVault));
-        betaVault = IkStakingVault(payable(vaultsDeploy.betaVault));
-
-        vaultAdapterImpl = VaultAdapter(payable(adaptersDeploy.vaultAdapterImpl));
-        minterAdapterUSDC = VaultAdapter(payable(adaptersDeploy.kMinterAdapterUSDC));
-        minterAdapterWBTC = VaultAdapter(payable(adaptersDeploy.kMinterAdapterWBTC));
-        DNVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.dnVaultAdapterUSDC));
-        ALPHAVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.alphaVaultAdapter));
-        BETHAVaultAdapterUSDC = VaultAdapter(payable(adaptersDeploy.betaVaultAdapter));
-
+            insuranceScript.run(false, _registryDeploy.registry, address(0), address(0));
         insuranceSmartAccount = insuranceDeploy.insuranceSmartAccount;
+    }
 
-        erc7540USDC = MockERC7540(mocks.ERC7540USDC);
-        erc7540WBTC = MockERC7540(mocks.ERC7540WBTC);
+    function _assignContractReferences() internal {
+        factory = ERC1967Factory(_registryDeploy.factory);
+        registryImpl = kRegistry(payable(_registryDeploy.registryImpl));
+        registry = kRegistry(payable(_registryDeploy.registry));
 
-        wallet = MockWallet(payable(mocks.WalletUSDC));
+        minterImpl = kMinter(payable(_minterDeploy.minterImpl));
+        minter = kMinter(payable(_minterDeploy.minter));
 
-        _labelContracts();
+        assetRouterImpl = kAssetRouter(payable(_assetRouterDeploy.assetRouterImpl));
+        assetRouter = kAssetRouter(payable(_assetRouterDeploy.assetRouter));
 
-        // Set up roles and permissions (if not already done by scripts)
-        _setupRoles();
+        kUSD = kToken(payable(_tokenDeploy.kUSD));
+        kBTC = kToken(payable(_tokenDeploy.kBTC));
 
-        // Fund test users with assets
-        _fundUsers();
+        readerModule = ReaderModule(_modulesDeploy.readerModule);
+
+        stakingVaultImpl = kStakingVault(payable(_vaultsDeploy.stakingVaultImpl));
+        dnVault = IkStakingVault(payable(_vaultsDeploy.dnVaultUSDC));
+        alphaVault = IkStakingVault(payable(_vaultsDeploy.alphaVault));
+        betaVault = IkStakingVault(payable(_vaultsDeploy.betaVault));
+
+        vaultAdapterImpl = VaultAdapter(payable(_adaptersDeploy.vaultAdapterImpl));
+        minterAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.kMinterAdapterUSDC));
+        minterAdapterWBTC = VaultAdapter(payable(_adaptersDeploy.kMinterAdapterWBTC));
+        DNVaultAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.dnVaultAdapterUSDC));
+        ALPHAVaultAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.alphaVaultAdapter));
+        BETHAVaultAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.betaVaultAdapter));
+
+        erc7540USDC = MockERC7540(_mocks.ERC7540USDC);
+        erc7540WBTC = MockERC7540(_mocks.ERC7540WBTC);
+
+        wallet = MockWallet(payable(_mocks.WalletUSDC));
     }
 
     /**
