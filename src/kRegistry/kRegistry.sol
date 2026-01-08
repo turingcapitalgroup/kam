@@ -307,7 +307,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IRegistry
-    function setAssetBatchLimits(address _target, uint256 _maxMintPerBatch, uint256 _maxBurnPerBatch) external payable {
+    function setBatchLimits(address _target, uint256 _maxMintPerBatch, uint256 _maxBurnPerBatch) external payable {
         _checkAdmin(msg.sender);
         // Note: Zero values are valid and will disable minting/burning for the target
         // Large values (e.g., type(uint128).max) effectively remove the limit
@@ -320,7 +320,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         $.maxMintPerBatch[_target] = _maxMintPerBatch;
         $.maxBurnPerBatch[_target] = _maxBurnPerBatch;
 
-        emit AssetBatchLimitsUpdated(_target, _maxMintPerBatch, _maxBurnPerBatch);
+        emit BatchLimitsUpdated(_target, _maxMintPerBatch, _maxBurnPerBatch);
     }
 
     /// @inheritdoc IRegistry

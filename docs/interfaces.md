@@ -90,14 +90,14 @@ Central registry managing protocol contracts, supported assets, vault registrati
 
 **Asset Management**
 
-- `registerAsset(string name, string symbol, address asset, uint256 maxMintPerBatch, uint256 maxRedeemPerBatch, address emergencyAdmin)` - Deploys new kToken and establishes asset support with batch limits
+- `registerAsset(string name, string symbol, address asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch, address emergencyAdmin)` - Deploys new kToken and establishes asset support with batch limits
 - `removeAsset(address asset)` - Removes asset from protocol (requires no vaults using the asset, ADMIN_ROLE required)
 - `assetToKToken(address asset)` - Maps underlying assets to their kToken representations
 - `getAllAssets()` - Returns all protocol-supported assets
 - `isAsset(address asset)` - Checks if asset is supported by the protocol
-- `setAssetBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_)` - Sets maximum amounts per batch for asset or vault
-- `getMaxMintPerBatch(address asset)` - Returns maximum mint amount per batch for an asset
-- `getMaxBurnPerBatch(address asset)` - Returns maximum burn amount per batch for an asset
+- `setBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_)` - Sets maximum amounts per batch for asset or vault
+- `getMaxMintPerBatch(address target)` - Returns maximum mint/deposit amount per batch for an asset or vault
+- `getMaxBurnPerBatch(address target)` - Returns maximum burn/withdraw amount per batch for an asset or vault
 - `setHurdleRate(address asset, uint16 hurdleRate)` - Sets performance threshold for an asset (0 = no minimum threshold)
 - `getHurdleRate(address asset)` - Returns hurdle rate for an asset in basis points
 

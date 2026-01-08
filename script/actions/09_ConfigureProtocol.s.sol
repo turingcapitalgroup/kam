@@ -146,16 +146,16 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         _log("   - Registered Beta Vault as BETA vault for USDC");
 
         // Set asset batch limits
-        registry.setAssetBatchLimits(
+        registry.setBatchLimits(
             dnVaultUSDCAddr, config.dnVaultUSDC.maxDepositPerBatch, config.dnVaultUSDC.maxWithdrawPerBatch
         );
-        registry.setAssetBatchLimits(
+        registry.setBatchLimits(
             dnVaultWBTCAddr, config.dnVaultWBTC.maxDepositPerBatch, config.dnVaultWBTC.maxWithdrawPerBatch
         );
-        registry.setAssetBatchLimits(
+        registry.setBatchLimits(
             alphaVaultAddr, config.alphaVault.maxDepositPerBatch, config.alphaVault.maxWithdrawPerBatch
         );
-        registry.setAssetBatchLimits(
+        registry.setBatchLimits(
             betaVaultAddr, config.betaVault.maxDepositPerBatch, config.betaVault.maxWithdrawPerBatch
         );
 

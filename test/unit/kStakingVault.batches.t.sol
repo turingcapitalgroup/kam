@@ -315,7 +315,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
 
     function test_exceed_batch_deposit_limit() public {
         vm.prank(users.admin);
-        registry.setAssetBatchLimits(address(vault), 999 * _1_USDC, 0);
+        registry.setBatchLimits(address(vault), 999 * _1_USDC, 0);
 
         vm.startPrank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);

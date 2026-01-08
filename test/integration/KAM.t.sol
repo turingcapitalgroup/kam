@@ -297,7 +297,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
 
         vm.prank(users.admin);
         uint256 _max = 1_000_000 * _1_USDC;
-        registry.setAssetBatchLimits(USDC, _max, _max);
+        registry.setBatchLimits(USDC, _max, _max);
 
         vm.prank(users.institution);
         _requestId = minter.requestBurn(USDC, users.institution, _kTokenAmount);

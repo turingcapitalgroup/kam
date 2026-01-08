@@ -166,7 +166,7 @@ contract kMinterTest is DeploymentBaseTest {
 
     function test_Mint_Require_Amount_Below_Batch_Max_Mint() public {
         vm.prank(users.admin);
-        registry.setAssetBatchLimits(USDC, MINT_AMOUNT - 1, MINT_AMOUNT);
+        registry.setBatchLimits(USDC, MINT_AMOUNT - 1, MINT_AMOUNT);
 
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_BATCH_MINT_REACHED));
@@ -252,7 +252,7 @@ contract kMinterTest is DeploymentBaseTest {
         _mint(USDC, users.institution, MINT_AMOUNT);
 
         vm.prank(users.admin);
-        registry.setAssetBatchLimits(USDC, MINT_AMOUNT, REQUEST_AMOUNT - 1);
+        registry.setBatchLimits(USDC, MINT_AMOUNT, REQUEST_AMOUNT - 1);
 
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_BATCH_REDEEM_REACHED));

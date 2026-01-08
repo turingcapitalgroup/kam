@@ -47,30 +47,30 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
                                 ASSETS
     //////////////////////////////////////////////////////////////*/
 
-    function test_setAssetBatchLimits_Success() public {
+    function test_setBatchLimits_Success() public {
         uint256 _maxMintPerBatch = 1_000_000 * 1e6;
         uint256 _maxBurnPerBatch = 500_000 * 1e6;
 
         vm.prank(users.admin);
         vm.expectEmit(true, true, true, true);
-        emit IRegistry.AssetBatchLimitsUpdated(USDC, _maxMintPerBatch, _maxBurnPerBatch);
-        registry.setAssetBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
+        emit IRegistry.BatchLimitsUpdated(USDC, _maxMintPerBatch, _maxBurnPerBatch);
+        registry.setBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
 
         assertEq(registry.getMaxMintPerBatch(USDC), _maxMintPerBatch);
         assertEq(registry.getMaxBurnPerBatch(USDC), _maxBurnPerBatch);
     }
 
-    function test_setAssetBatchLimits_Require_Only_Admin() public {
+    function test_setBatchLimits_Require_Only_Admin() public {
         uint256 _maxMintPerBatch = 1_000_000 * 1e6;
         uint256 _maxBurnPerBatch = 500_000 * 1e6;
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.setAssetBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
+        registry.setBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.setAssetBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
+        registry.setBatchLimits(USDC, _maxMintPerBatch, _maxBurnPerBatch);
     }
 
     function test_RegisterAsset_NewAsset_Success() public {

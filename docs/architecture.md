@@ -181,7 +181,7 @@ The kMinter contract maintains separate batch cycles for each supported asset:
 │  • Independent lifecycles per asset                           │
 │  • No cross-asset blocking                                    │
 │  • Parallel settlement processing                             │
-│  • Asset-specific limits (maxMintPerBatch, maxRedeemPerBatch) │
+│  • Per-asset limits for kMinter (maxMintPerBatch, maxBurnPerBatch) │
 └─────────────────────────────────────────────────────────────--┘
 ```
 
@@ -539,6 +539,8 @@ The protocol implements a multi-layered emergency response system with global pa
 3. **Settled**: Settlement completed with share price updates
 
 **Key Difference**: kStakingVault does not create BatchReceiver contracts or unstake from them.
+
+**Per-Vault Limits**: Unlike kMinter which uses per-asset limits, kStakingVault uses per-vault limits configured via `setBatchLimits(vaultAddress, maxDepositPerBatch, maxWithdrawPerBatch)`.
 
 ## Fee Structure
 

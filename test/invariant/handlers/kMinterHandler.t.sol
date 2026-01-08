@@ -97,7 +97,14 @@ contract kMinterHandler is BaseHandler {
             return;
         }
         kMinter_kToken.safeApprove(address(kMinter_minter), amount);
-        if (kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token) < amount) {
+
+        // Check cumulative requested amount, not just this request
+        // The contract checks: virtualBalance >= alreadyRequested + newAmount
+        bytes32 batchId = kMinter_minter.getBatchId(kMinter_token);
+        (, uint256 alreadyRequested) = kMinter_assetRouter.getBatchIdBalances(address(kMinter_minter), batchId);
+        uint256 virtualBal = kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token);
+
+        if (virtualBal < alreadyRequested + amount) {
             vm.expectRevert();
             kMinter_minter.requestBurn(kMinter_token, currentActor, amount);
             vm.stopPrank();

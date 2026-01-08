@@ -27,11 +27,11 @@ interface IRegistry is IVersioned {
     /// @param vault The vault contract address being removed
     event VaultRemoved(address indexed vault);
 
-    /// @notice Emitted when an asset and its kToken are registered
-    /// @param asset The underlying asset address
-    /// @param maxMintPerBatch the max mint amount per batch
-    /// @param maxBurnPerBatch the max burn amount per batch
-    event AssetBatchLimitsUpdated(address indexed asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch);
+    /// @notice Emitted when batch limits are updated for an asset or vault
+    /// @param target The asset or vault address
+    /// @param maxMintPerBatch The max mint/deposit amount per batch
+    /// @param maxBurnPerBatch The max burn/withdraw amount per batch
+    event BatchLimitsUpdated(address indexed target, uint256 maxMintPerBatch, uint256 maxBurnPerBatch);
 
     /// @notice Emitted when an asset and its kToken are registered
     /// @param asset The underlying asset address
@@ -440,19 +440,19 @@ interface IRegistry is IVersioned {
     /// @param target The asset or vault address to set limits for
     /// @param maxMintPerBatch_ Maximum amount per batch for minting (asset) or deposits (vault), 0 to disable
     /// @param maxBurnPerBatch_ Maximum amount per batch for burning (asset) or withdrawals (vault), 0 to disable
-    function setAssetBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
+    function setBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
 
-    /// @notice Gets the maximum mint amount per batch for an asset
-    /// @dev Used to enforce minting limits for liquidity and risk management. Reverts if asset not registered.
-    /// @param asset The asset address to query
-    /// @return The maximum mint amount per batch
-    function getMaxMintPerBatch(address asset) external view returns (uint256);
+    /// @notice Gets the maximum mint/deposit amount per batch for an asset or vault
+    /// @dev Used to enforce minting/deposit limits for liquidity and risk management.
+    /// @param target The asset or vault address to query
+    /// @return The maximum mint/deposit amount per batch
+    function getMaxMintPerBatch(address target) external view returns (uint256);
 
-    /// @notice Gets the maximum redeem amount per batch for an asset
-    /// @dev Used to enforce redemption limits for liquidity and risk management. Reverts if asset not registered.
-    /// @param asset The asset address to query
-    /// @return The maximum redeem amount per batch
-    function getMaxBurnPerBatch(address asset) external view returns (uint256);
+    /// @notice Gets the maximum burn/withdraw amount per batch for an asset or vault
+    /// @dev Used to enforce burn/withdrawal limits for liquidity and risk management.
+    /// @param target The asset or vault address to query
+    /// @return The maximum burn/withdraw amount per batch
+    function getMaxBurnPerBatch(address target) external view returns (uint256);
 
     /* //////////////////////////////////////////////////////////////
                                 ENUMS
