@@ -152,7 +152,6 @@ string constant KSTAKINGVAULT_ZERO_AMOUNT = "SV9";
 string constant KSTAKINGVAULT_BATCH_LIMIT_REACHED = "SV10";
 string constant KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED = "SV11";
 string constant KSTAKINGVAULT_BATCH_NOT_VALID = "SV12";
-string constant KSTAKINGVAULT_DEPOSIT_TOO_SMALL = "SV13";
 
 // kToken Errors
 string constant KTOKEN_IS_PAUSED = "T1";

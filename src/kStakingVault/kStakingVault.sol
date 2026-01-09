@@ -22,7 +22,6 @@ import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import {
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
     KSTAKINGVAULT_BATCH_NOT_VALID,
-    KSTAKINGVAULT_DEPOSIT_TOO_SMALL,
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
     KSTAKINGVAULT_IS_PAUSED,
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
@@ -141,10 +140,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _checkPaused($);
         _checkAmountNotZero(_amount);
-
-        // Uses current price as estimate - actual shares calculated at settlement
-        uint256 _expectedShares = _convertToSharesWithTotals(_amount, _totalNetAssets(), totalSupply());
-        require(_expectedShares > 0, KSTAKINGVAULT_DEPOSIT_TOO_SMALL);
 
         // Cache frequently used values
         IkToken _kToken = IkToken($.kToken);
