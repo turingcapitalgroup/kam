@@ -176,11 +176,11 @@ contract kMinterHandler is BaseHandler {
             kMinter_nettedInBatch,
             0,
             block.timestamp + kMinter_assetRouter.getSettlementCooldown(),
-            false,
-            false
+            0,
+            0
         );
         bytes32 proposalId = kMinter_assetRouter.proposeSettleBatch(
-            kMinter_token, address(kMinter_minter), batchId, kMinter_expectedAdapterTotalAssets, false, false
+            kMinter_token, address(kMinter_minter), batchId, kMinter_expectedAdapterTotalAssets, 0, 0
         );
         vm.stopPrank();
         kMinter_pendingSettlementProposals.add(proposalId);

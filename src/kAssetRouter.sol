@@ -282,8 +282,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _vault,
         bytes32 _batchId,
         uint256 _totalAssets,
-        bool _chargeManagementFees,
-        bool _chargePerformanceFees
+        uint64 _lastFeesChargedManagement,
+        uint64 _lastFeesChargedPerformance
     )
         external
         payable
@@ -366,8 +366,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             netted: _netted,
             yield: _yield,
             executeAfter: _executeAfter.toUint64(),
-            chargeManagementFees: _chargeManagementFees,
-            chargePerformanceFees: _chargePerformanceFees
+            lastFeesChargedManagement: _lastFeesChargedManagement,
+            lastFeesChargedPerformance: _lastFeesChargedPerformance
         });
 
         emit SettlementProposed(
@@ -378,8 +378,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _netted,
             _yield,
             _executeAfter,
-            _chargeManagementFees,
-            _chargePerformanceFees
+            _lastFeesChargedManagement,
+            _lastFeesChargedPerformance
         );
         _unlockReentrant();
     }
@@ -503,12 +503,12 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             emit TotalAssetsSet(address(_adapter), _totalAssets);
 
             // If fees should be charged in this settlement, notify the vault to update share price
-            if (_proposal.chargeManagementFees) {
-                IkStakingVault(_vault).notifyManagementFeesCharged(uint64(block.timestamp));
+            if (_proposal.lastFeesChargedManagement != 0) {
+                IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
             }
 
-            if (_proposal.chargePerformanceFees) {
-                IkStakingVault(_vault).notifyPerformanceFeesCharged(uint64(block.timestamp));
+            if (_proposal.lastFeesChargedPerformance != 0) {
+                IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
             }
 
             // Mark batch as settled in the vault

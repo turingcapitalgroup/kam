@@ -443,11 +443,10 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         vm.expectEmit(false, true, true, false);
         emit IkAssetRouter.SettlementProposed(
-            bytes32(0), address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0, block.timestamp + 1, false, false
+            bytes32(0), address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0, block.timestamp + 1, 0, 0
         );
 
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         IkAssetRouter.VaultSettlementProposal memory _proposal = assetRouter.getSettlementProposal(testProposalId);
         assertEq(_proposal.asset, USDC);
@@ -467,7 +466,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
-        assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, false, false);
+        assetRouter.proposeSettleBatch(USDC, address(dnVault), TEST_BATCH_ID, TEST_TOTAL_ASSETS, 0, 0);
     }
 
     function test_ProposeSettleBatch_Require_Only_Relayer() public {
@@ -475,23 +474,22 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KASSETROUTER_WRONG_ROLE));
-        assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.prank(users.admin);
         vm.expectRevert(bytes(KASSETROUTER_WRONG_ROLE));
-        assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.prank(users.owner);
         vm.expectRevert(bytes(KASSETROUTER_WRONG_ROLE));
-        assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
     }
 
     function test_ProposeSettleBatch_Require_Batch_Closed() public {
         bytes32 _batchId = dnVault.getBatchId();
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_NOT_BATCH_CLOSED));
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
     }
 
     function test_ProposeSettleBatch_Require_Only_One_Pending_Proposal() public {
@@ -500,16 +498,14 @@ contract kAssetRouterTest is DeploymentBaseTest {
         _closeBatch(address(dnVault), _batchId);
 
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         _batchId = dnVault.getBatchId();
         _closeBatch(address(dnVault), _batchId);
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME));
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
     }
 
     function test_ProposeSettleBatch_Require_Not_Executed() public {
@@ -520,14 +516,12 @@ contract kAssetRouterTest is DeploymentBaseTest {
         _closeBatch(address(dnVault), _batchId);
 
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
         assetRouter.executeSettleBatch(testProposalId);
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_BATCH_ID_PROPOSED)); // KASSETROUTER_PROPOSAL_EXECUTED seems impossible to reach
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -541,8 +535,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         dnVault.closeBatch(batchId, true);
 
         vm.prank(users.relayer);
-        bytes32 proposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, false, false);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.prank(users.guardian);
         vm.expectEmit(true, true, true, false);
@@ -562,8 +555,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         dnVault.closeBatch(batchId, true);
 
         vm.prank(users.relayer);
-        bytes32 proposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, false, false);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.prank(users.emergencyAdmin);
         assetRouter.setPaused(true);
@@ -580,8 +572,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         dnVault.closeBatch(batchId, true);
 
         vm.prank(users.relayer);
-        bytes32 proposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, false, false);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KASSETROUTER_WRONG_ROLE));
@@ -615,8 +606,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         dnVault.closeBatch(batchId, true);
 
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.warp(block.timestamp + 2);
 
@@ -633,8 +623,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         dnVault.closeBatch(batchId, true);
 
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.warp(block.timestamp + 2);
 
@@ -662,8 +651,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         dnVault.closeBatch(batchId, true);
 
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KASSETROUTER_COOLDOWN_IS_UP));
@@ -681,8 +669,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         dnVault.closeBatch(_batchId, true);
 
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         (canExecute, reason) = assetRouter.canExecuteProposal(testProposalId);
         assertFalse(canExecute);
@@ -818,8 +805,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         dnVault.closeBatch(_batchId, true);
 
         vm.prank(users.relayer);
-        testProposalId =
-            assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, false, false);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
 
         proposal = assetRouter.getSettlementProposal(testProposalId);
         assertEq(proposal.asset, USDC);

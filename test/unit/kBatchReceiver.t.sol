@@ -227,7 +227,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         vm.prank(users.admin);
         assetRouter.setSettlementCooldown(0);
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _initialBatchId, 0, false, false);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _initialBatchId, 0, 0, 0);
         assetRouter.executeSettleBatch(_proposalId);
 
         // Now request burn - this creates the batch receiver

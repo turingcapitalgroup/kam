@@ -704,7 +704,7 @@ contract kMinterTest is DeploymentBaseTest {
         assetRouter.setSettlementCooldown(0);
 
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, 0, false, false);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, 0, 0, 0);
         assetRouter.executeSettleBatch(_proposalId);
     }
 
@@ -725,7 +725,7 @@ contract kMinterTest is DeploymentBaseTest {
 
         uint256 _totalAssets = IkToken(_kToken).totalSupply();
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, _totalAssets, false, false);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, _totalAssets, 0, 0);
         assetRouter.executeSettleBatch(_proposalId);
     }
 }
