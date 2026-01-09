@@ -223,12 +223,10 @@ Request Status Flow:
 │PENDING      │ ── Initial state when requestBurn() is called
 └──────┬──────┘
        │
-       ├──────────────────────────┐
-       │                          │
-       ▼                          ▼
-┌─────────────┐            ┌─────────────┐
-│SETTLED      │            │CANCELED     │ ── Via cancelBurnRequest() before batch closes
-└──────┬──────┘            └─────────────┘   (returns escrowed kTokens to user)
+       ▼
+┌─────────────┐
+│SETTLED      │ ── After batch settlement completes
+└──────┬──────┘
        │
        ▼
 ┌─────────────┐

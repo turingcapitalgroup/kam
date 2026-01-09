@@ -6,6 +6,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import {
     KBATCHRECEIVER_ALREADY_INITIALIZED,
     KBATCHRECEIVER_INSUFFICIENT_BALANCE,
+    KBATCHRECEIVER_INVALID_BATCH_ID,
     KBATCHRECEIVER_ONLY_KMINTER,
     KBATCHRECEIVER_TRANSFER_FAILED,
     KBATCHRECEIVER_WRONG_ASSET,
@@ -104,10 +105,11 @@ contract kBatchReceiver is IkBatchReceiver {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IkBatchReceiver
-    function pullAssets(address _receiver, uint256 _amount) external {
+    function pullAssets(address _receiver, uint256 _amount, bytes32 _batchId) external {
         _checkMinter(msg.sender);
         _checkAmountNotZero(_amount);
         _checkAddressNotZero(_receiver);
+        require(_batchId == batchId, KBATCHRECEIVER_INVALID_BATCH_ID);
 
         asset.safeTransfer(_receiver, _amount);
         emit PulledAssets(_receiver, asset, _amount);

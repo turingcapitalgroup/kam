@@ -88,7 +88,8 @@ interface IkBatchReceiver {
     /// individual users claim their settled redemptions, ensuring fair and orderly asset distribution.
     /// @param receiver The address that will receive the settled assets (the user completing redemption)
     /// @param amount The quantity of assets to transfer based on the user's proportional share
-    function pullAssets(address receiver, uint256 amount) external;
+    /// @param _batchId The batch identifier to validate against the receiver's configured batch
+    function pullAssets(address receiver, uint256 amount, bytes32 _batchId) external;
 
     /// @notice Emergency recovery function for accidentally sent assets to prevent permanent loss
     /// @dev Provides a safety mechanism for recovering tokens or ETH that were mistakenly sent to the receiver

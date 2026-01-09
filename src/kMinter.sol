@@ -23,7 +23,6 @@ import {
     KMINTER_INSUFFICIENT_BALANCE,
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
-    KMINTER_REQUEST_NOT_PENDING,
     KMINTER_UNAUTHORIZED,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
@@ -264,53 +263,10 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         IkToken(_kToken).burn(address(this), _amount);
 
         // Pull assets from batch receiver
-        kBatchReceiver(_batchReceiver).pullAssets(_recipient, _amount);
+        kBatchReceiver(_batchReceiver).pullAssets(_recipient, _amount, _batchId);
 
         _unlockReentrant();
         emit Burned(_requestId, _batchReceiver, _kToken, _recipient, _amount, _batchId);
-    }
-
-    /// @inheritdoc IkMinter
-    function cancelBurnRequest(bytes32 _requestId) external payable {
-        _lockReentrant();
-        _checkNotPaused();
-        _checkInstitution(msg.sender);
-
-        kMinterStorage storage $ = _getkMinterStorage();
-        BurnRequest storage _burnRequest = $.burnRequests[_requestId];
-
-        // Validate caller is the request creator
-        require(msg.sender == _burnRequest.user, KMINTER_UNAUTHORIZED);
-
-        // Validate request is in PENDING status
-        require(_burnRequest.status == RequestStatus.PENDING, KMINTER_REQUEST_NOT_PENDING);
-
-        uint256 _amount = _burnRequest.amount;
-        address _asset = _burnRequest.asset;
-        bytes32 _batchId = _burnRequest.batchId;
-
-        // Validate batch exists and is not closed
-        require(_batchId != bytes32(0), KMINTER_BATCH_NOT_VALID);
-        require(!$.batches[_batchId].isClosed, KMINTER_BATCH_CLOSED);
-
-        // Remove from user's request set
-        require($.userRequests[msg.sender].remove(_requestId), KMINTER_REQUEST_NOT_FOUND);
-
-        // Update request status to CANCELED
-        _burnRequest.status = RequestStatus.CANCELED;
-
-        // Decrement burnedInBatch to free up the requested amount
-        $.batches[_batchId].burnedInBatch -= _amount.toUint128();
-
-        // Return escrowed kTokens to user
-        address _kToken = _getKTokenForAsset(_asset);
-        _kToken.safeTransfer(msg.sender, _amount);
-
-        // Update router accounting - decrement requested amount
-        IkAssetRouter(_getKAssetRouter()).kAssetCancelPull(_asset, _amount, _batchId);
-
-        _unlockReentrant();
-        emit BurnRequestCanceled(_requestId, msg.sender, _amount, _batchId);
     }
 
     /* //////////////////////////////////////////////////////////////

@@ -91,13 +91,6 @@ interface IkAssetRouter is IVersioned {
     /// @param amount The quantity of assets requested for redemption
     event AssetsRequestPulled(address indexed vault, address indexed asset, uint256 amount);
 
-    /// @notice Emitted when a redemption request is canceled and removed from batch accounting
-    /// @dev This event tracks cancellations to maintain audit trail and accounting consistency
-    /// @param vault The kMinter vault that canceled the request
-    /// @param asset The underlying asset address of the canceled request
-    /// @param amount The quantity of assets removed from the batch request
-    event AssetsRequestCanceled(address indexed vault, address indexed asset, uint256 amount);
-
     /// @notice Emitted when assets are transferred between kStakingVaults for optimal allocation
     /// @dev This is a virtual transfer for accounting purposes - actual assets may remain in the same
     /// physical location while vault balances are updated to reflect the new allocation
@@ -272,17 +265,6 @@ interface IkAssetRouter is IVersioned {
     /// @param amount The quantity of assets requested for redemption
     /// @param batchId The batch identifier for coordinating this redemption with other requests
     function kAssetRequestPull(address _asset, uint256 amount, bytes32 batchId) external payable;
-
-    /// @notice Cancels a previously registered redemption request from the batch accounting
-    /// @dev This function decrements the requested amount in the batch balance tracking when a user cancels
-    /// their burn request before batch closure. It must be called by kMinter as part of the cancelBurnRequest
-    /// flow to maintain accounting consistency. The function will revert if called with an amount greater than
-    /// currently tracked, preventing underflow. This ensures the settlement process only pulls the correct
-    /// amount of assets from the vault adapter.
-    /// @param _asset The underlying asset address of the canceled redemption
-    /// @param _amount The quantity of assets to remove from the redemption request
-    /// @param _batchId The batch identifier from which to remove the request
-    function kAssetCancelPull(address _asset, uint256 _amount, bytes32 _batchId) external payable;
 
     /* //////////////////////////////////////////////////////////////
                         KSTAKING VAULT FUNCTIONS
