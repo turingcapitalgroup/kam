@@ -272,6 +272,35 @@ contract kRemoteRegistryTest is Test {
         assertEq(_targets.length, 0);
     }
 
+    function test_GetExecutorTargets_Not_Removed_When_Other_Selectors_Remain() public {
+        bytes4 selector1 = bytes4(keccak256("function1()"));
+        bytes4 selector2 = bytes4(keccak256("function2()"));
+
+        // Allow two selectors for the same target
+        vm.prank(owner);
+        registry.setAllowedSelector(executor, target, selector1, true);
+        vm.prank(owner);
+        registry.setAllowedSelector(executor, target, selector2, true);
+
+        address[] memory _targets = registry.getExecutorTargets(executor);
+        assertEq(_targets.length, 1);
+
+        // Disallow first selector - target should remain since selector2 is still allowed
+        vm.prank(owner);
+        registry.setAllowedSelector(executor, target, selector1, false);
+
+        _targets = registry.getExecutorTargets(executor);
+        assertEq(_targets.length, 1, "Target should remain when other selectors are still allowed");
+        assertTrue(registry.isSelectorAllowed(executor, target, selector2));
+
+        // Disallow second selector - now target should be removed
+        vm.prank(owner);
+        registry.setAllowedSelector(executor, target, selector2, false);
+
+        _targets = registry.getExecutorTargets(executor);
+        assertEq(_targets.length, 0, "Target should be removed when no selectors remain");
+    }
+
     /* //////////////////////////////////////////////////////////////
                         CONTRACT INFO
     //////////////////////////////////////////////////////////////*/
