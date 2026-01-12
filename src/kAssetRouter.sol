@@ -307,7 +307,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 - int256(uint256($.vaultBatchBalances[_vault][_batchId].requested));
         } else {
             uint256 _totalSupply = IkStakingVault(_vault).totalSupply();
-            uint256 _requestedAssets = (_totalSupply == 0 || _totalAssets == 0)
+            // When _totalSupply == 0, use 1:1 ratio; otherwise math handles _totalAssets == 0 naturally (returns 0)
+            uint256 _requestedAssets = _totalSupply == 0
                 ? $.vaultRequestedShares[_vault][_batchId]
                 : $.vaultRequestedShares[_vault][_batchId].fullMulDiv(_totalAssets, _totalSupply);
             // casting to 'int256' is safe because we're doing arithmetic on uint256 values
