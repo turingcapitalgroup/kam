@@ -65,11 +65,13 @@ contract kMinterBatchesTest is DeploymentBaseTest {
         emit IkMinter.BatchClosed(_batchId);
         minter.closeBatch(_batchId, false);
 
+        // Batch is closed but currentBatchId still points to it
         isActive = minter.hasActiveBatch(USDC);
         assertTrue(isActive != true);
 
-        bytes32 newBatchId = minter.getBatchId(USDC);
-        assertTrue(newBatchId == bytes32(0));
+        bytes32 currentBatchId = minter.getBatchId(USDC);
+        assertTrue(currentBatchId == _batchId); // Still points to closed batch
+        assertTrue(minter.isClosed(_batchId));
     }
 
     function test_CloseBatch_With_Batch_Creation_Success() public {

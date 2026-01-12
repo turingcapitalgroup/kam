@@ -104,6 +104,26 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         assertTrue(newBatch != bytes32(0));
     }
 
+    function test_CloseBatch_WithoutCreate_ThenCreateNewBatch() public {
+        bytes32 batchId = vault.getBatchId();
+
+        // Close batch without creating new one - keeps currentBatchId pointing to closed batch
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, false);
+
+        // currentBatchId still points to closed batch
+        assertEq(vault.getBatchId(), batchId);
+
+        // To reopen, use createNewBatch()
+        vm.prank(users.relayer);
+        vault.createNewBatch();
+
+        // Verify a new valid batch was created
+        bytes32 newBatch = vault.getBatchId();
+        assertTrue(newBatch != bytes32(0));
+        assertTrue(newBatch != batchId);
+    }
+
     function test_CloseBatch_RequiresRelayerRole() public {
         bytes32 batchId = vault.getBatchId();
 

@@ -140,10 +140,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         kMinterStorage storage $ = _getkMinterStorage();
 
         bytes32 _batchId = $.currentBatchIds[_asset];
-        // Create new batch if none exists or current batch is closed
-        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) {
-            _batchId = _createNewBatch(_asset);
-        }
+        require(_batchId != bytes32(0) && !$.batches[_batchId].isClosed, KMINTER_BATCH_NOT_VALID);
 
         // Make sure we dont exceed the max mint per batch
         require(
@@ -182,10 +179,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         kMinterStorage storage $ = _getkMinterStorage();
 
         bytes32 _batchId = $.currentBatchIds[_asset];
-        // Create new batch if none exists or current batch is closed
-        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) {
-            _batchId = _createNewBatch(_asset);
-        }
+        require(_batchId != bytes32(0) && !$.batches[_batchId].isClosed, KMINTER_BATCH_NOT_VALID);
 
         // Check cap before creating request ID to save gas if cap reached
         require(
@@ -294,8 +288,6 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
 
         if (_create) {
             _createNewBatch(_batchAsset); // Create new batch for same asset
-        } else {
-            $.currentBatchIds[_batchAsset] = bytes32(0); // Bytes(0), reverts on mint/requestBurn
         }
 
         emit BatchClosed(_batchId);

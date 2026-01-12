@@ -325,7 +325,7 @@ The kStakingVault is implemented as a unified contract that inherits from multip
 
 **BaseVault Integration**: Provides foundational vault logic including ERC20 token functionality for stkTokens. These tokens represent staked positions and automatically accrue yield through share price appreciation. The BaseVault handles core mathematical operations for asset-to-share conversions and fee calculations.
 
-**Batch Processing**: The vault manages the complete batch lifecycle for efficient gas usage. It creates new batches automatically, handles batch closure and settlement coordination with kAssetRouter, and processes direct asset transfers without requiring external BatchReceiver contracts.
+**Batch Processing**: The vault manages the complete batch lifecycle for efficient gas usage. Batches are created by the relayer via `createNewBatch()`, handles batch closure and settlement coordination with kAssetRouter, and processes direct asset transfers without requiring external BatchReceiver contracts.
 
 **Fee Management**: Implements comprehensive fee collection including management fees that accrue continuously based on time and assets under management, and performance fees charged only on positive yields. Fee calculations use precise mathematical operations to avoid rounding errors.
 
@@ -521,8 +521,8 @@ The protocol implements a multi-layered emergency response system with global pa
 
 **Batch Lifecycle**:
 
-1. **Active**: New batch created automatically when first mint/burn occurs for an asset
-2. **Closed**: Batch closed to new requests via `closeBatch()`
+1. **Active**: Batch created via `createNewBatch()` by relayer, accepts mint/burn requests
+2. **Closed**: Batch closed to new requests via `closeBatch()` - requests revert if batch is closed
 3. **Settled**: Batch marked settled after kAssetRouter processes settlement
 4. **BatchReceiver Created**: kMinter creates BatchReceiver via `_createBatchReceiver()` using clone pattern
 
@@ -534,8 +534,8 @@ The protocol implements a multi-layered emergency response system with global pa
 
 **Batch Lifecycle**:
 
-1. **Active**: Accepts stake/unstake requests for stkToken operations
-2. **Closed**: Batch closed when settlement begins
+1. **Active**: Batch created via `createNewBatch()` by relayer, accepts stake/unstake requests
+2. **Closed**: Batch closed via `closeBatch()` - requests revert if batch is closed
 3. **Settled**: Settlement completed with share price updates
 
 **Key Difference**: kStakingVault does not create BatchReceiver contracts or unstake from them.

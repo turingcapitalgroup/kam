@@ -146,6 +146,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(_kToken.balanceOf(_msgSender()) >= _amount, KSTAKINGVAULT_INSUFFICIENT_BALANCE);
 
         bytes32 _batchId = $.currentBatchId;
+        require(_batchId != bytes32(0) && !$.batches[_batchId].isClosed, KSTAKINGVAULT_BATCH_NOT_VALID);
         uint128 _amount128 = _amount.toUint128();
 
         // Make sure we dont exceed the max deposit per batch
@@ -204,6 +205,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(balanceOf(_msgSender()) >= _stkTokenAmount, KSTAKINGVAULT_INSUFFICIENT_BALANCE);
 
         bytes32 _batchId = $.currentBatchId;
+        require(_batchId != bytes32(0) && !$.batches[_batchId].isClosed, KSTAKINGVAULT_BATCH_NOT_VALID);
         uint128 _withdrawn = _convertToAssetsWithTotals(_stkTokenAmount, _totalNetAssets(), totalSupply()).toUint128();
 
         // Make sure we dont exceed the max withdraw per batch
@@ -273,8 +275,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Reduce total pending stake and remove user stake request
         $.totalPendingStake -= _request.kTokenAmount;
 
-        // Mint stkTokens to user
-        _mint(_request.user, _stkTokensToMint);
+        // Mint stkTokens to recipient
+        _mint(_request.recipient, _stkTokensToMint);
 
         // Close `nonRentrant`
         _unlockReentrant();
@@ -322,7 +324,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         emit UnstakingAssetsClaimed(batchId, _requestId, user, _totalKTokensNet);
         emit KTokenUnstaked(user, stkTokenAmount, _totalKTokensNet);
 
-        $.kToken.safeTransfer(user, _totalKTokensNet);
+        $.kToken.safeTransfer(_request.recipient, _totalKTokensNet);
 
         // Close `nonRentrant`
         _unlockReentrant();
@@ -348,7 +350,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         $.batches[_batchId].isClosed = true;
 
         if (_create) {
-            _batchId = _createNewBatch();
+            _createNewBatch();
         }
         emit BatchClosed(_batchId);
     }
