@@ -23,6 +23,7 @@ import {
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
     KSTAKINGVAULT_BATCH_NOT_VALID,
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
+    KSTAKINGVAULT_INVALID_MAX_TOTAL_ASSETS,
     KSTAKINGVAULT_IS_PAUSED,
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
     KSTAKINGVAULT_REQUEST_NOT_FOUND,
@@ -122,6 +123,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         $.sharePriceWatermark = (10 ** _decimals).toUint128();
         $.kToken = _registry().assetToKToken(_asset);
         $.receiverImplementation = address(new kBatchReceiver(_registry().getContractById(K_MINTER)));
+        require(_maxTotalAssets > 0, KSTAKINGVAULT_INVALID_MAX_TOTAL_ASSETS);
         $.maxTotalAssets = _maxTotalAssets;
 
         bytes32 _newBatchId = _createNewBatch();
