@@ -585,6 +585,9 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         if (_proposal.executeAfter == 0) {
             return (false, "Proposal not found");
         }
+        if (!$.vaultPendingProposalIds[_proposal.vault].contains(_proposalId)) {
+            return (false, "Proposal cancelled or executed");
+        }
         if (block.timestamp < _proposal.executeAfter) {
             return (false, "Cooldown not passed");
         }

@@ -682,6 +682,49 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assertEq(reason, "");
     }
 
+    function test_CanExecuteProposal_Cancelled() public {
+        bytes32 _batchId = dnVault.getBatchId();
+        vm.prank(users.relayer);
+        dnVault.closeBatch(_batchId, true);
+
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
+
+        // Warp past cooldown
+        vm.warp(block.timestamp + 2);
+
+        // Verify can execute before cancellation
+        (bool canExecute, string memory reason) = assetRouter.canExecuteProposal(proposalId);
+        assertTrue(canExecute);
+
+        // Cancel the proposal
+        vm.prank(users.guardian);
+        assetRouter.cancelProposal(proposalId);
+
+        // Verify canExecuteProposal returns false for cancelled proposal
+        (canExecute, reason) = assetRouter.canExecuteProposal(proposalId);
+        assertFalse(canExecute);
+        assertEq(reason, "Proposal cancelled or executed");
+    }
+
+    function test_CanExecuteProposal_AlreadyExecuted() public {
+        bytes32 _batchId = dnVault.getBatchId();
+        vm.prank(users.relayer);
+        dnVault.closeBatch(_batchId, true);
+
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
+
+        // Warp past cooldown and execute
+        vm.warp(block.timestamp + 2);
+        assetRouter.executeSettleBatch(proposalId);
+
+        // Verify canExecuteProposal returns false for executed proposal
+        (bool canExecute, string memory reason) = assetRouter.canExecuteProposal(proposalId);
+        assertFalse(canExecute);
+        assertEq(reason, "Proposal cancelled or executed");
+    }
+
     /* //////////////////////////////////////////////////////////////
                     COOLDOWN MANAGEMENT TESTS
     //////////////////////////////////////////////////////////////*/
