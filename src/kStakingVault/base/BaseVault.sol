@@ -112,7 +112,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.BaseVault")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 internal constant MODULE_BASE_STORAGE_LOCATION =
-        0x50bc60b877273d55cac3903fd4818902e5fd7aa256278ee2dc6b212f256c0b00;
+        0x63f7c1a183f3ce6ff685d16ab1e43ef8a572a1797aa1b858a84dd926a8739f00;
 
     /// @notice Returns the base vault storage struct using ERC-7201 pattern
     /// @return $ Storage reference for base vault state variables
