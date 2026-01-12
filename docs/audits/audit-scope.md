@@ -129,7 +129,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 - Tracks asset positions across all vaults without requiring immediate physical transfers
 - Enables capital efficiency by keeping assets deployed in yield strategies while maintaining liquidity
-- Records incoming/outgoing flows via `kAssetPush()`, `kAssetRequestPull()`, `kSharesRequestPush()`, `kSharesRequestPull()`
+- Records incoming/outgoing flows via `kAssetPush()`, `kAssetRequestPull()`, `kSharesRequestPush()`
 - Aggregates balances across multiple adapters per vault for unified accounting
 
 **Settlement Workflow**:

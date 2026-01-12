@@ -240,21 +240,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         _unlockReentrant();
     }
 
-    /// @inheritdoc IkAssetRouter
-    function kSharesRequestPull(address _sourceVault, uint256 _amount, bytes32 _batchId) external payable {
-        _lockReentrant();
-        _checkPaused();
-        _checkAmountNotZero(_amount);
-        _checkVault(msg.sender);
-
-        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-
-        $.vaultRequestedShares[_sourceVault][_batchId] -= _amount;
-
-        emit SharesRequestedPulled(_sourceVault, _batchId, _amount);
-        _unlockReentrant();
-    }
-
     /* //////////////////////////////////////////////////////////////
                             SETTLEMENT FUNCTIONS
     //////////////////////////////////////////////////////////////*/

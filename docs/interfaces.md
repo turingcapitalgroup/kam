@@ -49,7 +49,6 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `kAssetPush(address asset, uint256 amount, bytes32 batchId)` - Records incoming asset flows from caller to virtual balance
 - `kAssetRequestPull(address asset, uint256 amount, bytes32 batchId)` - Stages outgoing asset requests from caller's virtual balance
 - `kSharesRequestPush(address vault, uint256 amount, bytes32 batchId)` - Records incoming share flows for unstaking
-- `kSharesRequestPull(address vault, uint256 amount, bytes32 batchId)` - Records outgoing share flows for staking
 
 **Settlement Operations**
 

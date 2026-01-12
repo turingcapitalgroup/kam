@@ -108,13 +108,6 @@ interface IkAssetRouter is IVersioned {
     /// @param amount The quantity of shares being pushed
     event SharesRequestedPushed(address indexed vault, bytes32 indexed batchId, uint256 amount);
 
-    /// @notice Emitted when shares are requested for pull operations in kStakingVault redemptions
-    /// @dev Coordinates share-based redemptions for retail users through the batch system
-    /// @param vault The kStakingVault requesting the share pull operation
-    /// @param batchId The batch identifier for this redemption batch
-    /// @param amount The quantity of shares being pulled for redemption
-    event SharesRequestedPulled(address indexed vault, bytes32 indexed batchId, uint256 amount);
-
     /// @notice Emitted when shares are settled across multiple vaults with calculated share prices
     /// @dev Marks the completion of a cross-vault settlement with final share price determination
     /// @param vaults Array of vault addresses participating in the settlement
@@ -302,18 +295,6 @@ interface IkAssetRouter is IVersioned {
     /// @param amount The quantity of shares being requested for push to users
     /// @param batchId The batch identifier for coordinating share operations with settlement
     function kSharesRequestPush(address sourceVault, uint256 amount, bytes32 batchId) external payable;
-
-    /// @notice Requests shares to be pulled for kStakingVault redemption operations
-    /// @dev This function handles the share-based redemption process for retail users withdrawing from
-    /// kStakingVaults. The process involves: (1) calculating share amounts to redeem based on user
-    /// requests, (2) preparing for conversion back to kTokens at settlement time, (3) coordinating
-    /// with the batch settlement system for fair pricing. Unlike institutional redemptions through
-    /// kMinter, this uses share-based accounting to handle smaller, more frequent retail operations
-    /// efficiently through the vault's batch processing system.
-    /// @param sourceVault The kStakingVault address requesting share pull for redemptions
-    /// @param amount The quantity of shares being requested for pull from users
-    /// @param batchId The batch identifier for coordinating share redemptions with settlement
-    function kSharesRequestPull(address sourceVault, uint256 amount, bytes32 batchId) external payable;
 
     /* //////////////////////////////////////////////////////////////
                         SETTLEMENT FUNCTIONS

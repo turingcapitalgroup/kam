@@ -357,81 +357,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                            kSharesRequestPull
-    //////////////////////////////////////////////////////////////*/
-
-    function test_KSharesRequestPull_Success() public {
-        uint256 _amount = TEST_AMOUNT;
-        bytes32 _batchId = TEST_BATCH_ID;
-
-        vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPush(address(alphaVault), _amount, _batchId);
-
-        vm.prank(address(alphaVault));
-        vm.expectEmit(true, true, false, true);
-        emit IkAssetRouter.SharesRequestedPulled(address(alphaVault), _batchId, _amount);
-        assetRouter.kSharesRequestPull(address(alphaVault), _amount, _batchId);
-
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), _batchId), 0);
-    }
-
-    function test_KSharesRequestPull_Require_Not_Paused() public {
-        uint256 _amount = TEST_AMOUNT;
-        bytes32 _batchId = TEST_BATCH_ID;
-
-        vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPush(address(alphaVault), _amount, _batchId);
-
-        vm.prank(users.emergencyAdmin);
-        assetRouter.setPaused(true);
-
-        vm.prank(address(alphaVault));
-        vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
-        assetRouter.kSharesRequestPull(address(alphaVault), _amount, _batchId);
-    }
-
-    function test_KSharesRequestPull_Require_Amount_Not_Zero() public {
-        bytes32 _batchId = alphaVault.getBatchId();
-        vm.prank(address(alphaVault));
-        vm.expectRevert(bytes(KASSETROUTER_ZERO_AMOUNT));
-        assetRouter.kSharesRequestPull(address(alphaVault), 0, _batchId);
-    }
-
-    function test_KSharesRequestPull_Require_Only_KStaking_Vault() public {
-        bytes32 _batchId = alphaVault.getBatchId();
-
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
-        assetRouter.kSharesRequestPull(address(alphaVault), TEST_AMOUNT, _batchId);
-
-        vm.prank(users.admin);
-        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
-        assetRouter.kSharesRequestPull(address(alphaVault), TEST_AMOUNT, _batchId);
-
-        vm.prank(users.admin);
-        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
-        assetRouter.kSharesRequestPull(address(alphaVault), TEST_AMOUNT, _batchId);
-    }
-
-    function test_KSharesRequestPull_Require_Sufficient_Balance() public {
-        vm.prank(address(alphaVault));
-        vm.expectRevert();
-        assetRouter.kSharesRequestPull(address(alphaVault), TEST_AMOUNT, TEST_BATCH_ID);
-    }
-
-    function test_KSharesRequestPull_Require_Sufficient_Balance_ExceedsRequested() public {
-        uint256 _amount = TEST_AMOUNT;
-        bytes32 _batchId = TEST_BATCH_ID;
-
-        vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPush(address(alphaVault), _amount, _batchId);
-
-        vm.prank(address(alphaVault));
-        vm.expectRevert(); // underflows since it will be negative.
-        assetRouter.kSharesRequestPull(address(alphaVault), _amount + 1, _batchId);
-    }
-
-    /* //////////////////////////////////////////////////////////////
                         ProposeSettleBatch
     //////////////////////////////////////////////////////////////*/
 
@@ -858,11 +783,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assetRouter.kSharesRequestPush(address(alphaVault), amount, batchId);
 
         assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), amount);
-
-        vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPull(address(alphaVault), amount, batchId);
-
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), 0);
     }
 
     function test_GetRequestedShares_MultipleBatches() public {

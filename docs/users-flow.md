@@ -517,11 +517,11 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │  │                 │                          │                 │                               │
 │  └─────────────────┘                          └─────────┬───────┘                               │
 │                                                         │                                       │
-│                    kSharesRequestPull() via kAssetRouter│                                       │
+│                    kAssetTransfer() via kAssetRouter   │                                       │
 │                                                         ▼                                       │
 │                                               ┌─────────────────┐                               │
 │                                               │Virtual transfer │                               │
-│                                               │kMinter → Vault  │                               │
+│                                               │DN Vault → Vault │                               │
 │                                               └─────────┬───────┘                               │
 │                                                         │                                       │
 │                      After Settlement                   ▼                                       │
