@@ -725,6 +725,49 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assertEq(reason, "Proposal cancelled or executed");
     }
 
+    function test_IsProposalPending() public {
+        // Non-existent proposal
+        bytes32 fakeProposalId = keccak256("Banana");
+        assertFalse(assetRouter.isProposalPending(fakeProposalId));
+
+        // Create a proposal
+        bytes32 _batchId = dnVault.getBatchId();
+        vm.prank(users.relayer);
+        dnVault.closeBatch(_batchId, true);
+
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
+
+        // Pending proposal returns true
+        assertTrue(assetRouter.isProposalPending(proposalId));
+
+        // Cancel the proposal
+        vm.prank(users.guardian);
+        assetRouter.cancelProposal(proposalId);
+
+        // Cancelled proposal returns false
+        assertFalse(assetRouter.isProposalPending(proposalId));
+    }
+
+    function test_IsProposalPending_AfterExecution() public {
+        bytes32 _batchId = dnVault.getBatchId();
+        vm.prank(users.relayer);
+        dnVault.closeBatch(_batchId, true);
+
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
+
+        // Pending before execution
+        assertTrue(assetRouter.isProposalPending(proposalId));
+
+        // Execute
+        vm.warp(block.timestamp + 2);
+        assetRouter.executeSettleBatch(proposalId);
+
+        // Not pending after execution
+        assertFalse(assetRouter.isProposalPending(proposalId));
+    }
+
     /* //////////////////////////////////////////////////////////////
                     COOLDOWN MANAGEMENT TESTS
     //////////////////////////////////////////////////////////////*/

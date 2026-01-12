@@ -72,6 +72,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `isPaused()` - Checks if kAssetRouter contract is currently paused
 - `getSettlementProposal(bytes32 proposalId)` - Retrieves complete VaultSettlementProposal struct with all details
 - `canExecuteProposal(bytes32 proposalId)` - Checks execution readiness and returns boolean result with descriptive reason
+- `isProposalPending(bytes32 proposalId)` - Simple boolean check if proposal is still pending (not cancelled or executed)
 - `getSettlementCooldown()` - Gets current cooldown period in seconds before proposals can be executed
 - `getMaxAllowedDelta()` - Gets current yield tolerance threshold in basis points (exceeding emits warning event)
 - `virtualBalance(address vault, address asset)` - Returns virtual asset balance from vault's adapter

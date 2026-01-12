@@ -457,6 +457,13 @@ interface IkAssetRouter is IVersioned {
     /// @return reason Descriptive message explaining why execution is blocked (if applicable)
     function canExecuteProposal(bytes32 proposalId) external view returns (bool canExecute, string memory reason);
 
+    /// @notice Checks if a settlement proposal is still pending (not cancelled or executed)
+    /// @dev Returns true only if the proposal exists and is in the pending queue.
+    /// Use this for simple boolean state checks without detailed reason strings.
+    /// @param proposalId The unique identifier of the proposal to check
+    /// @return isPending True if the proposal is pending, false if cancelled, executed, or non-existent
+    function isProposalPending(bytes32 proposalId) external view returns (bool isPending);
+
     /// @notice Gets the current security cooldown period for settlement proposals
     /// @dev The cooldown period determines how long proposals must wait before execution.
     /// This security mechanism allows guardians to verify yield calculations and prevents
@@ -473,14 +480,13 @@ interface IkAssetRouter is IVersioned {
     /// @return tolerance The current yield tolerance in basis points
     function getMaxAllowedDelta() external view returns (uint256 tolerance);
 
-    /// @notice Retrieves the virtual balance of assets for a vault across all its adapters
-    /// @dev This function aggregates asset balances across all adapters connected to a vault to determine
-    /// the total virtual balance available for operations. Essential for coordination between physical
-    /// asset locations and protocol accounting. Used for settlement calculations and ensuring sufficient
-    /// assets are available for redemptions and transfers within the money flow system.
+    /// @notice Retrieves the virtual balance of assets for a vault's adapter
+    /// @dev Retrieves the total assets from the single adapter registered for this vault-asset pair.
+    /// Essential for coordination between physical asset locations and protocol accounting.
+    /// Used for settlement calculations and ensuring sufficient assets are available for redemptions.
     /// @param vault The vault address to calculate virtual balance for
     /// @param asset The underlying asset of the vault
-    /// @return balance The total virtual asset balance across all vault adapters
+    /// @return balance The total virtual asset balance from the vault's adapter
     function virtualBalance(address vault, address asset) external view returns (uint256);
 
     /// @notice Checks if a specific proposal has been executed

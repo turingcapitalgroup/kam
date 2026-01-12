@@ -596,6 +596,14 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     }
 
     /// @inheritdoc IkAssetRouter
+    function isProposalPending(bytes32 _proposalId) external view returns (bool _isPending) {
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+        VaultSettlementProposal storage _proposal = $.settlementProposals[_proposalId];
+        if (_proposal.executeAfter == 0) return false;
+        return $.vaultPendingProposalIds[_proposal.vault].contains(_proposalId);
+    }
+
+    /// @inheritdoc IkAssetRouter
     function getSettlementCooldown() external view returns (uint256) {
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         return $.vaultSettlementCooldown;
@@ -612,16 +620,16 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         return _virtualBalance(_vault, _asset);
     }
 
-    /// @notice Calculates the virtual balance of assets for a vault across all its adapters
-    /// @dev This function aggregates asset balances across all adapters connected to a vault to determine
-    /// the total virtual balance available for operations. Essential for coordination between physical
-    /// asset locations and protocol accounting. Used for settlement calculations and ensuring sufficient
-    /// assets are available for redemptions and transfers within the money flow system.
+    /// @notice Calculates the virtual balance of assets for a vault's adapter
+    /// @dev Retrieves the total assets from the single adapter registered for this vault-asset pair.
+    /// Essential for coordination between physical asset locations and protocol accounting.
+    /// Used for settlement calculations and ensuring sufficient assets are available for redemptions.
     /// @param _vault The vault address to calculate virtual balance for
-    /// @return _balance The total virtual asset balance across all vault adapters
+    /// @param _asset The asset address to query balance for
+    /// @return _balance The total virtual asset balance from the vault's adapter
     function _virtualBalance(address _vault, address _asset) private view returns (uint256 _balance) {
         IVaultAdapter _adapter = IVaultAdapter(_registry().getAdapter(_vault, _asset));
-        _balance += _adapter.totalAssets();
+        _balance = _adapter.totalAssets();
     }
 
     /// @notice Validates that the caller is an authorized kMinter contract
