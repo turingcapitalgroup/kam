@@ -640,12 +640,15 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         require(_isKMinter(_user), KASSETROUTER_ONLY_KMINTER);
     }
 
-    /// @notice Validates that the caller is an authorized kStakingVault contract
-    /// @dev Ensures only registered vaults can request share operations and asset transfers.
-    /// Essential for maintaining protocol security and preventing unauthorized money flows.
-    /// @param _user Address to validate as authorized vault
+    /// @notice Validates that the caller is an authorized kStakingVault contract (not kMinter)
+    /// @dev Ensures only registered staking vaults can request share operations and asset transfers.
+    /// Excludes kMinter which has no legitimate use case for these functions.
+    /// @param _user Address to validate as authorized staking vault
     function _checkVault(address _user) private view {
-        require(_isVault(_user), KASSETROUTER_ONLY_KSTAKING_VAULT);
+        require(
+            _isVault(_user) && _registry().getVaultType(_user) != uint8(IRegistry.VaultType.MINTER),
+            KASSETROUTER_ONLY_KSTAKING_VAULT
+        );
     }
 
     /// @notice Validates that an amount parameter is not zero to prevent invalid operations
