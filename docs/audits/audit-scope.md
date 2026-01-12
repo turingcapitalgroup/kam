@@ -296,7 +296,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 - **Batch Isolation**: Each receiver handles exactly one batch, preventing cross-contamination
 - **Immutable Authorization**: kMinter address set at construction, cannot be changed
 - **Batch ID Validation**: All operations require correct batch ID to prevent operational errors
-- **Emergency Recovery**: `rescueAssets()` for accidentally sent tokens (excluding protocol assets)
+- **Emergency Recovery**: `rescueAssets()` for accidentally sent tokens (excluding protocol assets and kTokens)
 
 **Gas Efficiency**: Minimal proxy pattern reduces deployment costs by ~90% compared to full contract deployment per batch.
 
