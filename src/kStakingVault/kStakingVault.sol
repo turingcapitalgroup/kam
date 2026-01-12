@@ -41,7 +41,7 @@ import {
 } from "kam/src/errors/Errors.sol";
 
 import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
-import { K_MINTER } from "kam/src/constants/Constants.sol";
+import { K_MINTER, MAX_BPS } from "kam/src/constants/Constants.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
@@ -440,7 +440,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /// fee validation to maintain consistent fee bounds across all fee types.
     /// @param _bps The basis point value to validate (must be <= 10000)
     function _checkValidBPS(uint256 _bps) private pure {
-        require(_bps <= 10_000, VAULTFEES_FEE_EXCEEDS_MAXIMUM);
+        require(_bps <= MAX_BPS, VAULTFEES_FEE_EXCEEDS_MAXIMUM);
     }
 
     /// @notice Validates relayer role authorization for batch management operations
