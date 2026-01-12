@@ -446,8 +446,15 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
             // Mark batch as settled in the vault
             ISettleBatch(_vault).settleBatch(_batchId);
-            _adapter.setTotalAssets(_totalAssets);
-            emit TotalAssetsSet(address(_adapter), _totalAssets);
+
+            // Use DELTA instead of SET to avoid race condition with kStakingVault settlements
+            // Both operations modifying kMinter adapter are now commutative (order-independent)
+            int256 _kMinterNewTotalAssets = int256(_adapter.totalAssets()) + _netted;
+            require(_kMinterNewTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
+            // casting to 'uint256' is safe because _kMinterNewTotalAssets is >= 0 due to require check
+            // forge-lint: disable-next-line(unsafe-typecast)
+            _adapter.setTotalAssets(uint256(_kMinterNewTotalAssets));
+            emit TotalAssetsSet(address(_adapter), uint256(_kMinterNewTotalAssets));
         } else {
             uint256 _totalRequestedShares = $.vaultRequestedShares[_vault][_batchId];
             // kMinter yield is sent to insuranceFund, cannot be minted.
