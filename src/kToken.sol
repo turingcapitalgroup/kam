@@ -157,7 +157,6 @@ contract kToken is
     /// distributions)
     function mint(address _to, uint256 _amount) external {
         _checkMinter(msg.sender);
-        _checkPaused();
         _mint(_to, _amount);
     }
 
@@ -172,7 +171,6 @@ contract kToken is
     /// @param _amount The quantity of kTokens to burn (matches redeemed assets or loss amounts)
     function burn(address _from, uint256 _amount) external {
         _checkMinter(msg.sender);
-        _checkPaused();
         _burn(_from, _amount);
     }
 
