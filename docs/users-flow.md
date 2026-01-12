@@ -61,8 +61,8 @@
          ▼
 ┌─────────────────┐
 │Notify Router    │
-│kSharesRequest   │
-│Pull()           │
+│kAssetTransfer() │
+│                 │
 └────────┬────────┘
          │
          ▼
