@@ -315,6 +315,12 @@ interface IRegistry is IVersioned {
     /// @return True if vault is registered
     function isVault(address vault) external view returns (bool);
 
+    /// @notice Checks if an address is a protocol kToken
+    /// @dev Uses kTokenToAsset reverse mapping for O(1) lookup
+    /// @param kToken The address to verify
+    /// @return True if address is a registered kToken
+    function isKToken(address kToken) external view returns (bool);
+
     /// @notice Gets the adapter registered for a specific vault and asset
     /// @dev Returns external protocol integration enabling yield strategies. Reverts if no adapter is set.
     /// @param vault The vault address to query

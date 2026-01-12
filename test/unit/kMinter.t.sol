@@ -472,6 +472,21 @@ contract kMinterTest is DeploymentBaseTest {
         assertEq(mockUSDC.balanceOf(_minter), _amount);
     }
 
+    function test_RescueAssets_Require_Not_KToken() public {
+        address _kToken = registry.assetToKToken(USDC);
+        uint256 _amount = 1000 * _1_USDC;
+
+        // Mint kTokens directly to kMinter (simulating escrowed tokens)
+        vm.prank(_minter);
+        IkToken(_kToken).mint(_minter, _amount);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KBASE_WRONG_ASSET));
+        minter.rescueAssets(_kToken, users.treasury, _amount);
+
+        assertEq(IkToken(_kToken).balanceOf(_minter), _amount);
+    }
+
     /* //////////////////////////////////////////////////////////////
                         RESCUE ASSETS TESTS - ETH
     //////////////////////////////////////////////////////////////*/

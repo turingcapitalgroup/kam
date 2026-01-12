@@ -630,6 +630,14 @@ contract kRegistryTest is DeploymentBaseTest {
         assertFalse(registry.isVault(makeAddr("Banana")));
     }
 
+    function test_IsKToken() public {
+        address _kToken = registry.assetToKToken(USDC);
+        assertTrue(registry.isKToken(_kToken));
+
+        assertFalse(registry.isKToken(makeAddr("Banana")));
+        assertFalse(registry.isKToken(USDC)); // underlying asset is not a kToken
+    }
+
     function test_IsAdapterRegistered() public {
         assertTrue(registry.isAdapterRegistered(address(betaVault), USDC, address(BETHAVaultAdapterUSDC)));
 

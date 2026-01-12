@@ -93,6 +93,7 @@ Central registry managing protocol contracts, supported assets, vault registrati
 - `assetToKToken(address asset)` - Maps underlying assets to their kToken representations
 - `getAllAssets()` - Returns all protocol-supported assets
 - `isAsset(address asset)` - Checks if asset is supported by the protocol
+- `isKToken(address kToken)` - Checks if address is a protocol kToken (O(1) lookup via reverse mapping)
 - `setBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_)` - Sets maximum amounts per batch for asset or vault
 - `getMaxMintPerBatch(address target)` - Returns maximum mint/deposit amount per batch for an asset or vault
 - `getMaxBurnPerBatch(address target)` - Returns maximum burn/withdraw amount per batch for an asset or vault

@@ -98,6 +98,9 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         /// @dev Maps underlying asset addresses to their corresponding kToken addresses
         /// Critical for minting/redemption operations and asset tracking
         mapping(address => address) assetToKToken;
+        /// @dev Reverse lookup: maps kToken addresses back to their underlying assets
+        /// Enables O(1) validation that an address is a protocol kToken
+        mapping(address => address) kTokenToAsset;
         /// @dev Maps vaults to their registered external protocol adapters
         /// Enables yield strategies through DeFi protocol integrations
         mapping(address => mapping(address => address)) vaultAdaptersByAsset;
@@ -368,8 +371,9 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         $.maxMintPerBatch[_asset] = _maxMintPerBatch;
         $.maxBurnPerBatch[_asset] = _maxBurnPerBatch;
 
-        // Register kToken
+        // Register kToken with bidirectional mapping
         $.assetToKToken[_asset] = _kToken;
+        $.kTokenToAsset[_kToken] = _asset;
         emit AssetRegistered(_asset, _kToken);
 
         emit KTokenDeployed(_kToken, _name, _symbol, _decimals);
@@ -386,6 +390,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
         // Cannot remove asset if vaults still reference it
         require($.vaultsByAsset[_asset].length() == 0, KREGISTRY_ASSET_IN_USE);
+
+        // Clear kToken reverse mapping before deleting forward mapping
+        address _kToken = $.assetToKToken[_asset];
+        delete $.kTokenToAsset[_kToken];
 
         $.supportedAssets.remove(_asset);
         delete $.maxMintPerBatch[_asset];
@@ -673,6 +681,12 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     function isVault(address _vault) external view returns (bool) {
         kRegistryStorage storage $ = _getkRegistryStorage();
         return $.allVaults.contains(_vault);
+    }
+
+    /// @inheritdoc IRegistry
+    function isKToken(address _kToken) external view returns (bool) {
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        return $.kTokenToAsset[_kToken] != address(0);
     }
 
     /// @inheritdoc IRegistry
