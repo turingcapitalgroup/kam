@@ -13,7 +13,6 @@ import { Ownable } from "solady/auth/Ownable.sol";
 
 import {
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
-    KSTAKINGVAULT_INVALID_MAX_TOTAL_ASSETS,
     KSTAKINGVAULT_ZERO_ADDRESS,
     KSTAKINGVAULT_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
@@ -56,27 +55,6 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         // Initial share price should be 1 USDC (1e6)
         assertEq(vault.netSharePrice(), 1e6);
-    }
-
-    function test_Initialize_Require_MaxTotalAssets_Not_Zero() public {
-        // Deploy a new proxy with the existing implementation
-        ERC1967Factory _factory = new ERC1967Factory();
-        address _newVault = _factory.deploy(address(stakingVaultImpl), users.owner);
-
-        // Try to initialize with maxTotalAssets = 0
-        vm.expectRevert(bytes(KSTAKINGVAULT_INVALID_MAX_TOTAL_ASSETS));
-        kStakingVault(payable(_newVault))
-            .initialize(
-                users.owner,
-                address(registry),
-                false,
-                "Test Vault",
-                "TV",
-                6,
-                address(mockUSDC),
-                0, // maxTotalAssets = 0 should fail
-                address(0)
-            );
     }
 
     /* //////////////////////////////////////////////////////////////

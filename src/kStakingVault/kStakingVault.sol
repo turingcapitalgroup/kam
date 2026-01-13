@@ -23,7 +23,6 @@ import {
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
     KSTAKINGVAULT_BATCH_NOT_VALID,
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
-    KSTAKINGVAULT_INVALID_MAX_TOTAL_ASSETS,
     KSTAKINGVAULT_IS_PAUSED,
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
     KSTAKINGVAULT_REQUEST_NOT_FOUND,
@@ -123,7 +122,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         $.sharePriceWatermark = (10 ** _decimals).toUint128();
         $.kToken = _registry().assetToKToken(_asset);
         $.receiverImplementation = address(new kBatchReceiver(_registry().getContractById(K_MINTER)));
-        require(_maxTotalAssets > 0, KSTAKINGVAULT_INVALID_MAX_TOTAL_ASSETS);
         $.maxTotalAssets = _maxTotalAssets;
 
         bytes32 _newBatchId = _createNewBatch();
@@ -268,17 +266,14 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Calculate stkToken amount based on settlement-time values
         BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
-        uint256 _stkTokensToMint =
+        uint256 _stkTokensToTransfer =
             _convertToSharesWithTotals(_request.kTokenAmount, batch.totalNetAssets, batch.totalSupply);
-        _checkAmountNotZero(_stkTokensToMint);
+        _checkAmountNotZero(_stkTokensToTransfer);
 
-        emit StakingSharesClaimed(_batchId, _requestId, _request.user, _stkTokensToMint);
+        emit StakingSharesClaimed(_batchId, _requestId, _request.recipient, _stkTokensToTransfer);
 
-        // Reduce total pending stake and remove user stake request
-        $.totalPendingStake -= _request.kTokenAmount;
-
-        // Mint stkTokens to recipient
-        _mint(_request.recipient, _stkTokensToMint);
+        // Transfer stkTokens from vault to recipient (shares were pre-minted at settlement)
+        _transfer(address(this), _request.recipient, _stkTokensToTransfer);
 
         // Close `nonRentrant`
         _unlockReentrant();
@@ -369,6 +364,17 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         $.batches[_batchId].totalAssets = _totalAssets();
         $.batches[_batchId].totalNetAssets = _totalNetAssets();
         $.batches[_batchId].totalSupply = totalSupply();
+
+        // Mint shares for this batch's pending stakes to the vault itself
+        // This effectively "claims" shares for all pending stakers in this batch at settlement price
+        uint128 batchDeposited = $.batches[_batchId].depositedInBatch;
+        if (batchDeposited > 0) {
+            uint256 sharesToMint = _convertToSharesWithTotals(
+                batchDeposited, $.batches[_batchId].totalNetAssets, $.batches[_batchId].totalSupply
+            );
+            _mint(address(this), sharesToMint);
+            $.totalPendingStake -= batchDeposited;
+        }
 
         emit BatchSettled(_batchId);
     }
