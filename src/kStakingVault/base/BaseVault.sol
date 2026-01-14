@@ -100,6 +100,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         address kToken;
         //10
         uint128 maxTotalAssets;
+        uint128 totalPendingUnstake;
         //11
         string name;
         //12
@@ -394,7 +395,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @return Total asset value managed by the vault including yields but excluding pending operations
     function _totalAssets() internal view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return $.kToken.balanceOf(address(this)) - $.totalPendingStake;
+        return $.kToken.balanceOf(address(this)) - $.totalPendingStake - $.totalPendingUnstake;
     }
 
     /// @notice Calculates net assets available to users after deducting accumulated fees

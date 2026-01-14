@@ -222,6 +222,10 @@ interface IVaultReader is IVersioned {
     /// @return Total pending stake amount
     function getTotalPendingStake() external view returns (uint256);
 
+    /// @notice Returns the total pending unstake amount (claimable kTokens for settled unstake requests)
+    /// @return Total pending unstake amount
+    function getTotalPendingUnstake() external view returns (uint256);
+
     /// @notice Returns the close state of a given batchId
     /// @param batchId_ the batchId to verify
     /// @return isClosed_ the state of the given batchId
