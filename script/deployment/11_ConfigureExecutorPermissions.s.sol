@@ -127,25 +127,42 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         _usdc = usdcAddr != address(0) ? usdcAddr : config.assets.USDC;
         _wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
 
-        // If any address is zero, read from JSON (for real deployments)
-        if (
-            registryAddr == address(0) || kMinterAdapterUSDCAddr == address(0) || kMinterAdapterWBTCAddr == address(0)
-                || dnVaultAdapterUSDCAddr == address(0) || dnVaultAdapterWBTCAddr == address(0)
-                || alphaVaultAdapterAddr == address(0) || betaVaultAdapterAddr == address(0)
-                || erc7540USDCAddr == address(0) || erc7540WBTCAddr == address(0) || walletUSDCAddr == address(0)
-        ) {
-            existing = readDeploymentOutput();
-            if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
-            if (kMinterAdapterUSDCAddr == address(0)) kMinterAdapterUSDCAddr = existing.contracts.kMinterAdapterUSDC;
-            if (kMinterAdapterWBTCAddr == address(0)) kMinterAdapterWBTCAddr = existing.contracts.kMinterAdapterWBTC;
-            if (dnVaultAdapterUSDCAddr == address(0)) dnVaultAdapterUSDCAddr = existing.contracts.dnVaultAdapterUSDC;
-            if (dnVaultAdapterWBTCAddr == address(0)) dnVaultAdapterWBTCAddr = existing.contracts.dnVaultAdapterWBTC;
-            if (alphaVaultAdapterAddr == address(0)) alphaVaultAdapterAddr = existing.contracts.alphaVaultAdapter;
-            if (betaVaultAdapterAddr == address(0)) betaVaultAdapterAddr = existing.contracts.betaVaultAdapter;
-            if (erc7540USDCAddr == address(0)) erc7540USDCAddr = existing.contracts.ERC7540USDC;
-            if (erc7540WBTCAddr == address(0)) erc7540WBTCAddr = existing.contracts.ERC7540WBTC;
-            if (walletUSDCAddr == address(0)) walletUSDCAddr = existing.contracts.WalletUSDC;
+        // Read deployment output for other contract addresses
+        existing = readDeploymentOutput();
+
+        // For non-metawallet addresses, read from deployment output if not provided
+        if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
+        if (kMinterAdapterUSDCAddr == address(0)) kMinterAdapterUSDCAddr = existing.contracts.kMinterAdapterUSDC;
+        if (kMinterAdapterWBTCAddr == address(0)) kMinterAdapterWBTCAddr = existing.contracts.kMinterAdapterWBTC;
+        if (dnVaultAdapterUSDCAddr == address(0)) dnVaultAdapterUSDCAddr = existing.contracts.dnVaultAdapterUSDC;
+        if (dnVaultAdapterWBTCAddr == address(0)) dnVaultAdapterWBTCAddr = existing.contracts.dnVaultAdapterWBTC;
+        if (alphaVaultAdapterAddr == address(0)) alphaVaultAdapterAddr = existing.contracts.alphaVaultAdapter;
+        if (betaVaultAdapterAddr == address(0)) betaVaultAdapterAddr = existing.contracts.betaVaultAdapter;
+        if (walletUSDCAddr == address(0)) walletUSDCAddr = existing.contracts.WalletUSDC;
+
+        // For metawallet addresses: prefer config file (production), fallback to addresses.json (mocks)
+        if (erc7540USDCAddr == address(0)) {
+            // Try config first (production deployments set this manually)
+            if (config.metawallets.USDC != address(0)) {
+                erc7540USDCAddr = config.metawallets.USDC;
+            } else {
+                // Fallback to addresses.json (mock deployments)
+                erc7540USDCAddr = existing.contracts.ERC7540USDC;
+            }
         }
+        if (erc7540WBTCAddr == address(0)) {
+            // Try config first (production deployments set this manually)
+            if (config.metawallets.WBTC != address(0)) {
+                erc7540WBTCAddr = config.metawallets.WBTC;
+            } else {
+                // Fallback to addresses.json (mock deployments)
+                erc7540WBTCAddr = existing.contracts.ERC7540WBTC;
+            }
+        }
+
+        // Validate metawallet assets match expected underlying assets
+        _validateMetawalletAsset(erc7540USDCAddr, _usdc, "metawalletUSDC", "USDC");
+        _validateMetawalletAsset(erc7540WBTCAddr, _wbtc, "metawalletWBTC", "WBTC");
 
         // Populate existing for logging
         existing.contracts.kRegistry = registryAddr;
@@ -160,7 +177,7 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         existing.contracts.WalletUSDC = walletUSDCAddr;
 
         // Log script header and configuration
-        logScriptHeader("10_ConfigureExecutorPermissions");
+        logScriptHeader("11_ConfigureExecutorPermissions");
         logRoles(config);
         logAssets(config);
         logExternalTargets(config);
@@ -191,8 +208,12 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         configureExecutorPermissions(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, wbtc, true);
         configureExecutorPermissions(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, usdc, false);
         configureExecutorPermissions(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, wbtc, false);
+        // Alpha/Beta adapters for custodial targets
         configureCustodialExecutorPermissions(registry, alphaVaultAdapterAddr, walletUSDCAddr);
         configureCustodialExecutorPermissions(registry, betaVaultAdapterAddr, walletUSDCAddr);
+        // Alpha/Beta adapters for metawallets (ERC7540 share transfers)
+        configureExecutorPermissions(registry, alphaVaultAdapterAddr, erc7540USDCAddr, usdc, false);
+        configureExecutorPermissions(registry, betaVaultAdapterAddr, erc7540USDCAddr, usdc, false);
 
         _log("");
         _log("2. Configuring execution validators...");
@@ -205,6 +226,9 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         configureExecutionValidator(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, validator, false);
         configureExecutionValidator(registry, alphaVaultAdapterAddr, walletUSDCAddr, validator, false);
         configureExecutionValidator(registry, betaVaultAdapterAddr, walletUSDCAddr, validator, false);
+        // Alpha/Beta adapters for metawallets
+        configureExecutionValidator(registry, alphaVaultAdapterAddr, erc7540USDCAddr, validator, true);
+        configureExecutionValidator(registry, betaVaultAdapterAddr, erc7540USDCAddr, validator, true);
 
         _log("");
         _log("3. Configuring execution validator permissions from config...");
@@ -236,10 +260,10 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         erc20ExecutionValidator.setMaxSingleTransfer(usdc, config.parameterChecker.maxSingleTransfer.USDC);
         erc20ExecutionValidator.setMaxSingleTransfer(wbtc, config.parameterChecker.maxSingleTransfer.WBTC);
         erc20ExecutionValidator.setMaxSingleTransfer(
-            erc7540USDCAddr, config.parameterChecker.maxSingleTransfer.ERC7540USDC
+            erc7540USDCAddr, config.parameterChecker.maxSingleTransfer.metawalletUSDC
         );
         erc20ExecutionValidator.setMaxSingleTransfer(
-            erc7540WBTCAddr, config.parameterChecker.maxSingleTransfer.ERC7540WBTC
+            erc7540WBTCAddr, config.parameterChecker.maxSingleTransfer.metawalletWBTC
         );
 
         vm.stopBroadcast();
@@ -340,19 +364,19 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
             }
         }
 
-        // ERC7540USDC receivers
-        for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.ERC7540USDC.length; i++) {
+        // metawalletUSDC receivers
+        for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.metawalletUSDC.length; i++) {
             address receiver =
-                _resolveAddress(config.parameterChecker.allowedReceivers.ERC7540USDC[i], config, existing);
+                _resolveAddress(config.parameterChecker.allowedReceivers.metawalletUSDC[i], config, existing);
             if (receiver != address(0)) {
                 validator.setAllowedReceiver(usdcVault, receiver, true);
             }
         }
 
-        // ERC7540WBTC receivers
-        for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.ERC7540WBTC.length; i++) {
+        // metawalletWBTC receivers
+        for (uint256 i = 0; i < config.parameterChecker.allowedReceivers.metawalletWBTC.length; i++) {
             address receiver =
-                _resolveAddress(config.parameterChecker.allowedReceivers.ERC7540WBTC[i], config, existing);
+                _resolveAddress(config.parameterChecker.allowedReceivers.metawalletWBTC[i], config, existing);
             if (receiver != address(0)) {
                 validator.setAllowedReceiver(existing.contracts.ERC7540WBTC, receiver, true);
             }
@@ -370,17 +394,17 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
     {
         _log("   - Set allowed sources from config");
 
-        // ERC7540USDC sources
-        for (uint256 i = 0; i < config.parameterChecker.allowedSources.ERC7540USDC.length; i++) {
-            address source = _resolveAddress(config.parameterChecker.allowedSources.ERC7540USDC[i], config, existing);
+        // metawalletUSDC sources
+        for (uint256 i = 0; i < config.parameterChecker.allowedSources.metawalletUSDC.length; i++) {
+            address source = _resolveAddress(config.parameterChecker.allowedSources.metawalletUSDC[i], config, existing);
             if (source != address(0)) {
                 validator.setAllowedSource(usdcVault, source, true);
             }
         }
 
-        // ERC7540WBTC sources
-        for (uint256 i = 0; i < config.parameterChecker.allowedSources.ERC7540WBTC.length; i++) {
-            address source = _resolveAddress(config.parameterChecker.allowedSources.ERC7540WBTC[i], config, existing);
+        // metawalletWBTC sources
+        for (uint256 i = 0; i < config.parameterChecker.allowedSources.metawalletWBTC.length; i++) {
+            address source = _resolveAddress(config.parameterChecker.allowedSources.metawalletWBTC[i], config, existing);
             if (source != address(0)) {
                 validator.setAllowedSource(wbtcVault, source, true);
             }
@@ -393,8 +417,8 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         DeploymentOutput memory existing,
         address usdc,
         address wbtc,
-        address, /* usdcVault */
-        address /* wbtcVault */
+        address usdcVault,
+        address wbtcVault
     )
         internal
     {
@@ -415,8 +439,27 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
                 validator.setAllowedSpender(wbtc, spender, true);
             }
         }
+
+        // metawalletUSDC spenders (adapters that can spend metawallet shares)
+        for (uint256 i = 0; i < config.parameterChecker.allowedSpenders.metawalletUSDC.length; i++) {
+            address spender =
+                _resolveAddress(config.parameterChecker.allowedSpenders.metawalletUSDC[i], config, existing);
+            if (spender != address(0)) {
+                validator.setAllowedSpender(usdcVault, spender, true);
+            }
+        }
+
+        // metawalletWBTC spenders (adapters that can spend metawallet shares)
+        for (uint256 i = 0; i < config.parameterChecker.allowedSpenders.metawalletWBTC.length; i++) {
+            address spender =
+                _resolveAddress(config.parameterChecker.allowedSpenders.metawalletWBTC[i], config, existing);
+            if (spender != address(0)) {
+                validator.setAllowedSpender(wbtcVault, spender, true);
+            }
+        }
     }
 
+    /// @dev Uses shared resolveAddress from DeploymentManager
     function _resolveAddress(
         string memory key,
         NetworkConfig memory config,
@@ -426,31 +469,40 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         pure
         returns (address)
     {
-        // Check if it's a contract key
-        if (keccak256(bytes(key)) == keccak256(bytes("kMinterAdapterUSDC"))) {
-            return existing.contracts.kMinterAdapterUSDC;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("kMinterAdapterWBTC"))) {
-            return existing.contracts.kMinterAdapterWBTC;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("dnVaultAdapterUSDC"))) {
-            return existing.contracts.dnVaultAdapterUSDC;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("dnVaultAdapterWBTC"))) {
-            return existing.contracts.dnVaultAdapterWBTC;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("alphaVaultAdapter"))) {
-            return existing.contracts.alphaVaultAdapter;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("betaVaultAdapter"))) {
-            return existing.contracts.betaVaultAdapter;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("treasury"))) {
-            return config.roles.treasury;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("walletUSDC"))) {
-            return existing.contracts.WalletUSDC;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("walletWBTC"))) {
-            return existing.contracts.WalletWBTC;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("ERC7540USDC"))) {
-            return existing.contracts.ERC7540USDC;
-        } else if (keccak256(bytes(key)) == keccak256(bytes("ERC7540WBTC"))) {
-            return existing.contracts.ERC7540WBTC;
+        return resolveAddress(key, config, existing);
+    }
+
+    /// @notice Validate that a metawallet's underlying asset matches the expected asset
+    /// @param metawallet Address of the metawallet (ERC7540 vault)
+    /// @param expectedAsset Address of the expected underlying asset
+    /// @param metawalletName Name of the metawallet for error messages
+    /// @param assetName Name of the expected asset for error messages
+    function _validateMetawalletAsset(
+        address metawallet,
+        address expectedAsset,
+        string memory metawalletName,
+        string memory assetName
+    )
+        internal
+        view
+    {
+        if (metawallet == address(0)) {
+            return; // Skip validation if metawallet not set
         }
 
-        return address(0);
+        address actualAsset = IERC7540(metawallet).asset();
+        require(
+            actualAsset == expectedAsset,
+            string.concat(
+                metawalletName,
+                " asset mismatch: expected ",
+                assetName,
+                " (",
+                vm.toString(expectedAsset),
+                ") but got ",
+                vm.toString(actualAsset)
+            )
+        );
+        _log(string.concat("   Validated ", metawalletName, " asset matches ", assetName));
     }
 }

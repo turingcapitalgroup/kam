@@ -78,10 +78,11 @@ contract DeployMinterScript is Script, DeploymentManager {
         // Return deployed addresses
         deployment = MinterDeployment({ minterImpl: address(minterImpl), minter: minterProxy });
 
-        // Write to JSON only if requested
+        // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            writeContractAddress("kMinterImpl", address(minterImpl));
-            writeContractAddress("kMinter", minterProxy);
+            queueContractAddress("kMinterImpl", address(minterImpl));
+            queueContractAddress("kMinter", minterProxy);
+            flushContractAddresses();
         }
 
         return deployment;

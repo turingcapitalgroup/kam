@@ -84,10 +84,11 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         // Return deployed addresses
         deployment = AssetRouterDeployment({ assetRouterImpl: address(assetRouterImpl), assetRouter: assetRouterProxy });
 
-        // Write to JSON only if requested
+        // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            writeContractAddress("kAssetRouterImpl", address(assetRouterImpl));
-            writeContractAddress("kAssetRouter", assetRouterProxy);
+            queueContractAddress("kAssetRouterImpl", address(assetRouterImpl));
+            queueContractAddress("kAssetRouter", assetRouterProxy);
+            flushContractAddresses();
         }
 
         return deployment;

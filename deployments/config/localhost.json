@@ -12,12 +12,16 @@
     "insurance": "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955"
   },
   "assets": {
-    "USDC": "0xe1708FA6bb2844D5384613ef0846F9Bc1e8eC55E",
-    "WBTC": "0x0aec7c174554AF8aEc3680BB58431F6618311510"
+    "USDC": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "WBTC": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
   },
-  "ERC7540s": {
-    "USDC": "0x8e264821AFa98DD104eEcfcfa7FD9f8D8B320adA",
-    "WBTC": "0x871ACbEabBaf8Bed65c22ba7132beCFaBf8c27B5"
+  "metawallets": {
+    "USDC": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "WBTC": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+  },
+  "custodialTargets": {
+    "walletUSDC": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+    "walletWBTC": "0x0000000000000000000000000000000000000000"
   },
   "kTokens": {
     "kUSD": {
@@ -41,7 +45,7 @@
       "symbol": "dnkUSD",
       "decimals": 6,
       "underlyingAsset": "USDC",
-      "useKToken": false,
+      "startPaused": false,
       "maxTotalAssets": 500000000000000,
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "maxWithdrawPerBatch": 50000000000000,
@@ -52,7 +56,7 @@
       "symbol": "dnkBTC",
       "decimals": 8,
       "underlyingAsset": "WBTC",
-      "useKToken": false,
+      "startPaused": false,
       "maxTotalAssets": 20000000000,
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "maxWithdrawPerBatch": 2000000000,
@@ -63,7 +67,7 @@
       "symbol": "akUSD",
       "decimals": 6,
       "underlyingAsset": "USDC",
-      "useKToken": false,
+      "startPaused": false,
       "maxTotalAssets": "200000000000000",
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "maxWithdrawPerBatch": 20000000000000,
@@ -74,7 +78,7 @@
       "symbol": "bkUSD",
       "decimals": 6,
       "underlyingAsset": "USDC",
-      "useKToken": false,
+      "startPaused": false,
       "maxTotalAssets": 200000000000000,
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "maxWithdrawPerBatch": 20000000000000,
@@ -97,8 +101,8 @@
     "maxSingleTransfer": {
       "USDC": "1000000000000",
       "WBTC": "3000000000",
-      "ERC7540USDC": "1000000000000",
-      "ERC7540WBTC": "3000000000"
+      "metawalletUSDC": "1000000000000",
+      "metawalletWBTC": "3000000000"
     },
     "allowedReceivers": {
       "USDC": [
@@ -111,11 +115,11 @@
         "walletUSDC",
         "dnVaultAdapterWBTC"
       ],
-      "ERC7540USDC": [
+      "metawalletUSDC": [
         "kMinterAdapterUSDC",
         "dnVaultAdapterUSDC"
       ],
-      "ERC7540WBTC": [
+      "metawalletWBTC": [
         "kMinterAdapterWBTC",
         "dnVaultAdapterWBTC"
       ]
@@ -133,12 +137,12 @@
         "dnVaultAdapterWBTC",
         "treasury"
       ],
-      "ERC7540USDC": [
+      "metawalletUSDC": [
         "kMinterAdapterUSDC",
         "dnVaultAdapterUSDC",
         "treasury"
       ],
-      "ERC7540WBTC": [
+      "metawalletWBTC": [
         "kMinterAdapterWBTC",
         "dnVaultAdapterWBTC",
         "treasury"
@@ -146,19 +150,30 @@
     },
     "allowedSpenders": {
       "USDC": [
-        "ERC7540USDC",
+        "metawalletUSDC",
         "dnVaultAdapterUSDC",
         "alphaVaultAdapter",
         "betaVaultAdapter"
       ],
       "WBTC": [
-        "ERC7540WBTC",
+        "metawalletWBTC",
+        "dnVaultAdapterWBTC"
+      ],
+      "metawalletUSDC": [
+        "kMinterAdapterUSDC",
+        "dnVaultAdapterUSDC",
+        "alphaVaultAdapter",
+        "betaVaultAdapter"
+      ],
+      "metawalletWBTC": [
+        "kMinterAdapterWBTC",
         "dnVaultAdapterWBTC"
       ]
     }
   },
   "mockAssets": {
     "enabled": true,
+    "WalletUSDC": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
     "mintAmounts": {
       "USDC": "10000000000000",
       "WBTC": "100000000000"
@@ -166,7 +181,6 @@
     "mockTargetAmounts": {
       "USDC": "1000000000000",
       "WBTC": "10000000000"
-    },
-    "WalletUSDC": "0x6A59CC73e334b018C9922793d96Df84B538E6fD5"
+    }
   }
 }

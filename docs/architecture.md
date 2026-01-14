@@ -576,7 +576,7 @@ VaultAdapters use a secure execution model where only relayers can call external
 
 - **Target Contract Validation**: Only whitelisted target contracts can be called
 - **Function Selector Validation**: Only approved function selectors are allowed per target
-- **Parameter Validation**: ERC20ParameterChecker enforces transfer limits and recipient restrictions
+- **Parameter Validation**: ERC20ExecutionValidator enforces transfer limits and recipient restrictions
 
 ### Registry Integration
 

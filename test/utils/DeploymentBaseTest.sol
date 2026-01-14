@@ -28,9 +28,6 @@ import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 import { IRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 // Scripts
-import { ConfigureProtocolScript } from "kam/script/actions/09_ConfigureProtocol.s.sol";
-import { ConfigureExecutorPermissionsScript } from "kam/script/actions/10_ConfigureExecutorPermissions.s.sol";
-import { RegisterModulesScript } from "kam/script/actions/11_RegisterVaultModules.s.sol";
 import { DeployMockAssetsScript } from "kam/script/deployment/00_DeployMockAssets.s.sol";
 import { DeployRegistryScript } from "kam/script/deployment/01_DeployRegistry.s.sol";
 import { DeployMinterScript } from "kam/script/deployment/02_DeployMinter.s.sol";
@@ -40,7 +37,9 @@ import { DeployTokensScript } from "kam/script/deployment/05_DeployTokens.s.sol"
 import { DeployVaultModulesScript } from "kam/script/deployment/06_DeployVaultModules.s.sol";
 import { DeployVaultsScript } from "kam/script/deployment/07_DeployVaults.s.sol";
 import { DeployAdaptersScript } from "kam/script/deployment/08_DeployAdapters.s.sol";
-import { DeployInsuranceAccountScript } from "kam/script/deployment/12_DeployInsuranceAccount.s.sol";
+import { DeployInsuranceAccountScript } from "kam/script/deployment/09_DeployInsuranceAccount.s.sol";
+import { ConfigureProtocolScript } from "kam/script/deployment/10_ConfigureProtocol.s.sol";
+import { ConfigureExecutorPermissionsScript } from "kam/script/deployment/11_ConfigureExecutorPermissions.s.sol";
 
 import { MockERC7540 } from "kam/test/mocks/MockERC7540.sol";
 import { MockWallet } from "kam/test/mocks/MockWallet.sol";
@@ -231,15 +230,7 @@ contract DeploymentBaseTest is BaseTest {
             _mocks.WBTC
         );
 
-        RegisterModulesScript registerModulesScript = new RegisterModulesScript();
-        registerModulesScript.setVerbose(false);
-        registerModulesScript.run(
-            _modulesDeploy.readerModule,
-            _vaultsDeploy.dnVaultUSDC,
-            _vaultsDeploy.dnVaultWBTC,
-            _vaultsDeploy.alphaVault,
-            _vaultsDeploy.betaVault
-        );
+        // Note: ReaderModule is already registered to vaults in 07_DeployVaults.s.sol
 
         DeployInsuranceAccountScript insuranceScript = new DeployInsuranceAccountScript();
         insuranceScript.setVerbose(false);
