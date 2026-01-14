@@ -492,19 +492,29 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _adapter.setTotalAssets(_totalAssets);
             emit TotalAssetsSet(address(_adapter), _totalAssets);
 
-            // If there were withdrawals we take fees on them
+            // If there were withdrawals, burn all shares at settlement and handle fees
             if (_totalRequestedShares != 0) {
-                // Discount protocol fees
-                uint256 _netRequestedShares = _totalRequestedShares.fullMulDiv(
-                    IkStakingVault(_vault).totalNetAssets(), IkStakingVault(_vault).totalAssets()
-                );
-                uint256 _feeShares = _totalRequestedShares - _netRequestedShares;
-                uint256 _feeAssets = IkStakingVault(_vault).convertToAssets(_feeShares);
+                // Get snapshot values from batch info (after settlement)
+                (,,,,, uint256 _batchTotalAssets, uint256 _batchTotalNetAssets, uint256 _batchTotalSupply) =
+                    IkStakingVault(_vault).getBatchIdInfo(_batchId);
 
-                // Burn redemption shares of staking vault corresponding to protocol fees
-                if (_feeShares != 0) IkStakingVault(_vault).burnFees(_feeShares);
+                // Calculate total kTokens corresponding to all requested shares at gross price
+                // This is the total pool to be divided between users (net) and fees
+                uint256 _totalKTokensForShares = IkStakingVault(_vault)
+                    .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalAssets, _batchTotalSupply);
 
-                // Move fees as ktokens to treasury
+                // Calculate claimable kTokens for users (net amount after fees)
+                uint256 _claimableKTokens = IkStakingVault(_vault)
+                    .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalNetAssets, _batchTotalSupply);
+
+                // Fee assets is the difference between gross and net kTokens
+                // This ensures no rounding dust remains in the vault
+                uint256 _feeAssets = _totalKTokensForShares - _claimableKTokens;
+
+                // Burn all requested shares (including fee portion)
+                IkStakingVault(_vault).burnUnstakeShares(_batchId, _totalRequestedShares, _claimableKTokens);
+
+                // Move fees as kTokens to treasury
                 if (_feeAssets != 0) {
                     IkToken(_kToken).burn(_vault, _feeAssets);
                     IkToken(_kToken).mint(_registry.getTreasury(), _feeAssets);

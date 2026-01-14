@@ -298,7 +298,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
         require(_msgSender() == user, VAULTCLAIMS_NOT_BENEFICIARY);
 
-        uint256 _totalAssets = batch.totalAssets;
         uint256 _totalNetAssets = batch.totalNetAssets;
         uint256 _totalSupply = batch.totalSupply;
 
@@ -309,14 +308,12 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         uint256 _totalKTokensNet = _convertToAssetsWithTotals(stkTokenAmount, _totalNetAssets, _totalSupply);
         _checkAmountNotZero(_totalKTokensNet);
 
-        // Calculate net shares to burn: (stkTokenAmount * _totalNetAssets) / _totalAssets
-        // This represents the net shares (after fees) that should be burned
-        uint256 _netSharesToBurn = uint256(stkTokenAmount).fullMulDiv(_totalNetAssets, _totalAssets);
-
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
-        _burn(address(this), _netSharesToBurn);
+
+        // Reduce totalPendingUnstake - shares were already burned at settlement time
+        $.totalPendingUnstake -= _totalKTokensNet.toUint128();
 
         emit UnstakingAssetsClaimed(batchId, _requestId, user, _totalKTokensNet);
         emit KTokenUnstaked(user, stkTokenAmount, _totalKTokensNet);
@@ -379,10 +376,25 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         emit BatchSettled(_batchId);
     }
 
-    /// @inheritdoc IVaultFees
-    function burnFees(uint256 _shares) external {
+    /// @notice Burns all unstake shares for a batch and records claimable kTokens
+    /// @dev Called by kAssetRouter during settlement to burn all requested shares (including fee portion)
+    /// and track the total claimable kTokens for users in this batch. This moves share burning from
+    /// claim time to settlement time, ensuring totalAssets correctly excludes pending unstake amounts.
+    /// @param _batchId The batch identifier
+    /// @param _totalRequestedShares Total shares to burn (including fee shares)
+    /// @param _claimableKTokens Total kTokens claimable by users (net of fees)
+    function burnUnstakeShares(bytes32 _batchId, uint256 _totalRequestedShares, uint256 _claimableKTokens) external {
         _checkRouter(_msgSender());
-        _burn(address(this), _shares);
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        require($.batches[_batchId].isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
+
+        // Burn all requested shares (including fee portion)
+        _burn(address(this), _totalRequestedShares);
+
+        // Track claimable kTokens in global tracking
+        $.totalPendingUnstake += _claimableKTokens.toUint128();
+
+        emit UnstakeSharesBurned(_batchId, _totalRequestedShares, _claimableKTokens);
     }
 
     /// @notice Internal function to create deterministic batch IDs with collision resistance
