@@ -7,6 +7,7 @@ import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
+import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
 contract DeployVaultsScript is Script, DeploymentManager {
     struct VaultsDeployment {
@@ -135,6 +136,14 @@ contract DeployVaultsScript is Script, DeploymentManager {
         _log("Setting batch limits for Beta Vault:");
         _log("  Max Deposit:", config.betaVault.maxDepositPerBatch);
         _log("  Max Withdraw:", config.betaVault.maxWithdrawPerBatch);
+
+        // Register ReaderModule to all vaults
+        _log("");
+        _log("=== REGISTERING READER MODULE ===");
+        _registerReaderModule(readerModuleAddr, dnVaultUSDC, "DN Vault USDC");
+        _registerReaderModule(readerModuleAddr, dnVaultWBTC, "DN Vault WBTC");
+        _registerReaderModule(readerModuleAddr, alphaVault, "Alpha Vault");
+        _registerReaderModule(readerModuleAddr, betaVault, "Beta Vault");
 
         vm.stopBroadcast();
 
@@ -291,5 +300,11 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 )
             )
         );
+    }
+
+    function _registerReaderModule(address _readerModule, address _vault, string memory _vaultName) internal {
+        bytes4[] memory selectors = ReaderModule(_readerModule).selectors();
+        kStakingVault(payable(_vault)).addFunctions(selectors, _readerModule, true);
+        _log("  Registered ReaderModule to", _vaultName);
     }
 }
