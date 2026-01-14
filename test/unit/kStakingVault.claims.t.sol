@@ -42,7 +42,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Close and settle batch
         vm.prank(users.relayer);
@@ -74,7 +74,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         kUSD.approve(address(vault), 1000 * _1_USDC);
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Try to claim without settling
         vm.prank(users.alice);
@@ -92,7 +92,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Close and settle batch
         vm.prank(users.relayer);
@@ -121,7 +121,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Close and settle batch
         vm.prank(users.relayer);
@@ -146,7 +146,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Close and settle batch
         vm.prank(users.relayer);
@@ -176,17 +176,17 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         vm.prank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
         vm.prank(users.alice);
-        bytes32 requestIdAlice = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestIdAlice = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.bob);
         kUSD.approve(address(vault), 500 * _1_USDC);
         vm.prank(users.bob);
-        bytes32 requestIdBob = vault.requestStake(users.bob, 500 * _1_USDC);
+        bytes32 requestIdBob = vault.requestStake(users.bob, users.bob, 500 * _1_USDC);
 
         vm.prank(users.charlie);
         kUSD.approve(address(vault), 750 * _1_USDC);
         vm.prank(users.charlie);
-        bytes32 requestIdCharlie = vault.requestStake(users.charlie, 750 * _1_USDC);
+        bytes32 requestIdCharlie = vault.requestStake(users.charlie, users.charlie, 750 * _1_USDC);
 
         // Close and settle batch
         vm.prank(users.relayer);
@@ -225,7 +225,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 stakeBatchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 stakeRequestId = vault.requestStake(users.alice, aliceDeposit);
+        bytes32 stakeRequestId = vault.requestStake(users.alice, users.alice, aliceDeposit);
 
         // Close and settle staking batch
         vm.prank(users.relayer);
@@ -286,7 +286,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 stakeBatchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 stakeRequestId = vault.requestStake(users.alice, aliceDeposit);
+        bytes32 stakeRequestId = vault.requestStake(users.alice, users.alice, aliceDeposit);
 
         // Close and settle staking batch
         vm.prank(users.relayer);
@@ -456,7 +456,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Verify kTokens were transferred from user
         assertEq(kUSD.balanceOf(users.alice), balanceBefore);
@@ -541,7 +541,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batch1Id = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 request1Id = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 request1Id = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.relayer);
         vault.closeBatch(batch1Id, true);
@@ -555,7 +555,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batch2Id = vault.getBatchId();
 
         vm.prank(users.bob);
-        bytes32 request2Id = vault.requestStake(users.bob, 500 * _1_USDC);
+        bytes32 request2Id = vault.requestStake(users.bob, users.bob, 500 * _1_USDC);
 
         vm.prank(users.relayer);
         vault.closeBatch(batch2Id, true);
@@ -598,7 +598,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1 * _1_USDC);
 
         // Close and settle batch
         vm.prank(users.relayer);
@@ -630,7 +630,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(user);
-        bytes32 requestId = vault.requestStake(user, amount);
+        bytes32 requestId = vault.requestStake(user, user, amount);
 
         // Close and settle batch
         vm.prank(users.relayer);

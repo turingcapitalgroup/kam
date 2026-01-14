@@ -140,10 +140,11 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     /// enters pending state until batch settlement, when the final share price is calculated based on vault
     /// performance. Users must later call claimStakedShares() after settlement to receive their stkTokens at
     /// the settled price. This two-phase approach ensures fair pricing for all users within a batch period.
+    /// @param owner The address that owns this stake request and can claim the resulting shares
     /// @param to The recipient address that will receive the stkTokens after successful settlement and claiming
     /// @param kTokensAmount The quantity of kTokens to stake (must not exceed user balance, cannot be zero)
     /// @return requestId Unique identifier for tracking this staking request through settlement and claiming
-    function requestStake(address to, uint256 kTokensAmount) external payable returns (bytes32 requestId);
+    function requestStake(address owner, address to, uint256 kTokensAmount) external payable returns (bytes32 requestId);
 
     /// @notice Initiates stkToken unstaking request for kToken redemption plus accrued yield through batch processing
     /// @dev This function begins the retail unstaking process by: (1) Validating user has sufficient stkToken balance

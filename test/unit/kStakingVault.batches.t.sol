@@ -164,7 +164,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        vault.requestStake(users.alice, 1000 * _1_USDC);
+        vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Close the batch
         vm.prank(users.relayer);
@@ -211,7 +211,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        vault.requestStake(users.alice, 1000 * _1_USDC);
+        vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -245,7 +245,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         vm.prank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // 3. Close batch and create new one
         vm.prank(users.relayer);
@@ -329,7 +329,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         vm.startPrank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
         vm.expectRevert(bytes(KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED));
-        vault.requestStake(users.alice, 1000 * _1_USDC);
+        vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
         vm.stopPrank();
     }
 
@@ -340,7 +340,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         vm.startPrank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
         vm.expectRevert(bytes(KSTAKINGVAULT_BATCH_LIMIT_REACHED));
-        vault.requestStake(users.alice, 1000 * _1_USDC);
+        vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
         vm.stopPrank();
     }
 }

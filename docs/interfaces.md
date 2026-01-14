@@ -179,7 +179,7 @@ Core interface for vault staking operations. Combines IVaultBatch, IVaultClaim, 
 
 **Staking Operations**
 
-- `requestStake(address to, uint256 kTokensAmount)` - Request to stake kTokens for stkTokens
+- `requestStake(address owner, address to, uint256 kTokensAmount)` - Request to stake kTokens for stkTokens
 - `requestUnstake(address to, uint256 stkTokenAmount)` - Request to unstake stkTokens for kTokens plus yield
 
 ### IVaultBatch

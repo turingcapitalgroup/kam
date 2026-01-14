@@ -144,7 +144,7 @@ contract kStakingVaultHandler is BaseHandler {
         uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
         kStakingVault_kToken.safeApprove(address(kStakingVault_vault), amount);
         if (kStakingVault_minterAdapter.totalAssets() < amount) vm.expectRevert();
-        bytes32 requestId = kStakingVault_vault.requestStake(currentActor, amount);
+        bytes32 requestId = kStakingVault_vault.requestStake(currentActor, currentActor, amount);
         kStakingVault_actorStakeRequests[currentActor].add(requestId);
         kStakingVault_depositedInBatch[kStakingVault_vault.getBatchId()] += amount;
         kStakingVault_pendingStakeInBatch[kStakingVault_vault.getBatchId()] += amount;

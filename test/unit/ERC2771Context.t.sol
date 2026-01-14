@@ -72,7 +72,7 @@ contract ERC2771ContextTest is BaseVaultTest {
 
         // Test: Direct call should work normally
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Verify request was created correctly
         BaseVaultTypes.StakeRequest memory req = vault.getStakeRequest(requestId);
@@ -95,6 +95,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes memory callData = abi.encodeCall(
             vault.requestStake,
             (
+                users.alice, // owner
                 users.alice, // recipient
                 1000 * _1_USDC // amount
             )
@@ -151,7 +152,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -207,7 +208,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
 
         // Prepare call data with Alice's address appended
-        bytes memory callData = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
+        bytes memory callData = abi.encodeCall(vault.requestStake, (users.alice, users.alice, 1000 * _1_USDC));
 
         // Try to call from Bob (not the trusted forwarder) with Alice's address appended
         // This should fail because Bob doesn't have approval or balance
@@ -234,7 +235,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         // Make a normal call with regular calldata
         // The _msgSender() should return the actual sender (Alice)
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Verify request was created correctly
         BaseVaultTypes.StakeRequest memory req = vault.getStakeRequest(requestId);
@@ -260,19 +261,19 @@ contract ERC2771ContextTest is BaseVaultTest {
         kUSD.approve(address(vault), 750 * _1_USDC);
 
         // Forward calls for each user
-        bytes memory callDataAlice = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
+        bytes memory callDataAlice = abi.encodeCall(vault.requestStake, (users.alice, users.alice, 1000 * _1_USDC));
         vm.prank(trustedForwarder);
         (bool success1, bytes memory returnData1) = address(vault).call(_appendSender(callDataAlice, users.alice));
         require(success1, "Alice's forwarded call failed");
         bytes32 requestIdAlice = abi.decode(returnData1, (bytes32));
 
-        bytes memory callDataBob = abi.encodeCall(vault.requestStake, (users.bob, 500 * _1_USDC));
+        bytes memory callDataBob = abi.encodeCall(vault.requestStake, (users.bob, users.bob, 500 * _1_USDC));
         vm.prank(trustedForwarder);
         (bool success2, bytes memory returnData2) = address(vault).call(_appendSender(callDataBob, users.bob));
         require(success2, "Bob's forwarded call failed");
         bytes32 requestIdBob = abi.decode(returnData2, (bytes32));
 
-        bytes memory callDataCharlie = abi.encodeCall(vault.requestStake, (users.charlie, 750 * _1_USDC));
+        bytes memory callDataCharlie = abi.encodeCall(vault.requestStake, (users.charlie, users.charlie, 750 * _1_USDC));
         vm.prank(trustedForwarder);
         (bool success3, bytes memory returnData3) = address(vault).call(_appendSender(callDataCharlie, users.charlie));
         require(success3, "Charlie's forwarded call failed");
@@ -302,17 +303,17 @@ contract ERC2771ContextTest is BaseVaultTest {
         vm.prank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
         vm.prank(users.alice);
-        bytes32 requestIdAlice = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestIdAlice = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.bob);
         kUSD.approve(address(vault), 500 * _1_USDC);
         vm.prank(users.bob);
-        bytes32 requestIdBob = vault.requestStake(users.bob, 500 * _1_USDC);
+        bytes32 requestIdBob = vault.requestStake(users.bob, users.bob, 500 * _1_USDC);
 
         vm.prank(users.charlie);
         kUSD.approve(address(vault), 750 * _1_USDC);
         vm.prank(users.charlie);
-        bytes32 requestIdCharlie = vault.requestStake(users.charlie, 750 * _1_USDC);
+        bytes32 requestIdCharlie = vault.requestStake(users.charlie, users.charlie, 750 * _1_USDC);
 
         // Verify each request has correct sender context
         BaseVaultTypes.StakeRequest memory req1 = vault.getStakeRequest(requestIdAlice);
@@ -334,7 +335,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -361,7 +362,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         // Forward stake request
-        bytes memory stakeCallData = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
+        bytes memory stakeCallData = abi.encodeCall(vault.requestStake, (users.alice, users.alice, 1000 * _1_USDC));
         vm.prank(trustedForwarder);
         (bool success1, bytes memory returnData1) = address(vault).call(_appendSender(stakeCallData, users.alice));
         require(success1, "Forwarded stake request failed");
@@ -396,7 +397,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Verify request was created correctly
         BaseVaultTypes.StakeRequest memory req = vault.getStakeRequest(requestId);
@@ -540,7 +541,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         kUSD.approve(address(vault), 1000 * _1_USDC);
 
         // Test: Forward a call through the new forwarder
-        bytes memory callData = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
+        bytes memory callData = abi.encodeCall(vault.requestStake, (users.alice, users.alice, 1000 * _1_USDC));
 
         vm.prank(newForwarder);
         (bool success, bytes memory returnData) = address(vault).call(_appendSender(callData, users.alice));
@@ -571,7 +572,7 @@ contract ERC2771ContextTest is BaseVaultTest {
 
         // Try to forward through old forwarder - should fail because _msgSender()
         // will return oldForwarder (not Alice from appended data)
-        bytes memory callData = abi.encodeCall(vault.requestStake, (users.alice, 1000 * _1_USDC));
+        bytes memory callData = abi.encodeCall(vault.requestStake, (users.alice, users.alice, 1000 * _1_USDC));
 
         vm.prank(oldForwarder);
         (bool success,) = address(vault).call(_appendSender(callData, users.alice));
@@ -593,7 +594,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(user);
-        bytes32 requestId = vault.requestStake(user, amount);
+        bytes32 requestId = vault.requestStake(user, user, amount);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);

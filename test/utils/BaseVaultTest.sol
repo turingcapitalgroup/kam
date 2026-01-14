@@ -44,7 +44,7 @@ contract BaseVaultTest is DeploymentBaseTest {
         uint256 lastTotalAssets = vault.totalAssets();
         // Request stake
         vm.prank(user);
-        bytes32 stakeRequestId = vault.requestStake(user, amount);
+        bytes32 stakeRequestId = vault.requestStake(user, user, amount);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);

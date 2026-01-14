@@ -121,13 +121,13 @@ contract KamIntegrationTest is DeploymentBaseTest {
         vm.prank(users.alice);
         IkToken(address(kUSD)).approve(_dnVault, _amount);
         vm.prank(users.alice);
-        bytes32 _requestIdDn = dnVault.requestStake(users.alice, _amount);
+        bytes32 _requestIdDn = dnVault.requestStake(users.alice, users.alice, _amount);
         assertEq(kUSD.balanceOf(users.alice), _amount);
 
         vm.prank(users.bob);
         IkToken(address(kUSD)).approve(_alphaVault, _amount);
         vm.prank(users.bob);
-        bytes32 _requestIdAlpha = alphaVault.requestStake(users.bob, _amount);
+        bytes32 _requestIdAlpha = alphaVault.requestStake(users.bob, users.bob, _amount);
         assertEq(kUSD.balanceOf(users.bob), _amount);
 
         _batchId = minter.getBatchId(USDC);
@@ -171,7 +171,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         vm.prank(users.bob);
         IkToken(address(kUSD)).approve(_dnVault, _amount);
         vm.prank(users.bob);
-        _requestIdDn = dnVault.requestStake(users.bob, _amount);
+        _requestIdDn = dnVault.requestStake(users.bob, users.bob, _amount);
 
         _batchId = dnVault.getBatchId();
         _closeBatch(_dnVault, _batchId);

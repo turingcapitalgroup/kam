@@ -192,7 +192,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Staking Workflow**:
 
-1. **Request Phase**: User calls `requestStake(to, kTokensAmount)`
+1. **Request Phase**: User calls `requestStake(owner, to, kTokensAmount)`
    - kTokens transferred from user to vault contract
    - Unique request ID generated and added to current batch
    - Virtual balance transfer coordinated via kAssetRouter

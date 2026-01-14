@@ -134,7 +134,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IVault
-    function requestStake(address _to, uint256 _amount) external payable returns (bytes32 _requestId) {
+    function requestStake(address _owner, address _to, uint256 _amount) external payable returns (bytes32 _requestId) {
         // Open `nonReentrant`
         _lockReentrant();
         BaseVaultStorage storage $ = _getBaseVaultStorage();
@@ -159,7 +159,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(_totalAssets() + _amount128 <= $.maxTotalAssets, KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED);
 
         // Generate request ID
-        _requestId = _createStakeRequestId(_msgSender(), _amount, block.timestamp);
+        _requestId = _createStakeRequestId(_owner, _amount, block.timestamp);
 
         // Notify the router to move underlying assets from DN strategy
         // To the strategy of this vault
@@ -174,11 +174,11 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         $.totalPendingStake += _amount.toUint128();
 
         // Add to user requests tracking
-        $.userRequests[_msgSender()].add(_requestId);
+        $.userRequests[_owner].add(_requestId);
 
         // Create staking request
         $.stakeRequests[_requestId] = BaseVaultTypes.StakeRequest({
-            user: _msgSender(),
+            user: _owner,
             kTokenAmount: _amount128,
             recipient: _to,
             requestTimestamp: block.timestamp.toUint64(),
@@ -186,7 +186,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             batchId: _batchId
         });
 
-        emit StakeRequestCreated(bytes32(_requestId), _msgSender(), $.kToken, _amount, _to, _batchId);
+        emit StakeRequestCreated(bytes32(_requestId), _owner, $.kToken, _amount, _to, _batchId);
 
         // Close `nonReentrant`
         _unlockReentrant();

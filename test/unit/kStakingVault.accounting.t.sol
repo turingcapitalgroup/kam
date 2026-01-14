@@ -143,7 +143,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
         // Request stake
         vm.prank(users.bob);
-        bytes32 requestId = vault.requestStake(users.bob, bobDeposit);
+        bytes32 requestId = vault.requestStake(users.bob, users.bob, bobDeposit);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -384,7 +384,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         vm.expectRevert(bytes(KSTAKINGVAULT_ZERO_AMOUNT)); // Should revert for zero amount
         vm.prank(users.alice);
-        vault.requestStake(users.alice, 0);
+        vault.requestStake(users.alice, users.alice, 0);
     }
 
     function test_InsufficientBalance_ShouldRevert() public {
@@ -395,7 +395,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         vm.expectRevert(bytes(KSTAKINGVAULT_INSUFFICIENT_BALANCE)); // Should revert for insufficient balance
         vm.prank(users.alice);
-        vault.requestStake(users.alice, excessiveAmount);
+        vault.requestStake(users.alice, users.alice, excessiveAmount);
     }
 
     function test_SharePrice_WithZeroTotalSupply() public view {
