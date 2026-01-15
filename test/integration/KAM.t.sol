@@ -210,7 +210,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         alphaVault.claimUnstakedAssets(_requestId);
         uint256 _balanceAfterBob = IkToken(address(kUSD)).balanceOf(users.bob);
         uint256 _claimedAmount = _balanceAfterBob - _balanceBeforeBob;
-        (,,,,,, uint256 totalNetAssets_, uint256 totalSupply_) = alphaVault.getBatchIdInfo(_batchId);
+        (,,,,,, uint256 totalNetAssets_, uint256 totalSupply_,,) = alphaVault.getBatchIdInfo(_batchId);
         uint256 _expectedAmount = alphaVault.convertToAssetsWithTotals(_sharesRequested, totalNetAssets_, totalSupply_);
         assertEq(_expectedAmount, _claimedAmount);
 

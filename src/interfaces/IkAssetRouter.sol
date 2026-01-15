@@ -27,17 +27,6 @@ interface IkAssetRouter is IVersioned {
                                 STRUCTS
     ///////////////////////////////////////////////////////////////*/
 
-    /// @notice Tracks requested and deposited asset amounts for batch processing coordination
-    /// @dev Used by kAssetRouter to maintain virtual balance accounting across vaults and coordinate
-    /// asset flows between kMinter redemption requests and vault settlements. Enables efficient
-    /// batch processing by tracking pending operations before physical asset movement occurs.
-    struct Balances {
-        /// @dev Amount of assets requested for redemption by kMinter but not yet processed
-        uint128 requested;
-        /// @dev Amount of assets deposited into vaults and available for yield generation
-        uint128 deposited;
-    }
-
     /// @notice Contains all parameters for a batch settlement proposal in the yield distribution system
     /// @dev Settlement proposals implement a cooldown mechanism for security, allowing guardians to verify
     /// yield calculations before execution. Once executed, the proposal triggers kToken minting/burning to
@@ -108,41 +97,12 @@ interface IkAssetRouter is IVersioned {
     /// @param amount The quantity of shares being pushed
     event SharesRequestedPushed(address indexed vault, bytes32 indexed batchId, uint256 amount);
 
-    /// @notice Emitted when shares are settled across multiple vaults with calculated share prices
-    /// @dev Marks the completion of a cross-vault settlement with final share price determination
-    /// @param vaults Array of vault addresses participating in the settlement
-    /// @param batchId The batch identifier for this settlement period
-    /// @param totalRequestedShares Total shares requested across all vaults in this settlement
-    /// @param totalAssets Array of total assets for each vault after settlement
-    /// @param sharePrice The final calculated share price for this settlement period
-    event SharesSettled(
-        address[] vaults,
-        bytes32 indexed batchId,
-        uint256 totalRequestedShares,
-        uint256[] totalAssets,
-        uint256 sharePrice
-    );
-
     /// @notice Emitted when a vault batch is settled with final asset accounting
     /// @dev Indicates completion of yield distribution and final asset allocation for a batch
     /// @param vault The vault address that completed batch settlement
     /// @param batchId The batch identifier that was settled
     /// @param totalAssets The final total asset value in the vault after settlement
     event BatchSettled(address indexed vault, bytes32 indexed batchId, uint256 totalAssets);
-
-    /// @notice Emitted when peg protection mechanism is activated due to vault shortfall
-    /// @dev Triggered when a vault cannot fulfill redemption requests, requiring asset transfers
-    /// from other vaults to maintain the protocol's 1:1 backing guarantee
-    /// @param vault The vault experiencing shortfall that triggered peg protection
-    /// @param shortfall The amount of assets needed to fulfill pending redemption requests
-    event PegProtectionActivated(address indexed vault, uint256 shortfall);
-
-    /// @notice Emitted when peg protection transfers assets between vaults to cover shortfalls
-    /// @dev Maintains protocol solvency by redistributing assets from surplus to deficit vaults
-    /// @param sourceVault The vault providing assets to cover the shortfall
-    /// @param targetVault The vault receiving assets to fulfill its redemption obligations
-    /// @param amount The quantity of assets transferred for peg protection
-    event PegProtectionExecuted(address indexed sourceVault, address indexed targetVault, uint256 amount);
 
     /// @notice Emitted when yield is distributed through kToken minting/burning operations
     /// @dev This is the core mechanism for maintaining 1:1 backing while distributing yield.
@@ -197,17 +157,6 @@ interface IkAssetRouter is IVersioned {
     /// @param vault The vault address for which settlement was cancelled
     /// @param batchId The batch identifier for which settlement was cancelled
     event SettlementCancelled(bytes32 indexed proposalId, address indexed vault, bytes32 indexed batchId);
-
-    /// @notice Emitted when a settlement proposal is updated with new yield calculation data
-    /// @dev Allows for correction of settlement proposals before execution if needed
-    /// @param proposalId The unique identifier of the updated proposal
-    /// @param totalAssets Updated total asset value in the vault
-    /// @param netted Updated net amount of deposits/redemptions
-    /// @param yield Updated yield amount for distribution
-    /// @param profit Updated profit flag (true for gains, false for losses)
-    event SettlementUpdated(
-        bytes32 indexed proposalId, uint256 totalAssets, uint256 netted, uint256 yield, bool profit
-    );
 
     /// @notice Emitted when the settlement cooldown period is updated by protocol governance
     /// @dev Cooldown provides security by allowing time to verify settlement proposals before execution

@@ -245,7 +245,7 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorStakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.StakeRequest memory stakeRequest = kStakingVault_vault.getStakeRequest(requestId);
         bytes32 batchId = stakeRequest.batchId;
-        (,, bool isSettled,,,, uint256 totalNetAssets, uint256 totalSupply) =
+        (,, bool isSettled,,,, uint256 totalNetAssets, uint256 totalSupply,,) =
             kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
@@ -324,7 +324,7 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorUnstakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.UnstakeRequest memory unstakeRequest = kStakingVault_vault.getUnstakeRequest(requestId);
         bytes32 batchId = unstakeRequest.batchId;
-        (,, bool isSettled,,, uint256 totalAssets, uint256 totalNetAssets, uint256 totalSupply) =
+        (,, bool isSettled,,, uint256 totalAssets, uint256 totalNetAssets, uint256 totalSupply,,) =
             kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
@@ -547,7 +547,7 @@ contract kStakingVaultHandler is BaseHandler {
                 - int256(kStakingVault_pendingStakeInBatch[proposal.batchId])
         );
 
-        (,,,,, uint256 totalAssets, uint256 totalNetAssets,) = kStakingVault_vault.getBatchIdInfo(proposal.batchId);
+        (,,,,, uint256 totalAssets, uint256 totalNetAssets,,,) = kStakingVault_vault.getBatchIdInfo(proposal.batchId);
         uint256 expectedSharesToBurn;
         if (totalRequestedShares != 0) {
             // Discount protocol fees
@@ -597,7 +597,7 @@ contract kStakingVaultHandler is BaseHandler {
         // Shares minted = depositedInBatch * totalSupply / totalNetAssets (at settlement snapshot)
         uint256 depositedInBatch = kStakingVault_depositedInBatch[proposal.batchId];
         if (depositedInBatch > 0 && totalNetAssets > 0) {
-            (,,,,,, uint256 batchTotalNetAssets, uint256 batchTotalSupply) =
+            (,,,,,, uint256 batchTotalNetAssets, uint256 batchTotalSupply,,) =
                 kStakingVault_vault.getBatchIdInfo(proposal.batchId);
             uint256 sharesMintedToVault = VaultMathLib.convertToSharesWithAssetsAndSupply(
                 depositedInBatch, batchTotalNetAssets, batchTotalSupply

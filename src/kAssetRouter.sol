@@ -100,10 +100,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         OptimizedBytes32EnumerableSetLib.Bytes32Set batchIds;
         /// @dev Maps each vault to its set of pending settlement proposal IDs awaiting execution
         mapping(address vault => OptimizedBytes32EnumerableSetLib.Bytes32Set) vaultPendingProposalIds;
-        /// @dev Virtual balance tracking for each vault-batch combination (deposited/requested amounts)
-        mapping(address account => mapping(bytes32 batchId => Balances)) vaultBatchBalances;
-        /// @dev Tracks requested shares for each vault-batch combination in share-based accounting
-        mapping(address vault => mapping(bytes32 batchId => uint256)) vaultRequestedShares;
         /// @dev Complete settlement proposal data indexed by unique proposal ID
         mapping(bytes32 proposalId => VaultSettlementProposal) settlementProposals;
     }
@@ -162,14 +158,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _kMinter = msg.sender;
         _checkKMinter(_kMinter);
 
-        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-
         // Send deposits to kMinter adapter
         IVaultAdapter _adapter = IVaultAdapter(_registry().getAdapter(_kMinter, _asset));
         _asset.safeTransfer(address(_adapter), _amount);
 
-        // Increase deposits in the batch for kMinter
-        $.vaultBatchBalances[_kMinter][_batchId].deposited += _amount.toUint128();
         emit AssetsPushed(_kMinter, _amount);
 
         _unlockReentrant();
@@ -183,10 +175,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _kMinter = msg.sender;
         _checkKMinter(_kMinter);
 
-        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-
-        // Increment first, then validate cumulative total doesn't exceed virtual balance
-        uint256 _totalRequested = $.vaultBatchBalances[_kMinter][_batchId].requested += _amount.toUint128();
+        // Validate cumulative total doesn't exceed virtual balance
+        uint256 _totalRequested = IkMinter(_kMinter).getBatchInfo(_batchId).requestedSharesInBatch;
         _checkSufficientVirtualBalance(_kMinter, _asset, _totalRequested);
 
         emit AssetsRequestPulled(_kMinter, _asset, _amount);
@@ -213,12 +203,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         _checkAmountNotZero(_amount);
         _checkVault(msg.sender);
 
-        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-        uint256 _totalAssetsRequested = $.vaultBatchBalances[_sourceVault][_batchId].requested += _amount.toUint128();
-
-        _checkSufficientVirtualBalance(_sourceVault, _asset, _totalAssetsRequested);
-
-        $.vaultBatchBalances[_targetVault][_batchId].deposited += _amount.toUint128();
+        // Validate source vault has sufficient virtual balance to transfer
+        _checkSufficientVirtualBalance(_sourceVault, _asset, _amount);
 
         emit AssetsTransferred(_sourceVault, _targetVault, _asset, _amount);
         _unlockReentrant();
@@ -230,11 +216,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         _checkPaused();
         _checkAmountNotZero(_amount);
         _checkVault(msg.sender);
-
-        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-
-        // Update batch tracking for settlement
-        $.vaultRequestedShares[_sourceVault][_batchId] += _amount;
 
         emit SharesRequestedPushed(_sourceVault, _batchId, _amount);
         _unlockReentrant();
@@ -288,18 +269,19 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         uint256 _lastTotalAssets = _virtualBalance(_vault, _asset);
 
         if (_isKMinter(_vault)) {
-            _netted = int256(uint256($.vaultBatchBalances[_vault][_batchId].deposited))
-                - int256(uint256($.vaultBatchBalances[_vault][_batchId].requested));
+            IkMinter.BatchInfo memory _batchInfo = IkMinter(_vault).getBatchInfo(_batchId);
+            _netted = int256(uint256(_batchInfo.depositedInBatch)) - int256(uint256(_batchInfo.requestedSharesInBatch));
         } else {
+            (,,,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
+                IkStakingVault(_vault).getBatchIdInfo(_batchId);
             uint256 _totalSupply = IkStakingVault(_vault).totalSupply();
             // When _totalSupply == 0, use 1:1 ratio; otherwise math handles _totalAssets == 0 naturally (returns 0)
             uint256 _requestedAssets = _totalSupply == 0
-                ? $.vaultRequestedShares[_vault][_batchId]
-                : $.vaultRequestedShares[_vault][_batchId].fullMulDiv(_totalAssets, _totalSupply);
+                ? _requestedSharesInBatch
+                : _requestedSharesInBatch.fullMulDiv(_totalAssets, _totalSupply);
             // casting to 'int256' is safe because we're doing arithmetic on uint256 values
             // forge-lint: disable-next-line(unsafe-typecast)
-            _netted =
-                int256(uint256($.vaultBatchBalances[_vault][_batchId].deposited)) - int256(uint256(_requestedAssets));
+            _netted = int256(_depositedInBatch) - int256(_requestedAssets);
         }
 
         // casting to 'int256' is safe because we're doing arithmetic on uint256 values
@@ -419,7 +401,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         int256 _netted = _proposal.netted;
         int256 _yield = _proposal.yield;
         bool _profit = _yield > 0;
-        uint256 _requested = $.vaultBatchBalances[_vault][_batchId].requested;
         address _kMinter = _getKMinter();
         address _kToken = _getKTokenForAsset(_asset);
         IRegistry _registry = _registry();
@@ -429,6 +410,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
         // kMinter settlement
         if (_vault == _kMinter) {
+            uint256 _requested = IkMinter(_vault).getBatchInfo(_batchId).requestedSharesInBatch;
             if (_requested > 0) {
                 // Transfer assets to batch receiver for redemptions
                 address _receiver = IkMinter(_vault).getBatchReceiver(_batchId);
@@ -456,7 +438,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _adapter.setTotalAssets(uint256(_kMinterNewTotalAssets));
             emit TotalAssetsSet(address(_adapter), uint256(_kMinterNewTotalAssets));
         } else {
-            uint256 _totalRequestedShares = $.vaultRequestedShares[_vault][_batchId];
+            // Get requested shares from vault batch info
+            (,,,,,,,,, uint256 _totalRequestedShares) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
             // kMinter yield is sent to insuranceFund, cannot be minted.
             if (_yield != 0) {
                 if (_profit) {
@@ -487,19 +470,18 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
             }
 
-            // Mark batch as settled in the vault
+            // Mark batch as settled in the vault (also burns unstake shares and tracks claimable kTokens)
             ISettleBatch(_vault).settleBatch(_batchId);
             _adapter.setTotalAssets(_totalAssets);
             emit TotalAssetsSet(address(_adapter), _totalAssets);
 
-            // If there were withdrawals, burn all shares at settlement and handle fees
+            // If there were withdrawals, handle fee transfer to treasury
             if (_totalRequestedShares != 0) {
                 // Get snapshot values from batch info (after settlement)
-                (,,,,, uint256 _batchTotalAssets, uint256 _batchTotalNetAssets, uint256 _batchTotalSupply) =
+                (,,,,, uint256 _batchTotalAssets, uint256 _batchTotalNetAssets, uint256 _batchTotalSupply,,) =
                     IkStakingVault(_vault).getBatchIdInfo(_batchId);
 
                 // Calculate total kTokens corresponding to all requested shares at gross price
-                // This is the total pool to be divided between users (net) and fees
                 uint256 _totalKTokensForShares = IkStakingVault(_vault)
                     .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalAssets, _batchTotalSupply);
 
@@ -508,11 +490,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                     .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalNetAssets, _batchTotalSupply);
 
                 // Fee assets is the difference between gross and net kTokens
-                // This ensures no rounding dust remains in the vault
                 uint256 _feeAssets = _totalKTokensForShares - _claimableKTokens;
-
-                // Burn all requested shares (including fee portion)
-                IkStakingVault(_vault).burnUnstakeShares(_batchId, _totalRequestedShares, _claimableKTokens);
 
                 // Move fees as kTokens to treasury
                 if (_feeAssets != 0) {
@@ -705,15 +683,20 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         view
         returns (uint256 _deposited, uint256 _requested)
     {
-        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-        Balances memory _balances = $.vaultBatchBalances[_vault][_batchId];
-        return (_balances.deposited, _balances.requested);
+        if (_isKMinter(_vault)) {
+            IkMinter.BatchInfo memory _batchInfo = IkMinter(_vault).getBatchInfo(_batchId);
+            return (_batchInfo.depositedInBatch, _batchInfo.requestedSharesInBatch);
+        } else {
+            (,,,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
+                IkStakingVault(_vault).getBatchIdInfo(_batchId);
+            return (_depositedInBatch, _requestedSharesInBatch);
+        }
     }
 
     /// @inheritdoc IkAssetRouter
     function getRequestedShares(address _vault, bytes32 _batchId) external view returns (uint256) {
-        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-        return $.vaultRequestedShares[_vault][_batchId];
+        (,,,,,,,,, uint256 _requestedSharesInBatch) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
+        return _requestedSharesInBatch;
     }
 
     /// @inheritdoc IkAssetRouter
