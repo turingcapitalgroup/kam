@@ -57,6 +57,8 @@ library BaseVaultTypes {
         uint128 depositedInBatch;
         /// @notice Amount of assets withdrawn in a batch
         uint128 withdrawnInBatch;
+        /// @notice Amount of shares requested for unstaking in a batch
+        uint128 requestedSharesInBatch;
         /// @notice Total assets at settlement time (gross, including fees)
         uint256 totalAssets;
         /// @notice Total net assets at settlement time (after fees)

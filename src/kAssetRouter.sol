@@ -487,19 +487,18 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
             }
 
-            // Mark batch as settled in the vault
+            // Mark batch as settled in the vault (also burns unstake shares and tracks claimable kTokens)
             ISettleBatch(_vault).settleBatch(_batchId);
             _adapter.setTotalAssets(_totalAssets);
             emit TotalAssetsSet(address(_adapter), _totalAssets);
 
-            // If there were withdrawals, burn all shares at settlement and handle fees
+            // If there were withdrawals, handle fee transfer to treasury
             if (_totalRequestedShares != 0) {
                 // Get snapshot values from batch info (after settlement)
                 (,,,,, uint256 _batchTotalAssets, uint256 _batchTotalNetAssets, uint256 _batchTotalSupply) =
                     IkStakingVault(_vault).getBatchIdInfo(_batchId);
 
                 // Calculate total kTokens corresponding to all requested shares at gross price
-                // This is the total pool to be divided between users (net) and fees
                 uint256 _totalKTokensForShares = IkStakingVault(_vault)
                     .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalAssets, _batchTotalSupply);
 
@@ -508,11 +507,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                     .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalNetAssets, _batchTotalSupply);
 
                 // Fee assets is the difference between gross and net kTokens
-                // This ensures no rounding dust remains in the vault
                 uint256 _feeAssets = _totalKTokensForShares - _claimableKTokens;
-
-                // Burn all requested shares (including fee portion)
-                IkStakingVault(_vault).burnUnstakeShares(_batchId, _totalRequestedShares, _claimableKTokens);
 
                 // Move fees as kTokens to treasury
                 if (_feeAssets != 0) {

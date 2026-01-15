@@ -214,6 +214,9 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             KSTAKINGVAULT_BATCH_LIMIT_REACHED
         );
 
+        // Track requested shares in batch for settlement
+        $.batches[_batchId].requestedSharesInBatch += _stkTokenAmount.toUint128();
+
         // Generate request ID
         _requestId = _createStakeRequestId(_msgSender(), _stkTokenAmount, block.timestamp);
 
@@ -357,44 +360,42 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(!$.batches[_batchId].isSettled, VAULTBATCHES_VAULT_SETTLED);
         $.batches[_batchId].isSettled = true;
 
-        // Snapshot total assets and supply at settlement time to calculate share prices on-demand
-        $.batches[_batchId].totalAssets = _totalAssets();
-        $.batches[_batchId].totalNetAssets = _totalNetAssets();
-        $.batches[_batchId].totalSupply = totalSupply();
+        // Cache total assets and supply at settlement time for calculations
+        uint256 _batchTotalAssets = _totalAssets();
+        uint256 _batchTotalNetAssets = _totalNetAssets();
+        uint256 _batchTotalSupply = totalSupply();
 
         // Mint shares for this batch's pending stakes to the vault itself
         // This effectively "claims" shares for all pending stakers in this batch at settlement price
         uint128 batchDeposited = $.batches[_batchId].depositedInBatch;
         if (batchDeposited > 0) {
-            uint256 sharesToMint = _convertToSharesWithTotals(
-                batchDeposited, $.batches[_batchId].totalNetAssets, $.batches[_batchId].totalSupply
-            );
+            uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalNetAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
             $.totalPendingStake -= batchDeposited;
         }
 
+        // Burn all unstake shares and track claimable kTokens
+        uint128 requestedShares = $.batches[_batchId].requestedSharesInBatch;
+        if (requestedShares > 0) {
+            // Calculate claimable kTokens for users (net amount after fees)
+            uint256 _claimableKTokens =
+                _convertToAssetsWithTotals(requestedShares, _batchTotalNetAssets, _batchTotalSupply);
+
+            // Burn all requested shares
+            _burn(address(this), requestedShares);
+
+            // Track claimable kTokens in global tracking
+            $.totalPendingUnstake += _claimableKTokens.toUint128();
+
+            emit UnstakeSharesBurned(_batchId, requestedShares, _claimableKTokens);
+        }
+
+        // Snapshot total assets and supply after all operations
+        $.batches[_batchId].totalAssets = _batchTotalAssets;
+        $.batches[_batchId].totalNetAssets = _batchTotalNetAssets;
+        $.batches[_batchId].totalSupply = _batchTotalSupply;
+
         emit BatchSettled(_batchId);
-    }
-
-    /// @notice Burns all unstake shares for a batch and records claimable kTokens
-    /// @dev Called by kAssetRouter during settlement to burn all requested shares (including fee portion)
-    /// and track the total claimable kTokens for users in this batch. This moves share burning from
-    /// claim time to settlement time, ensuring totalAssets correctly excludes pending unstake amounts.
-    /// @param _batchId The batch identifier
-    /// @param _totalRequestedShares Total shares to burn (including fee shares)
-    /// @param _claimableKTokens Total kTokens claimable by users (net of fees)
-    function burnUnstakeShares(bytes32 _batchId, uint256 _totalRequestedShares, uint256 _claimableKTokens) external {
-        _checkRouter(_msgSender());
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        require($.batches[_batchId].isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
-
-        // Burn all requested shares (including fee portion)
-        _burn(address(this), _totalRequestedShares);
-
-        // Track claimable kTokens in global tracking
-        $.totalPendingUnstake += _claimableKTokens.toUint128();
-
-        emit UnstakeSharesBurned(_batchId, _totalRequestedShares, _claimableKTokens);
     }
 
     /// @notice Internal function to create deterministic batch IDs with collision resistance
