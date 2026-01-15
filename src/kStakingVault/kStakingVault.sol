@@ -44,7 +44,6 @@ import { K_MINTER, MAX_BPS } from "kam/src/constants/Constants.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
-import {console} from "forge-std/console.sol";
 
 /// @title kStakingVault
 /// @notice Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
@@ -310,16 +309,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
 
-        console.log("1");
-        console.log("stkTokenAmount : ", stkTokenAmount);
-        console.log("$.totalPendingUnstake : ",$.totalPendingUnstake);
-        console.log("$._totalKTokensNet : ",_totalKTokensNet);
-        console.log("totalNEtAssets : ",batch.totalNetAssets);
-        console.log("totalSupply : ",batch.totalSupply);
-
         // Reduce totalPendingUnstake - shares were already burned at settlement time
         $.totalPendingUnstake -= _totalKTokensNet.toUint128();
-        console.log("1");
 
         emit UnstakingAssetsClaimed(batchId, _requestId, user, _totalKTokensNet);
         emit KTokenUnstaked(user, stkTokenAmount, _totalKTokensNet);
@@ -363,33 +354,23 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(!$.batches[_batchId].isSettled, VAULTBATCHES_VAULT_SETTLED);
         $.batches[_batchId].isSettled = true;
 
-
-        console.log("sp : ", _sharePrice());
         // Cache total assets and supply at settlement time for calculations
         uint256 _batchTotalAssets = _totalAssets();
         uint256 _batchTotalNetAssets = _totalNetAssets();
         uint256 _batchTotalSupply = totalSupply();
 
-        console.log("_batchTotalAssets : ", _batchTotalAssets);
-        console.log("_batchTotalNetAssets : ", _batchTotalNetAssets);
-        console.log("_batchTotalSupply : ", _batchTotalSupply);
-
         // Mint shares for this batch's pending stakes to the vault itself
         // This effectively "claims" shares for all pending stakers in this batch at settlement price
         uint128 batchDeposited = $.batches[_batchId].depositedInBatch;
-        console.log("batchDeposited : ", batchDeposited);
-
         
         if (batchDeposited != 0) {
             uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalNetAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
             $.totalPendingStake -= batchDeposited;
         }
-        console.log("sp : ", _sharePrice());
 
         // Burn all unstake shares and track claimable kTokens
         uint128 requestedShares = $.batches[_batchId].requestedSharesInBatch;
-        console.log("requestedShares : ", requestedShares);
 
         if (requestedShares != 0) {
             // Calculate total kTokens corresponding to all requested shares at gross price
@@ -417,17 +398,11 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             emit UnstakeSharesBurned(_batchId, requestedShares, _claimableKTokens);
         }
 
-        console.log("sp : ", _sharePrice());
-
         // Snapshot total assets and supply after all operations
         // Only keep the net
         $.batches[_batchId].totalAssets = _batchTotalAssets;
         $.batches[_batchId].totalNetAssets = _batchTotalNetAssets;
         $.batches[_batchId].totalSupply = _batchTotalSupply;
-
-        console.log("_batchTotalAssets 2: ", $.batches[_batchId].totalAssets);
-        console.log("_batchTotalNetAssets 2: ", $.batches[_batchId].totalNetAssets);
-        console.log("_batchTotalSupply 2: ", $.batches[_batchId].totalSupply);
 
         emit BatchSettled(_batchId);
     }
