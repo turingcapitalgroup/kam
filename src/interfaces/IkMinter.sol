@@ -47,10 +47,10 @@ interface IkMinter is IVersioned {
         address asset;
         /// @notice Batch receiver address
         address batchReceiver;
-        /// @notice Assets minted in this batch
-        uint128 mintedInBatch;
-        /// @notice Assets redeemed in this batch
-        uint128 burnedInBatch;
+        /// @notice Assets deposited in this batch
+        uint128 depositedInBatch;
+        /// @notice Assets requested for redemption in this batch
+        uint128 requestedSharesInBatch;
         /// @notice Whether the batch is closed
         bool isClosed;
         /// @notice Whether the batch is settled

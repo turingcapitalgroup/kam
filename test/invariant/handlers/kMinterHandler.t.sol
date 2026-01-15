@@ -183,8 +183,8 @@ contract kMinterHandler is BaseHandler {
         // INVARIANT_F: Track batch closure - record minted/burned at closure
         IkMinter.BatchInfo memory batch = kMinter_minter.getBatchInfo(batchId);
         kMinter_closedBatches.add(batchId);
-        kMinter_mintedAtClosure[batchId] = batch.mintedInBatch;
-        kMinter_burnedAtClosure[batchId] = batch.burnedInBatch;
+        kMinter_mintedAtClosure[batchId] = batch.depositedInBatch;
+        kMinter_burnedAtClosure[batchId] = batch.requestedSharesInBatch;
 
         vm.expectEmit(false, true, true, true);
         emit IkAssetRouter.SettlementProposed(
@@ -393,8 +393,14 @@ contract kMinterHandler is BaseHandler {
         for (uint256 i = 0; i < kMinter_closedBatches.count(); i++) {
             bytes32 batchId = kMinter_closedBatches.at(i);
             IkMinter.BatchInfo memory batch = kMinter_minter.getBatchInfo(batchId);
-            assertEq(batch.mintedInBatch, kMinter_mintedAtClosure[batchId], "KMINTER: INVARIANT_F - Mint after closure");
-            assertEq(batch.burnedInBatch, kMinter_burnedAtClosure[batchId], "KMINTER: INVARIANT_F - Burn after closure");
+            assertEq(
+                batch.depositedInBatch, kMinter_mintedAtClosure[batchId], "KMINTER: INVARIANT_F - Mint after closure"
+            );
+            assertEq(
+                batch.requestedSharesInBatch,
+                kMinter_burnedAtClosure[batchId],
+                "KMINTER: INVARIANT_F - Burn after closure"
+            );
         }
     }
 

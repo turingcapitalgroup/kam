@@ -248,7 +248,9 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
             uint256 netSharePrice_,
             uint256 totalAssets_,
             uint256 totalNetAssets_,
-            uint256 totalSupply_
+            uint256 totalSupply_,
+            uint256 depositedInBatch,
+            uint256 requestedSharesInBatch
         )
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
@@ -268,7 +270,9 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
             netSharePrice_,
             batch.totalAssets,
             batch.totalNetAssets,
-            batch.totalSupply
+            batch.totalSupply,
+            batch.depositedInBatch,
+            batch.requestedSharesInBatch
         );
     }
 

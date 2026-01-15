@@ -123,10 +123,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         assetRouter.kAssetPush(USDC, _amount, _batchId);
 
-        (uint256 _deposited, uint256 _requested) = assetRouter.getBatchIdBalances(address(minter), _batchId);
-        assertEq(_deposited, _amount);
-        assertEq(_requested, 0);
-
         IVaultAdapter _adapter = IVaultAdapter(registry.getAdapter(address(minter), USDC));
         assertEq(mockUSDC.balanceOf(address(_adapter)), _amount);
     }
@@ -172,10 +168,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.expectEmit(true, true, true, true);
         emit IkAssetRouter.AssetsRequestPulled(address(minter), USDC, _amount);
         assetRouter.kAssetRequestPull(USDC, _amount, _batchId);
-
-        (uint256 _deposited, uint256 _requested) = assetRouter.getBatchIdBalances(address(minter), _batchId);
-        assertEq(_requested, _amount);
-        assertEq(_deposited, 0);
     }
 
     function test_KAssetRequestPull_Require_Not_Paused() public {
@@ -210,10 +202,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(address(minter));
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
         assetRouter.kAssetRequestPull(DAI, _amount, _batchId);
-
-        vm.prank(address(minter));
-        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
-        assetRouter.kAssetRequestPull(USDC, _amount, _batchId);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -233,15 +221,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
         emit IkAssetRouter.AssetsTransferred(address(alphaVault), address(betaVault), USDC, _amount);
 
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
-
-        (uint256 _alphaDeposited, uint256 _alphaRequested) =
-            assetRouter.getBatchIdBalances(address(alphaVault), _batchId);
-        (uint256 _betaDeposited, uint256 _betaRequested) = assetRouter.getBatchIdBalances(address(betaVault), _batchId);
-
-        assertEq(_alphaRequested, _amount);
-        assertEq(_alphaDeposited, 0);
-        assertEq(_betaDeposited, _amount);
-        assertEq(_betaRequested, 0);
     }
 
     function test_KAssetTransfer_Require_Not_Paused() public {
@@ -278,7 +257,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         bytes32 _batchId = TEST_BATCH_ID;
 
         vm.prank(address(alphaVault));
-        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
+        vm.expectRevert();
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
 
         IVaultAdapter _sourceAdapter = IVaultAdapter(registry.getAdapter(address(alphaVault), USDC));
@@ -286,7 +265,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         _sourceAdapter.setTotalAssets(_amount - 1);
 
         vm.prank(address(alphaVault));
-        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
+        vm.expectRevert();
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
     }
 
@@ -302,7 +281,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
 
         vm.prank(address(alphaVault));
-        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, 1, _batchId);
     }
 
@@ -318,8 +296,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.expectEmit(true, true, false, true);
         emit IkAssetRouter.SharesRequestedPushed(address(alphaVault), _batchId, _amount);
         assetRouter.kSharesRequestPush(address(alphaVault), _amount, _batchId);
-
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), _batchId), _amount);
     }
 
     function test_KSharesRequestPush_Require_Not_Paused() public {
@@ -758,49 +734,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assertEq(req, 0);
     }
 
-    function test_GetBatchIdBalances_WithData() public {
-        bytes32 batchId = TEST_BATCH_ID;
-        uint256 depositAmount = TEST_AMOUNT;
-
-        mockUSDC.mint(address(minter), depositAmount);
-        vm.prank(address(minter));
-        IERC20(USDC).transfer(address(assetRouter), depositAmount);
-        vm.prank(address(minter));
-        assetRouter.kAssetPush(USDC, depositAmount, batchId);
-
-        (uint256 dep, uint256 req) = assetRouter.getBatchIdBalances(address(minter), batchId);
-        assertEq(dep, depositAmount);
-        assertEq(req, 0);
-    }
-
-    function test_GetRequestedShares() public {
-        uint256 amount = TEST_AMOUNT;
-        bytes32 batchId = TEST_BATCH_ID;
-
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), 0);
-
-        vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPush(address(alphaVault), amount, batchId);
-
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId), amount);
-    }
-
-    function test_GetRequestedShares_MultipleBatches() public {
-        uint256 amount1 = TEST_AMOUNT;
-        uint256 amount2 = TEST_AMOUNT * 2;
-        bytes32 batchId1 = TEST_BATCH_ID;
-        bytes32 batchId2 = bytes32(uint256(TEST_BATCH_ID) + 1);
-
-        vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPush(address(alphaVault), amount1, batchId1);
-
-        vm.prank(address(alphaVault));
-        assetRouter.kSharesRequestPush(address(alphaVault), amount2, batchId2);
-
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId1), amount1);
-        assertEq(assetRouter.getRequestedShares(address(alphaVault), batchId2), amount2);
-    }
-
     function test_GetSettlementProposal() public {
         bytes32 fakeProposalId = keccak256("fake");
         IkAssetRouter.VaultSettlementProposal memory proposal = assetRouter.getSettlementProposal(fakeProposalId);
@@ -917,8 +850,8 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(address(minter));
         assetRouter.kAssetPush(USDC, maxAmount, batchId);
 
-        (uint256 deposited,) = assetRouter.getBatchIdBalances(address(minter), batchId);
-        assertEq(deposited, maxAmount);
+        IVaultAdapter _adapter = IVaultAdapter(registry.getAdapter(address(minter), USDC));
+        assertEq(mockUSDC.balanceOf(address(_adapter)), maxAmount);
     }
 
     /* //////////////////////////////////////////////////////////////

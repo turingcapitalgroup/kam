@@ -27,17 +27,6 @@ interface IkAssetRouter is IVersioned {
                                 STRUCTS
     ///////////////////////////////////////////////////////////////*/
 
-    /// @notice Tracks requested and deposited asset amounts for batch processing coordination
-    /// @dev Used by kAssetRouter to maintain virtual balance accounting across vaults and coordinate
-    /// asset flows between kMinter redemption requests and vault settlements. Enables efficient
-    /// batch processing by tracking pending operations before physical asset movement occurs.
-    struct Balances {
-        /// @dev Amount of assets requested for redemption by kMinter but not yet processed
-        uint128 requested;
-        /// @dev Amount of assets deposited into vaults and available for yield generation
-        uint128 deposited;
-    }
-
     /// @notice Contains all parameters for a batch settlement proposal in the yield distribution system
     /// @dev Settlement proposals implement a cooldown mechanism for security, allowing guardians to verify
     /// yield calculations before execution. Once executed, the proposal triggers kToken minting/burning to

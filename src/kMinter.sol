@@ -144,7 +144,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
 
         // Make sure we dont exceed the max mint per batch
         require(
-            ($.batches[_batchId].mintedInBatch += _amount.toUint128()) <= _registry().getMaxMintPerBatch(_asset),
+            ($.batches[_batchId].depositedInBatch += _amount.toUint128()) <= _registry().getMaxMintPerBatch(_asset),
             KMINTER_BATCH_MINT_REACHED
         );
         $.totalLockedAssets[_asset] += _amount;
@@ -183,7 +183,8 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
 
         // Check cap before creating request ID to save gas if cap reached
         require(
-            ($.batches[_batchId].burnedInBatch += _amount.toUint128()) <= _registry().getMaxBurnPerBatch(_asset),
+            ($.batches[_batchId].requestedSharesInBatch += _amount.toUint128())
+                <= _registry().getMaxBurnPerBatch(_asset),
             KMINTER_BATCH_REDEEM_REACHED
         );
 
