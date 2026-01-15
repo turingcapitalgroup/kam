@@ -166,13 +166,14 @@ contract DeployVaultsScript is Script, DeploymentManager {
             betaVault: betaVault
         });
 
-        // Write to JSON only if requested
+        // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            writeContractAddress("kStakingVaultImpl", stakingVaultImpl);
-            writeContractAddress("dnVaultUSDC", dnVaultUSDC);
-            writeContractAddress("dnVaultWBTC", dnVaultWBTC);
-            writeContractAddress("alphaVault", alphaVault);
-            writeContractAddress("betaVault", betaVault);
+            queueContractAddress("kStakingVaultImpl", stakingVaultImpl);
+            queueContractAddress("dnVaultUSDC", dnVaultUSDC);
+            queueContractAddress("dnVaultWBTC", dnVaultWBTC);
+            queueContractAddress("alphaVault", alphaVault);
+            queueContractAddress("betaVault", betaVault);
+            flushContractAddresses();
         }
 
         return deployment;
@@ -212,7 +213,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 (
                     config.roles.owner,
                     existing.contracts.kRegistry,
-                    config.dnVaultUSDC.useKToken,
+                    config.dnVaultUSDC.startPaused,
                     config.dnVaultUSDC.name,
                     config.dnVaultUSDC.symbol,
                     config.dnVaultUSDC.decimals,
@@ -238,7 +239,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 (
                     config.roles.owner,
                     existing.contracts.kRegistry,
-                    config.dnVaultWBTC.useKToken,
+                    config.dnVaultWBTC.startPaused,
                     config.dnVaultWBTC.name,
                     config.dnVaultWBTC.symbol,
                     config.dnVaultWBTC.decimals,
@@ -264,7 +265,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 (
                     config.roles.owner,
                     existing.contracts.kRegistry,
-                    config.alphaVault.useKToken,
+                    config.alphaVault.startPaused,
                     config.alphaVault.name,
                     config.alphaVault.symbol,
                     config.alphaVault.decimals,
@@ -290,7 +291,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 (
                     config.roles.owner,
                     existing.contracts.kRegistry,
-                    config.betaVault.useKToken,
+                    config.betaVault.startPaused,
                     config.betaVault.name,
                     config.betaVault.symbol,
                     config.betaVault.decimals,

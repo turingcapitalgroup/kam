@@ -21,7 +21,7 @@ abstract contract DeploymentManager is Script {
         uint256 chainId;
         RoleAddresses roles;
         AssetAddresses assets;
-        ERC7540Addresses ERC7540s;
+        MetawalletAddresses metawallets;
         CustodialTargets custodialTargets;
         KTokenConfig kUSD;
         KTokenConfig kBTC;
@@ -51,7 +51,7 @@ abstract contract DeploymentManager is Script {
         address WBTC;
     }
 
-    struct ERC7540Addresses {
+    struct MetawalletAddresses {
         address USDC;
         address WBTC;
     }
@@ -74,7 +74,7 @@ abstract contract DeploymentManager is Script {
         string symbol;
         uint8 decimals;
         string underlyingAsset;
-        bool useKToken;
+        bool startPaused;
         uint128 maxTotalAssets;
         uint256 maxDepositPerBatch;
         uint256 maxWithdrawPerBatch;
@@ -107,25 +107,27 @@ abstract contract DeploymentManager is Script {
     struct MaxTransferAmounts {
         uint256 USDC;
         uint256 WBTC;
-        uint256 ERC7540USDC;
-        uint256 ERC7540WBTC;
+        uint256 metawalletUSDC;
+        uint256 metawalletWBTC;
     }
 
     struct AllowedReceivers {
         string[] USDC;
         string[] WBTC;
-        string[] ERC7540USDC;
-        string[] ERC7540WBTC;
+        string[] metawalletUSDC;
+        string[] metawalletWBTC;
     }
 
     struct AllowedSources {
-        string[] ERC7540USDC;
-        string[] ERC7540WBTC;
+        string[] metawalletUSDC;
+        string[] metawalletWBTC;
     }
 
     struct AllowedSpenders {
         string[] USDC;
         string[] WBTC;
+        string[] metawalletUSDC;
+        string[] metawalletWBTC;
     }
 
     struct MockAssetsConfig {
@@ -152,6 +154,7 @@ abstract contract DeploymentManager is Script {
     }
 
     struct ContractAddresses {
+        // Core infrastructure
         address ERC1967Factory;
         address kRegistryImpl;
         address kRegistry;
@@ -159,38 +162,122 @@ abstract contract DeploymentManager is Script {
         address kMinter;
         address kAssetRouterImpl;
         address kAssetRouter;
+        // Tokens
         address kUSD;
         address kBTC;
+        // Modules
         address readerModule;
         address adapterGuardianModule;
         address kTokenFactory;
+        // Vaults
         address kStakingVaultImpl;
-        address dnVault;
+        address dnVault; // unused but kept for struct layout
         address dnVaultUSDC;
         address dnVaultWBTC;
         address alphaVault;
         address betaVault;
+        // Adapters
         address vaultAdapterImpl;
-        address vaultAdapter;
+        address vaultAdapter; // unused but kept for struct layout
         address dnVaultAdapterUSDC;
         address dnVaultAdapterWBTC;
         address alphaVaultAdapter;
         address betaVaultAdapter;
         address kMinterAdapterUSDC;
         address kMinterAdapterWBTC;
+        // Mock contracts (unused but kept for struct layout)
         address mockERC7540USDC;
         address mockERC7540WBTC;
         address mockWalletUSDC;
         address mockWalletWBTC;
+        // External contracts
         address ERC7540USDC;
         address ERC7540WBTC;
         address WalletUSDC;
-        address WalletWBTC;
-        address erc20ParameterChecker;
+        address WalletWBTC; // unused but kept for struct layout
+        // Insurance
+        address erc20ExecutionValidator;
         address minimalSmartAccountImpl;
         address minimalSmartAccountFactory;
         address insuranceSmartAccount;
     }
+
+    /// @notice Pending contract address write for batch operations
+    struct PendingWrite {
+        bytes32 key;
+        address addr;
+    }
+
+    /// @notice Pending writes array (max 50 entries per script)
+    PendingWrite[50] private _pendingWrites;
+
+    /// @notice Count of pending writes
+    uint256 private _pendingWriteCount;
+
+    /*//////////////////////////////////////////////////////////////
+                    JSON ADDRESS KEY CONSTANTS
+    //////////////////////////////////////////////////////////////*/
+    // NOTE: These are for JSON serialization only, NOT protocol registry lookups.
+    // Prefix JK_ (Json Key) to avoid shadowing protocol constants (K_MINTER, K_ASSET_ROUTER, etc.)
+
+    // Core infrastructure
+    bytes32 internal constant JK_ERC1967_FACTORY = keccak256("ERC1967Factory");
+    bytes32 internal constant JK_REGISTRY_IMPL = keccak256("kRegistryImpl");
+    bytes32 internal constant JK_REGISTRY = keccak256("kRegistry");
+    bytes32 internal constant JK_MINTER_IMPL = keccak256("kMinterImpl");
+    bytes32 internal constant JK_MINTER = keccak256("kMinter");
+    bytes32 internal constant JK_ASSET_ROUTER_IMPL = keccak256("kAssetRouterImpl");
+    bytes32 internal constant JK_ASSET_ROUTER = keccak256("kAssetRouter");
+
+    // Tokens
+    bytes32 internal constant JK_USD = keccak256("kUSD");
+    bytes32 internal constant JK_BTC = keccak256("kBTC");
+
+    // Modules
+    bytes32 internal constant JK_READER_MODULE = keccak256("readerModule");
+    bytes32 internal constant JK_ADAPTER_GUARDIAN_MODULE = keccak256("AdapterGuardianModule");
+    bytes32 internal constant JK_TOKEN_FACTORY = keccak256("kTokenFactory");
+    bytes32 internal constant JK_EXECUTION_GUARDIAN_MODULE = keccak256("ExecutionGuardianModule");
+
+    // Vaults
+    bytes32 internal constant JK_STAKING_VAULT_IMPL = keccak256("kStakingVaultImpl");
+    bytes32 internal constant JK_DN_VAULT_USDC = keccak256("dnVaultUSDC");
+    bytes32 internal constant JK_DN_VAULT_WBTC = keccak256("dnVaultWBTC");
+    bytes32 internal constant JK_ALPHA_VAULT = keccak256("alphaVault");
+    bytes32 internal constant JK_BETA_VAULT = keccak256("betaVault");
+
+    // Adapters
+    bytes32 internal constant JK_VAULT_ADAPTER_IMPL = keccak256("vaultAdapterImpl");
+    bytes32 internal constant JK_DN_VAULT_ADAPTER_USDC = keccak256("dnVaultAdapterUSDC");
+    bytes32 internal constant JK_DN_VAULT_ADAPTER_WBTC = keccak256("dnVaultAdapterWBTC");
+    bytes32 internal constant JK_ALPHA_VAULT_ADAPTER = keccak256("alphaVaultAdapter");
+    bytes32 internal constant JK_BETA_VAULT_ADAPTER = keccak256("betaVaultAdapter");
+    bytes32 internal constant JK_MINTER_ADAPTER_USDC = keccak256("kMinterAdapterUSDC");
+    bytes32 internal constant JK_MINTER_ADAPTER_WBTC = keccak256("kMinterAdapterWBTC");
+
+    // External contracts (metawallets, wallets)
+    bytes32 internal constant JK_ERC7540_USDC = keccak256("ERC7540USDC");
+    bytes32 internal constant JK_ERC7540_WBTC = keccak256("ERC7540WBTC");
+    bytes32 internal constant JK_WALLET_USDC = keccak256("WalletUSDC");
+
+    // Insurance
+    bytes32 internal constant JK_ERC20_EXECUTION_VALIDATOR = keccak256("erc20ExecutionValidator");
+    bytes32 internal constant JK_MINIMAL_SMART_ACCOUNT_IMPL = keccak256("minimalSmartAccountImpl");
+    bytes32 internal constant JK_MINIMAL_SMART_ACCOUNT_FACTORY = keccak256("minimalSmartAccountFactory");
+    bytes32 internal constant JK_INSURANCE_SMART_ACCOUNT = keccak256("insuranceSmartAccount");
+
+    // Config role keys (for resolveAddress)
+    bytes32 internal constant JK_TREASURY = keccak256("treasury");
+    bytes32 internal constant JK_INSURANCE = keccak256("insurance");
+    bytes32 internal constant JK_RELAYER = keccak256("relayer");
+    bytes32 internal constant JK_ADMIN = keccak256("admin");
+    bytes32 internal constant JK_GUARDIAN = keccak256("guardian");
+
+    // Alias keys (for resolveAddress compatibility)
+    bytes32 internal constant JK_METAWALLET_USDC = keccak256("metawalletUSDC");
+    bytes32 internal constant JK_METAWALLET_WBTC = keccak256("metawalletWBTC");
+    bytes32 internal constant JK_WALLET_USDC_ALIAS = keccak256("walletUSDC");
+    bytes32 internal constant JK_WALLET_WBTC_ALIAS = keccak256("walletWBTC");
 
     function getCurrentNetwork() internal view returns (string memory) {
         uint256 chainId = block.chainid;
@@ -247,9 +334,9 @@ abstract contract DeploymentManager is Script {
         config.assets.USDC = json.readAddress(".assets.USDC");
         config.assets.WBTC = json.readAddress(".assets.WBTC");
 
-        // Parse ERC7540 addresses
-        config.ERC7540s.USDC = json.readAddress(".ERC7540s.USDC");
-        config.ERC7540s.WBTC = json.readAddress(".ERC7540s.WBTC");
+        // Parse metawallet addresses
+        config.metawallets.USDC = json.readAddress(".metawallets.USDC");
+        config.metawallets.WBTC = json.readAddress(".metawallets.WBTC");
     }
 
     function _readCustodialTargets(string memory json, NetworkConfig memory config) private pure {
@@ -315,7 +402,7 @@ abstract contract DeploymentManager is Script {
         config.symbol = json.readString(string.concat(path, ".symbol"));
         config.decimals = uint8(json.readUint(string.concat(path, ".decimals")));
         config.underlyingAsset = json.readString(string.concat(path, ".underlyingAsset"));
-        config.useKToken = json.readBool(string.concat(path, ".useKToken"));
+        config.startPaused = json.readBool(string.concat(path, ".startPaused"));
         config.maxTotalAssets = uint128(json.readUint(string.concat(path, ".maxTotalAssets")));
         config.maxDepositPerBatch = uint128(json.readUint(string.concat(path, ".maxDepositPerBatch")));
         config.maxWithdrawPerBatch = uint128(json.readUint(string.concat(path, ".maxWithdrawPerBatch")));
@@ -329,10 +416,10 @@ abstract contract DeploymentManager is Script {
         // Read max single transfer amounts
         config.maxSingleTransfer.USDC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.USDC"));
         config.maxSingleTransfer.WBTC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.WBTC"));
-        config.maxSingleTransfer.ERC7540USDC =
-            _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.ERC7540USDC"));
-        config.maxSingleTransfer.ERC7540WBTC =
-            _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.ERC7540WBTC"));
+        config.maxSingleTransfer.metawalletUSDC =
+            _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.metawalletUSDC"));
+        config.maxSingleTransfer.metawalletWBTC =
+            _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.metawalletWBTC"));
 
         // Read allowed receivers arrays
         bytes memory usdcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.USDC");
@@ -341,18 +428,18 @@ abstract contract DeploymentManager is Script {
         bytes memory wbtcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.WBTC");
         config.allowedReceivers.WBTC = abi.decode(wbtcReceivers, (string[]));
 
-        bytes memory erc7540UsdcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.ERC7540USDC");
-        config.allowedReceivers.ERC7540USDC = abi.decode(erc7540UsdcReceivers, (string[]));
+        bytes memory metawalletUsdcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.metawalletUSDC");
+        config.allowedReceivers.metawalletUSDC = abi.decode(metawalletUsdcReceivers, (string[]));
 
-        bytes memory erc7540WbtcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.ERC7540WBTC");
-        config.allowedReceivers.ERC7540WBTC = abi.decode(erc7540WbtcReceivers, (string[]));
+        bytes memory metawalletWbtcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.metawalletWBTC");
+        config.allowedReceivers.metawalletWBTC = abi.decode(metawalletWbtcReceivers, (string[]));
 
         // Read allowed sources arrays
-        bytes memory erc7540UsdcSources = json.parseRaw(".parameterChecker.allowedSources.ERC7540USDC");
-        config.allowedSources.ERC7540USDC = abi.decode(erc7540UsdcSources, (string[]));
+        bytes memory metawalletUsdcSources = json.parseRaw(".parameterChecker.allowedSources.metawalletUSDC");
+        config.allowedSources.metawalletUSDC = abi.decode(metawalletUsdcSources, (string[]));
 
-        bytes memory erc7540WbtcSources = json.parseRaw(".parameterChecker.allowedSources.ERC7540WBTC");
-        config.allowedSources.ERC7540WBTC = abi.decode(erc7540WbtcSources, (string[]));
+        bytes memory metawalletWbtcSources = json.parseRaw(".parameterChecker.allowedSources.metawalletWBTC");
+        config.allowedSources.metawalletWBTC = abi.decode(metawalletWbtcSources, (string[]));
 
         // Read allowed spenders arrays
         bytes memory usdcSpenders = json.parseRaw(".parameterChecker.allowedSpenders.USDC");
@@ -360,6 +447,12 @@ abstract contract DeploymentManager is Script {
 
         bytes memory wbtcSpenders = json.parseRaw(".parameterChecker.allowedSpenders.WBTC");
         config.allowedSpenders.WBTC = abi.decode(wbtcSpenders, (string[]));
+
+        bytes memory metawalletUsdcSpenders = json.parseRaw(".parameterChecker.allowedSpenders.metawalletUSDC");
+        config.allowedSpenders.metawalletUSDC = abi.decode(metawalletUsdcSpenders, (string[]));
+
+        bytes memory metawalletWbtcSpenders = json.parseRaw(".parameterChecker.allowedSpenders.metawalletWBTC");
+        config.allowedSpenders.metawalletWBTC = abi.decode(metawalletWbtcSpenders, (string[]));
 
         return config;
     }
@@ -393,31 +486,50 @@ abstract contract DeploymentManager is Script {
         revert("Unknown asset key");
     }
 
-    function resolveContractAddress(
-        DeploymentOutput memory existing,
-        string memory contractKey
+    /// @notice Resolve an address from a string key using deployed contracts and config
+    /// @param key The string key to resolve (e.g., "kMinterAdapterUSDC", "treasury")
+    /// @param config The network configuration (for roles like treasury, insurance)
+    /// @param existing The deployment output (for deployed contract addresses)
+    /// @return The resolved address, or address(0) if not found
+    function resolveAddress(
+        string memory key,
+        NetworkConfig memory config,
+        DeploymentOutput memory existing
     )
         internal
         pure
         returns (address)
     {
-        if (keccak256(bytes(contractKey)) == keccak256(bytes("kMinterAdapterUSDC"))) {
-            return existing.contracts.kMinterAdapterUSDC;
-        } else if (keccak256(bytes(contractKey)) == keccak256(bytes("kMinterAdapterWBTC"))) {
-            return existing.contracts.kMinterAdapterWBTC;
-        } else if (keccak256(bytes(contractKey)) == keccak256(bytes("dnVaultAdapterUSDC"))) {
-            return existing.contracts.dnVaultAdapterUSDC;
-        } else if (keccak256(bytes(contractKey)) == keccak256(bytes("dnVaultAdapterWBTC"))) {
-            return existing.contracts.dnVaultAdapterWBTC;
-        } else if (keccak256(bytes(contractKey)) == keccak256(bytes("treasury"))) {
-            // This would need to come from config
-            return address(0);
-        } else if (keccak256(bytes(contractKey)) == keccak256(bytes("walletUSDC"))) {
-            return existing.contracts.WalletUSDC;
-        } else if (keccak256(bytes(contractKey)) == keccak256(bytes("walletWBTC"))) {
-            return existing.contracts.WalletWBTC;
-        }
-        revert("Unknown contract key");
+        bytes32 h = keccak256(bytes(key));
+
+        // Adapters
+        if (h == JK_MINTER_ADAPTER_USDC) return existing.contracts.kMinterAdapterUSDC;
+        if (h == JK_MINTER_ADAPTER_WBTC) return existing.contracts.kMinterAdapterWBTC;
+        if (h == JK_DN_VAULT_ADAPTER_USDC) return existing.contracts.dnVaultAdapterUSDC;
+        if (h == JK_DN_VAULT_ADAPTER_WBTC) return existing.contracts.dnVaultAdapterWBTC;
+        if (h == JK_ALPHA_VAULT_ADAPTER) return existing.contracts.alphaVaultAdapter;
+        if (h == JK_BETA_VAULT_ADAPTER) return existing.contracts.betaVaultAdapter;
+
+        // Metawallets
+        if (h == JK_METAWALLET_USDC) return existing.contracts.ERC7540USDC;
+        if (h == JK_METAWALLET_WBTC) return existing.contracts.ERC7540WBTC;
+
+        // Custodial wallets
+        if (h == JK_WALLET_USDC_ALIAS) return existing.contracts.WalletUSDC;
+
+        // Core contracts
+        if (h == JK_REGISTRY) return existing.contracts.kRegistry;
+        if (h == JK_MINTER) return existing.contracts.kMinter;
+        if (h == JK_ASSET_ROUTER) return existing.contracts.kAssetRouter;
+
+        // Config roles
+        if (h == JK_TREASURY) return config.roles.treasury;
+        if (h == JK_INSURANCE) return config.roles.insurance;
+        if (h == JK_RELAYER) return config.roles.relayer;
+        if (h == JK_ADMIN) return config.roles.admin;
+        if (h == JK_GUARDIAN) return config.roles.guardian;
+
+        return address(0);
     }
 
     function readDeploymentOutput() internal view returns (DeploymentOutput memory output) {
@@ -436,234 +548,183 @@ abstract contract DeploymentManager is Script {
         output.network = json.readString(".network");
         output.timestamp = json.readUint(".timestamp");
 
-        // Parse all contract addresses
-        if (json.keyExists(".contracts.ERC1967Factory")) {
-            output.contracts.ERC1967Factory = json.readAddress(".contracts.ERC1967Factory");
-        }
-        if (json.keyExists(".contracts.kRegistryImpl")) {
-            output.contracts.kRegistryImpl = json.readAddress(".contracts.kRegistryImpl");
-        }
-        if (json.keyExists(".contracts.kRegistry")) {
-            output.contracts.kRegistry = json.readAddress(".contracts.kRegistry");
-        }
-        if (json.keyExists(".contracts.kMinterImpl")) {
-            output.contracts.kMinterImpl = json.readAddress(".contracts.kMinterImpl");
-        }
-        if (json.keyExists(".contracts.kMinter")) {
-            output.contracts.kMinter = json.readAddress(".contracts.kMinter");
-        }
-        if (json.keyExists(".contracts.kAssetRouterImpl")) {
-            output.contracts.kAssetRouterImpl = json.readAddress(".contracts.kAssetRouterImpl");
-        }
-        if (json.keyExists(".contracts.kAssetRouter")) {
-            output.contracts.kAssetRouter = json.readAddress(".contracts.kAssetRouter");
-        }
-        if (json.keyExists(".contracts.kUSD")) {
-            output.contracts.kUSD = json.readAddress(".contracts.kUSD");
-        }
-        if (json.keyExists(".contracts.kBTC")) {
-            output.contracts.kBTC = json.readAddress(".contracts.kBTC");
-        }
-        if (json.keyExists(".contracts.readerModule")) {
-            output.contracts.readerModule = json.readAddress(".contracts.readerModule");
-        }
-        if (json.keyExists(".contracts.adapterGuardianModule")) {
-            output.contracts.adapterGuardianModule = json.readAddress(".contracts.adapterGuardianModule");
-        }
-        if (json.keyExists(".contracts.kTokenFactory")) {
-            output.contracts.kTokenFactory = json.readAddress(".contracts.kTokenFactory");
-        }
-        if (json.keyExists(".contracts.kStakingVaultImpl")) {
-            output.contracts.kStakingVaultImpl = json.readAddress(".contracts.kStakingVaultImpl");
-        }
-        if (json.keyExists(".contracts.dnVaultUSDC")) {
-            output.contracts.dnVaultUSDC = json.readAddress(".contracts.dnVaultUSDC");
-        }
-        if (json.keyExists(".contracts.dnVaultWBTC")) {
-            output.contracts.dnVaultWBTC = json.readAddress(".contracts.dnVaultWBTC");
-        }
-        if (json.keyExists(".contracts.alphaVault")) {
-            output.contracts.alphaVault = json.readAddress(".contracts.alphaVault");
-        }
-        if (json.keyExists(".contracts.betaVault")) {
-            output.contracts.betaVault = json.readAddress(".contracts.betaVault");
-        }
-        if (json.keyExists(".contracts.vaultAdapterImpl")) {
-            output.contracts.vaultAdapterImpl = json.readAddress(".contracts.vaultAdapterImpl");
-        }
-        if (json.keyExists(".contracts.dnVaultAdapterUSDC")) {
-            output.contracts.dnVaultAdapterUSDC = json.readAddress(".contracts.dnVaultAdapterUSDC");
-        }
-        if (json.keyExists(".contracts.dnVaultAdapterWBTC")) {
-            output.contracts.dnVaultAdapterWBTC = json.readAddress(".contracts.dnVaultAdapterWBTC");
-        }
-        if (json.keyExists(".contracts.alphaVaultAdapter")) {
-            output.contracts.alphaVaultAdapter = json.readAddress(".contracts.alphaVaultAdapter");
-        }
-        if (json.keyExists(".contracts.betaVaultAdapter")) {
-            output.contracts.betaVaultAdapter = json.readAddress(".contracts.betaVaultAdapter");
-        }
-        if (json.keyExists(".contracts.kMinterAdapterUSDC")) {
-            output.contracts.kMinterAdapterUSDC = json.readAddress(".contracts.kMinterAdapterUSDC");
-        }
-        if (json.keyExists(".contracts.kMinterAdapterWBTC")) {
-            output.contracts.kMinterAdapterWBTC = json.readAddress(".contracts.kMinterAdapterWBTC");
-        }
-        if (json.keyExists(".contracts.ERC7540USDC")) {
-            output.contracts.ERC7540USDC = json.readAddress(".contracts.ERC7540USDC");
-        }
-        if (json.keyExists(".contracts.ERC7540WBTC")) {
-            output.contracts.ERC7540WBTC = json.readAddress(".contracts.ERC7540WBTC");
-        }
-        if (json.keyExists(".contracts.WalletUSDC")) {
-            output.contracts.WalletUSDC = json.readAddress(".contracts.WalletUSDC");
-        }
-        if (json.keyExists(".contracts.erc20ParameterChecker")) {
-            output.contracts.erc20ParameterChecker = json.readAddress(".contracts.erc20ParameterChecker");
-        }
-        if (json.keyExists(".contracts.minimalSmartAccountImpl")) {
-            output.contracts.minimalSmartAccountImpl = json.readAddress(".contracts.minimalSmartAccountImpl");
-        }
-        if (json.keyExists(".contracts.minimalSmartAccountFactory")) {
-            output.contracts.minimalSmartAccountFactory = json.readAddress(".contracts.minimalSmartAccountFactory");
-        }
-        if (json.keyExists(".contracts.insuranceSmartAccount")) {
-            output.contracts.insuranceSmartAccount = json.readAddress(".contracts.insuranceSmartAccount");
-        }
+        // Direct reads - JSON structure is fixed, all keys exist after first write
+        output.contracts.ERC1967Factory = json.readAddress(".contracts.ERC1967Factory");
+        output.contracts.kRegistryImpl = json.readAddress(".contracts.kRegistryImpl");
+        output.contracts.kRegistry = json.readAddress(".contracts.kRegistry");
+        output.contracts.kMinterImpl = json.readAddress(".contracts.kMinterImpl");
+        output.contracts.kMinter = json.readAddress(".contracts.kMinter");
+        output.contracts.kAssetRouterImpl = json.readAddress(".contracts.kAssetRouterImpl");
+        output.contracts.kAssetRouter = json.readAddress(".contracts.kAssetRouter");
+        output.contracts.kUSD = json.readAddress(".contracts.kUSD");
+        output.contracts.kBTC = json.readAddress(".contracts.kBTC");
+        output.contracts.readerModule = json.readAddress(".contracts.readerModule");
+        output.contracts.adapterGuardianModule = json.readAddress(".contracts.adapterGuardianModule");
+        output.contracts.kTokenFactory = json.readAddress(".contracts.kTokenFactory");
+        output.contracts.kStakingVaultImpl = json.readAddress(".contracts.kStakingVaultImpl");
+        output.contracts.dnVaultUSDC = json.readAddress(".contracts.dnVaultUSDC");
+        output.contracts.dnVaultWBTC = json.readAddress(".contracts.dnVaultWBTC");
+        output.contracts.alphaVault = json.readAddress(".contracts.alphaVault");
+        output.contracts.betaVault = json.readAddress(".contracts.betaVault");
+        output.contracts.vaultAdapterImpl = json.readAddress(".contracts.vaultAdapterImpl");
+        output.contracts.dnVaultAdapterUSDC = json.readAddress(".contracts.dnVaultAdapterUSDC");
+        output.contracts.dnVaultAdapterWBTC = json.readAddress(".contracts.dnVaultAdapterWBTC");
+        output.contracts.alphaVaultAdapter = json.readAddress(".contracts.alphaVaultAdapter");
+        output.contracts.betaVaultAdapter = json.readAddress(".contracts.betaVaultAdapter");
+        output.contracts.kMinterAdapterUSDC = json.readAddress(".contracts.kMinterAdapterUSDC");
+        output.contracts.kMinterAdapterWBTC = json.readAddress(".contracts.kMinterAdapterWBTC");
+        output.contracts.ERC7540USDC = json.readAddress(".contracts.ERC7540USDC");
+        output.contracts.ERC7540WBTC = json.readAddress(".contracts.ERC7540WBTC");
+        output.contracts.WalletUSDC = json.readAddress(".contracts.WalletUSDC");
+        output.contracts.erc20ExecutionValidator = json.readAddress(".contracts.erc20ExecutionValidator");
+        output.contracts.minimalSmartAccountImpl = json.readAddress(".contracts.minimalSmartAccountImpl");
+        output.contracts.minimalSmartAccountFactory = json.readAddress(".contracts.minimalSmartAccountFactory");
+        output.contracts.insuranceSmartAccount = json.readAddress(".contracts.insuranceSmartAccount");
 
         return output;
     }
 
-    function writeContractAddress(string memory contractName, address contractAddress) internal {
+    /// @notice Queue a contract address for batch writing (no I/O until flush)
+    /// @param contractName The name of the contract
+    /// @param contractAddress The deployed address
+    function queueContractAddress(string memory contractName, address contractAddress) internal {
+        require(_pendingWriteCount < 50, "Too many pending writes");
+        _pendingWrites[_pendingWriteCount] =
+            PendingWrite({ key: keccak256(bytes(contractName)), addr: contractAddress });
+        _pendingWriteCount++;
+        if (verbose) {
+            console.log(string.concat("  Queued: ", contractName), contractAddress);
+        }
+    }
+
+    /// @notice Queue a contract address using pre-computed key (gas optimized)
+    /// @param key The pre-computed keccak256 key (use K_* constants)
+    /// @param contractAddress The deployed address
+    function queueContractKey(bytes32 key, address contractAddress) internal {
+        require(_pendingWriteCount < 50, "Too many pending writes");
+        _pendingWrites[_pendingWriteCount] = PendingWrite({ key: key, addr: contractAddress });
+        _pendingWriteCount++;
+    }
+
+    /// @notice Flush all pending writes to JSON in a single I/O operation
+    function flushContractAddresses() internal {
+        if (_pendingWriteCount == 0) return;
+
         string memory network = getCurrentNetwork();
         string memory deploymentsPath = getDeploymentsPath();
         string memory outputPath = string.concat(deploymentsPath, "/output/", network, "/addresses.json");
 
+        // Read existing once
         DeploymentOutput memory output = readDeploymentOutput();
         output.chainId = block.chainid;
         output.network = network;
         output.timestamp = block.timestamp;
 
-        // Update the specific contract address
-        if (keccak256(bytes(contractName)) == keccak256(bytes("ERC1967Factory"))) {
-            output.contracts.ERC1967Factory = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kRegistryImpl"))) {
-            output.contracts.kRegistryImpl = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kRegistry"))) {
-            output.contracts.kRegistry = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kMinterImpl"))) {
-            output.contracts.kMinterImpl = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kMinter"))) {
-            output.contracts.kMinter = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kAssetRouterImpl"))) {
-            output.contracts.kAssetRouterImpl = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kAssetRouter"))) {
-            output.contracts.kAssetRouter = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kUSD"))) {
-            output.contracts.kUSD = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kBTC"))) {
-            output.contracts.kBTC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("readerModule"))) {
-            output.contracts.readerModule = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("AdapterGuardianModule"))) {
-            output.contracts.adapterGuardianModule = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kTokenFactory"))) {
-            output.contracts.kTokenFactory = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kStakingVaultImpl"))) {
-            output.contracts.kStakingVaultImpl = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("dnVaultUSDC"))) {
-            output.contracts.dnVaultUSDC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("dnVaultWBTC"))) {
-            output.contracts.dnVaultWBTC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("alphaVault"))) {
-            output.contracts.alphaVault = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("betaVault"))) {
-            output.contracts.betaVault = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("vaultAdapterImpl"))) {
-            output.contracts.vaultAdapterImpl = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("dnVaultAdapterUSDC"))) {
-            output.contracts.dnVaultAdapterUSDC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("dnVaultAdapterWBTC"))) {
-            output.contracts.dnVaultAdapterWBTC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("alphaVaultAdapter"))) {
-            output.contracts.alphaVaultAdapter = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("betaVaultAdapter"))) {
-            output.contracts.betaVaultAdapter = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kMinterAdapterUSDC"))) {
-            output.contracts.kMinterAdapterUSDC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("kMinterAdapterWBTC"))) {
-            output.contracts.kMinterAdapterWBTC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("ERC7540USDC"))) {
-            output.contracts.ERC7540USDC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("ERC7540WBTC"))) {
-            output.contracts.ERC7540WBTC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("WalletUSDC"))) {
-            output.contracts.WalletUSDC = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("erc20ParameterChecker"))) {
-            output.contracts.erc20ParameterChecker = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("minimalSmartAccountImpl"))) {
-            output.contracts.minimalSmartAccountImpl = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("minimalSmartAccountFactory"))) {
-            output.contracts.minimalSmartAccountFactory = contractAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("insuranceSmartAccount"))) {
-            output.contracts.insuranceSmartAccount = contractAddress;
+        // Apply all pending updates
+        for (uint256 i = 0; i < _pendingWriteCount; i++) {
+            _applyAddressUpdate(output, _pendingWrites[i].key, _pendingWrites[i].addr);
         }
 
-        string memory json = _serializeDeploymentOutput(output);
+        // Serialize using vm.serialize* pattern (single write)
+        string memory json = _serializeOutputWithVm(output);
         vm.writeFile(outputPath, json);
 
-        console.log(string.concat(contractName, " address written to: "), outputPath);
+        if (verbose) {
+            console.log("Flushed", _pendingWriteCount, "addresses to:");
+            console.log("  ", outputPath);
+        }
+
+        // Clear pending writes
+        _pendingWriteCount = 0;
     }
 
-    function _serializeDeploymentOutput(DeploymentOutput memory output) private pure returns (string memory) {
-        string memory json = "{";
-        json = string.concat(json, '"chainId":', vm.toString(output.chainId), ",");
-        json = string.concat(json, '"network":"', output.network, '",');
-        json = string.concat(json, '"timestamp":', vm.toString(output.timestamp), ",");
-        json = string.concat(json, '"contracts":{');
+    /// @notice Backward-compatible wrapper: queues + flushes immediately
+    /// @dev Prefer using queueContractAddress + flushContractAddresses for batch operations
+    function writeContractAddress(string memory contractName, address contractAddress) internal {
+        queueContractAddress(contractName, contractAddress);
+        flushContractAddresses();
+    }
 
-        json = string.concat(json, '"ERC1967Factory":"', vm.toString(output.contracts.ERC1967Factory), '",');
-        json = string.concat(json, '"kRegistryImpl":"', vm.toString(output.contracts.kRegistryImpl), '",');
-        json = string.concat(json, '"kRegistry":"', vm.toString(output.contracts.kRegistry), '",');
-        json = string.concat(json, '"kMinterImpl":"', vm.toString(output.contracts.kMinterImpl), '",');
-        json = string.concat(json, '"kMinter":"', vm.toString(output.contracts.kMinter), '",');
-        json = string.concat(json, '"kAssetRouterImpl":"', vm.toString(output.contracts.kAssetRouterImpl), '",');
-        json = string.concat(json, '"kAssetRouter":"', vm.toString(output.contracts.kAssetRouter), '",');
-        json = string.concat(json, '"kUSD":"', vm.toString(output.contracts.kUSD), '",');
-        json = string.concat(json, '"kBTC":"', vm.toString(output.contracts.kBTC), '",');
-        json = string.concat(json, '"kStakingVaultImpl":"', vm.toString(output.contracts.kStakingVaultImpl), '",');
-        json = string.concat(json, '"readerModule":"', vm.toString(output.contracts.readerModule), '",');
-        json =
-            string.concat(json, '"adapterGuardianModule":"', vm.toString(output.contracts.adapterGuardianModule), '",');
-        json = string.concat(json, '"kTokenFactory":"', vm.toString(output.contracts.kTokenFactory), '",');
-        json = string.concat(json, '"dnVaultUSDC":"', vm.toString(output.contracts.dnVaultUSDC), '",');
-        json = string.concat(json, '"dnVaultWBTC":"', vm.toString(output.contracts.dnVaultWBTC), '",');
-        json = string.concat(json, '"alphaVault":"', vm.toString(output.contracts.alphaVault), '",');
-        json = string.concat(json, '"betaVault":"', vm.toString(output.contracts.betaVault), '",');
-        json = string.concat(json, '"vaultAdapterImpl":"', vm.toString(output.contracts.vaultAdapterImpl), '",');
-        json = string.concat(json, '"dnVaultAdapterUSDC":"', vm.toString(output.contracts.dnVaultAdapterUSDC), '",');
-        json = string.concat(json, '"dnVaultAdapterWBTC":"', vm.toString(output.contracts.dnVaultAdapterWBTC), '",');
-        json = string.concat(json, '"alphaVaultAdapter":"', vm.toString(output.contracts.alphaVaultAdapter), '",');
-        json = string.concat(json, '"betaVaultAdapter":"', vm.toString(output.contracts.betaVaultAdapter), '",');
-        json = string.concat(json, '"kMinterAdapterUSDC":"', vm.toString(output.contracts.kMinterAdapterUSDC), '",');
-        json = string.concat(json, '"kMinterAdapterWBTC":"', vm.toString(output.contracts.kMinterAdapterWBTC), '",');
-        json = string.concat(json, '"ERC7540USDC":"', vm.toString(output.contracts.ERC7540USDC), '",');
-        json = string.concat(json, '"ERC7540WBTC":"', vm.toString(output.contracts.ERC7540WBTC), '",');
-        json = string.concat(json, '"WalletUSDC":"', vm.toString(output.contracts.WalletUSDC), '",');
-        json =
-            string.concat(json, '"erc20ParameterChecker":"', vm.toString(output.contracts.erc20ParameterChecker), '",');
-        json = string.concat(
-            json, '"minimalSmartAccountImpl":"', vm.toString(output.contracts.minimalSmartAccountImpl), '",'
-        );
-        json = string.concat(
-            json, '"minimalSmartAccountFactory":"', vm.toString(output.contracts.minimalSmartAccountFactory), '",'
-        );
-        json = string.concat(
-            json, '"insuranceSmartAccount":"', vm.toString(output.contracts.insuranceSmartAccount), '"'
-        );
-        json = string.concat(json, "}}");
+    /// @notice Apply a single address update to the output struct using pre-computed key
+    function _applyAddressUpdate(DeploymentOutput memory output, bytes32 h, address contractAddress) private pure {
+        if (h == JK_ERC1967_FACTORY) output.contracts.ERC1967Factory = contractAddress;
+        else if (h == JK_REGISTRY_IMPL) output.contracts.kRegistryImpl = contractAddress;
+        else if (h == JK_REGISTRY) output.contracts.kRegistry = contractAddress;
+        else if (h == JK_MINTER_IMPL) output.contracts.kMinterImpl = contractAddress;
+        else if (h == JK_MINTER) output.contracts.kMinter = contractAddress;
+        else if (h == JK_ASSET_ROUTER_IMPL) output.contracts.kAssetRouterImpl = contractAddress;
+        else if (h == JK_ASSET_ROUTER) output.contracts.kAssetRouter = contractAddress;
+        else if (h == JK_USD) output.contracts.kUSD = contractAddress;
+        else if (h == JK_BTC) output.contracts.kBTC = contractAddress;
+        else if (h == JK_READER_MODULE) output.contracts.readerModule = contractAddress;
+        else if (h == JK_ADAPTER_GUARDIAN_MODULE) output.contracts.adapterGuardianModule = contractAddress;
+        else if (h == JK_TOKEN_FACTORY) output.contracts.kTokenFactory = contractAddress;
+        else if (h == JK_STAKING_VAULT_IMPL) output.contracts.kStakingVaultImpl = contractAddress;
+        else if (h == JK_DN_VAULT_USDC) output.contracts.dnVaultUSDC = contractAddress;
+        else if (h == JK_DN_VAULT_WBTC) output.contracts.dnVaultWBTC = contractAddress;
+        else if (h == JK_ALPHA_VAULT) output.contracts.alphaVault = contractAddress;
+        else if (h == JK_BETA_VAULT) output.contracts.betaVault = contractAddress;
+        else if (h == JK_VAULT_ADAPTER_IMPL) output.contracts.vaultAdapterImpl = contractAddress;
+        else if (h == JK_DN_VAULT_ADAPTER_USDC) output.contracts.dnVaultAdapterUSDC = contractAddress;
+        else if (h == JK_DN_VAULT_ADAPTER_WBTC) output.contracts.dnVaultAdapterWBTC = contractAddress;
+        else if (h == JK_ALPHA_VAULT_ADAPTER) output.contracts.alphaVaultAdapter = contractAddress;
+        else if (h == JK_BETA_VAULT_ADAPTER) output.contracts.betaVaultAdapter = contractAddress;
+        else if (h == JK_MINTER_ADAPTER_USDC) output.contracts.kMinterAdapterUSDC = contractAddress;
+        else if (h == JK_MINTER_ADAPTER_WBTC) output.contracts.kMinterAdapterWBTC = contractAddress;
+        else if (h == JK_ERC7540_USDC) output.contracts.ERC7540USDC = contractAddress;
+        else if (h == JK_ERC7540_WBTC) output.contracts.ERC7540WBTC = contractAddress;
+        else if (h == JK_WALLET_USDC) output.contracts.WalletUSDC = contractAddress;
+        else if (h == JK_ERC20_EXECUTION_VALIDATOR) output.contracts.erc20ExecutionValidator = contractAddress;
+        else if (h == JK_MINIMAL_SMART_ACCOUNT_IMPL) output.contracts.minimalSmartAccountImpl = contractAddress;
+        else if (h == JK_MINIMAL_SMART_ACCOUNT_FACTORY) output.contracts.minimalSmartAccountFactory = contractAddress;
+        else if (h == JK_INSURANCE_SMART_ACCOUNT) output.contracts.insuranceSmartAccount = contractAddress;
+        // Support ExecutionGuardianModule key as alias for adapterGuardianModule
+        else if (h == JK_EXECUTION_GUARDIAN_MODULE) output.contracts.adapterGuardianModule = contractAddress;
+    }
 
-        return json;
+    /// @notice Serialize output using vm.serialize* pattern for efficient JSON building
+    function _serializeOutputWithVm(DeploymentOutput memory output) private returns (string memory) {
+        // Serialize contracts object
+        string memory c = "contracts";
+        vm.serializeAddress(c, "ERC1967Factory", output.contracts.ERC1967Factory);
+        vm.serializeAddress(c, "kRegistryImpl", output.contracts.kRegistryImpl);
+        vm.serializeAddress(c, "kRegistry", output.contracts.kRegistry);
+        vm.serializeAddress(c, "kMinterImpl", output.contracts.kMinterImpl);
+        vm.serializeAddress(c, "kMinter", output.contracts.kMinter);
+        vm.serializeAddress(c, "kAssetRouterImpl", output.contracts.kAssetRouterImpl);
+        vm.serializeAddress(c, "kAssetRouter", output.contracts.kAssetRouter);
+        vm.serializeAddress(c, "kUSD", output.contracts.kUSD);
+        vm.serializeAddress(c, "kBTC", output.contracts.kBTC);
+        vm.serializeAddress(c, "kStakingVaultImpl", output.contracts.kStakingVaultImpl);
+        vm.serializeAddress(c, "readerModule", output.contracts.readerModule);
+        vm.serializeAddress(c, "adapterGuardianModule", output.contracts.adapterGuardianModule);
+        vm.serializeAddress(c, "kTokenFactory", output.contracts.kTokenFactory);
+        vm.serializeAddress(c, "dnVaultUSDC", output.contracts.dnVaultUSDC);
+        vm.serializeAddress(c, "dnVaultWBTC", output.contracts.dnVaultWBTC);
+        vm.serializeAddress(c, "alphaVault", output.contracts.alphaVault);
+        vm.serializeAddress(c, "betaVault", output.contracts.betaVault);
+        vm.serializeAddress(c, "vaultAdapterImpl", output.contracts.vaultAdapterImpl);
+        vm.serializeAddress(c, "dnVaultAdapterUSDC", output.contracts.dnVaultAdapterUSDC);
+        vm.serializeAddress(c, "dnVaultAdapterWBTC", output.contracts.dnVaultAdapterWBTC);
+        vm.serializeAddress(c, "alphaVaultAdapter", output.contracts.alphaVaultAdapter);
+        vm.serializeAddress(c, "betaVaultAdapter", output.contracts.betaVaultAdapter);
+        vm.serializeAddress(c, "kMinterAdapterUSDC", output.contracts.kMinterAdapterUSDC);
+        vm.serializeAddress(c, "kMinterAdapterWBTC", output.contracts.kMinterAdapterWBTC);
+        vm.serializeAddress(c, "ERC7540USDC", output.contracts.ERC7540USDC);
+        vm.serializeAddress(c, "ERC7540WBTC", output.contracts.ERC7540WBTC);
+        vm.serializeAddress(c, "WalletUSDC", output.contracts.WalletUSDC);
+        vm.serializeAddress(c, "erc20ExecutionValidator", output.contracts.erc20ExecutionValidator);
+        vm.serializeAddress(c, "minimalSmartAccountImpl", output.contracts.minimalSmartAccountImpl);
+        vm.serializeAddress(c, "minimalSmartAccountFactory", output.contracts.minimalSmartAccountFactory);
+        string memory contractsJson =
+            vm.serializeAddress(c, "insuranceSmartAccount", output.contracts.insuranceSmartAccount);
+
+        // Serialize root object
+        string memory root = "root";
+        vm.serializeUint(root, "chainId", output.chainId);
+        vm.serializeString(root, "network", output.network);
+        vm.serializeUint(root, "timestamp", output.timestamp);
+        return vm.serializeString(root, "contracts", contractsJson);
     }
 
     function validateConfig(NetworkConfig memory config) internal pure {
@@ -777,13 +838,13 @@ abstract contract DeploymentManager is Script {
         console.log("");
     }
 
-    /// @notice Log ERC7540 and custodial target addresses
+    /// @notice Log metawallet and custodial target addresses
     function logExternalTargets(NetworkConfig memory config) internal view {
         if (!verbose) return;
 
         console.log("--- EXTERNAL TARGETS ---");
-        console.log("ERC7540 USDC:     ", config.ERC7540s.USDC);
-        console.log("ERC7540 WBTC:     ", config.ERC7540s.WBTC);
+        console.log("Metawallet USDC:  ", config.metawallets.USDC);
+        console.log("Metawallet WBTC:  ", config.metawallets.WBTC);
         console.log("Wallet USDC:      ", config.custodialTargets.walletUSDC);
         console.log("Wallet WBTC:      ", config.custodialTargets.walletWBTC);
         console.log("");
@@ -811,7 +872,7 @@ abstract contract DeploymentManager is Script {
         console.log("Symbol:           ", vault.symbol);
         console.log("Decimals:         ", vault.decimals);
         console.log("Underlying Asset: ", vault.underlyingAsset);
-        console.log("Use kToken:       ", vault.useKToken ? "YES" : "NO");
+        console.log("Start Paused:     ", vault.startPaused ? "YES" : "NO");
         console.log("Max Total Assets: ", vault.maxTotalAssets);
         console.log("Max Deposit/Batch:", vault.maxDepositPerBatch);
         console.log("Max Withdraw/Batch:", vault.maxWithdrawPerBatch);
@@ -846,28 +907,46 @@ abstract contract DeploymentManager is Script {
         if (!verbose) return;
 
         console.log("--- PARAMETER CHECKER CONFIG ---");
-        console.log("Max Transfer USDC:      ", config.parameterChecker.maxSingleTransfer.USDC);
-        console.log("Max Transfer WBTC:      ", config.parameterChecker.maxSingleTransfer.WBTC);
-        console.log("Max Transfer ERC7540USDC:", config.parameterChecker.maxSingleTransfer.ERC7540USDC);
-        console.log("Max Transfer ERC7540WBTC:", config.parameterChecker.maxSingleTransfer.ERC7540WBTC);
+        console.log("Max Transfer USDC:          ", config.parameterChecker.maxSingleTransfer.USDC);
+        console.log("Max Transfer WBTC:          ", config.parameterChecker.maxSingleTransfer.WBTC);
+        console.log("Max Transfer metawalletUSDC:", config.parameterChecker.maxSingleTransfer.metawalletUSDC);
+        console.log("Max Transfer metawalletWBTC:", config.parameterChecker.maxSingleTransfer.metawalletWBTC);
         console.log("");
 
-        console.log("Allowed Receivers USDC:        ", config.parameterChecker.allowedReceivers.USDC.length, "entries");
-        console.log("Allowed Receivers WBTC:        ", config.parameterChecker.allowedReceivers.WBTC.length, "entries");
         console.log(
-            "Allowed Receivers ERC7540USDC: ", config.parameterChecker.allowedReceivers.ERC7540USDC.length, "entries"
+            "Allowed Receivers USDC:          ", config.parameterChecker.allowedReceivers.USDC.length, "entries"
         );
         console.log(
-            "Allowed Receivers ERC7540WBTC: ", config.parameterChecker.allowedReceivers.ERC7540WBTC.length, "entries"
+            "Allowed Receivers WBTC:          ", config.parameterChecker.allowedReceivers.WBTC.length, "entries"
         );
         console.log(
-            "Allowed Sources ERC7540USDC:   ", config.parameterChecker.allowedSources.ERC7540USDC.length, "entries"
+            "Allowed Receivers metawalletUSDC:",
+            config.parameterChecker.allowedReceivers.metawalletUSDC.length,
+            "entries"
         );
         console.log(
-            "Allowed Sources ERC7540WBTC:   ", config.parameterChecker.allowedSources.ERC7540WBTC.length, "entries"
+            "Allowed Receivers metawalletWBTC:",
+            config.parameterChecker.allowedReceivers.metawalletWBTC.length,
+            "entries"
         );
-        console.log("Allowed Spenders USDC:         ", config.parameterChecker.allowedSpenders.USDC.length, "entries");
-        console.log("Allowed Spenders WBTC:         ", config.parameterChecker.allowedSpenders.WBTC.length, "entries");
+        console.log(
+            "Allowed Sources metawalletUSDC:  ", config.parameterChecker.allowedSources.metawalletUSDC.length, "entries"
+        );
+        console.log(
+            "Allowed Sources metawalletWBTC:  ", config.parameterChecker.allowedSources.metawalletWBTC.length, "entries"
+        );
+        console.log("Allowed Spenders USDC:           ", config.parameterChecker.allowedSpenders.USDC.length, "entries");
+        console.log("Allowed Spenders WBTC:           ", config.parameterChecker.allowedSpenders.WBTC.length, "entries");
+        console.log(
+            "Allowed Spenders metawalletUSDC: ",
+            config.parameterChecker.allowedSpenders.metawalletUSDC.length,
+            "entries"
+        );
+        console.log(
+            "Allowed Spenders metawalletWBTC: ",
+            config.parameterChecker.allowedSpenders.metawalletWBTC.length,
+            "entries"
+        );
         console.log("");
     }
 
@@ -947,16 +1026,16 @@ abstract contract DeploymentManager is Script {
             console.log("kMinterAdapterWBTC:", existing.contracts.kMinterAdapterWBTC);
         }
         if (existing.contracts.ERC7540USDC != address(0)) {
-            console.log("ERC7540USDC:      ", existing.contracts.ERC7540USDC);
+            console.log("metawalletUSDC:   ", existing.contracts.ERC7540USDC);
         }
         if (existing.contracts.ERC7540WBTC != address(0)) {
-            console.log("ERC7540WBTC:      ", existing.contracts.ERC7540WBTC);
+            console.log("metawalletWBTC:   ", existing.contracts.ERC7540WBTC);
         }
         if (existing.contracts.WalletUSDC != address(0)) {
             console.log("WalletUSDC:       ", existing.contracts.WalletUSDC);
         }
-        if (existing.contracts.erc20ParameterChecker != address(0)) {
-            console.log("ERC20ParameterChecker:", existing.contracts.erc20ParameterChecker);
+        if (existing.contracts.erc20ExecutionValidator != address(0)) {
+            console.log("ERC20ExecutionValidator:", existing.contracts.erc20ExecutionValidator);
         }
         console.log("");
     }

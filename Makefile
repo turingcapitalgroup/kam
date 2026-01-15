@@ -3,40 +3,47 @@
 -include .env
 export
 
-.PHONY: help deploy-mainnet deploy-mainnet-dry-run deploy-sepolia deploy-sepolia-dry-run deploy-localhost deploy-localhost-dry-run config-mainnet config-mainnet-dry-run config-sepolia config-sepolia-dry-run config-localhost config-localhost-dry-run deploy-all config-all deploy-mock-assets verify-mainnet verify-sepolia verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage gas-estimations
+.PHONY: help deploy-mainnet deploy-mainnet-dry-run deploy-sepolia deploy-sepolia-dry-run deploy-localhost deploy-localhost-dry-run config-mainnet config-mainnet-dry-run config-sepolia config-sepolia-dry-run config-localhost config-localhost-dry-run deploy-all config-all deploy-mock-assets verify-mainnet verify-sepolia verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage gas-estimations deploy-phase1-sepolia deploy-phase1-sepolia-dry-run deploy-phase1-mainnet deploy-phase1-mainnet-dry-run config-phase2-sepolia config-phase2-sepolia-dry-run config-phase2-mainnet config-phase2-mainnet-dry-run
 
 # Default target
 help:
 	@echo "KAM Protocol Deployment Commands"
 	@echo "================================="
 	@echo ""
-	@echo "Deploy contracts (00-08):"
-	@echo "make deploy-mainnet          - Deploy to mainnet"
-	@echo "make deploy-mainnet-dry-run  - Simulate deployment to mainnet (no broadcast)"
-	@echo "make deploy-sepolia          - Deploy to Sepolia testnet"
-	@echo "make deploy-sepolia-dry-run  - Simulate deployment to Sepolia (no broadcast)"
-	@echo "make deploy-localhost        - Deploy to localhost"
-	@echo "make deploy-localhost-dry-run- Simulate deployment to localhost (no broadcast)"
+	@echo "=== LOCALHOST (Full deployment with mocks) ==="
+	@echo "make deploy-localhost        - Deploy everything to localhost (includes mocks)"
+	@echo "make deploy-localhost-dry-run- Simulate deployment (no broadcast)"
+	@echo "make config-localhost        - Configure protocol on localhost"
+	@echo "make config-localhost-dry-run- Simulate configuration (no broadcast)"
 	@echo ""
-	@echo "Configure protocol (09-10):"
-	@echo "make config-mainnet          - Configure on mainnet"
-	@echo "make config-mainnet-dry-run  - Simulate configuration on mainnet (no broadcast)"
-	@echo "make config-sepolia          - Configure on Sepolia testnet"
-	@echo "make config-sepolia-dry-run  - Simulate configuration on Sepolia (no broadcast)"
-	@echo "make config-localhost        - Configure on localhost"
-	@echo "make config-localhost-dry-run- Simulate configuration on localhost (no broadcast)"
+	@echo "=== SEPOLIA/MAINNET (Two-phase deployment) ==="
 	@echo ""
-	@echo "Verify contracts on Etherscan:"
+	@echo "Phase 1 - Deploy contracts (before metawallet deployment):"
+	@echo "make deploy-phase1-sepolia      - Deploy contracts to Sepolia"
+	@echo "make deploy-phase1-sepolia-dry-run - Simulate Phase 1 on Sepolia"
+	@echo "make deploy-phase1-mainnet      - Deploy contracts to mainnet"
+	@echo "make deploy-phase1-mainnet-dry-run - Simulate Phase 1 on mainnet"
+	@echo ""
+	@echo "  After Phase 1: Note the kRegistry address, deploy metawallets externally,"
+	@echo "  then add metawallet addresses to deployments/config/{network}.json"
+	@echo ""
+	@echo "Phase 2 - Configure protocol (after metawallet deployment):"
+	@echo "make config-phase2-sepolia      - Configure protocol on Sepolia"
+	@echo "make config-phase2-sepolia-dry-run - Simulate Phase 2 on Sepolia"
+	@echo "make config-phase2-mainnet      - Configure protocol on mainnet"
+	@echo "make config-phase2-mainnet-dry-run - Simulate Phase 2 on mainnet"
+	@echo ""
+	@echo "=== Etherscan Verification ==="
 	@echo "make verify-mainnet          - Verify contracts on mainnet Etherscan"
 	@echo "make verify-sepolia          - Verify contracts on Sepolia Etherscan"
 	@echo ""
-	@echo "Other commands:"
+	@echo "=== Other commands ==="
 	@echo "make verify             - Check deployment files exist"
 	@echo "make clean              - Clean localhost deployment files"
 	@echo "make clean-all          - Clean ALL deployment files (DANGER)"
 	@echo "make gas-estimations    - Generate gas report with USD cost estimates"
 	@echo ""
-	@echo "Individual deployment steps (script/deployment/):"
+	@echo "=== Individual deployment steps (script/deployment/) ==="
 	@echo "make deploy-mock-assets - Deploy mock assets for testnets (00)"
 	@echo "make deploy-core        - Deploy core contracts (01-03)"
 	@echo "make setup-singletons   - Register singletons (04)"
@@ -44,12 +51,12 @@ help:
 	@echo "make deploy-modules     - Deploy vault modules (06)"
 	@echo "make deploy-vaults      - Deploy vaults (07)"
 	@echo "make deploy-adapters    - Deploy adapters (08)"
-	@echo "make deploy-insurance   - Deploy insurance smart account (12)"
+	@echo "make deploy-insurance   - Deploy insurance smart account (09)"
 	@echo ""
-	@echo "Individual configuration steps (script/actions/):"
-	@echo "make configure          - Configure protocol (09)"
-	@echo "make configure-adapters - Configure adapter permissions (10)"
-	@echo "make register-modules   - Register vault modules (11) [OPTIONAL]"
+	@echo "=== Individual configuration steps (script/deployment/) ==="
+	@echo "make configure            - Configure protocol (10)"
+	@echo "make configure-adapters   - Configure adapter permissions (11)"
+	@echo "make configure-approvals  - Configure adapter ERC20 approvals (12)"
 
 # Network-specific deployments
 deploy-mainnet:
@@ -79,6 +86,74 @@ deploy-localhost-dry-run:
 	@echo "🟢 [DRY-RUN] Simulating deployment to LOCALHOST..."
 	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
 	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
+
+# ========================================
+# TWO-PHASE DEPLOYMENT (Sepolia/Mainnet)
+# ========================================
+
+# Phase 1: Deploy contracts (before metawallet deployment)
+deploy-phase1-sepolia:
+	@echo "🟡 [PHASE 1] Deploying contracts to SEPOLIA..."
+	@echo "   This deploys all contracts. After completion:"
+	@echo "   1. Note the kRegistry address from output"
+	@echo "   2. Deploy metawallets externally using that registry"
+	@echo "   3. Add metawallet addresses to deployments/config/sepolia.json"
+	@echo "   4. Run: make config-phase2-sepolia"
+	@echo ""
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+	@echo ""
+	@echo "✅ Phase 1 complete! Next steps:"
+	@echo "   1. Deploy metawallets with kRegistry address"
+	@echo "   2. Update deployments/config/sepolia.json with metawallet addresses"
+	@echo "   3. Run: make config-phase2-sepolia"
+
+deploy-phase1-sepolia-dry-run:
+	@echo "🟡 [DRY-RUN] [PHASE 1] Simulating deployment to SEPOLIA..."
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+
+deploy-phase1-mainnet:
+	@echo "🔴 [PHASE 1] Deploying contracts to MAINNET..."
+	@echo "   This deploys all contracts. After completion:"
+	@echo "   1. Note the kRegistry address from output"
+	@echo "   2. Deploy metawallets externally using that registry"
+	@echo "   3. Add metawallet addresses to deployments/config/mainnet.json"
+	@echo "   4. Run: make config-phase2-mainnet"
+	@echo ""
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+	@echo ""
+	@echo "✅ Phase 1 complete! Next steps:"
+	@echo "   1. Deploy metawallets with kRegistry address"
+	@echo "   2. Update deployments/config/mainnet.json with metawallet addresses"
+	@echo "   3. Run: make config-phase2-mainnet"
+
+deploy-phase1-mainnet-dry-run:
+	@echo "🔴 [DRY-RUN] [PHASE 1] Simulating deployment to MAINNET..."
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+
+# Phase 2: Configure protocol (after metawallet deployment)
+config-phase2-sepolia:
+	@echo "🟡 [PHASE 2] Configuring protocol on SEPOLIA..."
+	@echo "   Reading metawallet addresses from deployments/config/sepolia.json"
+	@echo ""
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+	@echo ""
+	@echo "✅ Phase 2 complete! Protocol is fully configured."
+
+config-phase2-sepolia-dry-run:
+	@echo "🟡 [DRY-RUN] [PHASE 2] Simulating configuration on SEPOLIA..."
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_SEPOLIA} --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+
+config-phase2-mainnet:
+	@echo "🔴 [PHASE 2] Configuring protocol on MAINNET..."
+	@echo "   Reading metawallet addresses from deployments/config/mainnet.json"
+	@echo ""
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --broadcast --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
+	@echo ""
+	@echo "✅ Phase 2 complete! Protocol is fully configured."
+
+config-phase2-mainnet-dry-run:
+	@echo "🔴 [DRY-RUN] [PHASE 2] Simulating configuration on MAINNET..."
+	@$(MAKE) config-all FORGE_ARGS="--rpc-url ${RPC_MAINNET} --account keyDeployer --sender ${DEPLOYER_ADDRESS} --slow"
 
 # Network-specific configurations
 config-mainnet:
@@ -130,8 +205,12 @@ verify-mainnet:
 	@forge verify-contract $$(jq -r '.contracts.adapterGuardianModule' deployments/output/mainnet/addresses.json) src/kRegistry/modules/AdapterGuardianModule.sol:AdapterGuardianModule --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying VaultAdapter implementation..."
 	@forge verify-contract $$(jq -r '.contracts.vaultAdapterImpl' deployments/output/mainnet/addresses.json) src/adapters/VaultAdapter.sol:VaultAdapter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
-	@echo "Verifying ERC20ParameterChecker..."
-	@forge verify-contract $$(jq -r '.contracts.erc20ParameterChecker' deployments/output/mainnet/addresses.json) src/adapters/parameters/ERC20ParameterChecker.sol:ERC20ParameterChecker --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json)) --watch || true
+	@echo "Verifying ERC20ExecutionValidator..."
+	@forge verify-contract $$(jq -r '.contracts.erc20ExecutionValidator' deployments/output/mainnet/addresses.json) src/adapters/parameters/ERC20ExecutionValidator.sol:ERC20ExecutionValidator --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json)) --watch || true
+	@echo "Verifying MinimalSmartAccount implementation..."
+	@forge verify-contract $$(jq -r '.contracts.minimalSmartAccountImpl' deployments/output/mainnet/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccount.sol:MinimalSmartAccount --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@echo "Verifying MinimalSmartAccountFactory..."
+	@forge verify-contract $$(jq -r '.contracts.minimalSmartAccountFactory' deployments/output/mainnet/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccountFactory.sol:MinimalSmartAccountFactory --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo ""
 	@echo "Note: kUSD/kBTC are ERC1967 proxies - Etherscan will auto-detect them once kToken implementation is verified"
 	@echo "✅ Mainnet verification complete!"
@@ -161,8 +240,12 @@ verify-sepolia:
 	@forge verify-contract $$(jq -r '.contracts.adapterGuardianModule' deployments/output/sepolia/addresses.json) src/kRegistry/modules/AdapterGuardianModule.sol:AdapterGuardianModule --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying VaultAdapter implementation..."
 	@forge verify-contract $$(jq -r '.contracts.vaultAdapterImpl' deployments/output/sepolia/addresses.json) src/adapters/VaultAdapter.sol:VaultAdapter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
-	@echo "Verifying ERC20ParameterChecker..."
-	@forge verify-contract $$(jq -r '.contracts.erc20ParameterChecker' deployments/output/sepolia/addresses.json) src/adapters/parameters/ERC20ParameterChecker.sol:ERC20ParameterChecker --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json)) --watch || true
+	@echo "Verifying ERC20ExecutionValidator..."
+	@forge verify-contract $$(jq -r '.contracts.erc20ExecutionValidator' deployments/output/sepolia/addresses.json) src/adapters/parameters/ERC20ExecutionValidator.sol:ERC20ExecutionValidator --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json)) --watch || true
+	@echo "Verifying MinimalSmartAccount implementation..."
+	@forge verify-contract $$(jq -r '.contracts.minimalSmartAccountImpl' deployments/output/sepolia/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccount.sol:MinimalSmartAccount --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@echo "Verifying MinimalSmartAccountFactory..."
+	@forge verify-contract $$(jq -r '.contracts.minimalSmartAccountFactory' deployments/output/sepolia/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccountFactory.sol:MinimalSmartAccountFactory --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo ""
 	@echo "Note: kUSD/kBTC are ERC1967 proxies - Etherscan will auto-detect them once kToken implementation is verified"
 	@echo "✅ Sepolia verification complete!"
@@ -172,7 +255,7 @@ deploy-all: deploy-core setup-singletons deploy-tokens deploy-modules deploy-vau
 	@echo "✅ Protocol deployment finished!"
 
 # Complete configuration sequence (configures deployed contracts)
-config-all: configure configure-adapters format-output
+config-all: configure configure-adapters configure-approvals format-output
 	@echo "✅ Protocol configuration finished!"
 
 # Format JSON output files
@@ -225,26 +308,25 @@ deploy-adapters:
 	@echo "🔌 Deploying adapters..."
 	forge script script/deployment/08_DeployAdapters.s.sol --sig "run()" $(FORGE_ARGS)
 
-# Insurance (12)
+# Insurance (09)
 deploy-insurance:
 	@echo "🛡️  Deploying insurance smart account..."
-	forge script script/deployment/12_DeployInsuranceAccount.s.sol --sig "run()" $(FORGE_ARGS)
+	forge script script/deployment/09_DeployInsuranceAccount.s.sol --sig "run()" $(FORGE_ARGS)
 
-# Final configuration (09) - in actions folder
+# Final configuration (10)
 configure:
 	@echo "⚙️  Executing protocol configuration..."
-	forge script script/actions/09_ConfigureProtocol.s.sol --sig "run()" $(FORGE_ARGS)
+	forge script script/deployment/10_ConfigureProtocol.s.sol --sig "run()" $(FORGE_ARGS)
 
-# Adapter permissions configuration (10) - in actions folder
+# Adapter permissions configuration (11)
 configure-adapters:
 	@echo "🔐 Configuring adapter permissions..."
-	forge script script/actions/10_ConfigureAdapterPermissions.s.sol --sig "run()" $(FORGE_ARGS)
+	forge script script/deployment/11_ConfigureExecutorPermissions.s.sol --sig "run()" $(FORGE_ARGS)
 
-# Register vault modules (11) - Optional step for adding ReaderModule to vaults - in actions folder
-register-modules:
-	@echo "📦 Registering vault modules..."
-	forge script script/actions/11_RegisterVaultModules.s.sol --sig "run()" $(FORGE_ARGS)
-	@echo "⚠️  Execute the displayed admin calls via admin account"
+# Adapter ERC20 approvals (12) - Required for adapters to transfer assets
+configure-approvals:
+	@echo "✅ Configuring adapter ERC20 approvals..."
+	forge script script/deployment/12_ConfigureAdapterApprovals.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Verification
 verify:

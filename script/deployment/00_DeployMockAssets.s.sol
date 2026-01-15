@@ -91,7 +91,7 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         _log("Mock ERC7540 WBTC deployed at:", address(mockERC7540WBTC));
         _log("Mock Wallet USDC deployed at:", address(mockWalletUSDC));
 
-        // Write to JSON only if requested (for real deployments)
+        // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
             // Update network config with deployed addresses
             _updateNetworkConfig(
@@ -103,10 +103,11 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
                 address(mockWalletUSDC)
             );
 
-            // Write mock target addresses to deployment output
-            writeContractAddress("ERC7540USDC", address(mockERC7540USDC));
-            writeContractAddress("ERC7540WBTC", address(mockERC7540WBTC));
-            writeContractAddress("WalletUSDC", address(mockWalletUSDC));
+            // Write mock target addresses to deployment output (batched)
+            queueContractAddress("ERC7540USDC", address(mockERC7540USDC));
+            queueContractAddress("ERC7540WBTC", address(mockERC7540WBTC));
+            queueContractAddress("WalletUSDC", address(mockWalletUSDC));
+            flushContractAddresses();
         }
 
         // Mint tokens using config amounts
@@ -164,12 +165,13 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         vm.writeJson(vm.toString(mockUSDC), configPath, ".assets.USDC");
         vm.writeJson(vm.toString(mockWBTC), configPath, ".assets.WBTC");
 
-        // 2. Update ERC7540 Vault Addresses
-        vm.writeJson(vm.toString(mockERC7540USDC), configPath, ".ERC7540s.USDC");
-        vm.writeJson(vm.toString(mockERC7540WBTC), configPath, ".ERC7540s.WBTC");
+        // 2. Update Metawallet Addresses
+        vm.writeJson(vm.toString(mockERC7540USDC), configPath, ".metawallets.USDC");
+        vm.writeJson(vm.toString(mockERC7540WBTC), configPath, ".metawallets.WBTC");
 
-        // 3. Update the MockWallet Address
+        // 3. Update the MockWallet Address (both locations for consistency)
         vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".mockAssets.WalletUSDC");
+        vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".custodialTargets.walletUSDC");
 
         _log("Updated config file with mock asset addresses");
     }

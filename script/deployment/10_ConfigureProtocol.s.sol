@@ -89,7 +89,7 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         existing.contracts.kMinterAdapterWBTC = minterAdapterWBTCAddr;
 
         // Log script header and configuration
-        logScriptHeader("09_ConfigureProtocol");
+        logScriptHeader("10_ConfigureProtocol");
         logRoles(config);
         logAssets(config);
         logRegistryConfig(config);

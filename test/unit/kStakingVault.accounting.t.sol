@@ -16,7 +16,6 @@ import {
     KSTAKINGVAULT_ZERO_ADDRESS,
     KSTAKINGVAULT_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
-import { ERC1967Factory } from "kam/src/vendor/solady/utils/ERC1967Factory.sol";
 
 contract kStakingVaultAccountingTest is BaseVaultTest {
     using OptimizedFixedPointMathLib for uint256;
