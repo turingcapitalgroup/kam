@@ -72,11 +72,6 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     /// @param isHard True for hard hurdle, false for soft hurdle
     event HardHurdleRateSet(bool isHard);
 
-    /// @notice Emitted when fees are charged to the vault
-    /// @param managementFees Amount of management fees collected
-    /// @param performanceFees Amount of performance fees collected
-    event FeesAssessed(uint256 managementFees, uint256 performanceFees);
-
     /// @notice Emitted when management fees are charged
     /// @param timestamp Timestamp of the fee charge
     event ManagementFeesCharged(uint256 timestamp);
@@ -109,10 +104,6 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
         address recipient,
         bytes32 batchId
     );
-
-    /// @notice Emitted when a stake request is redeemed
-    /// @param requestId The unique identifier of the stake request
-    event StakeRequestRedeemed(bytes32 indexed requestId);
 
     /// @notice Emitted when an unstake request is created
     /// @param requestId The unique identifier of the unstake request
