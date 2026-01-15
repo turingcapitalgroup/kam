@@ -311,8 +311,12 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
 
         console.log("1");
+        console.log("stkTokenAmount : ", stkTokenAmount);
         console.log("$.totalPendingUnstake : ",$.totalPendingUnstake);
         console.log("$._totalKTokensNet : ",_totalKTokensNet);
+        console.log("totalNEtAssets : ",batch.totalNetAssets);
+        console.log("totalSupply : ",batch.totalSupply);
+
         // Reduce totalPendingUnstake - shares were already burned at settlement time
         $.totalPendingUnstake -= _totalKTokensNet.toUint128();
         console.log("1");
@@ -417,9 +421,9 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Snapshot total assets and supply after all operations
         // Only keep the net
-        $.batches[_batchId].totalAssets = _totalAssets();
-        $.batches[_batchId].totalNetAssets = _totalNetAssets();
-        $.batches[_batchId].totalSupply = totalSupply();
+        $.batches[_batchId].totalAssets = _batchTotalAssets;
+        $.batches[_batchId].totalNetAssets = _batchTotalNetAssets;
+        $.batches[_batchId].totalSupply = _batchTotalSupply;
 
         console.log("_batchTotalAssets 2: ", $.batches[_batchId].totalAssets);
         console.log("_batchTotalNetAssets 2: ", $.batches[_batchId].totalNetAssets);
