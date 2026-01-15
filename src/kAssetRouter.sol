@@ -461,23 +461,15 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
             emit TotalAssetsSet(address(_adapter), _totalAssets);
 
-            // If fees should be charged in this settlement, notify the vault to update share price
-            if (_proposal.lastFeesChargedManagement != 0) {
-                IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
-            }
-
-            if (_proposal.lastFeesChargedPerformance != 0) {
-                IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
-            }
-
-            // Mark batch as settled in the vault (also burns unstake shares and tracks claimable kTokens)
+            // Mark batch as settled in the vault FIRST (snapshot captures accumulated fees before reset)
+            // This must happen BEFORE notifyFeesCharged to ensure correct fee calculation
             ISettleBatch(_vault).settleBatch(_batchId);
             _adapter.setTotalAssets(_totalAssets);
             emit TotalAssetsSet(address(_adapter), _totalAssets);
 
             // If there were withdrawals, handle fee transfer to treasury
             if (_totalRequestedShares != 0) {
-                // Get snapshot values from batch info (after settlement)
+                // Get snapshot values from batch info (captured during settleBatch with accumulated fees)
                 (,,,,, uint256 _batchTotalAssets, uint256 _batchTotalNetAssets, uint256 _batchTotalSupply,,) =
                     IkStakingVault(_vault).getBatchIdInfo(_batchId);
 
@@ -497,6 +489,16 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                     IkToken(_kToken).burn(_vault, _feeAssets);
                     IkToken(_kToken).mint(_registry.getTreasury(), _feeAssets);
                 }
+            }
+
+            // Notify fees charged AFTER settlement and fee transfer
+            // This resets the fee accumulation timestamps only after fees have been extracted
+            if (_proposal.lastFeesChargedManagement != 0) {
+                IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
+            }
+
+            if (_proposal.lastFeesChargedPerformance != 0) {
+                IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
             }
         }
 
