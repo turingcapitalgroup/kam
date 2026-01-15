@@ -438,8 +438,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _adapter.setTotalAssets(uint256(_kMinterNewTotalAssets));
             emit TotalAssetsSet(address(_adapter), uint256(_kMinterNewTotalAssets));
         } else {
-            // Get requested shares from vault batch info
-            (,,,,,,,,, uint256 _totalRequestedShares) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
             // kMinter yield is sent to insuranceFund, cannot be minted.
             if (_yield != 0) {
                 if (_profit) {
@@ -474,30 +472,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             ISettleBatch(_vault).settleBatch(_batchId);
             _adapter.setTotalAssets(_totalAssets);
             emit TotalAssetsSet(address(_adapter), _totalAssets);
-
-            // If there were withdrawals, handle fee transfer to treasury
-            if (_totalRequestedShares != 0) {
-                // Get snapshot values from batch info (after settlement)
-                (,,,,, uint256 _batchTotalAssets, uint256 _batchTotalNetAssets, uint256 _batchTotalSupply,,) =
-                    IkStakingVault(_vault).getBatchIdInfo(_batchId);
-
-                // Calculate total kTokens corresponding to all requested shares at gross price
-                uint256 _totalKTokensForShares = IkStakingVault(_vault)
-                    .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalAssets, _batchTotalSupply);
-
-                // Calculate claimable kTokens for users (net amount after fees)
-                uint256 _claimableKTokens = IkStakingVault(_vault)
-                    .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalNetAssets, _batchTotalSupply);
-
-                // Fee assets is the difference between gross and net kTokens
-                uint256 _feeAssets = _totalKTokensForShares - _claimableKTokens;
-
-                // Move fees as kTokens to treasury
-                if (_feeAssets != 0) {
-                    IkToken(_kToken).burn(_vault, _feeAssets);
-                    IkToken(_kToken).mint(_registry.getTreasury(), _feeAssets);
-                }
-            }
         }
 
         emit BatchSettled(_vault, _batchId, _totalAssets);

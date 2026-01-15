@@ -368,7 +368,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Mint shares for this batch's pending stakes to the vault itself
         // This effectively "claims" shares for all pending stakers in this batch at settlement price
         uint128 batchDeposited = $.batches[_batchId].depositedInBatch;
-        if (batchDeposited > 0) {
+        if (batchDeposited != 0) {
             uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalNetAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
             $.totalPendingStake -= batchDeposited;
@@ -376,13 +376,25 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Burn all unstake shares and track claimable kTokens
         uint128 requestedShares = $.batches[_batchId].requestedSharesInBatch;
-        if (requestedShares > 0) {
+        if (requestedShares != 0) {
+            // Calculate total kTokens corresponding to all requested shares at gross price
+            uint256 _totalKTokensForShares =
+                _convertToAssetsWithTotals(requestedShares, _batchTotalAssets, _batchTotalSupply);
+
             // Calculate claimable kTokens for users (net amount after fees)
             uint256 _claimableKTokens =
                 _convertToAssetsWithTotals(requestedShares, _batchTotalNetAssets, _batchTotalSupply);
 
             // Burn all requested shares
             _burn(address(this), requestedShares);
+
+            // Fee assets is the difference between gross and net kTokens
+            uint256 _feeAssets = _totalKTokensForShares - _claimableKTokens;
+
+            if (_feeAssets != 0) {
+                // Send fees in form of assets to the treasury
+                _getBaseVaultStorage().kToken.safeTransfer(_registry().getTreasury(), _feeAssets);
+            }
 
             // Track claimable kTokens in global tracking
             $.totalPendingUnstake += _claimableKTokens.toUint128();
@@ -391,9 +403,10 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         }
 
         // Snapshot total assets and supply after all operations
-        $.batches[_batchId].totalAssets = _batchTotalAssets;
-        $.batches[_batchId].totalNetAssets = _batchTotalNetAssets;
-        $.batches[_batchId].totalSupply = _batchTotalSupply;
+        // Only keep the net
+        $.batches[_batchId].totalAssets = _totalAssets();
+        $.batches[_batchId].totalNetAssets = _totalNetAssets();
+        $.batches[_batchId].totalSupply = totalSupply();
 
         emit BatchSettled(_batchId);
     }
