@@ -24,8 +24,8 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     //////////////////////////////////////////////////////////////*/
 
     // VaultBatches Events
-    // / @notice Emitted when a new batch is created
-    // / @param batchId The batch ID of the new batch
+    /// @notice Emitted when a new batch is created
+    /// @param batchId The batch ID of the new batch
     event BatchCreated(bytes32 indexed batchId);
 
     /// @notice Emitted when a batch is settled
@@ -157,14 +157,6 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     /// @param stkTokenAmount The quantity of stkTokens to unstake (must not exceed user balance, cannot be zero)
     /// @return requestId Unique identifier for tracking this unstaking request through settlement and claiming
     function requestUnstake(address to, uint256 stkTokenAmount) external payable returns (bytes32 requestId);
-
-    /// @notice Burns all unstake shares for a batch and records claimable kTokens
-    /// @dev Called by kAssetRouter during settlement to burn all requested shares (including fee portion)
-    /// and track the total claimable kTokens for users in this batch
-    /// @param batchId The batch identifier
-    /// @param totalRequestedShares Total shares to burn (including fee shares)
-    /// @param claimableKTokens Total kTokens claimable by users (net of fees)
-    function burnUnstakeShares(bytes32 batchId, uint256 totalRequestedShares, uint256 claimableKTokens) external;
 
     /// @notice Controls the vault's operational state for emergency situations and maintenance periods
     /// @dev This function provides critical safety controls for vault operations by: (1) Enabling emergency admins

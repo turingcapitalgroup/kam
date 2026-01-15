@@ -44,6 +44,7 @@ import { K_MINTER, MAX_BPS } from "kam/src/constants/Constants.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
+import {console} from "forge-std/console.sol";
 
 /// @title kStakingVault
 /// @notice Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
@@ -301,22 +302,20 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
         require(_msgSender() == user, VAULTCLAIMS_NOT_BENEFICIARY);
 
-        uint256 _totalNetAssets = batch.totalNetAssets;
-        uint256 _totalSupply = batch.totalSupply;
-
-        // This should never happen
-        require(_totalSupply > 0, KSTAKINGVAULT_ZERO_AMOUNT);
-
         // Calculate total kTokens to return: (stkTokenAmount * totalNetAssets) / totalSupply
-        uint256 _totalKTokensNet = _convertToAssetsWithTotals(stkTokenAmount, _totalNetAssets, _totalSupply);
+        uint256 _totalKTokensNet = _convertToAssetsWithTotals(stkTokenAmount, batch.totalNetAssets, batch.totalSupply);
         _checkAmountNotZero(_totalKTokensNet);
 
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
 
+        console.log("1");
+        console.log("$.totalPendingUnstake : ",$.totalPendingUnstake);
+        console.log("$._totalKTokensNet : ",_totalKTokensNet);
         // Reduce totalPendingUnstake - shares were already burned at settlement time
         $.totalPendingUnstake -= _totalKTokensNet.toUint128();
+        console.log("1");
 
         emit UnstakingAssetsClaimed(batchId, _requestId, user, _totalKTokensNet);
         emit KTokenUnstaked(user, stkTokenAmount, _totalKTokensNet);
@@ -360,22 +359,34 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(!$.batches[_batchId].isSettled, VAULTBATCHES_VAULT_SETTLED);
         $.batches[_batchId].isSettled = true;
 
+
+        console.log("sp : ", _sharePrice());
         // Cache total assets and supply at settlement time for calculations
         uint256 _batchTotalAssets = _totalAssets();
         uint256 _batchTotalNetAssets = _totalNetAssets();
         uint256 _batchTotalSupply = totalSupply();
 
+        console.log("_batchTotalAssets : ", _batchTotalAssets);
+        console.log("_batchTotalNetAssets : ", _batchTotalNetAssets);
+        console.log("_batchTotalSupply : ", _batchTotalSupply);
+
         // Mint shares for this batch's pending stakes to the vault itself
         // This effectively "claims" shares for all pending stakers in this batch at settlement price
         uint128 batchDeposited = $.batches[_batchId].depositedInBatch;
+        console.log("batchDeposited : ", batchDeposited);
+
+        
         if (batchDeposited != 0) {
             uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalNetAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
             $.totalPendingStake -= batchDeposited;
         }
+        console.log("sp : ", _sharePrice());
 
         // Burn all unstake shares and track claimable kTokens
         uint128 requestedShares = $.batches[_batchId].requestedSharesInBatch;
+        console.log("requestedShares : ", requestedShares);
+
         if (requestedShares != 0) {
             // Calculate total kTokens corresponding to all requested shares at gross price
             uint256 _totalKTokensForShares =
@@ -402,11 +413,17 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             emit UnstakeSharesBurned(_batchId, requestedShares, _claimableKTokens);
         }
 
+        console.log("sp : ", _sharePrice());
+
         // Snapshot total assets and supply after all operations
         // Only keep the net
         $.batches[_batchId].totalAssets = _totalAssets();
         $.batches[_batchId].totalNetAssets = _totalNetAssets();
         $.batches[_batchId].totalSupply = totalSupply();
+
+        console.log("_batchTotalAssets 2: ", $.batches[_batchId].totalAssets);
+        console.log("_batchTotalNetAssets 2: ", $.batches[_batchId].totalNetAssets);
+        console.log("_batchTotalSupply 2: ", $.batches[_batchId].totalSupply);
 
         emit BatchSettled(_batchId);
     }
