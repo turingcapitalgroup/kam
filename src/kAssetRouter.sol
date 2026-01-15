@@ -278,9 +278,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             console.log("deposited in batch :", _depositedInBatch);
             console.log("requested in batch :", _requestedSharesInBatch);
             uint256 _totalSupply = IkStakingVault(_vault).totalSupply();
-            // When _totalSupply == 0, use 1:1 ratio; otherwise math handles _totalAssets == 0 naturally (returns 0)
-            uint256 _requestedAssets = IkStakingVault(_vault).convertToAssetsWithTotals(_requestedSharesInBatch, _totalAssets, _totalSupply);
-
+            // When _totalSupply == 0, use 1:1 ratio; otherwise math handles _totalAssets == 0 naturally (returns 0)            
+            uint256 _requestedAssets = _totalSupply == 0
+                ? _requestedSharesInBatch
+                : _requestedSharesInBatch.fullMulDiv(_totalAssets, _totalSupply);
             // casting to 'int256' is safe because we're doing arithmetic on uint256 values
             // forge-lint: disable-next-line(unsafe-typecast)
             _netted = int256(_depositedInBatch) - int256(_requestedAssets);
