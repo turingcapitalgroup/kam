@@ -120,9 +120,11 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
    - `profit` = whether yield is positive or negative
    - Emits `YieldExceedsMaxDeltaWarning` if yield exceeds configured threshold (warning only, does not revert)
 
-2. **Cooldown Phase**: Mandatory waiting period (configurable 0-24 hours, default 1 hour) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds configured threshold (default 10%, max 50% in basis points), a warning event is emitted. Guardians must monitor for these warnings and cancel suspicious proposals during the cooldown window.
+2. **Cooldown Phase**: Mandatory waiting period (configurable 0-24 hours, default 1 hour) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds configured threshold (default 10%, max 50% in basis points), a warning event is emitted and the proposal is flagged as requiring approval (`requiresApproval = true`). Guardians must monitor for these warnings and either cancel suspicious proposals or approve legitimate high-yield proposals via `acceptProposal()`.
 
-3. **Execution Phase**: After cooldown, anyone calls `executeSettleBatch()` to complete settlement
+3. **Approval Phase** (conditional): If the proposal's yield exceeded the tolerance threshold, a guardian must call `acceptProposal()` before execution. This prevents automatic execution of potentially anomalous settlements while allowing legitimate high-yield batches to proceed after review.
+
+4. **Execution Phase**: After cooldown (and approval if required), anyone calls `executeSettleBatch()` to complete settlement
 
 **Yield Distribution**: During settlement execution:
 
@@ -240,6 +242,7 @@ The kAssetRouter serves as the central coordinator for all asset movements withi
 │                                                             │
 │  Guardian Operations:                                       │
 │  • cancelProposal() - Cancel suspicious proposals           │
+│  • acceptProposal() - Approve high-yield-delta proposals    │
 │                                                             │
 │  Admin Configuration:                                       │
 │  • setSettlementCooldown() - Configure cooldown period      │
@@ -290,26 +293,28 @@ The router handles four distinct types of asset movements: kMinter push operatio
 During settlement execution, the system handles kMinter versus regular vault settlement differently. For kMinter settlements, assets are transferred to batch receivers for institutional redemptions, with the vault variable being reassigned to the corresponding DN vault. For regular vault settlements, yield is minted or burned based on profit/loss calculations. Netted assets are then deployed to external strategies via adapters using explicit approval patterns for security.
 
 ```
-┌───────────────────────────────────────────────────────────────-----──┐
-│                     Three-Phase Settlement                           │
-├───────────────────────────────────────────────────────────────-------┤
-│                                                                      │
-│  Phase 1: PROPOSAL           Phase 2: COOLDOWN      Phase 3: EXECUTE |
-│  ┌──────────────┐           ┌──────────────┐      ┌──────────────┐   |
-│  │   Relayer    │           │   Timelock   │      │   Anyone     │   |
-│  │              │           │              │      │              │   |
-│  │ • Query      │           │ • 1hr wait   │      │ • Clear      │   |
-│  │   totalAssets│──────────>│ • Can cancel │─────>│   balances   │   |
-│  │ • Submit     │           │ • Can update │      │ • Deploy     │   |
-│  │   proposal   │           │              │      │   assets     │   |
-│  └──────────────┘           └──────────────┘      └──────────────┘   |
-│        ↓                                                             │
-│ ┌──────────────┐  Contract automatically calculates:                 │
-│ │ kAssetRouter │  • netted = deposited - requested                   │
-│ │              │  • yield = totalAssets - netted - lastTotalAssets   │
-│ │              │  • profit = yield > 0                               │
-│ └──────────────┘                                                     │
-└─────────────────────────────────────────────────────────────────-----┘
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                          Settlement Process (with optional approval)                      │
+├──────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│  Phase 1: PROPOSAL      Phase 2: COOLDOWN      Phase 3: APPROVAL     Phase 4: EXECUTE   │
+│  ┌──────────────┐      ┌──────────────┐       ┌──────────────┐      ┌──────────────┐    │
+│  │   Relayer    │      │   Timelock   │       │   Guardian   │      │   Anyone     │    │
+│  │              │      │              │       │  (if needed) │      │              │    │
+│  │ • Query      │      │ • 1hr wait   │       │ • Review     │      │ • Clear      │    │
+│  │   totalAssets│─────>│ • Can cancel │──────>│   high-delta │─────>│   balances   │    │
+│  │ • Submit     │      │              │       │ • Accept or  │      │ • Deploy     │    │
+│  │   proposal   │      │              │       │   cancel     │      │   assets     │    │
+│  └──────────────┘      └──────────────┘       └──────────────┘      └──────────────┘    │
+│        ↓                                              │                                  │
+│ ┌──────────────┐                            Phase 3 is only required                    │
+│ │ kAssetRouter │  Contract calculates:      when yield > maxAllowedDelta                │
+│ │              │  • netted = deposited - requested                                      │
+│ │              │  • yield = totalAssets - netted - lastTotalAssets                      │
+│ │              │  • profit = yield > 0                                                  │
+│ │              │  • requiresApproval = (yield > tolerance)                              │
+│ └──────────────┘                                                                        │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Vault System
@@ -495,7 +500,7 @@ The protocol implements granular permissions via Solady's OptimizedOwnableRoles 
 | VENDOR_ROLE          | Adapters    | Register adapters, manage assets|
 | RELAYER_ROLE         | Settlement  | Propose batch settlements       |
 | MANAGER_ROLE         | Adapters    | Adapter execution and management|
-| GUARDIAN_ROLE        | Settlement  | Cancel settlement proposals     |
+| GUARDIAN_ROLE        | Settlement  | Cancel/approve settlement proposals |
 
 ### Settlement Security
 
@@ -505,7 +510,8 @@ The two-phase commit system provides multiple safeguards:
 
 - Mandatory cooldown period (1hr default, max 1 day)
 - Guardian-only proposal cancellation during cooldown
-- Yield tolerance warning system (emits event if yield exceeds 10% max deviation, guardians must cancel)
+- High-yield-delta approval system: Proposals exceeding yield tolerance (default 10%) require explicit guardian approval via `acceptProposal()` before execution
+- `canExecuteProposal()` returns specific reasons for blocked proposals (cooldown pending, requires approval, cancelled, already executed)
 - On-chain validation of all settlement parameters
 
 ### Emergency Controls
