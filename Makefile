@@ -3,6 +3,9 @@
 -include .env
 export
 
+# Foundry profile for deployments (uses optimizer settings)
+DEPLOY_PROFILE = deploy
+
 .PHONY: help deploy-mainnet deploy-mainnet-dry-run deploy-sepolia deploy-sepolia-dry-run deploy-localhost deploy-localhost-dry-run config-mainnet config-mainnet-dry-run config-sepolia config-sepolia-dry-run config-localhost config-localhost-dry-run deploy-all config-all deploy-mock-assets verify-mainnet verify-sepolia verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage gas-estimations deploy-phase1-sepolia deploy-phase1-sepolia-dry-run deploy-phase1-mainnet deploy-phase1-mainnet-dry-run config-phase2-sepolia config-phase2-sepolia-dry-run config-phase2-mainnet config-phase2-mainnet-dry-run
 
 # Default target
@@ -181,71 +184,71 @@ config-localhost-dry-run:
 	@$(MAKE) config-all FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
 
 # Etherscan verification (mainnet)
-verify-mainnet:
+verify-mainnet: print-profile
 	@echo "🔍 Verifying contracts on MAINNET Etherscan..."
 	@if [ ! -f "deployments/output/mainnet/addresses.json" ]; then \
 		echo "❌ No mainnet deployment found"; \
 		exit 1; \
 	fi
 	@echo "Verifying kRegistry implementation..."
-	@forge verify-contract $$(jq -r '.contracts.kRegistryImpl' deployments/output/mainnet/addresses.json) src/kRegistry/kRegistry.sol:kRegistry --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kRegistryImpl' deployments/output/mainnet/addresses.json) src/kRegistry/kRegistry.sol:kRegistry --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying kMinter implementation..."
-	@forge verify-contract $$(jq -r '.contracts.kMinterImpl' deployments/output/mainnet/addresses.json) src/kMinter.sol:kMinter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kMinterImpl' deployments/output/mainnet/addresses.json) src/kMinter.sol:kMinter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying kAssetRouter implementation..."
-	@forge verify-contract $$(jq -r '.contracts.kAssetRouterImpl' deployments/output/mainnet/addresses.json) src/kAssetRouter.sol:kAssetRouter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kAssetRouterImpl' deployments/output/mainnet/addresses.json) src/kAssetRouter.sol:kAssetRouter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying kTokenFactory..."
-	@forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/mainnet/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json) $$(jq -r '.contracts.ERC1967Factory' deployments/output/mainnet/addresses.json)) --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/mainnet/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json) $$(jq -r '.contracts.ERC1967Factory' deployments/output/mainnet/addresses.json)) --watch || true
 	@echo "Verifying kToken implementation (via kTokenFactory.implementation())..."
-	@forge verify-contract $$(cast call $$(jq -r '.contracts.kTokenFactory' deployments/output/mainnet/addresses.json) "implementation()(address)" --rpc-url ${RPC_MAINNET}) src/kToken.sol:kToken --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(cast call $$(jq -r '.contracts.kTokenFactory' deployments/output/mainnet/addresses.json) "implementation()(address)" --rpc-url ${RPC_MAINNET}) src/kToken.sol:kToken --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying kStakingVault implementation..."
-	@forge verify-contract $$(jq -r '.contracts.kStakingVaultImpl' deployments/output/mainnet/addresses.json) src/kStakingVault/kStakingVault.sol:kStakingVault --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kStakingVaultImpl' deployments/output/mainnet/addresses.json) src/kStakingVault/kStakingVault.sol:kStakingVault --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying ReaderModule..."
-	@forge verify-contract $$(jq -r '.contracts.readerModule' deployments/output/mainnet/addresses.json) src/kStakingVault/modules/ReaderModule.sol:ReaderModule --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.readerModule' deployments/output/mainnet/addresses.json) src/kStakingVault/modules/ReaderModule.sol:ReaderModule --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying AdapterGuardianModule..."
-	@forge verify-contract $$(jq -r '.contracts.adapterGuardianModule' deployments/output/mainnet/addresses.json) src/kRegistry/modules/AdapterGuardianModule.sol:AdapterGuardianModule --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.adapterGuardianModule' deployments/output/mainnet/addresses.json) src/kRegistry/modules/AdapterGuardianModule.sol:AdapterGuardianModule --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying VaultAdapter implementation..."
-	@forge verify-contract $$(jq -r '.contracts.vaultAdapterImpl' deployments/output/mainnet/addresses.json) src/adapters/VaultAdapter.sol:VaultAdapter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.vaultAdapterImpl' deployments/output/mainnet/addresses.json) src/adapters/VaultAdapter.sol:VaultAdapter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying ERC20ExecutionValidator..."
-	@forge verify-contract $$(jq -r '.contracts.erc20ExecutionValidator' deployments/output/mainnet/addresses.json) src/adapters/parameters/ERC20ExecutionValidator.sol:ERC20ExecutionValidator --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json)) --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.erc20ExecutionValidator' deployments/output/mainnet/addresses.json) src/adapters/parameters/ERC20ExecutionValidator.sol:ERC20ExecutionValidator --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json)) --watch || true
 	@echo "Verifying MinimalSmartAccount implementation..."
-	@forge verify-contract $$(jq -r '.contracts.minimalSmartAccountImpl' deployments/output/mainnet/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccount.sol:MinimalSmartAccount --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.minimalSmartAccountImpl' deployments/output/mainnet/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccount.sol:MinimalSmartAccount --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying MinimalSmartAccountFactory..."
-	@forge verify-contract $$(jq -r '.contracts.minimalSmartAccountFactory' deployments/output/mainnet/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccountFactory.sol:MinimalSmartAccountFactory --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.minimalSmartAccountFactory' deployments/output/mainnet/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccountFactory.sol:MinimalSmartAccountFactory --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo ""
 	@echo "Note: kUSD/kBTC are ERC1967 proxies - Etherscan will auto-detect them once kToken implementation is verified"
 	@echo "✅ Mainnet verification complete!"
 
 # Etherscan verification (sepolia)
-verify-sepolia:
+verify-sepolia: print-profile
 	@echo "🔍 Verifying contracts on SEPOLIA Etherscan..."
 	@if [ ! -f "deployments/output/sepolia/addresses.json" ]; then \
 		echo "❌ No sepolia deployment found"; \
 		exit 1; \
 	fi
 	@echo "Verifying kRegistry implementation..."
-	@forge verify-contract $$(jq -r '.contracts.kRegistryImpl' deployments/output/sepolia/addresses.json) src/kRegistry/kRegistry.sol:kRegistry --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kRegistryImpl' deployments/output/sepolia/addresses.json) src/kRegistry/kRegistry.sol:kRegistry --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying kMinter implementation..."
-	@forge verify-contract $$(jq -r '.contracts.kMinterImpl' deployments/output/sepolia/addresses.json) src/kMinter.sol:kMinter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kMinterImpl' deployments/output/sepolia/addresses.json) src/kMinter.sol:kMinter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying kAssetRouter implementation..."
-	@forge verify-contract $$(jq -r '.contracts.kAssetRouterImpl' deployments/output/sepolia/addresses.json) src/kAssetRouter.sol:kAssetRouter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kAssetRouterImpl' deployments/output/sepolia/addresses.json) src/kAssetRouter.sol:kAssetRouter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying kTokenFactory..."
-	@forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/sepolia/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json) $$(jq -r '.contracts.ERC1967Factory' deployments/output/sepolia/addresses.json)) --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/sepolia/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json) $$(jq -r '.contracts.ERC1967Factory' deployments/output/sepolia/addresses.json)) --watch || true
 	@echo "Verifying kToken implementation (via kTokenFactory.implementation())..."
-	@forge verify-contract $$(cast call $$(jq -r '.contracts.kTokenFactory' deployments/output/sepolia/addresses.json) "implementation()(address)" --rpc-url ${RPC_SEPOLIA}) src/kToken.sol:kToken --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(cast call $$(jq -r '.contracts.kTokenFactory' deployments/output/sepolia/addresses.json) "implementation()(address)" --rpc-url ${RPC_SEPOLIA}) src/kToken.sol:kToken --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying kStakingVault implementation..."
-	@forge verify-contract $$(jq -r '.contracts.kStakingVaultImpl' deployments/output/sepolia/addresses.json) src/kStakingVault/kStakingVault.sol:kStakingVault --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kStakingVaultImpl' deployments/output/sepolia/addresses.json) src/kStakingVault/kStakingVault.sol:kStakingVault --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying ReaderModule..."
-	@forge verify-contract $$(jq -r '.contracts.readerModule' deployments/output/sepolia/addresses.json) src/kStakingVault/modules/ReaderModule.sol:ReaderModule --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.readerModule' deployments/output/sepolia/addresses.json) src/kStakingVault/modules/ReaderModule.sol:ReaderModule --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying AdapterGuardianModule..."
-	@forge verify-contract $$(jq -r '.contracts.adapterGuardianModule' deployments/output/sepolia/addresses.json) src/kRegistry/modules/AdapterGuardianModule.sol:AdapterGuardianModule --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.adapterGuardianModule' deployments/output/sepolia/addresses.json) src/kRegistry/modules/AdapterGuardianModule.sol:AdapterGuardianModule --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying VaultAdapter implementation..."
-	@forge verify-contract $$(jq -r '.contracts.vaultAdapterImpl' deployments/output/sepolia/addresses.json) src/adapters/VaultAdapter.sol:VaultAdapter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.vaultAdapterImpl' deployments/output/sepolia/addresses.json) src/adapters/VaultAdapter.sol:VaultAdapter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying ERC20ExecutionValidator..."
-	@forge verify-contract $$(jq -r '.contracts.erc20ExecutionValidator' deployments/output/sepolia/addresses.json) src/adapters/parameters/ERC20ExecutionValidator.sol:ERC20ExecutionValidator --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json)) --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.erc20ExecutionValidator' deployments/output/sepolia/addresses.json) src/adapters/parameters/ERC20ExecutionValidator.sol:ERC20ExecutionValidator --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json)) --watch || true
 	@echo "Verifying MinimalSmartAccount implementation..."
-	@forge verify-contract $$(jq -r '.contracts.minimalSmartAccountImpl' deployments/output/sepolia/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccount.sol:MinimalSmartAccount --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.minimalSmartAccountImpl' deployments/output/sepolia/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccount.sol:MinimalSmartAccount --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying MinimalSmartAccountFactory..."
-	@forge verify-contract $$(jq -r '.contracts.minimalSmartAccountFactory' deployments/output/sepolia/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccountFactory.sol:MinimalSmartAccountFactory --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.minimalSmartAccountFactory' deployments/output/sepolia/addresses.json) lib/minimal-smart-account/src/MinimalSmartAccountFactory.sol:MinimalSmartAccountFactory --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo ""
 	@echo "Note: kUSD/kBTC are ERC1967 proxies - Etherscan will auto-detect them once kToken implementation is verified"
 	@echo "✅ Sepolia verification complete!"
@@ -254,8 +257,13 @@ verify-sepolia:
 deploy-all: deploy-core setup-singletons deploy-tokens deploy-modules deploy-vaults deploy-adapters deploy-insurance format-output
 	@echo "✅ Protocol deployment finished!"
 
+# Print profile at the start of deployment (called before deploy-all)
+deploy-core: print-profile
+print-profile:
+	@echo "⚙️  Using Foundry profile: $(DEPLOY_PROFILE)"
+
 # Complete configuration sequence (configures deployed contracts)
-config-all: configure configure-adapters configure-approvals format-output
+config-all: print-profile configure configure-adapters configure-approvals format-output
 	@echo "✅ Protocol configuration finished!"
 
 # Format JSON output files
@@ -272,61 +280,61 @@ format-output:
 # Mock assets (00) - Only for testnets
 deploy-mock-assets:
 	@echo "🪙 Deploying mock assets for testnet..."
-	forge script script/deployment/00_DeployMockAssets.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/00_DeployMockAssets.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Core contracts (01-03)
 deploy-core:
 	@echo "📦 Deploying core contracts..."
-	forge script script/deployment/01_DeployRegistry.s.sol --sig "run()" $(FORGE_ARGS)
-	forge script script/deployment/02_DeployMinter.s.sol --sig "run()" $(FORGE_ARGS)
-	forge script script/deployment/03_DeployAssetRouter.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/01_DeployRegistry.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/02_DeployMinter.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/03_DeployAssetRouter.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Registry setup (04)
 setup-singletons:
 	@echo "⚙️  Registry singleton setup..."
-	forge script script/deployment/04_RegisterSingletons.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/04_RegisterSingletons.s.sol --sig "run()" $(FORGE_ARGS)
 	@echo "⚠️  Execute the displayed admin calls via admin account"
 
 # Token deployment (05)
 deploy-tokens:
 	@echo "🪙 Token deployment setup..."
-	forge script script/deployment/05_DeployTokens.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/05_DeployTokens.s.sol --sig "run()" $(FORGE_ARGS)
 	@echo "⚠️  Execute the displayed admin calls via admin account"
 
 # Vault modules (06)
 deploy-modules:
 	@echo "🧩 Deploying vault modules..."
-	forge script script/deployment/06_DeployVaultModules.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/06_DeployVaultModules.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Vaults (07)
 deploy-vaults:
 	@echo "🏛️  Deploying vaults..."
-	forge script script/deployment/07_DeployVaults.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/07_DeployVaults.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Adapters (08)
 deploy-adapters:
 	@echo "🔌 Deploying adapters..."
-	forge script script/deployment/08_DeployAdapters.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/08_DeployAdapters.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Insurance (09)
 deploy-insurance:
 	@echo "🛡️  Deploying insurance smart account..."
-	forge script script/deployment/09_DeployInsuranceAccount.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/09_DeployInsuranceAccount.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Final configuration (10)
 configure:
 	@echo "⚙️  Executing protocol configuration..."
-	forge script script/deployment/10_ConfigureProtocol.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/10_ConfigureProtocol.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Adapter permissions configuration (11)
 configure-adapters:
 	@echo "🔐 Configuring adapter permissions..."
-	forge script script/deployment/11_ConfigureExecutorPermissions.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/11_ConfigureExecutorPermissions.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Adapter ERC20 approvals (12) - Required for adapters to transfer assets
 configure-approvals:
 	@echo "✅ Configuring adapter ERC20 approvals..."
-	forge script script/deployment/12_ConfigureAdapterApprovals.s.sol --sig "run()" $(FORGE_ARGS)
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/12_ConfigureAdapterApprovals.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Verification
 verify:
