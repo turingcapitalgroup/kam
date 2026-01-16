@@ -519,7 +519,20 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// @inheritdoc IRegistry
     function removeAdapter(address _vault, address _asset, address _adapter) external payable {
         _checkAdmin(msg.sender);
+        _checkAddressNotZero(_vault);
+        _checkAddressNotZero(_asset);
+        require(_adapter != address(0), KREGISTRY_INVALID_ADAPTER);
+
         kRegistryStorage storage $ = _getkRegistryStorage();
+
+        // Ensure asset is registered in the protocol
+        _checkAssetRegistered(_asset);
+
+        // Ensure vault exists in protocol
+        if ($.singletonContracts[K_MINTER] != _vault) _checkVaultRegistered(_vault);
+
+        // Ensure vault supports this asset
+        require($.vaultAssets[_vault].contains(_asset), KREGISTRY_ASSET_NOT_SUPPORTED);
 
         require($.vaultAdaptersByAsset[_vault][_asset] == _adapter, KREGISTRY_INVALID_ADAPTER);
         delete $.vaultAdaptersByAsset[_vault][_asset];
