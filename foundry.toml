@@ -5,7 +5,7 @@ libs = ["dependencies"]
 gas_reports = ['*']
 solc_version = "0.8.30"
 optimizer = true
-optimizer_runs = 10_000
+optimizer_runs = 100
 via_ir = true
 ffi = true
 ast = true
@@ -15,7 +15,9 @@ dynamic_test_linking = true
 fs_permissions = [{ access = "read-write", path = "." }]
 
 [profile.deploy]
-optimizer_runs = 10_000
+via_ir = true
+optimizer=true
+optimizer_runs = 7777
 
 [profile.solx]
 gas_limit = 100_000_000

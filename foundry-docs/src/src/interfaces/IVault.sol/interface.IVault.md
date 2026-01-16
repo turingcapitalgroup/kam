@@ -34,12 +34,13 @@ the settled price. This two-phase approach ensures fair pricing for all users wi
 
 
 ```solidity
-function requestStake(address to, uint256 kTokensAmount) external payable returns (bytes32 requestId);
+function requestStake(address owner, address to, uint256 kTokensAmount) external payable returns (bytes32 requestId);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
+|`owner`|`address`|The address that owns this stake request and can claim the resulting shares|
 |`to`|`address`|The recipient address that will receive the stkTokens after successful settlement and claiming|
 |`kTokensAmount`|`uint256`|The quantity of kTokens to stake (must not exceed user balance, cannot be zero)|
 

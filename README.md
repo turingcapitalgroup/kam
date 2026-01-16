@@ -111,7 +111,7 @@ Institutions can mint kTokens 1:1 with underlying assets and request redemptions
 - `kMinter.mint()` - Creates new kTokens by accepting underlying asset deposits
 - `kMinter.requestBurn()` - Requests the burn of X shares for Y kTokens
 - `kMinter.burn()` - Burns the requested shares amount and transfer the kTokens
-- `kMinter.cancelRequest()` - Cancels redemption requests before settlement
+- `kMinter.cancelBurnRequest()` - Cancels pending burn requests before batch settlement
 
 ### Retail Operations
 

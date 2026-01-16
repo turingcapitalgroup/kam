@@ -38,4 +38,24 @@ contract kStakingVaultInvariants is SetUp {
     function invariant_kStakingVaultSharePriceDelta() public view {
         vaultHandlerAlpha.INVARIANT_G_SHARE_PRICE_DELTA();
     }
+
+    function invariant_kStakingVaultClaimStableSharePrice() public view {
+        vaultHandlerAlpha.INVARIANT_H_CLAIM_STABLE_SHARE_PRICE();
+    }
+
+    function invariant_kStakingVaultPendingStakeSettlement() public view {
+        vaultHandlerAlpha.INVARIANT_I_PENDING_STAKE_SETTLEMENT();
+    }
+
+    function invariant_kStakingVaultUnstakeClaimAccuracy() public view {
+        vaultHandlerAlpha.INVARIANT_J_UNSTAKE_CLAIM_ACCURACY();
+    }
+
+    function invariant_kStakingVaultFeeBounds() public view {
+        vaultHandlerAlpha.INVARIANT_K_FEE_BOUNDS();
+    }
+
+    function invariant_kStakingVaultSelfBalance() public view {
+        vaultHandlerAlpha.INVARIANT_L_VAULT_SELF_BALANCE();
+    }
 }

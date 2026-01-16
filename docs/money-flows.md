@@ -154,7 +154,7 @@ Result:
 ```
 User Action:
 1. User has 100,000 kUSDC
-2. Calls DNVaultUSDC.requestStake(100000)
+2. Calls DNVaultUSDC.requestStake(user, user, 100000)
 
 Physical Movement:
    User → DN Vault USDC
@@ -198,7 +198,7 @@ Result:
 ```
 User Action:
 1. User has 100,000 kUSDC  
-2. Calls AlphaVault.requestStake(100000)
+2. Calls AlphaVault.requestStake(user, user, 100000)
 
 Physical Movement #1:
    User → Alpha Vault

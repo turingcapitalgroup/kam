@@ -27,11 +27,11 @@ interface IRegistry is IVersioned {
     /// @param vault The vault contract address being removed
     event VaultRemoved(address indexed vault);
 
-    /// @notice Emitted when an asset and its kToken are registered
-    /// @param asset The underlying asset address
-    /// @param maxMintPerBatch the max mint amount per batch
-    /// @param maxBurnPerBatch the max burn amount per batch
-    event AssetBatchLimitsUpdated(address indexed asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch);
+    /// @notice Emitted when batch limits are updated for an asset or vault
+    /// @param target The asset or vault address
+    /// @param maxMintPerBatch The max mint/deposit amount per batch
+    /// @param maxBurnPerBatch The max burn/withdraw amount per batch
+    event BatchLimitsUpdated(address indexed target, uint256 maxMintPerBatch, uint256 maxBurnPerBatch);
 
     /// @notice Emitted when an asset and its kToken are registered
     /// @param asset The underlying asset address
@@ -41,6 +41,10 @@ interface IRegistry is IVersioned {
     /// @notice Emitted when an asset is added to the supported set
     /// @param asset The newly supported asset address
     event AssetSupported(address indexed asset);
+
+    /// @notice Emitted when an asset is removed from the protocol
+    /// @param asset The asset address being removed
+    event AssetRemoved(address indexed asset);
 
     /// @notice Emitted when an adapter is registered for a vault
     /// @param vault The vault receiving the adapter
@@ -157,6 +161,16 @@ interface IRegistry is IVersioned {
         external
         payable
         returns (address);
+
+    /// @notice Removes a registered asset from the protocol
+    /// @dev This function deregisters an asset and cleans up all associated storage mappings. Critical safety checks
+    /// ensure the asset cannot be removed if any vaults still reference it (vaultsByAsset must be empty).
+    /// This prevents orphaned state where vaults reference a non-existent asset. Clears: supportedAssets set,
+    /// maxMintPerBatch, maxBurnPerBatch, assetToKToken mapping, and assetHurdleRate. Note that the kToken contract
+    /// remains deployed but becomes orphaned - this is intentional as existing kToken holders should retain their
+    /// tokens. Only callable by ADMIN_ROLE.
+    /// @param asset The asset address to remove from the protocol
+    function removeAsset(address asset) external payable;
 
     /// @notice Registers a new vault contract in the protocol's vault management system
     /// @dev This function integrates vaults into the protocol by: (1) Validating the vault isn't already registered,
@@ -301,6 +315,12 @@ interface IRegistry is IVersioned {
     /// @return True if vault is registered
     function isVault(address vault) external view returns (bool);
 
+    /// @notice Checks if an address is a protocol kToken
+    /// @dev Uses kTokenToAsset reverse mapping for O(1) lookup
+    /// @param kToken The address to verify
+    /// @return True if address is a registered kToken
+    function isKToken(address kToken) external view returns (bool);
+
     /// @notice Gets the adapter registered for a specific vault and asset
     /// @dev Returns external protocol integration enabling yield strategies. Reverts if no adapter is set.
     /// @param vault The vault address to query
@@ -340,10 +360,12 @@ interface IRegistry is IVersioned {
     function getTreasury() external view returns (address);
 
     /// @notice Sets the hurdle rate for a specific asset
-    /// @dev Only relayer can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
+    /// @dev Only admin can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
     /// Asset must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
+    /// A hurdle rate of 0 is valid and means performance fees will be charged on all positive yield with no minimum
+    /// threshold.
     /// @param asset The asset address to set hurdle rate for
-    /// @param hurdleRate The hurdle rate in basis points (100 = 1%)
+    /// @param hurdleRate The hurdle rate in basis points (100 = 1%), 0 means no minimum threshold
     function setHurdleRate(address asset, uint16 hurdleRate) external payable;
 
     /// @notice Gets the hurdle rate for a specific asset
@@ -415,24 +437,28 @@ interface IRegistry is IVersioned {
         view
         returns (address treasury, address insurance, uint16 treasuryBps, uint16 insuranceBps);
 
-    /// @notice Sets maximum mint and redeem amounts per batch for an asset
-    /// @dev Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume assets.
-    /// @param asset The asset address to set limits for
-    /// @param maxMintPerBatch_ Maximum amount of the asset that can be minted in a single batch
-    /// @param maxBurnPerBatch_ Maximum amount of the asset that can be redeemed in a single batch
-    function setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
+    /// @notice Sets maximum mint/deposit and redeem/withdraw amounts per batch for an asset or vault
+    /// @dev Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume operations.
+    /// Setting a limit to 0 effectively disables minting/burning or deposits/withdrawals for the target.
+    /// Setting a limit to type(uint128).max or higher effectively removes the limit.
+    /// Limits should be set considering the target's decimals and expected volumes.
+    /// Target must be either a registered asset (for kMinter limits) or a registered vault (for kStakingVault limits).
+    /// @param target The asset or vault address to set limits for
+    /// @param maxMintPerBatch_ Maximum amount per batch for minting (asset) or deposits (vault), 0 to disable
+    /// @param maxBurnPerBatch_ Maximum amount per batch for burning (asset) or withdrawals (vault), 0 to disable
+    function setBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
 
-    /// @notice Gets the maximum mint amount per batch for an asset
-    /// @dev Used to enforce minting limits for liquidity and risk management. Reverts if asset not registered.
-    /// @param asset The asset address to query
-    /// @return The maximum mint amount per batch
-    function getMaxMintPerBatch(address asset) external view returns (uint256);
+    /// @notice Gets the maximum mint/deposit amount per batch for an asset or vault
+    /// @dev Used to enforce minting/deposit limits for liquidity and risk management.
+    /// @param target The asset or vault address to query
+    /// @return The maximum mint/deposit amount per batch
+    function getMaxMintPerBatch(address target) external view returns (uint256);
 
-    /// @notice Gets the maximum redeem amount per batch for an asset
-    /// @dev Used to enforce redemption limits for liquidity and risk management. Reverts if asset not registered.
-    /// @param asset The asset address to query
-    /// @return The maximum redeem amount per batch
-    function getMaxBurnPerBatch(address asset) external view returns (uint256);
+    /// @notice Gets the maximum burn/withdraw amount per batch for an asset or vault
+    /// @dev Used to enforce burn/withdrawal limits for liquidity and risk management.
+    /// @param target The asset or vault address to query
+    /// @return The maximum burn/withdraw amount per batch
+    function getMaxBurnPerBatch(address target) external view returns (uint256);
 
     /* //////////////////////////////////////////////////////////////
                                 ENUMS

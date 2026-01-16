@@ -19,11 +19,11 @@ interface IVaultClaim {
     /// @dev This function completes the staking process by distributing stkTokens to users after batch settlement.
     /// Process: (1) Validates batch has been settled and share prices are finalized to ensure accurate distribution,
     /// (2) Verifies request ownership and pending status to prevent unauthorized or duplicate claims, (3) Calculates
-    /// stkToken amount based on original kToken deposit and settled net share price (after fees), (4) Mints stkTokens
-    /// to specified recipient reflecting their proportional vault ownership, (5) Marks request as claimed to prevent
-    /// future reprocessing. The net share price accounts for management and performance fees, ensuring users receive
-    /// their accurate yield-adjusted position. stkTokens are ERC20-compatible shares that continue accruing yield
-    /// through share price appreciation until unstaking.
+    /// stkToken amount based on original kToken deposit and settled net share price (after fees), (4) Transfers
+    /// pre-minted stkTokens from vault to recipient (shares were minted to vault during settlement), (5) Marks
+    /// request as claimed to prevent future reprocessing. The net share price accounts for management and performance
+    /// fees, ensuring users receive their accurate yield-adjusted position. stkTokens are ERC20-compatible shares that
+    /// continue accruing yield through share price appreciation until unstaking.
     /// @param requestId The specific staking request identifier to claim rewards for
     function claimStakedShares(bytes32 requestId) external payable;
 

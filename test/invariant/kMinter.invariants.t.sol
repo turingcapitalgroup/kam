@@ -20,4 +20,20 @@ contract kMinterInvariants is SetUp {
     function invariant_kMinterAdapterTotalAssets() public view {
         minterHandler.INVARIANT_C_ADAPTER_TOTAL_ASSETS();
     }
+
+    function invariant_kMinterRequestStateConsistency() public view {
+        minterHandler.INVARIANT_D_REQUEST_STATE_CONSISTENCY();
+    }
+
+    function invariant_kMinterUserRequestSet() public view {
+        minterHandler.INVARIANT_E_USER_REQUEST_SET();
+    }
+
+    function invariant_kMinterBatchClosure() public view {
+        minterHandler.INVARIANT_F_BATCH_CLOSURE();
+    }
+
+    function invariant_kMinterKTokenSupply() public view {
+        minterHandler.INVARIANT_G_KTOKEN_SUPPLY();
+    }
 }

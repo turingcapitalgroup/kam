@@ -47,10 +47,10 @@ interface IkMinter is IVersioned {
         address asset;
         /// @notice Batch receiver address
         address batchReceiver;
-        /// @notice Assets minted in this batch
-        uint128 mintedInBatch;
-        /// @notice Assets redeemed in this batch
-        uint128 burnedInBatch;
+        /// @notice Assets deposited in this batch
+        uint128 depositedInBatch;
+        /// @notice Assets requested for redemption in this batch
+        uint128 requestedSharesInBatch;
         /// @notice Whether the batch is closed
         bool isClosed;
         /// @notice Whether the batch is settled
@@ -181,11 +181,6 @@ interface IkMinter is IVersioned {
     /// @notice Marks a batch as settled after processing
     /// @param _batchId The batch ID to settle
     function settleBatch(bytes32 _batchId) external;
-
-    /// @notice Creates a batch receiver contract for a specific batch
-    /// @param _batchId The batch ID to create a receiver for
-    /// @return The address of the created batch receiver
-    function createBatchReceiver(bytes32 _batchId) external returns (address);
 
     /// @notice Get the current active batch ID for a specific asset
     /// @param asset_ The asset to query

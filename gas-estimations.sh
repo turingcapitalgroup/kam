@@ -59,7 +59,7 @@ fi
 
 # Default fallback
 if [ -z "$GAS_PRICE_GWEI" ] || [ "$GAS_PRICE_GWEI" = "null" ]; then
-    GAS_PRICE_GWEI="0.048"
+    GAS_PRICE_GWEI="0.052"
     echo -e "${YELLOW}⚠️  Could not fetch gas price, using default: ${GAS_PRICE_GWEI} gwei${RESET}"
 fi
 

@@ -104,6 +104,26 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         assertTrue(newBatch != bytes32(0));
     }
 
+    function test_CloseBatch_WithoutCreate_ThenCreateNewBatch() public {
+        bytes32 batchId = vault.getBatchId();
+
+        // Close batch without creating new one - keeps currentBatchId pointing to closed batch
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, false);
+
+        // currentBatchId still points to closed batch
+        assertEq(vault.getBatchId(), batchId);
+
+        // To reopen, use createNewBatch()
+        vm.prank(users.relayer);
+        vault.createNewBatch();
+
+        // Verify a new valid batch was created
+        bytes32 newBatch = vault.getBatchId();
+        assertTrue(newBatch != bytes32(0));
+        assertTrue(newBatch != batchId);
+    }
+
     function test_CloseBatch_RequiresRelayerRole() public {
         bytes32 batchId = vault.getBatchId();
 
@@ -144,7 +164,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        vault.requestStake(users.alice, 1000 * _1_USDC);
+        vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Close the batch
         vm.prank(users.relayer);
@@ -191,7 +211,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        vault.requestStake(users.alice, 1000 * _1_USDC);
+        vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -225,7 +245,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         vm.prank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
 
         // 3. Close batch and create new one
         vm.prank(users.relayer);
@@ -309,18 +329,18 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         vm.startPrank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
         vm.expectRevert(bytes(KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED));
-        vault.requestStake(users.alice, 1000 * _1_USDC);
+        vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
         vm.stopPrank();
     }
 
     function test_exceed_batch_deposit_limit() public {
         vm.prank(users.admin);
-        registry.setAssetBatchLimits(address(vault), 999 * _1_USDC, 0);
+        registry.setBatchLimits(address(vault), 999 * _1_USDC, 0);
 
         vm.startPrank(users.alice);
         kUSD.approve(address(vault), 1000 * _1_USDC);
         vm.expectRevert(bytes(KSTAKINGVAULT_BATCH_LIMIT_REACHED));
-        vault.requestStake(users.alice, 1000 * _1_USDC);
+        vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
         vm.stopPrank();
     }
 }

@@ -129,7 +129,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 - Tracks asset positions across all vaults without requiring immediate physical transfers
 - Enables capital efficiency by keeping assets deployed in yield strategies while maintaining liquidity
-- Records incoming/outgoing flows via `kAssetPush()`, `kAssetRequestPull()`, `kSharesRequestPush()`, `kSharesRequestPull()`
+- Records incoming/outgoing flows via `kAssetPush()`, `kAssetRequestPull()`, `kSharesRequestPush()`
 - Aggregates balances across multiple adapters per vault for unified accounting
 
 **Settlement Workflow**:
@@ -192,7 +192,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Staking Workflow**:
 
-1. **Request Phase**: User calls `requestStake(to, kTokensAmount)`
+1. **Request Phase**: User calls `requestStake(owner, to, kTokensAmount)`
    - kTokens transferred from user to vault contract
    - Unique request ID generated and added to current batch
    - Virtual balance transfer coordinated via kAssetRouter
@@ -296,7 +296,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 - **Batch Isolation**: Each receiver handles exactly one batch, preventing cross-contamination
 - **Immutable Authorization**: kMinter address set at construction, cannot be changed
 - **Batch ID Validation**: All operations require correct batch ID to prevent operational errors
-- **Emergency Recovery**: `rescueAssets()` for accidentally sent tokens (excluding protocol assets)
+- **Emergency Recovery**: `rescueAssets()` for accidentally sent tokens (excluding protocol assets and kTokens)
 
 **Gas Efficiency**: Minimal proxy pattern reduces deployment costs by ~90% compared to full contract deployment per batch.
 

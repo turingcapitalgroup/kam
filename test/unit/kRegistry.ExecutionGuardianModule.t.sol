@@ -229,4 +229,33 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         assertTrue(_hasTarget1);
         assertTrue(_hasTarget2);
     }
+
+    function test_GetExecutorTargets_Not_Removed_When_Other_Selectors_Remain() public {
+        bytes4 selector1 = bytes4(keccak256("function1()"));
+        bytes4 selector2 = bytes4(keccak256("function2()"));
+
+        // Allow two selectors for the same target
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, selector1, true);
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, selector2, true);
+
+        address[] memory _targets = guardianModule.getExecutorTargets(testExecutor);
+        assertEq(_targets.length, 1);
+
+        // Disallow first selector - target should remain since selector2 is still allowed
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, selector1, false);
+
+        _targets = guardianModule.getExecutorTargets(testExecutor);
+        assertEq(_targets.length, 1, "Target should remain when other selectors are still allowed");
+        assertTrue(guardianModule.isSelectorAllowed(testExecutor, testTarget, selector2));
+
+        // Disallow second selector - now target should be removed
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, selector2, false);
+
+        _targets = guardianModule.getExecutorTargets(testExecutor);
+        assertEq(_targets.length, 0, "Target should be removed when no selectors remain");
+    }
 }

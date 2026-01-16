@@ -3,18 +3,19 @@
   "chainId": 1,
   "roles": {
     "owner": "0x0000000000000000000000000000000000000001",
-    "admin": "0x0000000000000000000000000000000000000002", 
+    "admin": "0x0000000000000000000000000000000000000002",
     "emergencyAdmin": "0x0000000000000000000000000000000000000003",
     "guardian": "0x0000000000000000000000000000000000000004",
     "relayer": "0x0000000000000000000000000000000000000005",
     "institution": "0x0000000000000000000000000000000000000006",
-    "treasury": "0x0000000000000000000000000000000000000007"
+    "treasury": "0x0000000000000000000000000000000000000007",
+    "insurance": "0x0000000000000000000000000000000000000008"
   },
   "assets": {
     "USDC": "0xA0b86a33E6d8c30c9b61aEB5eF6c5C756fA2A45F1",
     "WBTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f"
   },
-  "ERC7540s": {
+  "metawallets": {
     "USDC": "0x0000000000000000000000000000000000000000",
     "WBTC": "0x0000000000000000000000000000000000000000"
   },
@@ -44,20 +45,19 @@
       "symbol": "dnkUSD",
       "decimals": 6,
       "underlyingAsset": "USDC",
-      "useKToken": false,
+      "startPaused": false,
       "maxTotalAssets": 500000000000000,
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "maxWithdrawPerBatch": 50000000000000,
       "trustedForwarder": "0x0000000000000000000000000000000000000000"
-
     },
     "dnVaultWBTC": {
       "name": "KAM DN Vault BTC",
       "symbol": "dnkBTC",
       "decimals": 8,
       "underlyingAsset": "WBTC",
-      "useKToken": false,
-      "maxTotalAssets":20000000000,
+      "startPaused": false,
+      "maxTotalAssets": 20000000000,
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "maxWithdrawPerBatch": 2000000000,
       "trustedForwarder": "0x0000000000000000000000000000000000000000"
@@ -67,7 +67,7 @@
       "symbol": "akUSD",
       "decimals": 6,
       "underlyingAsset": "USDC",
-      "useKToken": false,
+      "startPaused": false,
       "maxTotalAssets": "200000000000000",
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "maxWithdrawPerBatch": 20000000000000,
@@ -78,8 +78,8 @@
       "symbol": "bkUSD",
       "decimals": 6,
       "underlyingAsset": "USDC",
-      "useKToken": false,
-      "maxTotalAssets":200000000000000,
+      "startPaused": false,
+      "maxTotalAssets": 200000000000000,
       "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
       "maxWithdrawPerBatch": 20000000000000,
       "trustedForwarder": "0x0000000000000000000000000000000000000000"
@@ -89,7 +89,9 @@
     "hurdleRate": {
       "USDC": 500,
       "WBTC": 500
-    }
+    },
+    "treasuryBps": 1000,
+    "insuranceBps": 500
   },
   "assetRouter": {
     "settlementCooldown": 0,
@@ -99,28 +101,31 @@
     "maxSingleTransfer": {
       "USDC": "1000000000000",
       "WBTC": "3000000000",
-      "ERC7540USDC": "1000000000000",
-      "ERC7540WBTC": "3000000000"
+      "metawalletUSDC": "1000000000000",
+      "metawalletWBTC": "3000000000"
     },
     "allowedReceivers": {
       "USDC": ["walletUSDC", "dnVaultAdapterUSDC", "alphaVaultAdapter", "betaVaultAdapter"],
       "WBTC": ["walletUSDC", "dnVaultAdapterWBTC"],
-      "ERC7540USDC": ["kMinterAdapterUSDC", "dnVaultAdapterUSDC"],
-      "ERC7540WBTC": ["kMinterAdapterWBTC", "dnVaultAdapterWBTC"]
+      "metawalletUSDC": ["kMinterAdapterUSDC", "dnVaultAdapterUSDC"],
+      "metawalletWBTC": ["kMinterAdapterWBTC", "dnVaultAdapterWBTC"]
     },
     "allowedSources": {
       "USDC": ["kMinterAdapterUSDC", "dnVaultAdapterUSDC", "alphaVaultAdapter", "betaVaultAdapter", "treasury"],
       "WBTC": ["kMinterAdapterWBTC", "dnVaultAdapterWBTC", "treasury"],
-      "ERC7540USDC": ["kMinterAdapterUSDC", "dnVaultAdapterUSDC", "treasury"],
-      "ERC7540WBTC": ["kMinterAdapterWBTC", "dnVaultAdapterWBTC", "treasury"]
+      "metawalletUSDC": ["kMinterAdapterUSDC", "dnVaultAdapterUSDC", "treasury"],
+      "metawalletWBTC": ["kMinterAdapterWBTC", "dnVaultAdapterWBTC", "treasury"]
     },
     "allowedSpenders": {
-      "USDC": ["ERC7540USDC", "dnVaultAdapterUSDC", "alphaVaultAdapter", "betaVaultAdapter"],
-      "WBTC": ["ERC7540WBTC", "dnVaultAdapterWBTC"]
+      "USDC": ["metawalletUSDC", "dnVaultAdapterUSDC", "alphaVaultAdapter", "betaVaultAdapter"],
+      "WBTC": ["metawalletWBTC", "dnVaultAdapterWBTC"],
+      "metawalletUSDC": ["kMinterAdapterUSDC", "dnVaultAdapterUSDC", "alphaVaultAdapter", "betaVaultAdapter"],
+      "metawalletWBTC": ["kMinterAdapterWBTC", "dnVaultAdapterWBTC"]
     }
   },
   "mockAssets": {
     "enabled": false,
+    "WalletUSDC": "0x0000000000000000000000000000000000000000",
     "mintAmounts": {
       "USDC": "10000000000000",
       "WBTC": "100000000000"

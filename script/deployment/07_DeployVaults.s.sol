@@ -7,6 +7,7 @@ import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
+import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
 contract DeployVaultsScript is Script, DeploymentManager {
     struct VaultsDeployment {
@@ -136,6 +137,14 @@ contract DeployVaultsScript is Script, DeploymentManager {
         _log("  Max Deposit:", config.betaVault.maxDepositPerBatch);
         _log("  Max Withdraw:", config.betaVault.maxWithdrawPerBatch);
 
+        // Register ReaderModule to all vaults
+        _log("");
+        _log("=== REGISTERING READER MODULE ===");
+        _registerReaderModule(readerModuleAddr, dnVaultUSDC, "DN Vault USDC");
+        _registerReaderModule(readerModuleAddr, dnVaultWBTC, "DN Vault WBTC");
+        _registerReaderModule(readerModuleAddr, alphaVault, "Alpha Vault");
+        _registerReaderModule(readerModuleAddr, betaVault, "Beta Vault");
+
         vm.stopBroadcast();
 
         _log("");
@@ -157,13 +166,14 @@ contract DeployVaultsScript is Script, DeploymentManager {
             betaVault: betaVault
         });
 
-        // Write to JSON only if requested
+        // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            writeContractAddress("kStakingVaultImpl", stakingVaultImpl);
-            writeContractAddress("dnVaultUSDC", dnVaultUSDC);
-            writeContractAddress("dnVaultWBTC", dnVaultWBTC);
-            writeContractAddress("alphaVault", alphaVault);
-            writeContractAddress("betaVault", betaVault);
+            queueContractAddress("kStakingVaultImpl", stakingVaultImpl);
+            queueContractAddress("dnVaultUSDC", dnVaultUSDC);
+            queueContractAddress("dnVaultWBTC", dnVaultWBTC);
+            queueContractAddress("alphaVault", alphaVault);
+            queueContractAddress("betaVault", betaVault);
+            flushContractAddresses();
         }
 
         return deployment;
@@ -203,7 +213,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 (
                     config.roles.owner,
                     existing.contracts.kRegistry,
-                    config.dnVaultUSDC.useKToken,
+                    config.dnVaultUSDC.startPaused,
                     config.dnVaultUSDC.name,
                     config.dnVaultUSDC.symbol,
                     config.dnVaultUSDC.decimals,
@@ -229,7 +239,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 (
                     config.roles.owner,
                     existing.contracts.kRegistry,
-                    config.dnVaultWBTC.useKToken,
+                    config.dnVaultWBTC.startPaused,
                     config.dnVaultWBTC.name,
                     config.dnVaultWBTC.symbol,
                     config.dnVaultWBTC.decimals,
@@ -255,7 +265,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 (
                     config.roles.owner,
                     existing.contracts.kRegistry,
-                    config.alphaVault.useKToken,
+                    config.alphaVault.startPaused,
                     config.alphaVault.name,
                     config.alphaVault.symbol,
                     config.alphaVault.decimals,
@@ -281,7 +291,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 (
                     config.roles.owner,
                     existing.contracts.kRegistry,
-                    config.betaVault.useKToken,
+                    config.betaVault.startPaused,
                     config.betaVault.name,
                     config.betaVault.symbol,
                     config.betaVault.decimals,
@@ -291,5 +301,11 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 )
             )
         );
+    }
+
+    function _registerReaderModule(address _readerModule, address _vault, string memory _vaultName) internal {
+        bytes4[] memory selectors = ReaderModule(_readerModule).selectors();
+        kStakingVault(payable(_vault)).addFunctions(selectors, _readerModule, true);
+        _log("  Registered ReaderModule to", _vaultName);
     }
 }

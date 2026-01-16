@@ -107,9 +107,9 @@ contract kBatchReceiver is IkBatchReceiver {
     /// @inheritdoc IkBatchReceiver
     function pullAssets(address _receiver, uint256 _amount, bytes32 _batchId) external {
         _checkMinter(msg.sender);
-        require(_batchId == batchId, KBATCHRECEIVER_INVALID_BATCH_ID);
         _checkAmountNotZero(_amount);
         _checkAddressNotZero(_receiver);
+        require(_batchId == batchId, KBATCHRECEIVER_INVALID_BATCH_ID);
 
         asset.safeTransfer(_receiver, _amount);
         emit PulledAssets(_receiver, asset, _amount);

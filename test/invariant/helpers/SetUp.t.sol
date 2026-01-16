@@ -118,7 +118,7 @@ abstract contract SetUp is StdInvariant, DeploymentBaseTest {
 
         // Set unlimited batch limits for testing
         vm.prank(users.admin);
-        registry.setAssetBatchLimits(tokens.usdc, type(uint128).max, type(uint128).max);
+        registry.setBatchLimits(tokens.usdc, type(uint128).max, type(uint128).max);
     }
 
     function _getMinterActors() internal view returns (address[] memory) {

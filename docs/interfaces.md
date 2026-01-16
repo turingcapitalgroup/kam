@@ -27,7 +27,6 @@ The institutional gateway for minting and burning kTokens. Implements a push-pul
 - `createNewBatch(address asset_)` - Creates new batch for asset and returns batch ID (RELAYER_ROLE or registry)
 - `closeBatch(bytes32 _batchId, bool _create)` - Closes batch to prevent new requests, optionally creates new batch (RELAYER_ROLE required)
 - `settleBatch(bytes32 _batchId)` - Marks batch as settled after processing (kAssetRouter only)
-- `createBatchReceiver(bytes32 _batchId)` - Deploys BatchReceiver contract for asset distribution (kAssetRouter only)
 - `getBatchId(address asset_)` - Returns current active batch ID for an asset
 - `getCurrentBatchNumber(address asset_)` - Returns current batch number counter for an asset
 - `hasActiveBatch(address asset_)` - Checks if asset has an active batch
@@ -50,7 +49,6 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `kAssetPush(address asset, uint256 amount, bytes32 batchId)` - Records incoming asset flows from caller to virtual balance
 - `kAssetRequestPull(address asset, uint256 amount, bytes32 batchId)` - Stages outgoing asset requests from caller's virtual balance
 - `kSharesRequestPush(address vault, uint256 amount, bytes32 batchId)` - Records incoming share flows for unstaking
-- `kSharesRequestPull(address vault, uint256 amount, bytes32 batchId)` - Records outgoing share flows for staking
 
 **Settlement Operations**
 
@@ -73,8 +71,9 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `isPaused()` - Checks if kAssetRouter contract is currently paused
 - `getSettlementProposal(bytes32 proposalId)` - Retrieves complete VaultSettlementProposal struct with all details
 - `canExecuteProposal(bytes32 proposalId)` - Checks execution readiness and returns boolean result with descriptive reason
+- `isProposalPending(bytes32 proposalId)` - Simple boolean check if proposal is still pending (not cancelled or executed)
 - `getSettlementCooldown()` - Gets current cooldown period in seconds before proposals can be executed
-- `getMaxAllowedDelta()` - Gets current yield tolerance threshold in basis points for proposal validation
+- `getMaxAllowedDelta()` - Gets current yield tolerance threshold in basis points (exceeding emits warning event)
 - `virtualBalance(address vault, address asset)` - Returns virtual asset balance from vault's adapter
 
 ### IkRegistry
@@ -89,14 +88,16 @@ Central registry managing protocol contracts, supported assets, vault registrati
 
 **Asset Management**
 
-- `registerAsset(string name, string symbol, address asset, uint256 maxMintPerBatch, uint256 maxRedeemPerBatch, address emergencyAdmin)` - Deploys new kToken and establishes asset support with batch limits
+- `registerAsset(string name, string symbol, address asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch, address emergencyAdmin)` - Deploys new kToken and establishes asset support with batch limits
+- `removeAsset(address asset)` - Removes asset from protocol (requires no vaults using the asset, ADMIN_ROLE required)
 - `assetToKToken(address asset)` - Maps underlying assets to their kToken representations
 - `getAllAssets()` - Returns all protocol-supported assets
 - `isAsset(address asset)` - Checks if asset is supported by the protocol
-- `setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 maxRedeemPerBatch_)` - Sets maximum amounts per batch
-- `getMaxMintPerBatch(address asset)` - Returns maximum mint amount per batch for an asset
-- `getMaxBurnPerBatch(address asset)` - Returns maximum burn amount per batch for an asset
-- `setHurdleRate(address asset, uint16 hurdleRate)` - Sets performance threshold for an asset
+- `isKToken(address kToken)` - Checks if address is a protocol kToken (O(1) lookup via reverse mapping)
+- `setBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_)` - Sets maximum amounts per batch for asset or vault
+- `getMaxMintPerBatch(address target)` - Returns maximum mint/deposit amount per batch for an asset or vault
+- `getMaxBurnPerBatch(address target)` - Returns maximum burn/withdraw amount per batch for an asset or vault
+- `setHurdleRate(address asset, uint16 hurdleRate)` - Sets performance threshold for an asset (0 = no minimum threshold)
 - `getHurdleRate(address asset)` - Returns hurdle rate for an asset in basis points
 
 **Vault Registry**
@@ -113,18 +114,6 @@ Central registry managing protocol contracts, supported assets, vault registrati
 - `removeAdapter(address vault, address asset, address adapter)` - Removes adapter registration
 - `isAdapterRegistered(address vault, address asset, address adapter)` - Validates adapter registration status
 - `isSelectorAllowed(address executor, address target, bytes4 selector)` - Validates if executor can call target/selector (via ExecutionGuardianModule)
-
-**Treasury & Insurance Configuration**
-
-- `setTreasury(address treasury_)` - Sets the treasury address (ADMIN_ROLE required)
-- `getTreasury()` - Returns the treasury address
-- `setTreasuryBps(uint16 treasuryBps_)` - Sets treasury allocation in basis points (ADMIN_ROLE required)
-- `getTreasuryBps()` - Returns treasury allocation in basis points
-- `setInsurance(address insurance_)` - Sets the insurance fund address for depeg protection reserves (ADMIN_ROLE required)
-- `getInsurance()` - Returns the insurance fund address
-- `setInsuranceBps(uint16 insuranceBps_)` - Sets insurance allocation from kMinter yields in basis points (ADMIN_ROLE required)
-- `getInsuranceBps()` - Returns insurance allocation in basis points
-- `getSettlementConfig()` - Returns settlement configuration (treasury, insurance, treasuryBps, insuranceBps)
 
 **Treasury & Insurance Configuration**
 
@@ -190,7 +179,7 @@ Core interface for vault staking operations. Combines IVaultBatch, IVaultClaim, 
 
 **Staking Operations**
 
-- `requestStake(address to, uint256 kTokensAmount)` - Request to stake kTokens for stkTokens
+- `requestStake(address owner, address to, uint256 kTokensAmount)` - Request to stake kTokens for stkTokens
 - `requestUnstake(address to, uint256 stkTokenAmount)` - Request to unstake stkTokens for kTokens plus yield
 
 ### IVaultBatch
@@ -272,14 +261,13 @@ Minimal proxy contract that holds and distributes settled assets for batch redem
 
 **Asset Distribution**
 
-- `pullAssets(address receiver, uint256 amount, bytes32 batchId)` - Transfers assets from contract to specified receiver
-- Only callable by kMinter with proper batch ID validation
-- `rescueAssets(address asset)` - Rescues stuck assets (not protocol assets)
+- `pullAssets(address receiver, uint256 amount, bytes32 batchId)` - Transfers assets from contract to specified receiver with batch ID validation (kMinter only)
+- `rescueAssets(address asset, address to, uint256 amount)` - Rescues stuck assets not designated for batch settlement (kMinter only)
 
 **Access Control**
 
 - Immutable kMinter address set at construction for security
-- Batch ID validation prevents cross-batch asset distribution
+- Only kMinter can interact with receiver contracts
 
 ## Token Interfaces
 

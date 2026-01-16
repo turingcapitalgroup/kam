@@ -108,6 +108,8 @@ interface IVaultReader is IVersioned {
     /// @return totalAssets_ Total assets of settlement
     /// @return totalNetAssets_ Total net assets of settlement
     /// @return totalSupply_ Total shares supply settlement
+    /// @return depositedInBatch Amount of assets deposited in this batch
+    /// @return requestedSharesInBatch Amount of shares requested for unstaking in this batch
     function getBatchIdInfo(bytes32 batchId)
         external
         view
@@ -119,7 +121,9 @@ interface IVaultReader is IVersioned {
             uint256 netSharePrice,
             uint256 totalAssets_,
             uint256 totalNetAssets_,
-            uint256 totalSupply_
+            uint256 totalSupply_,
+            uint256 depositedInBatch,
+            uint256 requestedSharesInBatch
         );
 
     /// @notice Returns the batch receiver address for a specific batch ID
@@ -221,6 +225,10 @@ interface IVaultReader is IVersioned {
     /// @notice Returns the total pending stake amount
     /// @return Total pending stake amount
     function getTotalPendingStake() external view returns (uint256);
+
+    /// @notice Returns the total pending unstake amount (claimable kTokens for settled unstake requests)
+    /// @return Total pending unstake amount
+    function getTotalPendingUnstake() external view returns (uint256);
 
     /// @notice Returns the close state of a given batchId
     /// @param batchId_ the batchId to verify

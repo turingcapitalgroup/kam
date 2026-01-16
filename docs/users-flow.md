@@ -61,8 +61,8 @@
          ▼
 ┌─────────────────┐
 │Notify Router    │
-│kSharesRequest   │
-│Pull()           │
+│kAssetTransfer() │
+│                 │
 └────────┬────────┘
          │
          ▼
@@ -172,6 +172,12 @@
          │
          ▼
 ┌─────────────────┐
+│Mint stkTokens   │
+│to Vault         │ ── Pre-mint shares for all pending stakers
+└────────┬────────┘    at settlement price, clear totalPendingStake
+         │
+         ▼
+┌─────────────────┐
 │Ready for Claims │
 └─────────────────┘
 ```
@@ -194,14 +200,15 @@
 ┌─────────────────┐
 │Calculate        │
 │stkTokens Based  │ ── stkTokens = kTokens * (10^decimals) / netSharePrice
-│on Net Share     │ 
+│on Net Share     │    (using batch settlement snapshot values)
 │Price            │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│Mint stkTokens   │
-│to User          │ ── ERC20 mint operation
+│Transfer         │
+│stkTokens        │ ── ERC20 transfer from vault to user
+│from Vault       │    (shares were pre-minted at settlement)
 └────────┬────────┘
          │
          ▼
@@ -209,7 +216,7 @@
 │Update State     │
 │- Mark CLAIMED   │ ── Status = RequestStatus.CLAIMED
 │- Remove from    │ ── $.userRequests[user].remove(requestId)
-│  user requests  │ ── $.totalPendingStake -= kTokenAmount
+│  user requests  │
 └────────┬────────┘
          │
          ▼
@@ -449,7 +456,8 @@ Request Status Flow:
 │  │  Start unstaking process  │      │  Stop new requests        │   │
 │  │                           │      │                           │   │
 │  │• claimStakedShares()      │      │• settleBatch()            │   │
-│  │  Get stkTokens            │      │  Lock share prices        │   │
+│  │  Get stkTokens            │      │  Lock share prices &      │   │
+│  │  (transfer from vault)    │      │  mint shares to vault     │   │
 │  │                           │      │  (Called by kAssetRouter) │   │
 │  │• claimUnstakedAssets()    │      └───────────────────────────┘   │
 │  │  Get kTokens + yield      │                                      │
@@ -517,18 +525,25 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │  │                 │                          │                 │                               │
 │  └─────────────────┘                          └─────────┬───────┘                               │
 │                                                         │                                       │
-│                    kSharesRequestPull() via kAssetRouter│                                       │
+│                    kAssetTransfer() via kAssetRouter   │                                       │
 │                                                         ▼                                       │
 │                                               ┌─────────────────┐                               │
 │                                               │Virtual transfer │                               │
-│                                               │kMinter → Vault  │                               │
+│                                               │DN Vault → Vault │                               │
 │                                               └─────────┬───────┘                               │
 │                                                         │                                       │
 │                      After Settlement                   ▼                                       │
 │                                               ┌─────────────────┐                               │
 │                                               │Mint stkTokens   │                               │
-│                                               │based on share   │                               │
-│                                               │price to User    │                               │
+│                                               │to Vault at      │                               │
+│                                               │settlement       │                               │
+│                                               └─────────┬───────┘                               │
+│                                                         │                                       │
+│                      On Claim                           ▼                                       │
+│                                               ┌─────────────────┐                               │
+│                                               │Transfer         │                               │
+│                                               │stkTokens from   │                               │
+│                                               │Vault to User    │                               │
 │                                               └─────────────────┘                               │
 │                                                                                                 │
 │  UNSTAKING FLOW:                                                                                │

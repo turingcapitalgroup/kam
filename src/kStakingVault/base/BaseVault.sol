@@ -69,6 +69,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_SHIFT = 43;
     uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_MASK = 0xFFFFFFFFFFFFFFFF;
     uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 107;
+    uint256 internal constant VIRTUAL_SHARES = 1e6;
+    uint256 internal constant VIRTUAL_ASSETS = 1e6;
 
     /* //////////////////////////////////////////////////////////////
                               STORAGE
@@ -98,6 +100,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         address kToken;
         //10
         uint128 maxTotalAssets;
+        uint128 totalPendingUnstake;
         //11
         string name;
         //12
@@ -110,7 +113,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.BaseVault")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 internal constant MODULE_BASE_STORAGE_LOCATION =
-        0x50bc60b877273d55cac3903fd4818902e5fd7aa256278ee2dc6b212f256c0b00;
+        0x63f7c1a183f3ce6ff685d16ab1e43ef8a572a1797aa1b858a84dd926a8739f00;
 
     /// @notice Returns the base vault storage struct using ERC-7201 pattern
     /// @return $ Storage reference for base vault state variables
@@ -310,13 +313,14 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     //////////////////////////////////////////////////////////////*/
     /// @notice Converts stkToken shares to underlying asset value based on current vault performance
     /// @dev This function implements the core share accounting mechanism that determines asset value for stkToken
-    /// holders. The conversion process: (1) Handles edge case where total supply is zero by returning 1:1 conversion,
+    /// holders. The conversion uses virtual shares/assets offset (ERC4626 security pattern) to prevent inflation
+    /// attacks. The calculation: (1) Adds VIRTUAL_ASSETS to total assets and VIRTUAL_SHARES to total supply,
     /// (2) Uses precise fixed-point math to calculate proportional asset value based on share ownership percentage,
-    /// (3) Applies current total net assets (after fees) to ensure accurate user valuations. The calculation
-    /// maintains precision through fullMulDiv to prevent rounding errors that could accumulate over time. This
-    /// function is critical for determining redemption values, share price calculations, and user balance queries.
+    /// (3) Applies current total net assets (after fees) to ensure accurate user valuations. The virtual offset
+    /// makes inflation attacks economically infeasible by requiring attackers to donate ~1000x the victim's deposit.
     /// @param _shares The quantity of stkTokens to convert to underlying asset terms
     /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
+    /// @param _totalSupply The total supply of stkTokens
     /// @return _assets The equivalent value in underlying assets based on current vault performance
     function _convertToAssetsWithTotals(
         uint256 _shares,
@@ -327,19 +331,20 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         pure
         returns (uint256 _assets)
     {
-        if (_totalSupply == 0) return _shares;
-        return _shares.fullMulDiv(_totalAssetsValue, _totalSupply);
+        return _shares.fullMulDiv(_totalAssetsValue + VIRTUAL_ASSETS, _totalSupply + VIRTUAL_SHARES);
     }
 
     /// @notice Converts underlying asset amount to equivalent stkToken shares at current vault valuation
     /// @dev This function determines how many stkTokens should be issued for a given asset deposit based on current
-    /// vault performance. The conversion process: (1) Handles edge case of zero total supply with 1:1 initial pricing,
+    /// vault performance. The conversion uses virtual shares/assets offset (ERC4626 security pattern) to prevent
+    /// inflation attacks. The calculation: (1) Adds VIRTUAL_SHARES to total supply and VIRTUAL_ASSETS to total assets,
     /// (2) Calculates proportional share amount based on current vault valuation and total outstanding shares,
-    /// (3) Uses total net assets to ensure new shares are priced fairly relative to existing holders. The precise
-    /// fixed-point mathematics prevent dilution attacks and ensure fair pricing for all participants. This function
-    /// is essential for determining share issuance during staking operations and maintaining equitable vault ownership.
+    /// (3) Uses total net assets to ensure new shares are priced fairly relative to existing holders. The virtual
+    /// offset makes inflation attacks economically infeasible - an attacker would need to donate ~1000x the victim's
+    /// deposit to steal their funds.
     /// @param _assets The underlying asset amount to convert to share terms
     /// @param _totalAssetsValue The total asset value managed by the vault including yields but excluding pending operations
+    /// @param _totalSupply The total supply of stkTokens
     /// @return _shares The equivalent stkToken amount based on current share price
     function _convertToSharesWithTotals(
         uint256 _assets,
@@ -350,8 +355,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         pure
         returns (uint256 _shares)
     {
-        if (_totalSupply == 0) return _assets;
-        return _assets.fullMulDiv(_totalSupply, _totalAssetsValue);
+        return _assets.fullMulDiv(_totalSupply + VIRTUAL_SHARES, _totalAssetsValue + VIRTUAL_ASSETS);
     }
 
     /// @notice Calculates net share price per stkToken after deducting accumulated fees
@@ -391,7 +395,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @return Total asset value managed by the vault including yields but excluding pending operations
     function _totalAssets() internal view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return $.kToken.balanceOf(address(this)) - $.totalPendingStake;
+        return $.kToken.balanceOf(address(this)) - $.totalPendingStake - $.totalPendingUnstake;
     }
 
     /// @notice Calculates net assets available to users after deducting accumulated fees

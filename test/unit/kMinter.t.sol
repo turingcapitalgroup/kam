@@ -20,10 +20,10 @@ import {
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
     KMINTER_UNAUTHORIZED,
-    KMINTER_WRONG_ASSET,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
-    KMINTER_ZERO_AMOUNT
+    KMINTER_ZERO_AMOUNT,
+    KREGISTRY_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkToken } from "kam/src/interfaces/IkToken.sol";
@@ -71,6 +71,17 @@ contract kMinterTest is DeploymentBaseTest {
         kMinter newMinterImpl = new kMinter();
 
         bytes memory initData = abi.encodeCall(kMinter.initialize, (address(0), users.admin));
+
+        ERC1967Factory factory = new ERC1967Factory();
+
+        vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
+        factory.deployAndCall(address(newMinterImpl), users.admin, initData);
+    }
+
+    function test_Initialize_Require_Owner_Not_Zero_Address() public {
+        kMinter newMinterImpl = new kMinter();
+
+        bytes memory initData = abi.encodeCall(kMinter.initialize, (address(registry), ZERO_ADDRESS));
 
         ERC1967Factory factory = new ERC1967Factory();
 
@@ -135,7 +146,7 @@ contract kMinterTest is DeploymentBaseTest {
         address invalidAsset = address(0x347474);
 
         vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_WRONG_ASSET));
+        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
         minter.mint(invalidAsset, users.institution, MINT_AMOUNT);
     }
 
@@ -153,7 +164,7 @@ contract kMinterTest is DeploymentBaseTest {
 
     function test_Mint_Require_Amount_Below_Batch_Max_Mint() public {
         vm.prank(users.admin);
-        registry.setAssetBatchLimits(USDC, MINT_AMOUNT - 1, MINT_AMOUNT);
+        registry.setBatchLimits(USDC, MINT_AMOUNT - 1, MINT_AMOUNT);
 
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_BATCH_MINT_REACHED));
@@ -189,6 +200,10 @@ contract kMinterTest is DeploymentBaseTest {
         assertEq(kUSD.balanceOf(_minter), REQUEST_AMOUNT);
 
         assertEq(minter.getRequestCounter(), 1);
+
+        // Verify batch receiver was created during requestBurn
+        address _batchReceiver = minter.getBatchReceiver(_batchId);
+        assertTrue(_batchReceiver != address(0));
     }
 
     function test_RequestBurn_Require_Not_Paused() public {
@@ -215,7 +230,7 @@ contract kMinterTest is DeploymentBaseTest {
         address invalidAsset = address(0x347474);
 
         vm.prank(users.institution);
-        vm.expectRevert(bytes(KMINTER_WRONG_ASSET));
+        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
         minter.requestBurn(invalidAsset, users.institution, REQUEST_AMOUNT);
     }
 
@@ -235,7 +250,7 @@ contract kMinterTest is DeploymentBaseTest {
         _mint(USDC, users.institution, MINT_AMOUNT);
 
         vm.prank(users.admin);
-        registry.setAssetBatchLimits(USDC, MINT_AMOUNT, REQUEST_AMOUNT - 1);
+        registry.setBatchLimits(USDC, MINT_AMOUNT, REQUEST_AMOUNT - 1);
 
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_BATCH_REDEEM_REACHED));
@@ -455,6 +470,21 @@ contract kMinterTest is DeploymentBaseTest {
         minter.rescueAssets(USDC, users.treasury, _amount);
 
         assertEq(mockUSDC.balanceOf(_minter), _amount);
+    }
+
+    function test_RescueAssets_Require_Not_KToken() public {
+        address _kToken = registry.assetToKToken(USDC);
+        uint256 _amount = 1000 * _1_USDC;
+
+        // Mint kTokens directly to kMinter (simulating escrowed tokens)
+        vm.prank(_minter);
+        IkToken(_kToken).mint(_minter, _amount);
+
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KBASE_WRONG_ASSET));
+        minter.rescueAssets(_kToken, users.treasury, _amount);
+
+        assertEq(IkToken(_kToken).balanceOf(_minter), _amount);
     }
 
     /* //////////////////////////////////////////////////////////////

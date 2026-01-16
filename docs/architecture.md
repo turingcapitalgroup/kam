@@ -112,15 +112,15 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
 
 **Settlement Proposal Mechanism**: The kAssetRouter implements a secure two-phase settlement:
 
-1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets_)` providing only the current total assets from external strategies. The kAssetRouter contract automatically calculates:
+1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, chargeManagementFees, chargePerformanceFees)` providing the current total assets from external strategies and fee charging flags. The kAssetRouter contract automatically calculates:
    - `netted` = deposited - requested amounts from batch balances
    - `lastTotalAssets` = current virtual balance via `adapter.totalAssets()`
    - `totalAssetsAdjusted` = totalAssets_ - netted
    - `yield` = totalAssetsAdjusted - lastTotalAssets
    - `profit` = whether yield is positive or negative
-   - Applies yield tolerance check (rejects if yield exceeds configured percentage)
+   - Emits `YieldExceedsMaxDeltaWarning` if yield exceeds configured threshold (warning only, does not revert)
 
-2. **Cooldown Phase**: Mandatory waiting period (configurable 0-24 hours, default 1 hour) where guardians can `cancelProposal()`. **Yield Tolerance**: Proposals are automatically rejected if yield deviation exceeds configured threshold (default 10%, max 50% in basis points).
+2. **Cooldown Phase**: Mandatory waiting period (configurable 0-24 hours, default 1 hour) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds configured threshold (default 10%, max 50% in basis points), a warning event is emitted. Guardians must monitor for these warnings and cancel suspicious proposals during the cooldown window.
 
 3. **Execution Phase**: After cooldown, anyone calls `executeSettleBatch()` to complete settlement
 
@@ -181,7 +181,7 @@ The kMinter contract maintains separate batch cycles for each supported asset:
 │  • Independent lifecycles per asset                           │
 │  • No cross-asset blocking                                    │
 │  • Parallel settlement processing                             │
-│  • Asset-specific limits (maxMintPerBatch, maxRedeemPerBatch) │
+│  • Per-asset limits for kMinter (maxMintPerBatch, maxBurnPerBatch) │
 └─────────────────────────────────────────────────────────────--┘
 ```
 
@@ -233,7 +233,6 @@ The kAssetRouter serves as the central coordinator for all asset movements withi
 │  Retail Operations (kStakingVault):                         │
 │  • kAssetTransfer() - Virtual transfers between vaults      │
 │  • kSharesRequestPush() - Track share operations            │
-│  • kSharesRequestPull() - Track share redemptions           │
 │                                                             │
 │  Settlement Operations (Relayers):                          │
 │  • proposeSettleBatch() - Create settlement proposal        │
@@ -325,7 +324,7 @@ The kStakingVault is implemented as a unified contract that inherits from multip
 
 **BaseVault Integration**: Provides foundational vault logic including ERC20 token functionality for stkTokens. These tokens represent staked positions and automatically accrue yield through share price appreciation. The BaseVault handles core mathematical operations for asset-to-share conversions and fee calculations.
 
-**Batch Processing**: The vault manages the complete batch lifecycle for efficient gas usage. It creates new batches automatically, handles batch closure and settlement coordination with kAssetRouter, and processes direct asset transfers without requiring external BatchReceiver contracts.
+**Batch Processing**: The vault manages the complete batch lifecycle for efficient gas usage. Batches are created by the relayer via `createNewBatch()`, handles batch closure and settlement coordination with kAssetRouter, and processes direct asset transfers without requiring external BatchReceiver contracts.
 
 **Fee Management**: Implements comprehensive fee collection including management fees that accrue continuously based on time and assets under management, and performance fees charged only on positive yields. Fee calculations use precise mathematical operations to avoid rounding errors.
 
@@ -506,7 +505,7 @@ The two-phase commit system provides multiple safeguards:
 
 - Mandatory cooldown period (1hr default, max 1 day)
 - Guardian-only proposal cancellation during cooldown
-- Yield tolerance validation (default 10% max deviation)
+- Yield tolerance warning system (emits event if yield exceeds 10% max deviation, guardians must cancel)
 - On-chain validation of all settlement parameters
 
 ### Emergency Controls
@@ -521,12 +520,12 @@ The protocol implements a multi-layered emergency response system with global pa
 
 **Batch Lifecycle**:
 
-1. **Active**: New batch created automatically when first mint/burn occurs for an asset
-2. **Closed**: Batch closed to new requests via `closeBatch()`
+1. **Active**: Batch created via `createNewBatch()` by relayer, accepts mint/burn requests
+2. **Closed**: Batch closed to new requests via `closeBatch()` - requests revert if batch is closed
 3. **Settled**: Batch marked settled after kAssetRouter processes settlement
 4. **BatchReceiver Created**: kMinter creates BatchReceiver via `_createBatchReceiver()` using clone pattern
 
-**BatchReceiver Creation**: kMinter creates BatchReceiver contracts for **redemption distribution only**. These are deployed using `OptimizedLibClone.clone()` from the implementation created during initialization. BatchReceivers are created automatically during the first redemption request for a batch, or can be created explicitly by kAssetRouter during settlement preparation.
+**BatchReceiver Creation**: kMinter creates BatchReceiver contracts for **redemption distribution only**. These are deployed using `OptimizedLibClone.clone()` from the implementation created during initialization. BatchReceivers are created automatically during the first redemption request (`requestBurn()`) for a batch.
 
 ### kStakingVault Batch Architecture
 
@@ -534,11 +533,13 @@ The protocol implements a multi-layered emergency response system with global pa
 
 **Batch Lifecycle**:
 
-1. **Active**: Accepts stake/unstake requests for stkToken operations
-2. **Closed**: Batch closed when settlement begins
+1. **Active**: Batch created via `createNewBatch()` by relayer, accepts stake/unstake requests
+2. **Closed**: Batch closed via `closeBatch()` - requests revert if batch is closed
 3. **Settled**: Settlement completed with share price updates
 
 **Key Difference**: kStakingVault does not create BatchReceiver contracts or unstake from them.
+
+**Per-Vault Limits**: Unlike kMinter which uses per-asset limits, kStakingVault uses per-vault limits configured via `setBatchLimits(vaultAddress, maxDepositPerBatch, maxWithdrawPerBatch)`.
 
 ## Fee Structure
 
@@ -575,7 +576,7 @@ VaultAdapters use a secure execution model where only relayers can call external
 
 - **Target Contract Validation**: Only whitelisted target contracts can be called
 - **Function Selector Validation**: Only approved function selectors are allowed per target
-- **Parameter Validation**: ERC20ParameterChecker enforces transfer limits and recipient restrictions
+- **Parameter Validation**: ERC20ExecutionValidator enforces transfer limits and recipient restrictions
 
 ### Registry Integration
 

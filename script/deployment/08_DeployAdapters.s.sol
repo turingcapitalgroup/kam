@@ -137,15 +137,16 @@ contract DeployAdaptersScript is Script, DeploymentManager {
             kMinterAdapterWBTC: kMinterAdapterWBTC
         });
 
-        // Write to JSON only if requested
+        // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            writeContractAddress("vaultAdapterImpl", address(vaultAdapterImpl));
-            writeContractAddress("dnVaultAdapterUSDC", dnVaultAdapterUSDC);
-            writeContractAddress("dnVaultAdapterWBTC", dnVaultAdapterWBTC);
-            writeContractAddress("alphaVaultAdapter", alphaVaultAdapter);
-            writeContractAddress("betaVaultAdapter", betaVaultAdapter);
-            writeContractAddress("kMinterAdapterUSDC", kMinterAdapterUSDC);
-            writeContractAddress("kMinterAdapterWBTC", kMinterAdapterWBTC);
+            queueContractAddress("vaultAdapterImpl", address(vaultAdapterImpl));
+            queueContractAddress("dnVaultAdapterUSDC", dnVaultAdapterUSDC);
+            queueContractAddress("dnVaultAdapterWBTC", dnVaultAdapterWBTC);
+            queueContractAddress("alphaVaultAdapter", alphaVaultAdapter);
+            queueContractAddress("betaVaultAdapter", betaVaultAdapter);
+            queueContractAddress("kMinterAdapterUSDC", kMinterAdapterUSDC);
+            queueContractAddress("kMinterAdapterWBTC", kMinterAdapterWBTC);
+            flushContractAddresses();
         }
 
         return deployment;

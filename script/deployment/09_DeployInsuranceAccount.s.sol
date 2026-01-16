@@ -58,7 +58,7 @@ contract DeployInsuranceAccountScript is Script, DeploymentManager {
         existing.contracts.minimalSmartAccountFactory = existingFactoryAddr;
 
         // Log script header and configuration
-        logScriptHeader("12_DeployInsuranceAccount");
+        logScriptHeader("09_DeployInsuranceAccount");
         logRoles(config);
         logDependencies(existing);
         logBroadcaster(config.roles.admin);
@@ -137,11 +137,12 @@ contract DeployInsuranceAccountScript is Script, DeploymentManager {
             insuranceSmartAccount: insuranceSmartAccount
         });
 
-        // Write to JSON only if requested
+        // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            writeContractAddress("minimalSmartAccountImpl", implAddr);
-            writeContractAddress("minimalSmartAccountFactory", factoryAddr);
-            writeContractAddress("insuranceSmartAccount", insuranceSmartAccount);
+            queueContractAddress("minimalSmartAccountImpl", implAddr);
+            queueContractAddress("minimalSmartAccountFactory", factoryAddr);
+            queueContractAddress("insuranceSmartAccount", insuranceSmartAccount);
+            flushContractAddresses();
         }
 
         return deployment;

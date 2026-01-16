@@ -214,7 +214,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         vm.prank(users.alice);
         kUSD.approve(address(vault), SMALL_DEPOSIT);
         vm.prank(users.alice);
-        vault.requestStake(users.alice, SMALL_DEPOSIT);
+        vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
 
         // Close and settle the batch
         vm.prank(users.relayer);
@@ -226,7 +226,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         // Check the settled batch
         // Note: getCurrentBatchInfo returns info about the CURRENT batch (which is new after settlement)
         // We need to check the old batch
-        (, bool oldClosed, bool oldSettled,,,,,) = vault.getBatchIdInfo(batchId);
+        (, bool oldClosed, bool oldSettled,,,,,,,) = vault.getBatchIdInfo(batchId);
         assertTrue(oldClosed);
         assertTrue(oldSettled);
     }
@@ -251,7 +251,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         vm.prank(users.bob);
         kUSD.approve(address(vault), SMALL_DEPOSIT);
         vm.prank(users.bob);
-        vault.requestStake(users.bob, SMALL_DEPOSIT);
+        vault.requestStake(users.bob, users.bob, SMALL_DEPOSIT);
 
         // Close and settle
         vm.prank(users.relayer);
@@ -267,7 +267,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
             uint256 sharePrice_,
             uint256 netSharePrice_,
             uint256 totalAssets_,,
-            uint256 totalSupply_
+            uint256 totalSupply_,,
         ) = vault.getBatchIdInfo(batchId);
 
         assertTrue(isClosed);
@@ -301,7 +301,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         vm.prank(users.alice);
         kUSD.approve(address(vault), SMALL_DEPOSIT);
         vm.prank(users.alice);
-        vault.requestStake(users.alice, SMALL_DEPOSIT);
+        vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
 
         address receiver = vault.getBatchReceiver(batchId);
         // Receiver may or may not be created depending on implementation
@@ -316,7 +316,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         vm.prank(users.alice);
         kUSD.approve(address(vault), SMALL_DEPOSIT);
         vm.prank(users.alice);
-        vault.requestStake(users.alice, SMALL_DEPOSIT);
+        vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -414,8 +414,8 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         uint256 shares = vault.convertToSharesWithTotals(assets, totalAssets, totalSupply);
 
-        // With 1:1 ratio, should return same amount
-        assertEq(shares, assets);
+        // With 1:1 ratio, should return approximately same amount (tiny rounding from offset)
+        assertApproxEqAbs(shares, assets, 100); // Small tolerance for offset rounding
     }
 
     function test_convertToAssetsWithTotals_PureFunction() public view {
@@ -425,8 +425,8 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         uint256 assets = vault.convertToAssetsWithTotals(shares, totalAssets, totalSupply);
 
-        // With 1:1 ratio, should return same amount
-        assertEq(assets, shares);
+        // With 1:1 ratio, should return approximately same amount (tiny rounding from offset)
+        assertApproxEqAbs(assets, shares, 100); // Small tolerance for offset rounding
     }
 
     function test_convertToSharesWithTotals_HandlesZeroTotalSupply() public view {
@@ -436,7 +436,8 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         uint256 shares = vault.convertToSharesWithTotals(assets, totalAssets, totalSupply);
 
-        // When total supply is 0, should return the assets amount
+        // With (1e6, 1e6) pattern, first depositor gets 1:1 shares
+        // shares = assets * (0 + 1e6) / (0 + 1e6) = assets
         assertEq(shares, assets);
     }
 
@@ -454,10 +455,10 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         kUSD.approve(address(vault), SMALL_DEPOSIT * 2);
 
         vm.prank(users.alice);
-        bytes32 requestId1 = vault.requestStake(users.alice, SMALL_DEPOSIT);
+        bytes32 requestId1 = vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
 
         vm.prank(users.alice);
-        bytes32 requestId2 = vault.requestStake(users.alice, SMALL_DEPOSIT);
+        bytes32 requestId2 = vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
 
         bytes32[] memory requests = vault.getUserRequests(users.alice);
 
@@ -471,7 +472,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         kUSD.approve(address(vault), SMALL_DEPOSIT);
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestStake(users.bob, SMALL_DEPOSIT);
+        bytes32 requestId = vault.requestStake(users.alice, users.bob, SMALL_DEPOSIT);
 
         BaseVaultTypes.StakeRequest memory request = vault.getStakeRequest(requestId);
 
@@ -511,7 +512,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         kUSD.approve(address(vault), SMALL_DEPOSIT);
 
         vm.prank(users.alice);
-        vault.requestStake(users.alice, SMALL_DEPOSIT);
+        vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
 
         uint256 pending = vault.getTotalPendingStake();
         assertEq(pending, SMALL_DEPOSIT);
@@ -525,10 +526,10 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         kUSD.approve(address(vault), SMALL_DEPOSIT);
 
         vm.prank(users.alice);
-        vault.requestStake(users.alice, SMALL_DEPOSIT);
+        vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
 
         vm.prank(users.bob);
-        vault.requestStake(users.bob, SMALL_DEPOSIT);
+        vault.requestStake(users.bob, users.bob, SMALL_DEPOSIT);
 
         uint256 pending = vault.getTotalPendingStake();
         assertEq(pending, SMALL_DEPOSIT * 2);

@@ -293,9 +293,14 @@ contract kStakingVaultFeesTest is BaseVaultTest {
             address(vault),
             batchId,
             vault.totalAssets() + yieldAmount,
-            uint64(block.timestamp - 1),
-            uint64(block.timestamp - 1)
+            uint64(block.timestamp),
+            uint64(block.timestamp)
         );
+        vm.stopPrank();
+
+        // Accept proposal (high delta requires guardian approval)
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(proposalId);
 
         assetRouter.executeSettleBatch(proposalId);
 
@@ -321,9 +326,14 @@ contract kStakingVaultFeesTest is BaseVaultTest {
             address(vault),
             batchId,
             vault.totalAssets() - lossAmount,
-            uint64(block.timestamp - 1),
-            uint64(block.timestamp - 1)
+            uint64(block.timestamp),
+            uint64(block.timestamp)
         );
+        vm.stopPrank();
+
+        // Accept proposal (high delta requires guardian approval)
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(proposalId);
 
         assetRouter.executeSettleBatch(proposalId);
 
@@ -685,9 +695,14 @@ contract kStakingVaultFeesTest is BaseVaultTest {
             address(vault),
             batchId,
             vault.totalAssets() + yieldAmount,
-            uint64(block.timestamp - 1),
-            uint64(block.timestamp - 1)
+            uint64(block.timestamp),
+            uint64(block.timestamp)
         );
+        vm.stopPrank();
+
+        // Accept proposal (high delta requires guardian approval)
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(proposalId);
 
         // The watermark update happens during settlement when notifyFeesCharged is called
         // We need to calculate what the expected new watermark will be

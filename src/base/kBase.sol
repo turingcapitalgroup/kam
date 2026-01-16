@@ -177,8 +177,8 @@ contract kBase is OptimizedReentrancyGuardTransient {
 
             emit RescuedETH(_to, _amount);
         } else {
-            // Rescue ERC20 tokens
-            require(!_isAsset(_asset), KBASE_WRONG_ASSET);
+            // Rescue ERC20 tokens - block protocol assets and kTokens
+            require(!_isAsset(_asset) && !_isKToken(_asset), KBASE_WRONG_ASSET);
             require(_amount > 0 && _amount <= _asset.balanceOf(address(this)), KBASE_ZERO_AMOUNT);
 
             _asset.safeTransfer(_to, _amount);
@@ -317,5 +317,12 @@ contract kBase is OptimizedReentrancyGuardTransient {
     /// @return Whether the asset is registered
     function _isAsset(address _asset) internal view returns (bool) {
         return _registry().isAsset(_asset);
+    }
+
+    /// @notice Checks if an address is a protocol kToken
+    /// @param _kToken The address to check
+    /// @return Whether the address is a registered kToken
+    function _isKToken(address _kToken) internal view returns (bool) {
+        return _registry().isKToken(_kToken);
     }
 }
