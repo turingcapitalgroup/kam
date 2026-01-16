@@ -275,7 +275,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             (,,,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
             uint256 _totalSupply = IkStakingVault(_vault).totalSupply();
-            // When _totalSupply == 0, use 1:1 ratio; otherwise math handles _totalAssets == 0 naturally (returns 0)
+            // When _totalSupply == 0, use 1:1 ratio; otherwise math handles _totalAssets == 0 naturally (returns 0)            
             uint256 _requestedAssets = _totalSupply == 0
                 ? _requestedSharesInBatch
                 : _requestedSharesInBatch.fullMulDiv(_totalAssets, _totalSupply);
@@ -391,7 +391,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// the kToken supply is adjusted to precisely match underlying asset changes plus distributed yield.
     /// @param _proposal The settlement proposal storage reference containing all settlement parameters
     function _executeSettlement(VaultSettlementProposal storage _proposal) private {
-        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
 
         // Cache some values
         address _asset = _proposal.asset;
@@ -438,8 +437,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _adapter.setTotalAssets(uint256(_kMinterNewTotalAssets));
             emit TotalAssetsSet(address(_adapter), uint256(_kMinterNewTotalAssets));
         } else {
-            // Get requested shares from vault batch info
-            (,,,,,,,,, uint256 _totalRequestedShares) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
             // kMinter yield is sent to insuranceFund, cannot be minted.
             if (_yield != 0) {
                 if (_profit) {
@@ -449,55 +446,20 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 } else {
                     IkToken(_kToken).burn(_vault, _yield.abs());
                 }
-                emit YieldDistributed(_vault, _yield);
-            }
 
-            IVaultAdapter _kMinterAdapter = IVaultAdapter(_registry.getAdapter(_getKMinter(), _asset));
-            _checkAddressNotZero(address(_kMinterAdapter));
-            int256 _kMinterTotalAssets = int256(_kMinterAdapter.totalAssets()) - _netted;
-            require(_kMinterTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
-            // casting to 'uint256' is safe because _kMinterTotalAssets is >= 0 due to require check
-            // forge-lint: disable-next-line(unsafe-typecast)
-            _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
-            emit TotalAssetsSet(address(_adapter), _totalAssets);
-
-            // If fees should be charged in this settlement, notify the vault to update share price
-            if (_proposal.lastFeesChargedManagement != 0) {
-                IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
-            }
-
-            if (_proposal.lastFeesChargedPerformance != 0) {
-                IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
+                IVaultAdapter _kMinterAdapter = IVaultAdapter(_registry.getAdapter(_getKMinter(), _asset));
+                _checkAddressNotZero(address(_kMinterAdapter));
+                int256 _kMinterTotalAssets = int256(_kMinterAdapter.totalAssets()) - _netted;
+                require(_kMinterTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
+                // casting to 'uint256' is safe because _kMinterTotalAssets is >= 0 due to require check
+                // forge-lint: disable-next-line(unsafe-typecast)
+                _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
             }
 
             // Mark batch as settled in the vault (also burns unstake shares and tracks claimable kTokens)
             ISettleBatch(_vault).settleBatch(_batchId);
             _adapter.setTotalAssets(_totalAssets);
             emit TotalAssetsSet(address(_adapter), _totalAssets);
-
-            // If there were withdrawals, handle fee transfer to treasury
-            if (_totalRequestedShares != 0) {
-                // Get snapshot values from batch info (after settlement)
-                (,,,,, uint256 _batchTotalAssets, uint256 _batchTotalNetAssets, uint256 _batchTotalSupply,,) =
-                    IkStakingVault(_vault).getBatchIdInfo(_batchId);
-
-                // Calculate total kTokens corresponding to all requested shares at gross price
-                uint256 _totalKTokensForShares = IkStakingVault(_vault)
-                    .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalAssets, _batchTotalSupply);
-
-                // Calculate claimable kTokens for users (net amount after fees)
-                uint256 _claimableKTokens = IkStakingVault(_vault)
-                    .convertToAssetsWithTotals(_totalRequestedShares, _batchTotalNetAssets, _batchTotalSupply);
-
-                // Fee assets is the difference between gross and net kTokens
-                uint256 _feeAssets = _totalKTokensForShares - _claimableKTokens;
-
-                // Move fees as kTokens to treasury
-                if (_feeAssets != 0) {
-                    IkToken(_kToken).burn(_vault, _feeAssets);
-                    IkToken(_kToken).mint(_registry.getTreasury(), _feeAssets);
-                }
-            }
         }
 
         emit BatchSettled(_vault, _batchId, _totalAssets);
