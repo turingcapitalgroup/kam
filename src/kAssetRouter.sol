@@ -494,7 +494,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
             emit TotalAssetsSet(address(_kMinterAdapter), uint256(_kMinterTotalAssets));
 
-            // If fees should be charged in this settlement, notify the vault to update share price
+            // If new fees were scharged discount from current share price
             if (_proposal.lastFeesChargedManagement != 0) {
                 IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
             }

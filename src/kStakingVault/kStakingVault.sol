@@ -398,8 +398,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             emit UnstakeSharesBurned(_batchId, requestedShares, _claimableKTokens);
         }
 
-        // Snapshot total assets and supply after all operations
-        // Only keep the net
+        // Snapshot total assets and supply at the time of settelement
         $.batches[_batchId].totalAssets = _batchTotalAssets;
         $.batches[_batchId].totalNetAssets = _batchTotalNetAssets;
         $.batches[_batchId].totalSupply = _batchTotalSupply;
