@@ -141,6 +141,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// @param _registry Address of the kRegistry contract that manages protocol configuration
     /// @param _owner Initial owner of the contract
     function initialize(address _registry, address _owner) external initializer {
+        _checkAddressNotZero(_owner);
         __kBase_init(_registry);
         _initializeOwner(_owner);
 
