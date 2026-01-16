@@ -446,25 +446,14 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 } else {
                     IkToken(_kToken).burn(_vault, _yield.abs());
                 }
-                emit YieldDistributed(_vault, _yield);
-            }
 
-            IVaultAdapter _kMinterAdapter = IVaultAdapter(_registry.getAdapter(_getKMinter(), _asset));
-            _checkAddressNotZero(address(_kMinterAdapter));
-            int256 _kMinterTotalAssets = int256(_kMinterAdapter.totalAssets()) - _netted;
-            require(_kMinterTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
-            // casting to 'uint256' is safe because _kMinterTotalAssets is >= 0 due to require check
-            // forge-lint: disable-next-line(unsafe-typecast)
-            _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
-            emit TotalAssetsSet(address(_adapter), _totalAssets);
-
-            // If fees should be charged in this settlement, notify the vault to update share price
-            if (_proposal.lastFeesChargedManagement != 0) {
-                IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
-            }
-
-            if (_proposal.lastFeesChargedPerformance != 0) {
-                IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
+                IVaultAdapter _kMinterAdapter = IVaultAdapter(_registry.getAdapter(_getKMinter(), _asset));
+                _checkAddressNotZero(address(_kMinterAdapter));
+                int256 _kMinterTotalAssets = int256(_kMinterAdapter.totalAssets()) - _netted;
+                require(_kMinterTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
+                // casting to 'uint256' is safe because _kMinterTotalAssets is >= 0 due to require check
+                // forge-lint: disable-next-line(unsafe-typecast)
+                _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
             }
 
             // Mark batch as settled in the vault (also burns unstake shares and tracks claimable kTokens)
