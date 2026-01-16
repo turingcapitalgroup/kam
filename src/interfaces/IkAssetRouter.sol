@@ -50,6 +50,8 @@ interface IkAssetRouter is IVersioned {
         uint64 lastFeesChargedManagement;
         /// @dev Timestamp when performance fees were last charged (0 means no fees to charge)
         uint64 lastFeesChargedPerformance;
+        /// @dev True if yield delta exceeded threshold, requires guardian approval before execution
+        bool requiresApproval;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -157,6 +159,13 @@ interface IkAssetRouter is IVersioned {
     /// @param vault The vault address for which settlement was cancelled
     /// @param batchId The batch identifier for which settlement was cancelled
     event SettlementCancelled(bytes32 indexed proposalId, address indexed vault, bytes32 indexed batchId);
+
+    /// @notice Emitted when a high-delta settlement proposal is accepted by a guardian
+    /// @dev Proposals with yield exceeding maxAllowedDelta require explicit guardian approval before execution
+    /// @param proposalId The unique identifier of the accepted proposal
+    /// @param vault The vault address for which settlement was accepted
+    /// @param acceptedBy The guardian address who accepted the proposal
+    event SettlementAccepted(bytes32 indexed proposalId, address indexed vault, address indexed acceptedBy);
 
     /// @notice Emitted when the settlement cooldown period is updated by protocol governance
     /// @dev Cooldown provides security by allowing time to verify settlement proposals before execution
@@ -293,6 +302,13 @@ interface IkAssetRouter is IVersioned {
     /// @param proposalId The unique identifier of the settlement proposal to cancel
     function cancelProposal(bytes32 proposalId) external;
 
+    /// @notice Accepts a high-delta settlement proposal for execution
+    /// @dev Required for proposals where yield exceeded maxAllowedDelta threshold. This provides an extra
+    /// security layer by requiring explicit guardian approval before executing potentially risky settlements.
+    /// Only callable by guardians. The proposal must still pass the cooldown check during execution.
+    /// @param proposalId The unique identifier of the settlement proposal to accept
+    function acceptProposal(bytes32 proposalId) external;
+
     /* //////////////////////////////////////////////////////////////
                             ADMIN FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -393,6 +409,13 @@ interface IkAssetRouter is IVersioned {
     /// @param proposalId The unique identifier of the proposal to check
     /// @return isPending True if the proposal is pending, false if cancelled, executed, or non-existent
     function isProposalPending(bytes32 proposalId) external view returns (bool isPending);
+
+    /// @notice Checks if a high-delta settlement proposal has been accepted by a guardian
+    /// @dev Returns true if the proposal required approval and has been accepted via acceptProposal.
+    /// For proposals that don't require approval (yield within threshold), this returns false.
+    /// @param proposalId The unique identifier of the proposal to check
+    /// @return True if the proposal has been explicitly accepted by a guardian
+    function isProposalAccepted(bytes32 proposalId) external view returns (bool);
 
     /// @notice Gets the current security cooldown period for settlement proposals
     /// @dev The cooldown period determines how long proposals must wait before execution.

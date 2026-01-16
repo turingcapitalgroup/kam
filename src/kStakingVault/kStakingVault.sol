@@ -362,7 +362,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Mint shares for this batch's pending stakes to the vault itself
         // This effectively "claims" shares for all pending stakers in this batch at settlement price
         uint128 batchDeposited = $.batches[_batchId].depositedInBatch;
-        
+
         if (batchDeposited != 0) {
             uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalNetAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
