@@ -261,7 +261,7 @@ Minimal proxy contract that holds and distributes settled assets for batch redem
 
 **Asset Distribution**
 
-- `pullAssets(address receiver, uint256 amount, bytes32 batchId)` - Transfers assets from contract to specified receiver with batch ID validation (kMinter only)
+- `pullAssets(address receiver, uint256 amount)` - Transfers assets from contract to specified receiver (kMinter only)
 - `rescueAssets(address asset, address to, uint256 amount)` - Rescues stuck assets not designated for batch settlement (kMinter only)
 
 **Access Control**

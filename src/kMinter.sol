@@ -258,7 +258,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         IkToken(_kToken).burn(address(this), _amount);
 
         // Pull assets from batch receiver
-        kBatchReceiver(_batchReceiver).pullAssets(_recipient, _amount, _batchId);
+        kBatchReceiver(_batchReceiver).pullAssets(_recipient, _amount);
 
         _unlockReentrant();
         emit Burned(_requestId, _batchReceiver, _kToken, _recipient, _amount, _batchId);

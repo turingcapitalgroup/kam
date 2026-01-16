@@ -6,7 +6,6 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import {
     KBATCHRECEIVER_ALREADY_INITIALIZED,
     KBATCHRECEIVER_INSUFFICIENT_BALANCE,
-    KBATCHRECEIVER_INVALID_BATCH_ID,
     KBATCHRECEIVER_ONLY_KMINTER,
     KBATCHRECEIVER_WRONG_ASSET,
     KBATCHRECEIVER_ZERO_ADDRESS,
@@ -51,7 +50,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_PullAssets_Success() public {
-        (address _receiver, bytes32 _batchId) = _createBatchReceiver();
+        (address _receiver,) = _createBatchReceiver();
         uint256 _balanceBefore = mockUSDC.balanceOf(users.alice);
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
@@ -60,65 +59,51 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         vm.prank(address(minter));
         vm.expectEmit(true, true, true, true);
         emit IkBatchReceiver.PulledAssets(users.alice, USDC, _amount);
-        kBatchReceiver(_receiver).pullAssets(users.alice, _amount, _batchId);
+        kBatchReceiver(_receiver).pullAssets(users.alice, _amount);
 
         assertEq(mockUSDC.balanceOf(_receiver), 0);
         assertEq(mockUSDC.balanceOf(users.alice), _balanceBefore + _amount);
     }
 
     function test_PullAssets_Require_Only_Minter() public {
-        (address _receiver, bytes32 _batchId) = _createBatchReceiver();
+        (address _receiver,) = _createBatchReceiver();
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
-        kBatchReceiver(_receiver).pullAssets(users.alice, _amount, _batchId);
+        kBatchReceiver(_receiver).pullAssets(users.alice, _amount);
 
         vm.prank(users.admin);
         vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
-        kBatchReceiver(_receiver).pullAssets(users.alice, _amount, _batchId);
+        kBatchReceiver(_receiver).pullAssets(users.alice, _amount);
 
         assertTrue(mockUSDC.balanceOf(_receiver) == 1000 * _1_USDC);
     }
 
     function test_PullAssets_Require_Not_Zero_Amount() public {
-        (address _receiver, bytes32 _batchId) = _createBatchReceiver();
+        (address _receiver,) = _createBatchReceiver();
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
 
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_AMOUNT));
-        kBatchReceiver(_receiver).pullAssets(users.alice, 0, _batchId);
+        kBatchReceiver(_receiver).pullAssets(users.alice, 0);
 
         assertTrue(mockUSDC.balanceOf(_receiver) == 1000 * _1_USDC);
     }
 
     function test_PullAssets_Require_Address_Not_Zero() public {
-        (address _receiver, bytes32 _batchId) = _createBatchReceiver();
+        (address _receiver,) = _createBatchReceiver();
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
 
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
-        kBatchReceiver(_receiver).pullAssets(address(0), _amount, _batchId);
-
-        assertTrue(mockUSDC.balanceOf(_receiver) == 1000 * _1_USDC);
-    }
-
-    function test_PullAssets_Require_Valid_BatchId() public {
-        (address _receiver,) = _createBatchReceiver();
-        uint256 _amount = 1000 * _1_USDC;
-        mockUSDC.mint(_receiver, _amount);
-        assertEq(mockUSDC.balanceOf(_receiver), _amount);
-
-        bytes32 _invalidBatchId = keccak256("InvalidBatchId");
-        vm.prank(address(minter));
-        vm.expectRevert(bytes(KBATCHRECEIVER_INVALID_BATCH_ID));
-        kBatchReceiver(_receiver).pullAssets(users.alice, _amount, _invalidBatchId);
+        kBatchReceiver(_receiver).pullAssets(address(0), _amount);
 
         assertTrue(mockUSDC.balanceOf(_receiver) == 1000 * _1_USDC);
     }
