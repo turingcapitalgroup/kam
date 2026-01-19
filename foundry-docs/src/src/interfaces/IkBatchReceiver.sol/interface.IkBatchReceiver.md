@@ -1,5 +1,5 @@
 # IkBatchReceiver
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/IkBatchReceiver.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IkBatchReceiver.sol)
 
 Interface for minimal proxy contracts that manage asset distribution for completed batch redemptions
 
@@ -78,15 +78,14 @@ function batchId() external view returns (bytes32);
 Transfers settled assets from the receiver to a redemption user completing their withdrawal
 
 This is the core asset distribution function that fulfills redemption requests after batch settlement.
-The process works as follows: (1) kMinter calls this function with user's proportional share, (2) receiver
-validates the batch ID matches to prevent cross-batch contamination, (3) assets are transferred directly
-to the user completing their redemption. Only callable by the authorized kMinter contract to maintain strict
-access control. This function is typically called multiple times per batch as individual users claim their
-settled redemptions, ensuring fair and orderly asset distribution.
+The process works as follows: (1) kMinter calls this function with user's proportional share, (2) assets
+are transferred directly to the user completing their redemption. Only callable by the authorized kMinter
+contract to maintain strict access control. This function is typically called multiple times per batch as
+individual users claim their settled redemptions, ensuring fair and orderly asset distribution.
 
 
 ```solidity
-function pullAssets(address receiver, uint256 amount, bytes32 _batchId) external;
+function pullAssets(address receiver, uint256 amount) external;
 ```
 **Parameters**
 
@@ -94,7 +93,6 @@ function pullAssets(address receiver, uint256 amount, bytes32 _batchId) external
 |----|----|-----------|
 |`receiver`|`address`|The address that will receive the settled assets (the user completing redemption)|
 |`amount`|`uint256`|The quantity of assets to transfer based on the user's proportional share|
-|`_batchId`|`bytes32`|The batch identifier for validation (must match this receiver's configured batch)|
 
 
 ### rescueAssets

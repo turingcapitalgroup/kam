@@ -41,6 +41,8 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) executorTargets;
         /// @dev Maps the type of each target
         mapping(address => uint8 targetType) targetType;
+        /// @dev Counts allowed selectors per executor-target pair for accurate target tracking
+        mapping(address => mapping(address => uint256)) executorTargetSelectorCount;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.ExecutionGuardianModule")) - 1)) & ~bytes32(uint256(0xff))
@@ -89,13 +91,16 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         $.executorAllowedSelectors[_executor][_target][_selector] = _isAllowed;
         $.targetType[_target] = _targetType;
 
-        // Update tracking sets
+        // Update tracking sets with reference counting
         if (_isAllowed) {
-            // Add target to executor's target set
+            $.executorTargetSelectorCount[_executor][_target]++;
             $.executorTargets[_executor].add(_target);
         } else {
-            $.executorTargets[_executor].remove(_target);
-            // Also remove any execution validator
+            $.executorTargetSelectorCount[_executor][_target]--;
+            // Only remove target when no selectors remain
+            if ($.executorTargetSelectorCount[_executor][_target] == 0) {
+                $.executorTargets[_executor].remove(_target);
+            }
             delete $.executionValidator[_executor][_target][_selector];
         }
 

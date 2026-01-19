@@ -26,8 +26,9 @@ abstract contract ERC2771Context is IERC2771 {
     }
 
     function _getERC2771ContextStorage() private pure returns (ERC2771ContextStorage storage $) {
+        bytes32 slot = ERC2771_CONTEXT_STORAGE_LOCATION;
         assembly {
-            $.slot := 0x4b8f1be850ba8944bb65aafc52e97e45326b89aafdae45bf4d91f44bccce2a00
+            $.slot := slot
         }
     }
 

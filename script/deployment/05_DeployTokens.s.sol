@@ -108,10 +108,11 @@ contract DeployTokensScript is Script, DeploymentManager {
         // Return deployed addresses
         deployment = TokenDeployment({ kUSD: kUSDAddress, kBTC: kBTCAddress });
 
-        // Write to JSON only if requested
+        // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            writeContractAddress("kUSD", kUSDAddress);
-            writeContractAddress("kBTC", kBTCAddress);
+            queueContractAddress("kUSD", kUSDAddress);
+            queueContractAddress("kBTC", kBTCAddress);
+            flushContractAddresses();
         }
 
         return deployment;

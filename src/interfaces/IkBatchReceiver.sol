@@ -82,15 +82,13 @@ interface IkBatchReceiver {
 
     /// @notice Transfers settled assets from the receiver to a redemption user completing their withdrawal
     /// @dev This is the core asset distribution function that fulfills redemption requests after batch settlement.
-    /// The process works as follows: (1) kMinter calls this function with user's proportional share, (2) receiver
-    /// validates the batch ID matches to prevent cross-batch contamination, (3) assets are transferred directly
-    /// to the user completing their redemption. Only callable by the authorized kMinter contract to maintain strict
-    /// access control. This function is typically called multiple times per batch as individual users claim their
-    /// settled redemptions, ensuring fair and orderly asset distribution.
+    /// The process works as follows: (1) kMinter calls this function with user's proportional share, (2) assets
+    /// are transferred directly to the user completing their redemption. Only callable by the authorized kMinter
+    /// contract to maintain strict access control. This function is typically called multiple times per batch as
+    /// individual users claim their settled redemptions, ensuring fair and orderly asset distribution.
     /// @param receiver The address that will receive the settled assets (the user completing redemption)
     /// @param amount The quantity of assets to transfer based on the user's proportional share
-    /// @param _batchId The batch identifier for validation (must match this receiver's configured batch)
-    function pullAssets(address receiver, uint256 amount, bytes32 _batchId) external;
+    function pullAssets(address receiver, uint256 amount) external;
 
     /// @notice Emergency recovery function for accidentally sent assets to prevent permanent loss
     /// @dev Provides a safety mechanism for recovering tokens or ETH that were mistakenly sent to the receiver

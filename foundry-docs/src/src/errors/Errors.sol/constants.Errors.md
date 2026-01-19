@@ -1,5 +1,5 @@
 # Constants
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/errors/Errors.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/errors/Errors.sol)
 
 ### KASSETROUTER_ALREADY_REGISTERED
 KAM Protocol Error Codes - Centralized error code constants for the KAM protocol.
@@ -144,6 +144,24 @@ string constant KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME = "A20"
 string constant KASSETROUTER_NOT_BATCH_CLOSED = "A21"
 ```
 
+### KASSETROUTER_PROPOSAL_NOT_ACCEPTED
+
+```solidity
+string constant KASSETROUTER_PROPOSAL_NOT_ACCEPTED = "A22"
+```
+
+### KASSETROUTER_NO_APPROVAL_REQUIRED
+
+```solidity
+string constant KASSETROUTER_NO_APPROVAL_REQUIRED = "A23"
+```
+
+### KASSETROUTER_PROPOSAL_ALREADY_ACCEPTED
+
+```solidity
+string constant KASSETROUTER_PROPOSAL_ALREADY_ACCEPTED = "A24"
+```
+
 ### ADAPTER_ALREADY_INITIALIZED
 
 ```solidity
@@ -226,12 +244,6 @@ string constant BASEVAULT_NOT_INITIALIZED = "BV5"
 
 ```solidity
 string constant KBATCHRECEIVER_ALREADY_INITIALIZED = "B1"
-```
-
-### KBATCHRECEIVER_INVALID_BATCH_ID
-
-```solidity
-string constant KBATCHRECEIVER_INVALID_BATCH_ID = "B2"
 ```
 
 ### KBATCHRECEIVER_ONLY_KMINTER
@@ -550,6 +562,18 @@ string constant KREGISTRY_KTOKEN_ALREADY_SET = "R13"
 
 ```solidity
 string constant KREGISTRY_EMPTY_STRING = "R14"
+```
+
+### KREGISTRY_ASSET_IN_USE
+
+```solidity
+string constant KREGISTRY_ASSET_IN_USE = "R15"
+```
+
+### KREGISTRY_VAULT_TYPE_ASSIGNED
+
+```solidity
+string constant KREGISTRY_VAULT_TYPE_ASSIGNED = "R16"
 ```
 
 ### GUARDIANMODULE_UNAUTHORIZED

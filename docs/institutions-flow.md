@@ -225,7 +225,7 @@ Request Status Flow:
        │
        ▼
 ┌─────────────┐
-│SETTLED      │ ── After batch settlement is executed
+│SETTLED      │ ── After batch settlement completes
 └──────┬──────┘
        │
        ▼
@@ -261,7 +261,6 @@ Request Status Flow:
 │  │• createNewBatch() - Create new batch for asset              │ │
 │  │• closeBatch() - Stop accepting new requests                 │ │
 │  │• settleBatch() - Mark batch as settled after processing     │ │
-│  │• createBatchReceiver() - Deploy distributor per batch       │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────-─┘
 ```

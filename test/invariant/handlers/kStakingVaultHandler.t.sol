@@ -61,6 +61,24 @@ contract kStakingVaultHandler is BaseHandler {
     uint256 kStakingVault_expectedSharePrice;
     uint256 kStakingVault_actualSharePrice;
     int256 kStakingVault_sharePriceDelta;
+    // Track share price stability specifically for claims
+    uint256 kStakingVault_sharePriceBeforeLastClaim;
+    uint256 kStakingVault_sharePriceAfterLastClaim;
+    bool kStakingVault_lastActionWasClaim;
+
+    // INVARIANT_I: Pending Stake Settlement tracking
+    uint256 kStakingVault_totalPendingStakeBeforeSettlement;
+    uint256 kStakingVault_depositedInLastSettledBatch;
+    bool kStakingVault_lastActionWasSettlement;
+
+    // INVARIANT_J: Unstake Claim Accuracy tracking
+    uint256 kStakingVault_lastUnstakeClaimStkAmount;
+    uint256 kStakingVault_lastUnstakeClaimKTokensReceived;
+    uint256 kStakingVault_lastUnstakeClaimExpectedKTokens;
+    bool kStakingVault_lastActionWasUnstakeClaim;
+
+    // INVARIANT_L: Vault Self-Balance tracking
+    uint256 kStakingVault_expectedVaultSelfBalance;
 
     constructor(
         address _vault,
@@ -126,7 +144,7 @@ contract kStakingVaultHandler is BaseHandler {
         uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
         kStakingVault_kToken.safeApprove(address(kStakingVault_vault), amount);
         if (kStakingVault_minterAdapter.totalAssets() < amount) vm.expectRevert();
-        bytes32 requestId = kStakingVault_vault.requestStake(currentActor, amount);
+        bytes32 requestId = kStakingVault_vault.requestStake(currentActor, currentActor, amount);
         kStakingVault_actorStakeRequests[currentActor].add(requestId);
         kStakingVault_depositedInBatch[kStakingVault_vault.getBatchId()] += amount;
         kStakingVault_pendingStakeInBatch[kStakingVault_vault.getBatchId()] += amount;
@@ -214,6 +232,11 @@ contract kStakingVaultHandler is BaseHandler {
     }
 
     function kStakingVault_claimStakedShares(uint256 actorSeed, uint256 requestSeedIndex) public useActor(actorSeed) {
+        // Reset action flags
+        kStakingVault_lastActionWasClaim = false;
+        kStakingVault_lastActionWasSettlement = false;
+        kStakingVault_lastActionWasUnstakeClaim = false;
+
         vm.startPrank(currentActor);
         if (kStakingVault_actorStakeRequests[currentActor].count() == 0) {
             vm.stopPrank();
@@ -222,7 +245,7 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorStakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.StakeRequest memory stakeRequest = kStakingVault_vault.getStakeRequest(requestId);
         bytes32 batchId = stakeRequest.batchId;
-        (,, bool isSettled,,,, uint256 totalNetAssets, uint256 totalSupply) =
+        (,, bool isSettled,,,, uint256 totalNetAssets, uint256 totalSupply,,) =
             kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
@@ -230,29 +253,42 @@ contract kStakingVaultHandler is BaseHandler {
             vm.stopPrank();
             return;
         }
-        uint256 sharesToMint =
+        uint256 sharesToTransfer =
             VaultMathLib.convertToSharesWithAssetsAndSupply(stakeRequest.kTokenAmount, totalNetAssets, totalSupply);
-        if (sharesToMint == 0) {
+        if (sharesToTransfer == 0) {
             vm.expectRevert(bytes("SV9"));
             kStakingVault_vault.claimStakedShares(requestId);
             vm.stopPrank();
             return;
         }
+
+        // Track share price for claim stability invariant
         uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
+        kStakingVault_sharePriceBeforeLastClaim = sharePriceBefore;
+
         kStakingVault_vault.claimStakedShares(requestId);
         kStakingVault_actorStakeRequests[currentActor].remove(requestId);
         kStakingVault_pendingStakeInBatch[batchId] -= stakeRequest.kTokenAmount;
-        kStakingVault_expectedTotalAssets += stakeRequest.kTokenAmount;
+
+        // With the fix: claim is a transfer, not mint
+        // totalAssets and totalSupply do NOT change on claim (already accounted at settlement)
+        // So we don't update expectedTotalAssets or expectedSupply here
+
         kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
-        kStakingVault_expectedSupply += sharesToMint;
         kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
         (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
             kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
         );
         kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
+
         uint256 sharePriceAfter = kStakingVault_vault.sharePrice();
+        kStakingVault_sharePriceAfterLastClaim = sharePriceAfter;
         kStakingVault_sharePriceDelta = int256(sharePriceAfter) - int256(sharePriceBefore);
+        kStakingVault_lastActionWasClaim = true;
+
+        // INVARIANT_L: Decrement vault self-balance by shares transferred
+        kStakingVault_expectedVaultSelfBalance -= sharesToTransfer;
 
         vm.stopPrank();
     }
@@ -275,6 +311,11 @@ contract kStakingVaultHandler is BaseHandler {
     }
 
     function kStakingVault_claimUnstakedAssets(uint256 actorSeed, uint256 requestSeedIndex) public useActor(actorSeed) {
+        // Reset action flags
+        kStakingVault_lastActionWasClaim = false;
+        kStakingVault_lastActionWasSettlement = false;
+        kStakingVault_lastActionWasUnstakeClaim = false;
+
         vm.startPrank(currentActor);
         if (kStakingVault_actorUnstakeRequests[currentActor].count() == 0) {
             vm.stopPrank();
@@ -283,7 +324,7 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 requestId = kStakingVault_actorUnstakeRequests[currentActor].rand(requestSeedIndex);
         BaseVaultTypes.UnstakeRequest memory unstakeRequest = kStakingVault_vault.getUnstakeRequest(requestId);
         bytes32 batchId = unstakeRequest.batchId;
-        (,, bool isSettled,,, uint256 totalAssets, uint256 totalNetAssets, uint256 totalSupply) =
+        (,, bool isSettled,,, uint256 totalAssets, uint256 totalNetAssets, uint256 totalSupply,,) =
             kStakingVault_vault.getBatchIdInfo(batchId);
         if (!isSettled) {
             vm.expectRevert();
@@ -300,9 +341,21 @@ contract kStakingVaultHandler is BaseHandler {
             vm.stopPrank();
             return;
         }
+
+        // INVARIANT_J: Track unstake claim amounts (use totalKTokensNet calculated above with VaultMathLib)
+        kStakingVault_lastUnstakeClaimStkAmount = unstakeRequest.stkTokenAmount;
+        kStakingVault_lastUnstakeClaimExpectedKTokens = totalKTokensNet;
+        uint256 userKTokenBalanceBefore = kStakingVault_kToken.balanceOf(unstakeRequest.recipient);
+
         uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
         kStakingVault_vault.claimUnstakedAssets(requestId);
         kStakingVault_actorUnstakeRequests[currentActor].remove(requestId);
+
+        // INVARIANT_J: Track actual kTokens received
+        uint256 userKTokenBalanceAfter = kStakingVault_kToken.balanceOf(unstakeRequest.recipient);
+        kStakingVault_lastUnstakeClaimKTokensReceived = userKTokenBalanceAfter - userKTokenBalanceBefore;
+        kStakingVault_lastActionWasUnstakeClaim = true;
+
         uint256 sharesToBurn = uint256(unstakeRequest.stkTokenAmount).fullMulDiv(totalNetAssets, totalAssets);
         kStakingVault_expectedSupply -= sharesToBurn;
         kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
@@ -430,8 +483,8 @@ contract kStakingVaultHandler is BaseHandler {
             netted,
             yieldAmount,
             block.timestamp + kStakingVault_assetRouter.getSettlementCooldown(),
-            uint64(lastFeesChargedPerformance_),
-            uint64(lastFeesChargedManagement_)
+            uint64(lastFeesChargedManagement_),
+            uint64(lastFeesChargedPerformance_)
         );
 
         bytes32 proposalId = kStakingVault_assetRouter.proposeSettleBatch(
@@ -439,8 +492,8 @@ contract kStakingVaultHandler is BaseHandler {
             address(kStakingVault_vault),
             batchId,
             newTotalAssets,
-            uint64(lastFeesChargedPerformance_),
-            uint64(lastFeesChargedManagement_)
+            uint64(lastFeesChargedManagement_),
+            uint64(lastFeesChargedPerformance_)
         );
         vm.stopPrank();
         kStakingVault_pendingSettlementProposals.add(proposalId);
@@ -461,6 +514,11 @@ contract kStakingVaultHandler is BaseHandler {
     }
 
     function kStakingVault_executeSettlement() public {
+        // Reset action flags
+        kStakingVault_lastActionWasSettlement = false;
+        kStakingVault_lastActionWasClaim = false;
+        kStakingVault_lastActionWasUnstakeClaim = false;
+
         vm.startPrank(kStakingVault_relayer);
         if (kStakingVault_pendingSettlementProposals.count() == 0) {
             vm.stopPrank();
@@ -472,6 +530,11 @@ contract kStakingVaultHandler is BaseHandler {
         uint256 totalRequestedShares =
             kStakingVault_assetRouter.getRequestedShares(address(kStakingVault_vault), proposal.batchId);
         int256 netted = proposal.netted;
+
+        // INVARIANT_I: Track pending stake before settlement
+        kStakingVault_totalPendingStakeBeforeSettlement = kStakingVault_vault.getTotalPendingStake();
+        kStakingVault_depositedInLastSettledBatch = kStakingVault_depositedInBatch[proposal.batchId];
+
         kStakingVault_assetRouter.executeSettleBatch(proposalId);
         vm.stopPrank();
         kStakingVault_pendingSettlementProposals.remove(proposalId);
@@ -484,7 +547,7 @@ contract kStakingVaultHandler is BaseHandler {
                 - int256(kStakingVault_pendingStakeInBatch[proposal.batchId])
         );
 
-        (,,,,, uint256 totalAssets, uint256 totalNetAssets,) = kStakingVault_vault.getBatchIdInfo(proposal.batchId);
+        (,,,,, uint256 totalAssets, uint256 totalNetAssets,,,) = kStakingVault_vault.getBatchIdInfo(proposal.batchId);
         uint256 expectedSharesToBurn;
         if (totalRequestedShares != 0) {
             // Discount protocol fees
@@ -525,6 +588,21 @@ contract kStakingVaultHandler is BaseHandler {
 
             uint256 newActualAdapterTotalAssets = kStakingVault_minterAdapter.totalAssets();
             kStakingVault_minterHandler.set_kMinter_actualAdapterTotalAssets(newActualAdapterTotalAssets);
+        }
+
+        // INVARIANT_I & L: Track settlement completion
+        kStakingVault_lastActionWasSettlement = true;
+
+        // INVARIANT_L: Calculate shares minted to vault for pending stakers
+        // Shares minted = depositedInBatch * totalSupply / totalNetAssets (at settlement snapshot)
+        uint256 depositedInBatch = kStakingVault_depositedInBatch[proposal.batchId];
+        if (depositedInBatch > 0 && totalNetAssets > 0) {
+            (,,,,,, uint256 batchTotalNetAssets, uint256 batchTotalSupply,,) =
+                kStakingVault_vault.getBatchIdInfo(proposal.batchId);
+            uint256 sharesMintedToVault = VaultMathLib.convertToSharesWithAssetsAndSupply(
+                depositedInBatch, batchTotalNetAssets, batchTotalSupply
+            );
+            kStakingVault_expectedVaultSelfBalance += sharesMintedToVault;
         }
     }
 
@@ -735,5 +813,65 @@ contract kStakingVaultHandler is BaseHandler {
 
     function INVARIANT_G_SHARE_PRICE_DELTA() public view {
         assertEq(kStakingVault_sharePriceDelta, 0, "KSTAKING_VAULT: INVARIANT_G_SHARE_PRICE_DELTA");
+    }
+
+    /// @notice Invariant: Claiming staked shares must NOT change share price
+    /// @dev This catches the dilution vulnerability where delayed claims could
+    ///      cause share price drops for existing shareholders. With the fix,
+    ///      shares are pre-minted at settlement, so claim is just a transfer.
+    function INVARIANT_H_CLAIM_STABLE_SHARE_PRICE() public view {
+        if (kStakingVault_lastActionWasClaim) {
+            assertEq(
+                kStakingVault_sharePriceAfterLastClaim,
+                kStakingVault_sharePriceBeforeLastClaim,
+                "KSTAKING_VAULT: INVARIANT_H_CLAIM_STABLE_SHARE_PRICE - claim changed share price!"
+            );
+        }
+    }
+
+    /// @notice Invariant: totalPendingStake must decrease by depositedInBatch after settlement
+    /// @dev Ensures pending stake tracking is correctly reduced at settlement
+    function INVARIANT_I_PENDING_STAKE_SETTLEMENT() public view {
+        if (kStakingVault_lastActionWasSettlement && kStakingVault_depositedInLastSettledBatch > 0) {
+            uint256 expectedPendingStake =
+                kStakingVault_totalPendingStakeBeforeSettlement - kStakingVault_depositedInLastSettledBatch;
+            assertEq(
+                kStakingVault_vault.getTotalPendingStake(),
+                expectedPendingStake,
+                "KSTAKING_VAULT: INVARIANT_I - totalPendingStake not reduced correctly at settlement"
+            );
+        }
+    }
+
+    /// @notice Invariant: Unstake claim returns correct kToken amount
+    /// @dev Validates: kTokensReceived == convertToAssets(stkTokenAmount, totalNetAssets, totalSupply)
+    function INVARIANT_J_UNSTAKE_CLAIM_ACCURACY() public view {
+        if (kStakingVault_lastActionWasUnstakeClaim && kStakingVault_lastUnstakeClaimStkAmount > 0) {
+            assertEq(
+                kStakingVault_lastUnstakeClaimKTokensReceived,
+                kStakingVault_lastUnstakeClaimExpectedKTokens,
+                "KSTAKING_VAULT: INVARIANT_J - Unstake claim returned incorrect kToken amount"
+            );
+        }
+    }
+
+    /// @notice Invariant: Accumulated fees can never exceed total assets
+    /// @dev Prevents fee extraction overflow that could drain vault
+    function INVARIANT_K_FEE_BOUNDS() public view {
+        uint256 totalAssets = kStakingVault_vault.totalAssets();
+        (uint256 mgmtFees, uint256 perfFees,) = kStakingVault_vault.computeLastBatchFees();
+        uint256 totalFees = mgmtFees + perfFees;
+
+        assertLe(totalFees, totalAssets, "KSTAKING_VAULT: INVARIANT_K - Fees exceed total assets");
+    }
+
+    /// @notice Invariant: Vault's self-balance equals sum of unclaimed settled stake shares
+    /// @dev Catches pre-mint/transfer accounting bugs related to dilution fix
+    function INVARIANT_L_VAULT_SELF_BALANCE() public view {
+        assertEq(
+            kStakingVault_vault.balanceOf(address(kStakingVault_vault)),
+            kStakingVault_expectedVaultSelfBalance,
+            "KSTAKING_VAULT: INVARIANT_L - Vault self-balance doesn't match expected"
+        );
     }
 }

@@ -110,7 +110,9 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
 
     /// @inheritdoc IVaultAdapter
     function pull(address _asset, uint256 _amount) external {
-        _checkRouter(_getVaultAdapterStorage());
+        VaultAdapterStorage storage $ = _getVaultAdapterStorage();
+        _checkPaused($);
+        _checkRouter($);
         _asset.safeTransfer(msg.sender, _amount);
     }
 

@@ -1,5 +1,5 @@
 # IkMinter
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/IkMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IkMinter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -148,27 +148,6 @@ function settleBatch(bytes32 _batchId) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`_batchId`|`bytes32`|The batch ID to settle|
-
-
-### createBatchReceiver
-
-Creates a batch receiver contract for a specific batch
-
-
-```solidity
-function createBatchReceiver(bytes32 _batchId) external returns (address);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_batchId`|`bytes32`|The batch ID to create a receiver for|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`address`|The address of the created batch receiver|
 
 
 ### getBatchId
@@ -602,10 +581,10 @@ struct BatchInfo {
     address asset;
     /// @notice Batch receiver address
     address batchReceiver;
-    /// @notice Assets minted in this batch
-    uint128 mintedInBatch;
-    /// @notice Assets redeemed in this batch
-    uint128 burnedInBatch;
+    /// @notice Assets deposited in this batch
+    uint128 depositedInBatch;
+    /// @notice Assets requested for redemption in this batch
+    uint128 requestedSharesInBatch;
     /// @notice Whether the batch is closed
     bool isClosed;
     /// @notice Whether the batch is settled

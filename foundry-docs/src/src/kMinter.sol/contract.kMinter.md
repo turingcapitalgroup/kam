@@ -1,5 +1,5 @@
 # kMinter
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kMinter.sol)
 
 **Inherits:**
 [IkMinter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
@@ -209,30 +209,9 @@ function settleBatch(bytes32 _batchId) external;
 |`_batchId`|`bytes32`|The batch ID to settle|
 
 
-### createBatchReceiver
-
-Creates a batch receiver contract for a specific batch
-
-
-```solidity
-function createBatchReceiver(bytes32 _batchId) external returns (address);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_batchId`|`bytes32`|The batch ID to create a receiver for|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`address`|The address of the created batch receiver|
-
-
 ### _createBatchReceiver
 
-Creates a batch receiver for the specified batch (unchanged functionality)
+Creates a batch receiver for the specified batch
 
 
 ```solidity
@@ -454,21 +433,6 @@ function _checkInstitution(address _user) private view;
 |`_user`|`address`|Address to check|
 
 
-### _checkAdmin
-
-Check if caller is an admin
-
-
-```solidity
-function _checkAdmin(address _user) private view;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_user`|`address`|Address to check|
-
-
 ### _checkRelayer
 
 Check if caller is a relayer
@@ -497,21 +461,6 @@ function _checkRouter(address _user) private view;
 |Name|Type|Description|
 |----|----|-----------|
 |`_user`|`address`|Address to check|
-
-
-### _checkValidAsset
-
-Check if asset is valid/supported
-
-
-```solidity
-function _checkValidAsset(address _asset) private view;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_asset`|`address`|Asset address to check|
 
 
 ### _checkAmountNotZero
@@ -770,7 +719,7 @@ struct kMinterStorage {
     address receiverImplementation;
     /// @dev Tracks total assets locked in pending redemption requests per asset
     mapping(address => uint256) totalLockedAssets;
-    /// @dev Tracks total assets locked in pending redemption requests per asset
+    /// @dev Maps request IDs to their corresponding burn request data
     mapping(bytes32 => BurnRequest) burnRequests;
     /// @dev Maps user addresses to their set of redemption request IDs for efficient lookup
     /// Enables quick retrieval of all requests associated with a specific user

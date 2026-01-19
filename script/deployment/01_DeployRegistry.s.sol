@@ -87,13 +87,14 @@ contract DeployRegistryScript is Script, DeploymentManager {
             kTokenFactory: address(tokenFactory)
         });
 
-        // Write to JSON only if requested (for real deployments)
+        // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            writeContractAddress("ERC1967Factory", address(factory));
-            writeContractAddress("kRegistryImpl", address(registryImpl));
-            writeContractAddress("kRegistry", registryProxy);
-            writeContractAddress("ExecutionGuardianModule", address(executionGuardianModule));
-            writeContractAddress("kTokenFactory", address(tokenFactory));
+            queueContractAddress("ERC1967Factory", address(factory));
+            queueContractAddress("kRegistryImpl", address(registryImpl));
+            queueContractAddress("kRegistry", registryProxy);
+            queueContractAddress("ExecutionGuardianModule", address(executionGuardianModule));
+            queueContractAddress("kTokenFactory", address(tokenFactory));
+            flushContractAddresses();
         }
 
         return deployment;

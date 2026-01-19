@@ -1,5 +1,5 @@
 # IkAssetRouter
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/IkAssetRouter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IkAssetRouter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -121,30 +121,6 @@ function kSharesRequestPush(address sourceVault, uint256 amount, bytes32 batchId
 |`batchId`|`bytes32`|The batch identifier for coordinating share operations with settlement|
 
 
-### kSharesRequestPull
-
-Requests shares to be pulled for kStakingVault redemption operations
-
-This function handles the share-based redemption process for retail users withdrawing from
-kStakingVaults. The process involves: (1) calculating share amounts to redeem based on user
-requests, (2) preparing for conversion back to kTokens at settlement time, (3) coordinating
-with the batch settlement system for fair pricing. Unlike institutional redemptions through
-kMinter, this uses share-based accounting to handle smaller, more frequent retail operations
-efficiently through the vault's batch processing system.
-
-
-```solidity
-function kSharesRequestPull(address sourceVault, uint256 amount, bytes32 batchId) external payable;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`sourceVault`|`address`|The kStakingVault address requesting share pull for redemptions|
-|`amount`|`uint256`|The quantity of shares being requested for pull from users|
-|`batchId`|`bytes32`|The batch identifier for coordinating share redemptions with settlement|
-
-
 ### proposeSettleBatch
 
 Proposes a batch settlement for a vault with yield distribution through kToken minting/burning
@@ -178,8 +154,8 @@ function proposeSettleBatch(
 |`vault`|`address`|The DN vault address where yield was generated|
 |`batchId`|`bytes32`|The batch identifier for this settlement period|
 |`totalAssets`|`uint256`|Total asset value in the vault after yield generation/loss|
-|`lastFeesChargedManagement`|`uint64`|Last management fees charged|
-|`lastFeesChargedPerformance`|`uint64`|Last performance fees charged|
+|`lastFeesChargedManagement`|`uint64`|Timestamp when management fees were last charged (0 = no fees)|
+|`lastFeesChargedPerformance`|`uint64`|Timestamp when performance fees were last charged (0 = no fees)|
 
 
 ### executeSettleBatch
@@ -223,6 +199,25 @@ function cancelProposal(bytes32 proposalId) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`proposalId`|`bytes32`|The unique identifier of the settlement proposal to cancel|
+
+
+### acceptProposal
+
+Accepts a high-delta settlement proposal for execution
+
+Required for proposals where yield exceeded maxAllowedDelta threshold. This provides an extra
+security layer by requiring explicit guardian approval before executing potentially risky settlements.
+Only callable by guardians. The proposal must still pass the cooldown check during execution.
+
+
+```solidity
+function acceptProposal(bytes32 proposalId) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`proposalId`|`bytes32`|The unique identifier of the settlement proposal to accept|
 
 
 ### setSettlementCooldown
@@ -450,6 +445,54 @@ function canExecuteProposal(bytes32 proposalId) external view returns (bool canE
 |`reason`|`string`|Descriptive message explaining why execution is blocked (if applicable)|
 
 
+### isProposalPending
+
+Checks if a settlement proposal is still pending (not cancelled or executed)
+
+Returns true only if the proposal exists and is in the pending queue.
+Use this for simple boolean state checks without detailed reason strings.
+
+
+```solidity
+function isProposalPending(bytes32 proposalId) external view returns (bool isPending);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`proposalId`|`bytes32`|The unique identifier of the proposal to check|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`isPending`|`bool`|True if the proposal is pending, false if cancelled, executed, or non-existent|
+
+
+### isProposalAccepted
+
+Checks if a high-delta settlement proposal has been accepted by a guardian
+
+Returns true if the proposal required approval and has been accepted via acceptProposal.
+For proposals that don't require approval (yield within threshold), this returns false.
+
+
+```solidity
+function isProposalAccepted(bytes32 proposalId) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`proposalId`|`bytes32`|The unique identifier of the proposal to check|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if the proposal has been explicitly accepted by a guardian|
+
+
 ### getSettlementCooldown
 
 Gets the current security cooldown period for settlement proposals
@@ -492,12 +535,11 @@ function getMaxAllowedDelta() external view returns (uint256 tolerance);
 
 ### virtualBalance
 
-Retrieves the virtual balance of assets for a vault across all its adapters
+Retrieves the virtual balance of assets for a vault's adapter
 
-This function aggregates asset balances across all adapters connected to a vault to determine
-the total virtual balance available for operations. Essential for coordination between physical
-asset locations and protocol accounting. Used for settlement calculations and ensuring sufficient
-assets are available for redemptions and transfers within the money flow system.
+Retrieves the total assets from the single adapter registered for this vault-asset pair.
+Essential for coordination between physical asset locations and protocol accounting.
+Used for settlement calculations and ensuring sufficient assets are available for redemptions.
 
 
 ```solidity
@@ -514,7 +556,7 @@ function virtualBalance(address vault, address asset) external view returns (uin
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|balance The total virtual asset balance across all vault adapters|
+|`<none>`|`uint256`|balance The total virtual asset balance from the vault's adapter|
 
 
 ### isProposalExecuted
@@ -670,50 +712,6 @@ event SharesRequestedPushed(address indexed vault, bytes32 indexed batchId, uint
 |`batchId`|`bytes32`|The batch identifier for this operation|
 |`amount`|`uint256`|The quantity of shares being pushed|
 
-### SharesRequestedPulled
-Emitted when shares are requested for pull operations in kStakingVault redemptions
-
-Coordinates share-based redemptions for retail users through the batch system
-
-
-```solidity
-event SharesRequestedPulled(address indexed vault, bytes32 indexed batchId, uint256 amount);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`vault`|`address`|The kStakingVault requesting the share pull operation|
-|`batchId`|`bytes32`|The batch identifier for this redemption batch|
-|`amount`|`uint256`|The quantity of shares being pulled for redemption|
-
-### SharesSettled
-Emitted when shares are settled across multiple vaults with calculated share prices
-
-Marks the completion of a cross-vault settlement with final share price determination
-
-
-```solidity
-event SharesSettled(
-    address[] vaults,
-    bytes32 indexed batchId,
-    uint256 totalRequestedShares,
-    uint256[] totalAssets,
-    uint256 sharePrice
-);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`vaults`|`address[]`|Array of vault addresses participating in the settlement|
-|`batchId`|`bytes32`|The batch identifier for this settlement period|
-|`totalRequestedShares`|`uint256`|Total shares requested across all vaults in this settlement|
-|`totalAssets`|`uint256[]`|Array of total assets for each vault after settlement|
-|`sharePrice`|`uint256`|The final calculated share price for this settlement period|
-
 ### BatchSettled
 Emitted when a vault batch is settled with final asset accounting
 
@@ -731,42 +729,6 @@ event BatchSettled(address indexed vault, bytes32 indexed batchId, uint256 total
 |`vault`|`address`|The vault address that completed batch settlement|
 |`batchId`|`bytes32`|The batch identifier that was settled|
 |`totalAssets`|`uint256`|The final total asset value in the vault after settlement|
-
-### PegProtectionActivated
-Emitted when peg protection mechanism is activated due to vault shortfall
-
-Triggered when a vault cannot fulfill redemption requests, requiring asset transfers
-from other vaults to maintain the protocol's 1:1 backing guarantee
-
-
-```solidity
-event PegProtectionActivated(address indexed vault, uint256 shortfall);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`vault`|`address`|The vault experiencing shortfall that triggered peg protection|
-|`shortfall`|`uint256`|The amount of assets needed to fulfill pending redemption requests|
-
-### PegProtectionExecuted
-Emitted when peg protection transfers assets between vaults to cover shortfalls
-
-Maintains protocol solvency by redistributing assets from surplus to deficit vaults
-
-
-```solidity
-event PegProtectionExecuted(address indexed sourceVault, address indexed targetVault, uint256 amount);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`sourceVault`|`address`|The vault providing assets to cover the shortfall|
-|`targetVault`|`address`|The vault receiving assets to fulfill its redemption obligations|
-|`amount`|`uint256`|The quantity of assets transferred for peg protection|
 
 ### YieldDistributed
 Emitted when yield is distributed through kToken minting/burning operations
@@ -819,8 +781,8 @@ event SettlementProposed(
     int256 netted,
     int256 yield,
     uint256 executeAfter,
-    uint256 lastFeesChargedManagement,
-    uint256 lastFeesChargedPerformance
+    uint64 lastFeesChargedManagement,
+    uint64 lastFeesChargedPerformance
 );
 ```
 
@@ -835,8 +797,8 @@ event SettlementProposed(
 |`netted`|`int256`|Net amount of new deposits/redemptions in this batch|
 |`yield`|`int256`|Absolute yield amount generated in this batch|
 |`executeAfter`|`uint256`|Timestamp after which the proposal can be executed|
-|`lastFeesChargedManagement`|`uint256`|Last management fees charged|
-|`lastFeesChargedPerformance`|`uint256`|Last performance fees charged|
+|`lastFeesChargedManagement`|`uint64`|Timestamp when management fees were last charged (0 = no fees)|
+|`lastFeesChargedPerformance`|`uint64`|Timestamp when performance fees were last charged (0 = no fees)|
 
 ### SettlementExecuted
 Emitted when a settlement proposal is successfully executed
@@ -877,27 +839,23 @@ event SettlementCancelled(bytes32 indexed proposalId, address indexed vault, byt
 |`vault`|`address`|The vault address for which settlement was cancelled|
 |`batchId`|`bytes32`|The batch identifier for which settlement was cancelled|
 
-### SettlementUpdated
-Emitted when a settlement proposal is updated with new yield calculation data
+### SettlementAccepted
+Emitted when a high-delta settlement proposal is accepted by a guardian
 
-Allows for correction of settlement proposals before execution if needed
+Proposals with yield exceeding maxAllowedDelta require explicit guardian approval before execution
 
 
 ```solidity
-event SettlementUpdated(
-    bytes32 indexed proposalId, uint256 totalAssets, uint256 netted, uint256 yield, bool profit
-);
+event SettlementAccepted(bytes32 indexed proposalId, address indexed vault, address indexed acceptedBy);
 ```
 
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`proposalId`|`bytes32`|The unique identifier of the updated proposal|
-|`totalAssets`|`uint256`|Updated total asset value in the vault|
-|`netted`|`uint256`|Updated net amount of deposits/redemptions|
-|`yield`|`uint256`|Updated yield amount for distribution|
-|`profit`|`bool`|Updated profit flag (true for gains, false for losses)|
+|`proposalId`|`bytes32`|The unique identifier of the accepted proposal|
+|`vault`|`address`|The vault address for which settlement was accepted|
+|`acceptedBy`|`address`|The guardian address who accepted the proposal|
 
 ### SettlementCooldownUpdated
 Emitted when the settlement cooldown period is updated by protocol governance
@@ -955,23 +913,6 @@ event YieldExceedsMaxDeltaWarning(
 |`maxAllowedYield`|`uint256`|The maximum allowed yield|
 
 ## Structs
-### Balances
-Tracks requested and deposited asset amounts for batch processing coordination
-
-Used by kAssetRouter to maintain virtual balance accounting across vaults and coordinate
-asset flows between kMinter redemption requests and vault settlements. Enables efficient
-batch processing by tracking pending operations before physical asset movement occurs.
-
-
-```solidity
-struct Balances {
-    /// @dev Amount of assets requested for redemption by kMinter but not yet processed
-    uint128 requested;
-    /// @dev Amount of assets deposited into vaults and available for yield generation
-    uint128 deposited;
-}
-```
-
 ### VaultSettlementProposal
 Contains all parameters for a batch settlement proposal in the yield distribution system
 
@@ -996,10 +937,12 @@ struct VaultSettlementProposal {
     int256 yield;
     /// @dev Timestamp after which this proposal can be executed (cooldown protection)
     uint64 executeAfter;
-    /// @dev Timestamp of last management fee charged
+    /// @dev Timestamp when management fees were last charged (0 means no fees to charge)
     uint64 lastFeesChargedManagement;
-    /// @dev Timestamp of last performance fee charged
+    /// @dev Timestamp when performance fees were last charged (0 means no fees to charge)
     uint64 lastFeesChargedPerformance;
+    /// @dev True if yield delta exceeded threshold, requires guardian approval before execution
+    bool requiresApproval;
 }
 ```
 

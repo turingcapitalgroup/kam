@@ -6,19 +6,23 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import {
     KBATCHRECEIVER_ALREADY_INITIALIZED,
     KBATCHRECEIVER_INSUFFICIENT_BALANCE,
-    KBATCHRECEIVER_INVALID_BATCH_ID,
     KBATCHRECEIVER_ONLY_KMINTER,
     KBATCHRECEIVER_WRONG_ASSET,
     KBATCHRECEIVER_ZERO_ADDRESS,
     KBATCHRECEIVER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
+import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 
 contract kBatchReceiverTest is DeploymentBaseTest {
     address USDC;
     address WBTC;
     address router;
+    address _minter;
+
+    uint256 internal constant MINT_AMOUNT = 100_000 * _1_USDC;
+    uint256 internal constant REQUEST_AMOUNT = 50_000 * _1_USDC;
 
     function setUp() public override {
         DeploymentBaseTest.setUp();
@@ -26,6 +30,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         USDC = address(mockUSDC);
         WBTC = address(mockWBTC);
         router = address(assetRouter);
+        _minter = address(minter);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -33,8 +38,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_BatchReceiver_Require_Not_Initialized() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver, bytes32 _batchId) = _createBatchReceiver();
 
         vm.prank(router);
         vm.expectRevert(bytes(KBATCHRECEIVER_ALREADY_INITIALIZED));
@@ -46,8 +50,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_PullAssets_Success() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
         uint256 _balanceBefore = mockUSDC.balanceOf(users.alice);
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
@@ -56,69 +59,51 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         vm.prank(address(minter));
         vm.expectEmit(true, true, true, true);
         emit IkBatchReceiver.PulledAssets(users.alice, USDC, _amount);
-        kBatchReceiver(_receiver).pullAssets(users.alice, _amount, _batchId);
+        kBatchReceiver(_receiver).pullAssets(users.alice, _amount);
 
         assertEq(mockUSDC.balanceOf(_receiver), 0);
         assertEq(mockUSDC.balanceOf(users.alice), _balanceBefore + _amount);
     }
 
     function test_PullAssets_Require_Only_Minter() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
-        kBatchReceiver(_receiver).pullAssets(users.alice, _amount, _batchId);
+        kBatchReceiver(_receiver).pullAssets(users.alice, _amount);
 
         vm.prank(users.admin);
         vm.expectRevert(bytes(KBATCHRECEIVER_ONLY_KMINTER));
-        kBatchReceiver(_receiver).pullAssets(users.alice, _amount, _batchId);
-
-        assertTrue(mockUSDC.balanceOf(_receiver) == 1000 * _1_USDC);
-    }
-
-    function test_PullAssets_Require_Same_BatchId() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
-        uint256 _amount = 1000 * _1_USDC;
-        mockUSDC.mint(_receiver, _amount);
-        assertEq(mockUSDC.balanceOf(_receiver), _amount);
-
-        vm.prank(address(minter));
-        _batchId = keccak256("Banana");
-        vm.expectRevert(bytes(KBATCHRECEIVER_INVALID_BATCH_ID));
-        kBatchReceiver(_receiver).pullAssets(users.alice, _amount, _batchId);
+        kBatchReceiver(_receiver).pullAssets(users.alice, _amount);
 
         assertTrue(mockUSDC.balanceOf(_receiver) == 1000 * _1_USDC);
     }
 
     function test_PullAssets_Require_Not_Zero_Amount() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
 
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_AMOUNT));
-        kBatchReceiver(_receiver).pullAssets(users.alice, 0, _batchId);
+        kBatchReceiver(_receiver).pullAssets(users.alice, 0);
 
         assertTrue(mockUSDC.balanceOf(_receiver) == 1000 * _1_USDC);
     }
 
     function test_PullAssets_Require_Address_Not_Zero() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
         uint256 _amount = 1000 * _1_USDC;
         mockUSDC.mint(_receiver, _amount);
         assertEq(mockUSDC.balanceOf(_receiver), _amount);
 
         vm.prank(address(minter));
         vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
-        kBatchReceiver(_receiver).pullAssets(address(0), _amount, _batchId);
+        kBatchReceiver(_receiver).pullAssets(address(0), _amount);
 
         assertTrue(mockUSDC.balanceOf(_receiver) == 1000 * _1_USDC);
     }
@@ -128,8 +113,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_RescueAssets_Success() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
         uint256 _balanceBefore = mockWBTC.balanceOf(users.alice);
         uint256 _rescueAmount = 5 * _1_WBTC;
         mockWBTC.mint(_receiver, _rescueAmount);
@@ -145,8 +129,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     }
 
     function test_RescueAssets_Require_Only_KMinter() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
         mockWBTC.mint(_receiver, _1_WBTC);
 
         vm.prank(users.alice);
@@ -163,8 +146,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     }
 
     function test_RescueAssets_Require_Not_Zero_Address() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
         mockWBTC.mint(_receiver, _1_WBTC);
 
         vm.prank(address(minter));
@@ -173,8 +155,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     }
 
     function test_RescueAssets_Require_Non_Zero_Amount() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
         assertEq(mockWBTC.balanceOf(_receiver), 0);
 
         vm.prank(address(minter));
@@ -183,8 +164,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     }
 
     function test_RescueAssets_Require_Not_Batch_Asset() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
         mockUSDC.mint(_receiver, _1_USDC);
 
         vm.prank(address(minter));
@@ -197,8 +177,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_RescueAssets_ETH_Success() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
 
         uint256 _ethAmount = 1 ether;
         vm.deal(_receiver, _ethAmount);
@@ -216,8 +195,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     }
 
     function test_RescueAssets_ETH_Require_Non_Zero_Balance() public {
-        bytes32 _batchId = minter.getBatchId(USDC);
-        address _receiver = _createBatchReceiver(_batchId);
+        (address _receiver,) = _createBatchReceiver();
 
         assertEq(_receiver.balance, 0);
 
@@ -230,8 +208,36 @@ contract kBatchReceiverTest is DeploymentBaseTest {
                                 PRIVATE
     //////////////////////////////////////////////////////////////*/
 
-    function _createBatchReceiver(bytes32 _batchId) private returns (address _receiver) {
-        vm.prank(router);
-        _receiver = minter.createBatchReceiver(_batchId);
+    /// @dev Creates a batch receiver by going through the requestBurn flow
+    /// @return _receiver The batch receiver address
+    /// @return _newBatchId The batch ID that the receiver belongs to
+    function _createBatchReceiver() private returns (address _receiver, bytes32 _newBatchId) {
+        bytes32 _initialBatchId = minter.getBatchId(USDC);
+
+        // Mint kTokens first
+        mockUSDC.mint(users.institution, MINT_AMOUNT);
+        vm.prank(users.institution);
+        mockUSDC.approve(_minter, MINT_AMOUNT);
+        vm.prank(users.institution);
+        minter.mint(USDC, users.institution, MINT_AMOUNT);
+
+        // Close and settle the mint batch
+        vm.prank(users.relayer);
+        minter.closeBatch(_initialBatchId, true);
+        vm.prank(users.admin);
+        assetRouter.setSettlementCooldown(0);
+        vm.prank(users.relayer);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _initialBatchId, 0, 0, 0);
+        assetRouter.executeSettleBatch(_proposalId);
+
+        // Now request burn - this creates the batch receiver
+        _newBatchId = minter.getBatchId(USDC);
+        address _kToken = registry.assetToKToken(USDC);
+        vm.prank(users.institution);
+        IkToken(_kToken).approve(_minter, REQUEST_AMOUNT);
+        vm.prank(users.institution);
+        minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        _receiver = minter.getBatchReceiver(_newBatchId);
     }
 }

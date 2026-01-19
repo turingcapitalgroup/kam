@@ -38,6 +38,8 @@ contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ow
         mapping(address => mapping(address => mapping(bytes4 => address))) executionValidator;
         /// @dev Tracks all targets for each executor for enumeration
         mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) executorTargets;
+        /// @dev Counts allowed selectors per executor-target pair for accurate target tracking
+        mapping(address => mapping(address => uint256)) executorTargetSelectorCount;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.kRemoteRegistry")) - 1)) & ~bytes32(uint256(0xff))
@@ -98,12 +100,16 @@ contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ow
 
         $.executorAllowedSelectors[_executor][_target][_selector] = _allowed;
 
-        // Update target tracking
+        // Update target tracking with reference counting
         if (_allowed) {
+            $.executorTargetSelectorCount[_executor][_target]++;
             $.executorTargets[_executor].add(_target);
         } else {
-            $.executorTargets[_executor].remove(_target);
-            // Also remove any execution validator when disabling
+            $.executorTargetSelectorCount[_executor][_target]--;
+            // Only remove target when no selectors remain
+            if ($.executorTargetSelectorCount[_executor][_target] == 0) {
+                $.executorTargets[_executor].remove(_target);
+            }
             delete $.executionValidator[_executor][_target][_selector];
         }
 

@@ -1,5 +1,5 @@
 # BaseVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kStakingVault/base/BaseVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kStakingVault/base/BaseVault.sol)
 
 **Inherits:**
 [ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
@@ -134,11 +134,25 @@ uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 107
 ```
 
 
+### VIRTUAL_SHARES
+
+```solidity
+uint256 internal constant VIRTUAL_SHARES = 1e6
+```
+
+
+### VIRTUAL_ASSETS
+
+```solidity
+uint256 internal constant VIRTUAL_ASSETS = 1e6
+```
+
+
 ### MODULE_BASE_STORAGE_LOCATION
 
 ```solidity
 bytes32 internal constant MODULE_BASE_STORAGE_LOCATION =
-    0x50bc60b877273d55cac3903fd4818902e5fd7aa256278ee2dc6b212f256c0b00
+    0x63f7c1a183f3ce6ff685d16ab1e43ef8a572a1797aa1b858a84dd926a8739f00
 ```
 
 
@@ -422,11 +436,11 @@ function _setPaused(bool _paused) internal;
 Converts stkToken shares to underlying asset value based on current vault performance
 
 This function implements the core share accounting mechanism that determines asset value for stkToken
-holders. The conversion process: (1) Handles edge case where total supply is zero by returning 1:1 conversion,
+holders. The conversion uses virtual shares/assets offset (ERC4626 security pattern) to prevent inflation
+attacks. The calculation: (1) Adds VIRTUAL_ASSETS to total assets and VIRTUAL_SHARES to total supply,
 (2) Uses precise fixed-point math to calculate proportional asset value based on share ownership percentage,
-(3) Applies current total net assets (after fees) to ensure accurate user valuations. The calculation
-maintains precision through fullMulDiv to prevent rounding errors that could accumulate over time. This
-function is critical for determining redemption values, share price calculations, and user balance queries.
+(3) Applies current total net assets (after fees) to ensure accurate user valuations. The virtual offset
+makes inflation attacks economically infeasible by requiring attackers to donate ~1000x the victim's deposit.
 
 
 ```solidity
@@ -445,7 +459,7 @@ function _convertToAssetsWithTotals(
 |----|----|-----------|
 |`_shares`|`uint256`|The quantity of stkTokens to convert to underlying asset terms|
 |`_totalAssetsValue`|`uint256`|The total asset value managed by the vault including yields but excluding pending operations|
-|`_totalSupply`|`uint256`||
+|`_totalSupply`|`uint256`|The total supply of stkTokens|
 
 **Returns**
 
@@ -459,11 +473,12 @@ function _convertToAssetsWithTotals(
 Converts underlying asset amount to equivalent stkToken shares at current vault valuation
 
 This function determines how many stkTokens should be issued for a given asset deposit based on current
-vault performance. The conversion process: (1) Handles edge case of zero total supply with 1:1 initial pricing,
+vault performance. The conversion uses virtual shares/assets offset (ERC4626 security pattern) to prevent
+inflation attacks. The calculation: (1) Adds VIRTUAL_SHARES to total supply and VIRTUAL_ASSETS to total assets,
 (2) Calculates proportional share amount based on current vault valuation and total outstanding shares,
-(3) Uses total net assets to ensure new shares are priced fairly relative to existing holders. The precise
-fixed-point mathematics prevent dilution attacks and ensure fair pricing for all participants. This function
-is essential for determining share issuance during staking operations and maintaining equitable vault ownership.
+(3) Uses total net assets to ensure new shares are priced fairly relative to existing holders. The virtual
+offset makes inflation attacks economically infeasible - an attacker would need to donate ~1000x the victim's
+deposit to steal their funds.
 
 
 ```solidity
@@ -482,7 +497,7 @@ function _convertToSharesWithTotals(
 |----|----|-----------|
 |`_assets`|`uint256`|The underlying asset amount to convert to share terms|
 |`_totalAssetsValue`|`uint256`|The total asset value managed by the vault including yields but excluding pending operations|
-|`_totalSupply`|`uint256`||
+|`_totalSupply`|`uint256`|The total supply of stkTokens|
 
 **Returns**
 
@@ -725,25 +740,26 @@ struct BaseVaultStorage {
     //1
     uint256 config; // decimals, performance fee, management fee, initialized, paused,
     // isHardHurdleRate, lastFeesChargedManagement, lastFeesChargedPerformance
-    //2
-    uint128 sharePriceWatermark;
+    //2 - packed together for gas efficiency (both read in _totalAssets)
     uint128 totalPendingStake;
+    uint128 totalPendingUnstake;
     //3
-    uint256 currentBatch;
-    //4
-    uint256 requestCounter;
-    //5
-    bytes32 currentBatchId;
-    //6
-    address registry;
-    //7
-    address receiverImplementation;
-    //8
-    address underlyingAsset;
-    //9
-    address kToken;
-    //10
+    uint128 sharePriceWatermark;
     uint128 maxTotalAssets;
+    //4
+    uint256 currentBatch;
+    //5
+    uint256 requestCounter;
+    //6
+    bytes32 currentBatchId;
+    //7
+    address registry;
+    //8
+    address receiverImplementation;
+    //9
+    address underlyingAsset;
+    //10
+    address kToken;
     //11
     string name;
     //12

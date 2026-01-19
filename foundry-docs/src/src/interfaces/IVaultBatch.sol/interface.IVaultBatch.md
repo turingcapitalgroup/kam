@@ -1,5 +1,5 @@
 # IVaultBatch
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/IVaultBatch.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IVaultBatch.sol)
 
 Interface for batch lifecycle management enabling gas-efficient settlement of multiple user operations
 
@@ -65,15 +65,16 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 ### settleBatch
 
-Marks a batch as settled after yield distribution and enables user claiming
+Marks a batch as settled after yield distribution, mints shares for pending stakers, and enables claiming
 
-This function finalizes batch settlement by recording final asset values and enabling claims. Process:
-(1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Snapshots both
-gross and net share prices at settlement time for accurate reward calculations, (3) Marks batch as settled
-enabling users to claim their staked shares or unstaked assets, (4) Completes the batch lifecycle allowing
-reward distribution through the claiming mechanism. Only kAssetRouter can settle batches as it coordinates
-yield calculations across DN vaults and manages cross-vault asset flows. Settlement triggers share price
-finalization based on vault performance during the batch period.
+This function finalizes batch settlement by recording final asset values, minting shares, and enabling claims.
+Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Snapshots both
+gross and net share prices at settlement time for accurate reward calculations, (3) Mints stkTokens for all pending
+stakers in this batch to the vault itself at the settlement share price (clearing totalPendingStake for this batch),
+(4) Marks batch as settled enabling users to claim their staked shares or unstaked assets, (5) Completes the batch
+lifecycle allowing reward distribution through the claiming mechanism. Only kAssetRouter can settle batches as it
+coordinates yield calculations across DN vaults and manages cross-vault asset flows. The pre-minting approach ensures
+share prices are locked at settlement and users receive shares via transfer (not mint) when they claim.
 
 
 ```solidity

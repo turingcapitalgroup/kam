@@ -27,17 +27,6 @@ interface IkAssetRouter is IVersioned {
                                 STRUCTS
     ///////////////////////////////////////////////////////////////*/
 
-    /// @notice Tracks requested and deposited asset amounts for batch processing coordination
-    /// @dev Used by kAssetRouter to maintain virtual balance accounting across vaults and coordinate
-    /// asset flows between kMinter redemption requests and vault settlements. Enables efficient
-    /// batch processing by tracking pending operations before physical asset movement occurs.
-    struct Balances {
-        /// @dev Amount of assets requested for redemption by kMinter but not yet processed
-        uint128 requested;
-        /// @dev Amount of assets deposited into vaults and available for yield generation
-        uint128 deposited;
-    }
-
     /// @notice Contains all parameters for a batch settlement proposal in the yield distribution system
     /// @dev Settlement proposals implement a cooldown mechanism for security, allowing guardians to verify
     /// yield calculations before execution. Once executed, the proposal triggers kToken minting/burning to
@@ -57,10 +46,12 @@ interface IkAssetRouter is IVersioned {
         int256 yield;
         /// @dev Timestamp after which this proposal can be executed (cooldown protection)
         uint64 executeAfter;
-        /// @dev Timestamp of last management fee charged
+        /// @dev Timestamp when management fees were last charged (0 means no fees to charge)
         uint64 lastFeesChargedManagement;
-        /// @dev Timestamp of last performance fee charged
+        /// @dev Timestamp when performance fees were last charged (0 means no fees to charge)
         uint64 lastFeesChargedPerformance;
+        /// @dev True if yield delta exceeded threshold, requires guardian approval before execution
+        bool requiresApproval;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -108,48 +99,12 @@ interface IkAssetRouter is IVersioned {
     /// @param amount The quantity of shares being pushed
     event SharesRequestedPushed(address indexed vault, bytes32 indexed batchId, uint256 amount);
 
-    /// @notice Emitted when shares are requested for pull operations in kStakingVault redemptions
-    /// @dev Coordinates share-based redemptions for retail users through the batch system
-    /// @param vault The kStakingVault requesting the share pull operation
-    /// @param batchId The batch identifier for this redemption batch
-    /// @param amount The quantity of shares being pulled for redemption
-    event SharesRequestedPulled(address indexed vault, bytes32 indexed batchId, uint256 amount);
-
-    /// @notice Emitted when shares are settled across multiple vaults with calculated share prices
-    /// @dev Marks the completion of a cross-vault settlement with final share price determination
-    /// @param vaults Array of vault addresses participating in the settlement
-    /// @param batchId The batch identifier for this settlement period
-    /// @param totalRequestedShares Total shares requested across all vaults in this settlement
-    /// @param totalAssets Array of total assets for each vault after settlement
-    /// @param sharePrice The final calculated share price for this settlement period
-    event SharesSettled(
-        address[] vaults,
-        bytes32 indexed batchId,
-        uint256 totalRequestedShares,
-        uint256[] totalAssets,
-        uint256 sharePrice
-    );
-
     /// @notice Emitted when a vault batch is settled with final asset accounting
     /// @dev Indicates completion of yield distribution and final asset allocation for a batch
     /// @param vault The vault address that completed batch settlement
     /// @param batchId The batch identifier that was settled
     /// @param totalAssets The final total asset value in the vault after settlement
     event BatchSettled(address indexed vault, bytes32 indexed batchId, uint256 totalAssets);
-
-    /// @notice Emitted when peg protection mechanism is activated due to vault shortfall
-    /// @dev Triggered when a vault cannot fulfill redemption requests, requiring asset transfers
-    /// from other vaults to maintain the protocol's 1:1 backing guarantee
-    /// @param vault The vault experiencing shortfall that triggered peg protection
-    /// @param shortfall The amount of assets needed to fulfill pending redemption requests
-    event PegProtectionActivated(address indexed vault, uint256 shortfall);
-
-    /// @notice Emitted when peg protection transfers assets between vaults to cover shortfalls
-    /// @dev Maintains protocol solvency by redistributing assets from surplus to deficit vaults
-    /// @param sourceVault The vault providing assets to cover the shortfall
-    /// @param targetVault The vault receiving assets to fulfill its redemption obligations
-    /// @param amount The quantity of assets transferred for peg protection
-    event PegProtectionExecuted(address indexed sourceVault, address indexed targetVault, uint256 amount);
 
     /// @notice Emitted when yield is distributed through kToken minting/burning operations
     /// @dev This is the core mechanism for maintaining 1:1 backing while distributing yield.
@@ -174,8 +129,8 @@ interface IkAssetRouter is IVersioned {
     /// @param netted Net amount of new deposits/redemptions in this batch
     /// @param yield Absolute yield amount generated in this batch
     /// @param executeAfter Timestamp after which the proposal can be executed
-    /// @param lastFeesChargedManagement Last management fees charged
-    /// @param lastFeesChargedPerformance Last performance fees charged
+    /// @param lastFeesChargedManagement Timestamp when management fees were last charged (0 = no fees)
+    /// @param lastFeesChargedPerformance Timestamp when performance fees were last charged (0 = no fees)
     event SettlementProposed(
         bytes32 indexed proposalId,
         address indexed vault,
@@ -184,8 +139,8 @@ interface IkAssetRouter is IVersioned {
         int256 netted,
         int256 yield,
         uint256 executeAfter,
-        uint256 lastFeesChargedManagement,
-        uint256 lastFeesChargedPerformance
+        uint64 lastFeesChargedManagement,
+        uint64 lastFeesChargedPerformance
     );
 
     /// @notice Emitted when a settlement proposal is successfully executed
@@ -205,16 +160,12 @@ interface IkAssetRouter is IVersioned {
     /// @param batchId The batch identifier for which settlement was cancelled
     event SettlementCancelled(bytes32 indexed proposalId, address indexed vault, bytes32 indexed batchId);
 
-    /// @notice Emitted when a settlement proposal is updated with new yield calculation data
-    /// @dev Allows for correction of settlement proposals before execution if needed
-    /// @param proposalId The unique identifier of the updated proposal
-    /// @param totalAssets Updated total asset value in the vault
-    /// @param netted Updated net amount of deposits/redemptions
-    /// @param yield Updated yield amount for distribution
-    /// @param profit Updated profit flag (true for gains, false for losses)
-    event SettlementUpdated(
-        bytes32 indexed proposalId, uint256 totalAssets, uint256 netted, uint256 yield, bool profit
-    );
+    /// @notice Emitted when a high-delta settlement proposal is accepted by a guardian
+    /// @dev Proposals with yield exceeding maxAllowedDelta require explicit guardian approval before execution
+    /// @param proposalId The unique identifier of the accepted proposal
+    /// @param vault The vault address for which settlement was accepted
+    /// @param acceptedBy The guardian address who accepted the proposal
+    event SettlementAccepted(bytes32 indexed proposalId, address indexed vault, address indexed acceptedBy);
 
     /// @notice Emitted when the settlement cooldown period is updated by protocol governance
     /// @dev Cooldown provides security by allowing time to verify settlement proposals before execution
@@ -303,18 +254,6 @@ interface IkAssetRouter is IVersioned {
     /// @param batchId The batch identifier for coordinating share operations with settlement
     function kSharesRequestPush(address sourceVault, uint256 amount, bytes32 batchId) external payable;
 
-    /// @notice Requests shares to be pulled for kStakingVault redemption operations
-    /// @dev This function handles the share-based redemption process for retail users withdrawing from
-    /// kStakingVaults. The process involves: (1) calculating share amounts to redeem based on user
-    /// requests, (2) preparing for conversion back to kTokens at settlement time, (3) coordinating
-    /// with the batch settlement system for fair pricing. Unlike institutional redemptions through
-    /// kMinter, this uses share-based accounting to handle smaller, more frequent retail operations
-    /// efficiently through the vault's batch processing system.
-    /// @param sourceVault The kStakingVault address requesting share pull for redemptions
-    /// @param amount The quantity of shares being requested for pull from users
-    /// @param batchId The batch identifier for coordinating share redemptions with settlement
-    function kSharesRequestPull(address sourceVault, uint256 amount, bytes32 batchId) external payable;
-
     /* //////////////////////////////////////////////////////////////
                         SETTLEMENT FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -330,8 +269,8 @@ interface IkAssetRouter is IVersioned {
     /// @param vault The DN vault address where yield was generated
     /// @param batchId The batch identifier for this settlement period
     /// @param totalAssets Total asset value in the vault after yield generation/loss
-    /// @param lastFeesChargedManagement Last management fees charged
-    /// @param lastFeesChargedPerformance Last performance fees charged
+    /// @param lastFeesChargedManagement Timestamp when management fees were last charged (0 = no fees)
+    /// @param lastFeesChargedPerformance Timestamp when performance fees were last charged (0 = no fees)
     function proposeSettleBatch(
         address asset,
         address vault,
@@ -362,6 +301,13 @@ interface IkAssetRouter is IVersioned {
     /// protocol's 1:1 backing guarantee. Only callable before the proposal execution.
     /// @param proposalId The unique identifier of the settlement proposal to cancel
     function cancelProposal(bytes32 proposalId) external;
+
+    /// @notice Accepts a high-delta settlement proposal for execution
+    /// @dev Required for proposals where yield exceeded maxAllowedDelta threshold. This provides an extra
+    /// security layer by requiring explicit guardian approval before executing potentially risky settlements.
+    /// Only callable by guardians. The proposal must still pass the cooldown check during execution.
+    /// @param proposalId The unique identifier of the settlement proposal to accept
+    function acceptProposal(bytes32 proposalId) external;
 
     /* //////////////////////////////////////////////////////////////
                             ADMIN FUNCTIONS
@@ -457,6 +403,20 @@ interface IkAssetRouter is IVersioned {
     /// @return reason Descriptive message explaining why execution is blocked (if applicable)
     function canExecuteProposal(bytes32 proposalId) external view returns (bool canExecute, string memory reason);
 
+    /// @notice Checks if a settlement proposal is still pending (not cancelled or executed)
+    /// @dev Returns true only if the proposal exists and is in the pending queue.
+    /// Use this for simple boolean state checks without detailed reason strings.
+    /// @param proposalId The unique identifier of the proposal to check
+    /// @return isPending True if the proposal is pending, false if cancelled, executed, or non-existent
+    function isProposalPending(bytes32 proposalId) external view returns (bool isPending);
+
+    /// @notice Checks if a high-delta settlement proposal has been accepted by a guardian
+    /// @dev Returns true if the proposal required approval and has been accepted via acceptProposal.
+    /// For proposals that don't require approval (yield within threshold), this returns false.
+    /// @param proposalId The unique identifier of the proposal to check
+    /// @return True if the proposal has been explicitly accepted by a guardian
+    function isProposalAccepted(bytes32 proposalId) external view returns (bool);
+
     /// @notice Gets the current security cooldown period for settlement proposals
     /// @dev The cooldown period determines how long proposals must wait before execution.
     /// This security mechanism allows guardians to verify yield calculations and prevents
@@ -473,14 +433,13 @@ interface IkAssetRouter is IVersioned {
     /// @return tolerance The current yield tolerance in basis points
     function getMaxAllowedDelta() external view returns (uint256 tolerance);
 
-    /// @notice Retrieves the virtual balance of assets for a vault across all its adapters
-    /// @dev This function aggregates asset balances across all adapters connected to a vault to determine
-    /// the total virtual balance available for operations. Essential for coordination between physical
-    /// asset locations and protocol accounting. Used for settlement calculations and ensuring sufficient
-    /// assets are available for redemptions and transfers within the money flow system.
+    /// @notice Retrieves the virtual balance of assets for a vault's adapter
+    /// @dev Retrieves the total assets from the single adapter registered for this vault-asset pair.
+    /// Essential for coordination between physical asset locations and protocol accounting.
+    /// Used for settlement calculations and ensuring sufficient assets are available for redemptions.
     /// @param vault The vault address to calculate virtual balance for
     /// @param asset The underlying asset of the vault
-    /// @return balance The total virtual asset balance across all vault adapters
+    /// @return balance The total virtual asset balance from the vault's adapter
     function virtualBalance(address vault, address asset) external view returns (uint256);
 
     /// @notice Checks if a specific proposal has been executed

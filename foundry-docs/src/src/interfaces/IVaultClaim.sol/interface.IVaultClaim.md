@@ -1,5 +1,5 @@
 # IVaultClaim
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/IVaultClaim.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IVaultClaim.sol)
 
 Interface for claiming settled staking rewards and unstaking assets after batch processing completion
 
@@ -24,11 +24,11 @@ Claims stkTokens from a settled staking batch at the finalized share price
 This function completes the staking process by distributing stkTokens to users after batch settlement.
 Process: (1) Validates batch has been settled and share prices are finalized to ensure accurate distribution,
 (2) Verifies request ownership and pending status to prevent unauthorized or duplicate claims, (3) Calculates
-stkToken amount based on original kToken deposit and settled net share price (after fees), (4) Mints stkTokens
-to specified recipient reflecting their proportional vault ownership, (5) Marks request as claimed to prevent
-future reprocessing. The net share price accounts for management and performance fees, ensuring users receive
-their accurate yield-adjusted position. stkTokens are ERC20-compatible shares that continue accruing yield
-through share price appreciation until unstaking.
+stkToken amount based on original kToken deposit and settled net share price (after fees), (4) Transfers
+pre-minted stkTokens from vault to recipient (shares were minted to vault during settlement), (5) Marks
+request as claimed to prevent future reprocessing. The net share price accounts for management and performance
+fees, ensuring users receive their accurate yield-adjusted position. stkTokens are ERC20-compatible shares that
+continue accruing yield through share price appreciation until unstaking.
 
 
 ```solidity

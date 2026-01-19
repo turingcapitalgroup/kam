@@ -5,6 +5,7 @@ import { Bytes32Set, LibBytes32Set } from "../helpers/Bytes32Set.sol";
 import { BaseHandler } from "./BaseHandler.t.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
+import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
@@ -35,6 +36,14 @@ contract kMinterHandler is BaseHandler {
     uint256 public kMinter_actualAdapterBalance;
     uint256 public kMinter_expectedAdapterTotalAssets;
     uint256 public kMinter_actualAdapterTotalAssets;
+
+    // INVARIANT_E: User Request Set tracking
+    mapping(address => uint256) public kMinter_expectedUserRequestCount;
+
+    // INVARIANT_F: Batch Closure tracking
+    Bytes32Set kMinter_closedBatches;
+    mapping(bytes32 => uint128) public kMinter_mintedAtClosure;
+    mapping(bytes32 => uint128) public kMinter_burnedAtClosure;
 
     constructor(
         address _minter,
@@ -97,7 +106,14 @@ contract kMinterHandler is BaseHandler {
             return;
         }
         kMinter_kToken.safeApprove(address(kMinter_minter), amount);
-        if (kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token) < amount) {
+
+        // Check cumulative requested amount, not just this request
+        // The contract checks: virtualBalance >= alreadyRequested + newAmount
+        bytes32 batchId = kMinter_minter.getBatchId(kMinter_token);
+        (, uint256 alreadyRequested) = kMinter_assetRouter.getBatchIdBalances(address(kMinter_minter), batchId);
+        uint256 virtualBal = kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token);
+
+        if (virtualBal < alreadyRequested + amount) {
             vm.expectRevert();
             kMinter_minter.requestBurn(kMinter_token, currentActor, amount);
             vm.stopPrank();
@@ -106,6 +122,8 @@ contract kMinterHandler is BaseHandler {
         bytes32 requestId = kMinter_minter.requestBurn(kMinter_token, currentActor, amount);
         vm.stopPrank();
         kMinter_actorRequests[currentActor].add(requestId);
+        // INVARIANT_E: Track user request count
+        kMinter_expectedUserRequestCount[currentActor]++;
         kMinter_actualTotalLockedAssets = kMinter_minter.getTotalLockedAssets(kMinter_token);
 
         kMinter_actualAdapterBalance = kMinter_token.balanceOf(address(kMinter_adapter));
@@ -133,6 +151,8 @@ contract kMinterHandler is BaseHandler {
         }
         kMinter_minter.burn(requestId);
         vm.stopPrank();
+        // INVARIANT_E: Decrement user request count on successful burn
+        kMinter_expectedUserRequestCount[currentActor]--;
         kMinter_expectedTotalLockedAssets -= amount;
         kMinter_actualTotalLockedAssets = kMinter_minter.getTotalLockedAssets(kMinter_token);
 
@@ -159,6 +179,12 @@ contract kMinterHandler is BaseHandler {
         }
         vm.startPrank(kMinter_relayer);
         kMinter_minter.closeBatch(batchId, true);
+
+        // INVARIANT_F: Track batch closure - record minted/burned at closure
+        IkMinter.BatchInfo memory batch = kMinter_minter.getBatchInfo(batchId);
+        kMinter_closedBatches.add(batchId);
+        kMinter_mintedAtClosure[batchId] = batch.depositedInBatch;
+        kMinter_burnedAtClosure[batchId] = batch.requestedSharesInBatch;
 
         vm.expectEmit(false, true, true, true);
         emit IkAssetRouter.SettlementProposed(
@@ -324,6 +350,69 @@ contract kMinterHandler is BaseHandler {
             kMinter_expectedAdapterTotalAssets,
             kMinter_actualAdapterTotalAssets,
             "KMINTER: INVARIANT_C_ADAPTER_TOTAL_ASSETS"
+        );
+    }
+
+    /// @notice Invariant: All tracked requests must be valid (non-zero amount, exist in contract)
+    /// @dev Ensures handler tracking matches contract state
+    function INVARIANT_D_REQUEST_STATE_CONSISTENCY() public view {
+        // For each actor, check their tracked requests are valid
+        address[] memory actorList = actors();
+        for (uint256 i = 0; i < actorList.length; i++) {
+            address actor = actorList[i];
+            uint256 requestCount = kMinter_actorRequests[actor].count();
+            for (uint256 j = 0; j < requestCount; j++) {
+                bytes32 requestId = kMinter_actorRequests[actor].at(j);
+                IkMinter.BurnRequest memory req = kMinter_minter.getBurnRequest(requestId);
+                // Request must have non-zero amount (means it exists and hasn't been claimed)
+                assertGt(req.amount, 0, "KMINTER: INVARIANT_D - Request doesn't exist or already claimed");
+                // Request user should match the actor
+                assertEq(req.user, actor, "KMINTER: INVARIANT_D - Request user mismatch");
+            }
+        }
+    }
+
+    /// @notice Invariant: User request count matches actual pending requests
+    /// @dev Ensures EnumerableSet stays in sync with actual state
+    function INVARIANT_E_USER_REQUEST_SET() public view {
+        address[] memory actorList = actors();
+        for (uint256 i = 0; i < actorList.length; i++) {
+            address actor = actorList[i];
+            uint256 actualCount = kMinter_minter.getUserRequests(actor).length;
+            assertEq(
+                actualCount,
+                kMinter_expectedUserRequestCount[actor],
+                "KMINTER: INVARIANT_E - User request set out of sync"
+            );
+        }
+    }
+
+    /// @notice Invariant: Closed batches cannot have increased minted/burned amounts
+    /// @dev Prevents race conditions where operations sneak into closed batches
+    function INVARIANT_F_BATCH_CLOSURE() public view {
+        for (uint256 i = 0; i < kMinter_closedBatches.count(); i++) {
+            bytes32 batchId = kMinter_closedBatches.at(i);
+            IkMinter.BatchInfo memory batch = kMinter_minter.getBatchInfo(batchId);
+            assertEq(
+                batch.depositedInBatch, kMinter_mintedAtClosure[batchId], "KMINTER: INVARIANT_F - Mint after closure"
+            );
+            assertEq(
+                batch.requestedSharesInBatch,
+                kMinter_burnedAtClosure[batchId],
+                "KMINTER: INVARIANT_F - Burn after closure"
+            );
+        }
+    }
+
+    /// @notice Invariant: kToken total supply >= total locked assets (1:1 backing)
+    /// @dev Core backing guarantee - if this fails, protocol is insolvent
+    function INVARIANT_G_KTOKEN_SUPPLY() public view {
+        uint256 totalSupply = IERC20(kMinter_kToken).totalSupply();
+        uint256 totalLocked = kMinter_minter.getTotalLockedAssets(kMinter_token);
+        assertGe(
+            totalSupply,
+            totalLocked,
+            "KMINTER: INVARIANT_G - kToken supply less than locked assets - 1:1 backing violated"
         );
     }
 }

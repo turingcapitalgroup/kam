@@ -24,13 +24,19 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     //////////////////////////////////////////////////////////////*/
 
     // VaultBatches Events
-    // / @notice Emitted when a new batch is created
-    // / @param batchId The batch ID of the new batch
+    /// @notice Emitted when a new batch is created
+    /// @param batchId The batch ID of the new batch
     event BatchCreated(bytes32 indexed batchId);
 
     /// @notice Emitted when a batch is settled
     /// @param batchId The batch ID of the settled batch
     event BatchSettled(bytes32 indexed batchId);
+
+    /// @notice Emitted when unstake shares are burned at settlement time
+    /// @param batchId The batch ID
+    /// @param totalSharesBurned Total shares burned (including fee shares)
+    /// @param claimableKTokens Total kTokens claimable by users (net of fees)
+    event UnstakeSharesBurned(bytes32 indexed batchId, uint256 totalSharesBurned, uint256 claimableKTokens);
 
     /// @notice Emitted when a batch is closed
     /// @param batchId The batch ID of the closed batch
@@ -66,11 +72,6 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     /// @param isHard True for hard hurdle, false for soft hurdle
     event HardHurdleRateSet(bool isHard);
 
-    /// @notice Emitted when fees are charged to the vault
-    /// @param managementFees Amount of management fees collected
-    /// @param performanceFees Amount of performance fees collected
-    event FeesAssessed(uint256 managementFees, uint256 performanceFees);
-
     /// @notice Emitted when management fees are charged
     /// @param timestamp Timestamp of the fee charge
     event ManagementFeesCharged(uint256 timestamp);
@@ -104,10 +105,6 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
         bytes32 batchId
     );
 
-    /// @notice Emitted when a stake request is redeemed
-    /// @param requestId The unique identifier of the stake request
-    event StakeRequestRedeemed(bytes32 indexed requestId);
-
     /// @notice Emitted when an unstake request is created
     /// @param requestId The unique identifier of the unstake request
     /// @param user The address of the user who created the request
@@ -140,10 +137,11 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     /// enters pending state until batch settlement, when the final share price is calculated based on vault
     /// performance. Users must later call claimStakedShares() after settlement to receive their stkTokens at
     /// the settled price. This two-phase approach ensures fair pricing for all users within a batch period.
+    /// @param owner The address that owns this stake request and can claim the resulting shares
     /// @param to The recipient address that will receive the stkTokens after successful settlement and claiming
     /// @param kTokensAmount The quantity of kTokens to stake (must not exceed user balance, cannot be zero)
     /// @return requestId Unique identifier for tracking this staking request through settlement and claiming
-    function requestStake(address to, uint256 kTokensAmount) external payable returns (bytes32 requestId);
+    function requestStake(address owner, address to, uint256 kTokensAmount) external payable returns (bytes32 requestId);
 
     /// @notice Initiates stkToken unstaking request for kToken redemption plus accrued yield through batch processing
     /// @dev This function begins the retail unstaking process by: (1) Validating user has sufficient stkToken balance

@@ -1,5 +1,5 @@
 # ReaderModule
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kStakingVault/modules/ReaderModule.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kStakingVault/modules/ReaderModule.sol)
 
 **Inherits:**
 [BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [IVaultReader](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IVaultReader.sol/interface.IVaultReader.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md)
@@ -14,6 +14,15 @@ Number of seconds in a year
 
 ```solidity
 uint256 constant SECS_PER_YEAR = 31_556_952
+```
+
+
+### MONTHS_PER_YEAR
+Number of months in a year
+
+
+```solidity
+uint256 constant MONTHS_PER_YEAR = 12
 ```
 
 
@@ -295,7 +304,9 @@ function getBatchIdInfo(bytes32 _batchId)
         uint256 netSharePrice_,
         uint256 totalAssets_,
         uint256 totalNetAssets_,
-        uint256 totalSupply_
+        uint256 totalSupply_,
+        uint256 depositedInBatch,
+        uint256 requestedSharesInBatch
     );
 ```
 **Parameters**
@@ -316,6 +327,8 @@ function getBatchIdInfo(bytes32 _batchId)
 |`totalAssets_`|`uint256`|Total assets of settlement|
 |`totalNetAssets_`|`uint256`|Total net assets of settlement|
 |`totalSupply_`|`uint256`|Total shares supply settlement|
+|`depositedInBatch`|`uint256`|Amount of assets deposited in this batch|
+|`requestedSharesInBatch`|`uint256`|Amount of shares requested for unstaking in this batch|
 
 
 ### isClosed
@@ -595,6 +608,21 @@ function getTotalPendingStake() external view returns (uint256);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`uint256`|Total pending stake amount|
+
+
+### getTotalPendingUnstake
+
+Returns the total pending unstake amount (claimable kTokens for settled unstake requests)
+
+
+```solidity
+function getTotalPendingUnstake() external view returns (uint256);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|Total pending unstake amount|
 
 
 ### getUserRequests
