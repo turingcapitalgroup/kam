@@ -141,6 +141,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// @param _registry Address of the kRegistry contract that manages protocol configuration
     /// @param _owner Initial owner of the contract
     function initialize(address _registry, address _owner) external initializer {
+        _checkAddressNotZero(_owner);
         __kBase_init(_registry);
         _initializeOwner(_owner);
 
@@ -573,8 +574,11 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         if (_proposal.executeAfter == 0) {
             return (false, "Proposal not found");
         }
+        if ($.executedProposalIds.contains(_proposalId)) {
+            return (false, "Proposal already executed");
+        }
         if (!$.vaultPendingProposalIds[_proposal.vault].contains(_proposalId)) {
-            return (false, "Proposal cancelled or executed");
+            return (false, "Proposal cancelled");
         }
         if (block.timestamp < _proposal.executeAfter) {
             return (false, "Cooldown not passed");

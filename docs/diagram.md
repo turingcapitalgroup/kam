@@ -4,7 +4,7 @@ graph TB
         INST[🏦 INSTITUTIONS<br/>Direct Mint/Redeem<br/>1:1 Backing<br/>Large Volume]
         RETAIL[👤 RETAIL USERS<br/>Stake kTokens<br/>Earn Yield<br/>Get stkTokens]
         RELAYER[⚙️ RELAYERS<br/>Propose Settlements<br/>Execute Batches<br/>Coordinate Flows]
-        GUARDIAN[🛡️ GUARDIANS<br/>Monitor Proposals<br/>Cancel Suspicious<br/>Safety Check]
+        GUARDIAN[🛡️ GUARDIANS<br/>Monitor Proposals<br/>Approve High-Delta<br/>Cancel Suspicious]
     end
 
     subgraph "TOKEN LAYER"
@@ -61,17 +61,21 @@ graph TB
         B1[📦 ACTIVE<br/>Accept Requests]
         B2[🔒 CLOSED<br/>No New Requests]
         B3[⏱️ PROPOSAL<br/>Cooldown 1hr]
+        B3A[🛡️ APPROVAL<br/>Guardian Required<br/>If High Delta]
         B4[✅ SETTLED<br/>Claims Available]
-        
+
         B1 -->|closeBatch| B2
         B2 -->|proposeSettlement| B3
-        B3 -->|executeSettlement| B4
+        B3 -->|normal yield| B4
+        B3 -->|high delta| B3A
+        B3A -->|acceptProposal| B4
     end
 
     subgraph "SAFETY"
         PAUSE[⏸️ EMERGENCY PAUSE<br/>Halt all operations]
         COOLDOWN[⏲️ SETTLEMENT COOLDOWN<br/>1 hour review period]
-        TOLERANCE[📊 YIELD TOLERANCE<br/>Max 10% deviation]
+        TOLERANCE[📊 YIELD TOLERANCE<br/>Max 10% deviation<br/>Requires approval if exceeded]
+        APPROVE[✅ GUARDIAN APPROVE<br/>Accept high-delta proposals]
         CANCEL[❌ GUARDIAN CANCEL<br/>Stop bad proposals]
     end
 
@@ -100,6 +104,7 @@ graph TB
     COOLDOWN -->|After 1hr| SETTLE_EXEC
     GUARDIAN -->|Monitor| SETTLE_PROP
     GUARDIAN -.->|Cancel if needed| CANCEL
+    GUARDIAN -.->|Approve high-delta| APPROVE
     
     %% Virtual to Real Settlement
     VIRTUAL_BAL --> SETTLE_PROP
@@ -173,4 +178,5 @@ graph TB
     style PAUSE fill:#ff9999
     style COOLDOWN fill:#ffcc99
     style TOLERANCE fill:#ffff99
+    style APPROVE fill:#99ff99
     style CANCEL fill:#ff9999

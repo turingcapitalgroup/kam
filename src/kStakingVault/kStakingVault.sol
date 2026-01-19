@@ -156,7 +156,10 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         );
 
         // Make sure we dont exceed the max total assets
-        require(_totalAssets() + _amount128 <= $.maxTotalAssets, KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED);
+        // Use actual kToken balance (not _totalAssets()) to prevent bypass via pending stakes
+        require(
+            $.kToken.balanceOf(address(this)) + _amount128 <= $.maxTotalAssets, KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED
+        );
 
         // Generate request ID
         _requestId = _createStakeRequestId(_owner, _amount, block.timestamp);

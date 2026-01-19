@@ -80,10 +80,12 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 - **Scope**: kAssetRouter
 - **Key Permissions**:
   - Cancel settlement proposals during cooldown
+  - Approve high-yield-delta proposals that exceed tolerance
   - Monitor settlement accuracy
   - Circuit breaker for incorrect settlements
 - **Key Functions**:
-  - `kAssetRouter.cancelProposal()` - Cancel settlement proposals (only function using GUARDIAN_ROLE)
+  - `kAssetRouter.cancelProposal()` - Cancel settlement proposals during cooldown
+  - `kAssetRouter.acceptProposal()` - Approve high-yield-delta proposals that require guardian approval
 
 ### RELAYER_ROLE
 
@@ -193,12 +195,15 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  └─────────────────┘    └─────────────────┘    └─────────────────┘ │
 │                                                                    │
 │  GUARDIAN_ROLE (Optional):                                         │
-│  ┌─────────────────┐                                               │
-│  │Cancel Proposal  │                                               │
-│  │(during cooldown)│                                               │
-│  │                 │                                               │
-│  │cancelProposal() │                                               │
-│  └─────────────────┘                                               │
+│  ┌─────────────────┐    ┌─────────────────┐                        │
+│  │Cancel Proposal  │    │Accept Proposal  │                        │
+│  │(during cooldown)│    │(if high-delta)  │                        │
+│  │                 │    │                 │                        │
+│  │cancelProposal() │    │acceptProposal() │                        │
+│  └─────────────────┘    └─────────────────┘                        │
+│                                                                    │
+│  Note: If yield exceeds tolerance, proposal requires guardian      │
+│  approval via acceptProposal() before execution can proceed.       │
 │                                                                    │
 └─────────────────────────────────────────────────────────────────---┘
 ```
@@ -292,7 +297,8 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  GUARDIAN_ROLE Functions:                                       │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │• cancelProposal() - Cancel settlement proposal              ││
-│  │  (only function using GUARDIAN_ROLE)                        ││
+│  │• acceptProposal() - Approve high-yield-delta proposals      ││
+│  │  (proposals exceeding yield tolerance require approval)     ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -545,11 +551,20 @@ Day 0:              Day 1:              Day 2:              Day 3:
 ### Settlement Oversight Timeline
 
 ```
-Day 1:              Day 1+1hr:         Day 1+1hr:         Day 1+1hr:
+Day 1:              Day 1 (cooldown):   Day 1+1hr:         Day 1+1hr:
 ┌─────────────┐     ┌────────────-─┐    ┌─────────────┐    ┌─────────────┐
 │RELAYER      │     │GUARDIAN      │    │Anyone       │    │Settlement   │
 │Proposes     │     │Can Cancel    │    │Can Execute  │    │Complete     │
 │Settlement   │     │(GUARDIAN_ROLE│    │(No Role)    │    │             │
 │(RELAYER_ROLE│     │)             │    │             │    │             │
+└─────────────┘     └─────────────-┘    └─────────────┘    └─────────────┘
+
+High-Yield-Delta Flow (when yield exceeds tolerance):
+Day 1:              Day 1 (cooldown):   Day 1+1hr:         Day 1+1hr:
+┌─────────────┐     ┌────────────-─┐    ┌─────────────┐    ┌─────────────┐
+│RELAYER      │     │GUARDIAN Must │    │Anyone       │    │Settlement   │
+│Proposes     │     │Accept or     │    │Can Execute  │    │Complete     │
+│Settlement   │     │Cancel        │    │(After       │    │             │
+│(RELAYER_ROLE│     │(GUARDIAN_ROLE│    │Approval)    │    │             │
 └─────────────┘     └─────────────-┘    └─────────────┘    └─────────────┘
 ```

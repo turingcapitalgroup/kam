@@ -604,7 +604,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Verify canExecuteProposal returns false for cancelled proposal
         (canExecute, reason) = assetRouter.canExecuteProposal(proposalId);
         assertFalse(canExecute);
-        assertEq(reason, "Proposal cancelled or executed");
+        assertEq(reason, "Proposal cancelled");
     }
 
     function test_CanExecuteProposal_AlreadyExecuted() public {
@@ -622,7 +622,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Verify canExecuteProposal returns false for executed proposal
         (bool canExecute, string memory reason) = assetRouter.canExecuteProposal(proposalId);
         assertFalse(canExecute);
-        assertEq(reason, "Proposal cancelled or executed");
+        assertEq(reason, "Proposal already executed");
     }
 
     function test_IsProposalPending() public {

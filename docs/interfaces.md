@@ -55,6 +55,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `proposeSettleBatch(address asset, address vault, bytes32 batchId, uint256 totalAssets, uint64 lastFeesChargedManagement, uint64 lastFeesChargedPerformance)` - Creates timelock settlement proposal with automatic yield calculations (RELAYER_ROLE required)
 - `executeSettleBatch(bytes32 proposalId)` - Executes approved settlement after cooldown using proposal ID (anyone can call after cooldown)
 - `cancelProposal(bytes32 proposalId)` - Cancels settlement proposals during cooldown period (GUARDIAN_ROLE required)
+- `acceptProposal(bytes32 proposalId)` - Approves high-yield-delta proposals that exceed the yield tolerance threshold (GUARDIAN_ROLE required)
 
 **Asset Transfer**
 
@@ -72,6 +73,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `getSettlementProposal(bytes32 proposalId)` - Retrieves complete VaultSettlementProposal struct with all details
 - `canExecuteProposal(bytes32 proposalId)` - Checks execution readiness and returns boolean result with descriptive reason
 - `isProposalPending(bytes32 proposalId)` - Simple boolean check if proposal is still pending (not cancelled or executed)
+- `isProposalAccepted(bytes32 proposalId)` - Checks if a high-yield-delta proposal has been approved by a guardian
 - `getSettlementCooldown()` - Gets current cooldown period in seconds before proposals can be executed
 - `getMaxAllowedDelta()` - Gets current yield tolerance threshold in basis points (exceeding emits warning event)
 - `virtualBalance(address vault, address asset)` - Returns virtual asset balance from vault's adapter
@@ -261,7 +263,7 @@ Minimal proxy contract that holds and distributes settled assets for batch redem
 
 **Asset Distribution**
 
-- `pullAssets(address receiver, uint256 amount, bytes32 batchId)` - Transfers assets from contract to specified receiver with batch ID validation (kMinter only)
+- `pullAssets(address receiver, uint256 amount)` - Transfers assets from contract to specified receiver (kMinter only)
 - `rescueAssets(address asset, address to, uint256 amount)` - Rescues stuck assets not designated for batch settlement (kMinter only)
 
 **Access Control**

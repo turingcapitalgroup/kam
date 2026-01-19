@@ -81,26 +81,26 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         //1
         uint256 config; // decimals, performance fee, management fee, initialized, paused,
         // isHardHurdleRate, lastFeesChargedManagement, lastFeesChargedPerformance
-        //2
-        uint128 sharePriceWatermark;
+        //2 - packed together for gas efficiency (both read in _totalAssets)
         uint128 totalPendingStake;
-        //3
-        uint256 currentBatch;
-        //4
-        uint256 requestCounter;
-        //5
-        bytes32 currentBatchId;
-        //6
-        address registry;
-        //7
-        address receiverImplementation;
-        //8
-        address underlyingAsset;
-        //9
-        address kToken;
-        //10
-        uint128 maxTotalAssets;
         uint128 totalPendingUnstake;
+        //3
+        uint128 sharePriceWatermark;
+        uint128 maxTotalAssets;
+        //4
+        uint256 currentBatch;
+        //5
+        uint256 requestCounter;
+        //6
+        bytes32 currentBatchId;
+        //7
+        address registry;
+        //8
+        address receiverImplementation;
+        //9
+        address underlyingAsset;
+        //10
+        address kToken;
         //11
         string name;
         //12

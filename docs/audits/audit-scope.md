@@ -136,7 +136,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, lastFeesChargedManagement, lastFeesChargedPerformance)`
    - Contract automatically calculates: `netted = deposited - requested`, then `yield = totalAssets - netted - lastTotalAssets`
-   - Validates yield against tolerance limits (default 10% in basis points)
+   - Validates yield against configurable tolerance limits
    - Creates proposal with mandatory cooldown period (default 1 hour, max 1 day)
    - Records fee timestamps for vault fee tracking synchronization
 2. **Cooldown Phase**: Guardian oversight period
@@ -286,8 +286,8 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 1. **Asset Reception**: During settlement, kAssetRouter transfers underlying assets to receiver
 2. **Individual Claims**: For each redemption in the batch:
-   - kMinter calls `pullAssets(receiver, amount, batchId)` with specific user address
-   - Receiver validates batch ID matches and caller is authorized kMinter
+   - kMinter calls `pullAssets(receiver, amount)` with specific user address
+   - Receiver validates caller is authorized kMinter
    - Assets transferred directly to individual redemption claimant
 3. **Batch Completion**: Receiver remains available for any delayed claims
 
@@ -295,7 +295,6 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 - **Batch Isolation**: Each receiver handles exactly one batch, preventing cross-contamination
 - **Immutable Authorization**: kMinter address set at construction, cannot be changed
-- **Batch ID Validation**: All operations require correct batch ID to prevent operational errors
 - **Emergency Recovery**: `rescueAssets()` for accidentally sent tokens (excluding protocol assets and kTokens)
 
 **Gas Efficiency**: Minimal proxy pattern reduces deployment costs by ~90% compared to full contract deployment per batch.

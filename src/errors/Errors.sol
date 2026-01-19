@@ -62,7 +62,6 @@ string constant BASEVAULT_NOT_INITIALIZED = "BV5";
 
 // kBatchReceiver Errors
 string constant KBATCHRECEIVER_ALREADY_INITIALIZED = "B1";
-string constant KBATCHRECEIVER_INVALID_BATCH_ID = "B2";
 string constant KBATCHRECEIVER_ONLY_KMINTER = "B3";
 string constant KBATCHRECEIVER_TRANSFER_FAILED = "B4";
 string constant KBATCHRECEIVER_WRONG_ASSET = "B5";
