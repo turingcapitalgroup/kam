@@ -136,7 +136,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, lastFeesChargedManagement, lastFeesChargedPerformance)`
    - Contract automatically calculates: `netted = deposited - requested`, then `yield = totalAssets - netted - lastTotalAssets`
-   - Validates yield against tolerance limits (default 10% in basis points)
+   - Validates yield against configurable tolerance limits
    - Creates proposal with mandatory cooldown period (default 1 hour, max 1 day)
    - Records fee timestamps for vault fee tracking synchronization
 2. **Cooldown Phase**: Guardian oversight period

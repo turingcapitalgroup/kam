@@ -120,9 +120,9 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
    - `profit` = whether yield is positive or negative
    - Emits `YieldExceedsMaxDeltaWarning` if yield exceeds configured threshold (warning only, does not revert)
 
-2. **Cooldown Phase**: Mandatory waiting period (configurable 0-24 hours, default 1 hour) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds configured threshold (default 10%, max 50% in basis points), a warning event is emitted and the proposal is flagged as requiring approval (`requiresApproval = true`). Guardians must monitor for these warnings and either cancel suspicious proposals or approve legitimate high-yield proposals via `acceptProposal()`.
+2. **Cooldown Phase**: Mandatory waiting period (configurable, up to 24 hours) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds the configured threshold, a warning event is emitted and the proposal is flagged as requiring approval (`requiresApproval = true`). Guardians must monitor for these warnings and either cancel suspicious proposals or approve legitimate high-yield proposals via `acceptProposal()`.
 
-3. **Approval Phase** (conditional): If the proposal's yield exceeded the tolerance threshold, a guardian must call `acceptProposal()` before execution. This prevents automatic execution of potentially anomalous settlements while allowing legitimate high-yield batches to proceed after review.
+3. **Approval Phase** (conditional): Guardian calls `acceptProposal()` if required by high yield delta.
 
 4. **Execution Phase**: After cooldown (and approval if required), anyone calls `executeSettleBatch()` to complete settlement
 
@@ -308,11 +308,11 @@ During settlement execution, the system handles kMinter versus regular vault set
 │  └──────────────┘      └──────────────┘       └──────────────┘      └──────────────┘    │
 │        ↓                                              │                                  │
 │ ┌──────────────┐                            Phase 3 is only required                    │
-│ │ kAssetRouter │  Contract calculates:      when yield > maxAllowedDelta                │
+│ │ kAssetRouter │  Contract calculates:      when |yield| > maxAllowedDelta              │
 │ │              │  • netted = deposited - requested                                      │
 │ │              │  • yield = totalAssets - netted - lastTotalAssets                      │
 │ │              │  • profit = yield > 0                                                  │
-│ │              │  • requiresApproval = (yield > tolerance)                              │
+│ │              │  • requiresApproval = (|yield| > tolerance)                            │
 │ └──────────────┘                                                                        │
 └──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -510,7 +510,7 @@ The two-phase commit system provides multiple safeguards:
 
 - Mandatory cooldown period (1hr default, max 1 day)
 - Guardian-only proposal cancellation during cooldown
-- High-yield-delta approval system: Proposals exceeding yield tolerance (default 10%) require explicit guardian approval via `acceptProposal()` before execution
+- High-yield-delta approval system: Proposals exceeding yield tolerance require explicit guardian approval via `acceptProposal()` before execution
 - `canExecuteProposal()` returns specific reasons for blocked proposals (cooldown pending, requires approval, cancelled, already executed)
 - On-chain validation of all settlement parameters
 
