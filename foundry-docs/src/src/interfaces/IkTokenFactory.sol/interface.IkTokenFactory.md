@@ -1,5 +1,5 @@
 # IkTokenFactory
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/IkTokenFactory.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IkTokenFactory.sol)
 
 Interface for kToken factory contract
 

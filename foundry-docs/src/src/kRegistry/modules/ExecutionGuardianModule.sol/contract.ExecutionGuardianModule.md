@@ -1,5 +1,5 @@
 # ExecutionGuardianModule
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kRegistry/modules/ExecutionGuardianModule.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kRegistry/modules/ExecutionGuardianModule.sol)
 
 **Inherits:**
 [IExecutionGuardian](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
@@ -258,6 +258,8 @@ struct ExecutionGuardianModuleStorage {
     mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) executorTargets;
     /// @dev Maps the type of each target
     mapping(address => uint8 targetType) targetType;
+    /// @dev Counts allowed selectors per executor-target pair for accurate target tracking
+    mapping(address => mapping(address => uint256)) executorTargetSelectorCount;
 }
 ```
 

@@ -1,5 +1,5 @@
 # IVaultReader
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/modules/IVaultReader.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/modules/IVaultReader.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -295,7 +295,9 @@ function getBatchIdInfo(bytes32 batchId)
         uint256 netSharePrice,
         uint256 totalAssets_,
         uint256 totalNetAssets_,
-        uint256 totalSupply_
+        uint256 totalSupply_,
+        uint256 depositedInBatch,
+        uint256 requestedSharesInBatch
     );
 ```
 **Parameters**
@@ -316,6 +318,8 @@ function getBatchIdInfo(bytes32 batchId)
 |`totalAssets_`|`uint256`|Total assets of settlement|
 |`totalNetAssets_`|`uint256`|Total net assets of settlement|
 |`totalSupply_`|`uint256`|Total shares supply settlement|
+|`depositedInBatch`|`uint256`|Amount of assets deposited in this batch|
+|`requestedSharesInBatch`|`uint256`|Amount of shares requested for unstaking in this batch|
 
 
 ### getBatchReceiver
@@ -640,6 +644,21 @@ function getTotalPendingStake() external view returns (uint256);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`uint256`|Total pending stake amount|
+
+
+### getTotalPendingUnstake
+
+Returns the total pending unstake amount (claimable kTokens for settled unstake requests)
+
+
+```solidity
+function getTotalPendingUnstake() external view returns (uint256);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|Total pending unstake amount|
 
 
 ### isClosed

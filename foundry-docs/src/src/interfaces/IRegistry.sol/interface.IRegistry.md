@@ -1,5 +1,5 @@
 # IRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/IRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IRegistry.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -92,6 +92,28 @@ function registerAsset(
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`address`|The deployed kToken contract address|
+
+
+### removeAsset
+
+Removes a registered asset from the protocol
+
+This function deregisters an asset and cleans up all associated storage mappings. Critical safety checks
+ensure the asset cannot be removed if any vaults still reference it (vaultsByAsset must be empty).
+This prevents orphaned state where vaults reference a non-existent asset. Clears: supportedAssets set,
+maxMintPerBatch, maxBurnPerBatch, assetToKToken mapping, and assetHurdleRate. Note that the kToken contract
+remains deployed but becomes orphaned - this is intentional as existing kToken holders should retain their
+tokens. Only callable by ADMIN_ROLE.
+
+
+```solidity
+function removeAsset(address asset) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`asset`|`address`|The asset address to remove from the protocol|
 
 
 ### registerVault
@@ -578,6 +600,29 @@ function isVault(address vault) external view returns (bool);
 |`<none>`|`bool`|True if vault is registered|
 
 
+### isKToken
+
+Checks if an address is a protocol kToken
+
+Uses kTokenToAsset reverse mapping for O(1) lookup
+
+
+```solidity
+function isKToken(address kToken) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`kToken`|`address`|The address to verify|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if address is a registered kToken|
+
+
 ### getAdapter
 
 Gets the adapter registered for a specific vault and asset
@@ -712,8 +757,10 @@ function getTreasury() external view returns (address);
 
 Sets the hurdle rate for a specific asset
 
-Only relayer can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
+Only admin can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
 Asset must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
+A hurdle rate of 0 is valid and means performance fees will be charged on all positive yield with no minimum
+threshold.
 
 
 ```solidity
@@ -724,7 +771,7 @@ function setHurdleRate(address asset, uint16 hurdleRate) external payable;
 |Name|Type|Description|
 |----|----|-----------|
 |`asset`|`address`|The asset address to set hurdle rate for|
-|`hurdleRate`|`uint16`|The hurdle rate in basis points (100 = 1%)|
+|`hurdleRate`|`uint16`|The hurdle rate in basis points (100 = 1%), 0 means no minimum threshold|
 
 
 ### getHurdleRate
@@ -944,69 +991,73 @@ function getSettlementConfig()
 |`insuranceBps`|`uint16`|The insurance fee in basis points|
 
 
-### setAssetBatchLimits
+### setBatchLimits
 
-Sets maximum mint and redeem amounts per batch for an asset
+Sets maximum mint/deposit and redeem/withdraw amounts per batch for an asset or vault
 
-Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume assets.
+Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume operations.
+Setting a limit to 0 effectively disables minting/burning or deposits/withdrawals for the target.
+Setting a limit to type(uint128).max or higher effectively removes the limit.
+Limits should be set considering the target's decimals and expected volumes.
+Target must be either a registered asset (for kMinter limits) or a registered vault (for kStakingVault limits).
 
 
 ```solidity
-function setAssetBatchLimits(address asset, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
+function setBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_) external payable;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset`|`address`|The asset address to set limits for|
-|`maxMintPerBatch_`|`uint256`|Maximum amount of the asset that can be minted in a single batch|
-|`maxBurnPerBatch_`|`uint256`|Maximum amount of the asset that can be redeemed in a single batch|
+|`target`|`address`|The asset or vault address to set limits for|
+|`maxMintPerBatch_`|`uint256`|Maximum amount per batch for minting (asset) or deposits (vault), 0 to disable|
+|`maxBurnPerBatch_`|`uint256`|Maximum amount per batch for burning (asset) or withdrawals (vault), 0 to disable|
 
 
 ### getMaxMintPerBatch
 
-Gets the maximum mint amount per batch for an asset
+Gets the maximum mint/deposit amount per batch for an asset or vault
 
-Used to enforce minting limits for liquidity and risk management. Reverts if asset not registered.
+Used to enforce minting/deposit limits for liquidity and risk management.
 
 
 ```solidity
-function getMaxMintPerBatch(address asset) external view returns (uint256);
+function getMaxMintPerBatch(address target) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset`|`address`|The asset address to query|
+|`target`|`address`|The asset or vault address to query|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|The maximum mint amount per batch|
+|`<none>`|`uint256`|The maximum mint/deposit amount per batch|
 
 
 ### getMaxBurnPerBatch
 
-Gets the maximum redeem amount per batch for an asset
+Gets the maximum burn/withdraw amount per batch for an asset or vault
 
-Used to enforce redemption limits for liquidity and risk management. Reverts if asset not registered.
+Used to enforce burn/withdrawal limits for liquidity and risk management.
 
 
 ```solidity
-function getMaxBurnPerBatch(address asset) external view returns (uint256);
+function getMaxBurnPerBatch(address target) external view returns (uint256);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset`|`address`|The asset address to query|
+|`target`|`address`|The asset or vault address to query|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|The maximum redeem amount per batch|
+|`<none>`|`uint256`|The maximum burn/withdraw amount per batch|
 
 
 ## Events
@@ -1055,21 +1106,21 @@ event VaultRemoved(address indexed vault);
 |----|----|-----------|
 |`vault`|`address`|The vault contract address being removed|
 
-### AssetBatchLimitsUpdated
-Emitted when an asset and its kToken are registered
+### BatchLimitsUpdated
+Emitted when batch limits are updated for an asset or vault
 
 
 ```solidity
-event AssetBatchLimitsUpdated(address indexed asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch);
+event BatchLimitsUpdated(address indexed target, uint256 maxMintPerBatch, uint256 maxBurnPerBatch);
 ```
 
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset`|`address`|The underlying asset address|
-|`maxMintPerBatch`|`uint256`|the max mint amount per batch|
-|`maxBurnPerBatch`|`uint256`|the max burn amount per batch|
+|`target`|`address`|The asset or vault address|
+|`maxMintPerBatch`|`uint256`|The max mint/deposit amount per batch|
+|`maxBurnPerBatch`|`uint256`|The max burn/withdraw amount per batch|
 
 ### AssetRegistered
 Emitted when an asset and its kToken are registered
@@ -1099,6 +1150,20 @@ event AssetSupported(address indexed asset);
 |Name|Type|Description|
 |----|----|-----------|
 |`asset`|`address`|The newly supported asset address|
+
+### AssetRemoved
+Emitted when an asset is removed from the protocol
+
+
+```solidity
+event AssetRemoved(address indexed asset);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`asset`|`address`|The asset address being removed|
 
 ### AdapterRegistered
 Emitted when an adapter is registered for a vault

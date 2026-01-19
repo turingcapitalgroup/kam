@@ -1,5 +1,5 @@
 # BaseVaultTypes
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kStakingVault/types/BaseVaultTypes.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kStakingVault/types/BaseVaultTypes.sol)
 
 Library containing all data structures used in the ModuleBase
 
@@ -67,6 +67,8 @@ struct BatchInfo {
     uint128 depositedInBatch;
     /// @notice Amount of assets withdrawn in a batch
     uint128 withdrawnInBatch;
+    /// @notice Amount of shares requested for unstaking in a batch
+    uint128 requestedSharesInBatch;
     /// @notice Total assets at settlement time (gross, including fees)
     uint256 totalAssets;
     /// @notice Total net assets at settlement time (after fees)

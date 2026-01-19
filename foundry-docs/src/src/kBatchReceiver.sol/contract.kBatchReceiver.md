@@ -1,5 +1,5 @@
 # kBatchReceiver
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kBatchReceiver.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kBatchReceiver.sol)
 
 **Inherits:**
 [IkBatchReceiver](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkBatchReceiver.sol/interface.IkBatchReceiver.md)
@@ -125,15 +125,14 @@ function initialize(bytes32 _batchId, address _asset) external;
 Transfers settled assets from the receiver to a redemption user completing their withdrawal
 
 This is the core asset distribution function that fulfills redemption requests after batch settlement.
-The process works as follows: (1) kMinter calls this function with user's proportional share, (2) receiver
-validates the batch ID matches to prevent cross-batch contamination, (3) assets are transferred directly
-to the user completing their redemption. Only callable by the authorized kMinter contract to maintain strict
-access control. This function is typically called multiple times per batch as individual users claim their
-settled redemptions, ensuring fair and orderly asset distribution.
+The process works as follows: (1) kMinter calls this function with user's proportional share, (2) assets
+are transferred directly to the user completing their redemption. Only callable by the authorized kMinter
+contract to maintain strict access control. This function is typically called multiple times per batch as
+individual users claim their settled redemptions, ensuring fair and orderly asset distribution.
 
 
 ```solidity
-function pullAssets(address _receiver, uint256 _amount, bytes32 _batchId) external;
+function pullAssets(address _receiver, uint256 _amount) external;
 ```
 **Parameters**
 
@@ -141,7 +140,6 @@ function pullAssets(address _receiver, uint256 _amount, bytes32 _batchId) extern
 |----|----|-----------|
 |`_receiver`|`address`||
 |`_amount`|`uint256`||
-|`_batchId`|`bytes32`|The batch identifier for validation (must match this receiver's configured batch)|
 
 
 ### rescueAssets

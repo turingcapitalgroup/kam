@@ -1,5 +1,5 @@
 # VaultAdapter
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/adapters/VaultAdapter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/adapters/VaultAdapter.sol)
 
 **Inherits:**
 [SmartAdapterAccount](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/adapters/SmartAdapterAccount.sol/contract.SmartAdapterAccount.md), [IVaultAdapter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md)
@@ -171,26 +171,6 @@ function _checkRouter(
     internal
     view;
 ```
-
-### _checkVaultCanCallSelector
-
-Validates that a vault can call a specific selector on a target
-
-This function enforces the new vault-specific permission model where each vault
-has granular permissions for specific functions on specific targets. This replaces
-the old global allowedTargets approach with better security isolation.
-
-
-```solidity
-function _checkVaultCanCallSelector(address _target, bytes4 _selector) internal view;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_target`|`address`|The target contract to be called|
-|`_selector`|`bytes4`|The function selector being called|
-
 
 ### _checkZeroAddress
 

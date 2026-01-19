@@ -1,5 +1,5 @@
 # IVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/IVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IVault.sol)
 
 **Inherits:**
 [IERC2771](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVaultBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
@@ -144,10 +144,18 @@ function setTrustedForwarder(address trustedForwarder_) external;
 
 ## Events
 ### BatchCreated
+Emitted when a new batch is created
+
 
 ```solidity
 event BatchCreated(bytes32 indexed batchId);
 ```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`batchId`|`bytes32`|The batch ID of the new batch|
 
 ### BatchSettled
 Emitted when a batch is settled
@@ -162,6 +170,22 @@ event BatchSettled(bytes32 indexed batchId);
 |Name|Type|Description|
 |----|----|-----------|
 |`batchId`|`bytes32`|The batch ID of the settled batch|
+
+### UnstakeSharesBurned
+Emitted when unstake shares are burned at settlement time
+
+
+```solidity
+event UnstakeSharesBurned(bytes32 indexed batchId, uint256 totalSharesBurned, uint256 claimableKTokens);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`batchId`|`bytes32`|The batch ID|
+|`totalSharesBurned`|`uint256`|Total shares burned (including fee shares)|
+|`claimableKTokens`|`uint256`|Total kTokens claimable by users (net of fees)|
 
 ### BatchClosed
 Emitted when a batch is closed
@@ -258,21 +282,6 @@ event HardHurdleRateSet(bool isHard);
 |----|----|-----------|
 |`isHard`|`bool`|True for hard hurdle, false for soft hurdle|
 
-### FeesAssessed
-Emitted when fees are charged to the vault
-
-
-```solidity
-event FeesAssessed(uint256 managementFees, uint256 performanceFees);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`managementFees`|`uint256`|Amount of management fees collected|
-|`performanceFees`|`uint256`|Amount of performance fees collected|
-
 ### ManagementFeesCharged
 Emitted when management fees are charged
 
@@ -355,20 +364,6 @@ event StakeRequestCreated(
 |`amount`|`uint256`|The amount of kTokens requested|
 |`recipient`|`address`|The address to which the kTokens will be sent|
 |`batchId`|`bytes32`|The batch ID associated with the request|
-
-### StakeRequestRedeemed
-Emitted when a stake request is redeemed
-
-
-```solidity
-event StakeRequestRedeemed(bytes32 indexed requestId);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`requestId`|`bytes32`|The unique identifier of the stake request|
 
 ### UnstakeRequestCreated
 Emitted when an unstake request is created

@@ -1,5 +1,5 @@
 # kStakingVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kStakingVault/kStakingVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kStakingVault/kStakingVault.sol)
 
 **Inherits:**
 [IVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
@@ -93,9 +93,9 @@ function requestStake(address _owner, address _to, uint256 _amount) external pay
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_owner`|`address`|The address that owns this stake request and can claim the resulting shares|
-|`_to`|`address`|The recipient address that will receive the stkTokens after successful settlement and claiming|
-|`_amount`|`uint256`|The quantity of kTokens to stake (must not exceed user balance, cannot be zero)|
+|`_owner`|`address`||
+|`_to`|`address`||
+|`_amount`|`uint256`||
 
 **Returns**
 
@@ -143,11 +143,11 @@ Claims stkTokens from a settled staking batch at the finalized share price
 This function completes the staking process by distributing stkTokens to users after batch settlement.
 Process: (1) Validates batch has been settled and share prices are finalized to ensure accurate distribution,
 (2) Verifies request ownership and pending status to prevent unauthorized or duplicate claims, (3) Calculates
-stkToken amount based on original kToken deposit and settled net share price (after fees), (4) Mints stkTokens
-to specified recipient reflecting their proportional vault ownership, (5) Marks request as claimed to prevent
-future reprocessing. The net share price accounts for management and performance fees, ensuring users receive
-their accurate yield-adjusted position. stkTokens are ERC20-compatible shares that continue accruing yield
-through share price appreciation until unstaking.
+stkToken amount based on original kToken deposit and settled net share price (after fees), (4) Transfers
+pre-minted stkTokens from vault to recipient (shares were minted to vault during settlement), (5) Marks
+request as claimed to prevent future reprocessing. The net share price accounts for management and performance
+fees, ensuring users receive their accurate yield-adjusted position. stkTokens are ERC20-compatible shares that
+continue accruing yield through share price appreciation until unstaking.
 
 
 ```solidity
@@ -235,15 +235,16 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 ### settleBatch
 
-Marks a batch as settled after yield distribution and enables user claiming
+Marks a batch as settled after yield distribution, mints shares for pending stakers, and enables claiming
 
-This function finalizes batch settlement by recording final asset values and enabling claims. Process:
-(1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Snapshots both
-gross and net share prices at settlement time for accurate reward calculations, (3) Marks batch as settled
-enabling users to claim their staked shares or unstaked assets, (4) Completes the batch lifecycle allowing
-reward distribution through the claiming mechanism. Only kAssetRouter can settle batches as it coordinates
-yield calculations across DN vaults and manages cross-vault asset flows. Settlement triggers share price
-finalization based on vault performance during the batch period.
+This function finalizes batch settlement by recording final asset values, minting shares, and enabling claims.
+Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Snapshots both
+gross and net share prices at settlement time for accurate reward calculations, (3) Mints stkTokens for all pending
+stakers in this batch to the vault itself at the settlement share price (clearing totalPendingStake for this batch),
+(4) Marks batch as settled enabling users to claim their staked shares or unstaked assets, (5) Completes the batch
+lifecycle allowing reward distribution through the claiming mechanism. Only kAssetRouter can settle batches as it
+coordinates yield calculations across DN vaults and manages cross-vault asset flows. The pre-minting approach ensures
+share prices are locked at settlement and users receive shares via transfer (not mint) when they claim.
 
 
 ```solidity
@@ -254,23 +255,6 @@ function settleBatch(bytes32 _batchId) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`_batchId`|`bytes32`|The batch identifier to mark as settled (must be closed, not previously settled)|
-
-
-### burnFees
-
-Burns shares from the vault for fees adjusting
-
-This function is only callable by the admin
-
-
-```solidity
-function burnFees(uint256 _shares) external;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_shares`|`uint256`||
 
 
 ### _createNewBatch

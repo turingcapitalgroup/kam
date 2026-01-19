@@ -1,5 +1,5 @@
 # IVaultFees
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/interfaces/IVaultFees.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IVaultFees.sol)
 
 Interface for vault fee management including performance and management fees with hurdle rate mechanisms
 
@@ -130,22 +130,5 @@ function notifyPerformanceFeesCharged(uint64 _timestamp) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`_timestamp`|`uint64`|The timestamp when performance fees were processed (must be >= last timestamp, <= current time)|
-
-
-### burnFees
-
-Burns shares from the vault for fees adjusting
-
-This function is only callable by the admin
-
-
-```solidity
-function burnFees(uint256 shares) external;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`shares`|`uint256`|The amount of shares to burn|
 
 

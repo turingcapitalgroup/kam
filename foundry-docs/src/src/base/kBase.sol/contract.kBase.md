@@ -1,5 +1,5 @@
 # kBase
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/base/kBase.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/base/kBase.sol)
 
 **Inherits:**
 [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md)
@@ -158,53 +158,6 @@ function _registry() internal view returns (IRegistry);
 |`<none>`|`IRegistry`|IRegistry interface for registry interaction|
 
 
-### _getBatchId
-
-Gets the current batch ID for a given vault
-
-Reverts if vault not registered
-
-
-```solidity
-function _getBatchId(address _vault) internal view returns (bytes32 _batchId);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_vault`|`address`|The vault address|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_batchId`|`bytes32`|The current batch ID|
-
-
-### _getBatchReceiver
-
-Gets the current batch receiver for a given batchId
-
-Reverts if vault not registered
-
-
-```solidity
-function _getBatchReceiver(address _vault, bytes32 _batchId) internal view returns (address _batchReceiver);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_vault`|`address`|The vault address|
-|`_batchId`|`bytes32`|The batch ID|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_batchReceiver`|`address`|The address of the batchReceiver where tokens will be sent|
-
-
 ### _getKMinter
 
 Gets the kMinter singleton contract address
@@ -260,52 +213,6 @@ function _getKTokenForAsset(address _asset) internal view returns (address _kTok
 |Name|Type|Description|
 |----|----|-----------|
 |`_kToken`|`address`|The corresponding kToken address|
-
-
-### _getVaultAssets
-
-Gets the asset managed by a vault
-
-Reverts if vault not registered
-
-
-```solidity
-function _getVaultAssets(address _vault) internal view returns (address[] memory _assets);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_vault`|`address`|The vault address|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_assets`|`address[]`|The asset address managed by the vault|
-
-
-### _getDNVaultByAsset
-
-Gets the DN vault address for a given asset
-
-Reverts if asset not supported
-
-
-```solidity
-function _getDNVaultByAsset(address _asset) internal view returns (address _vault);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_asset`|`address`|The asset address|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_vault`|`address`|The corresponding DN vault address|
 
 
 ### _isAdmin
@@ -511,6 +418,27 @@ function _isAsset(address _asset) internal view returns (bool);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`bool`|Whether the asset is registered|
+
+
+### _isKToken
+
+Checks if an address is a protocol kToken
+
+
+```solidity
+function _isKToken(address _kToken) internal view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_kToken`|`address`|The address to check|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|Whether the address is a registered kToken|
 
 
 ## Events

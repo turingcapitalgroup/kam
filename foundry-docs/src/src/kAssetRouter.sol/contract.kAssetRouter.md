@@ -1,5 +1,5 @@
 # kAssetRouter
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kAssetRouter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kAssetRouter.sol)
 
 **Inherits:**
 [IkAssetRouter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.IkAssetRouter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
@@ -218,30 +218,6 @@ function kSharesRequestPush(address _sourceVault, uint256 _amount, bytes32 _batc
 |`_batchId`|`bytes32`||
 
 
-### kSharesRequestPull
-
-Requests shares to be pulled for kStakingVault redemption operations
-
-This function handles the share-based redemption process for retail users withdrawing from
-kStakingVaults. The process involves: (1) calculating share amounts to redeem based on user
-requests, (2) preparing for conversion back to kTokens at settlement time, (3) coordinating
-with the batch settlement system for fair pricing. Unlike institutional redemptions through
-kMinter, this uses share-based accounting to handle smaller, more frequent retail operations
-efficiently through the vault's batch processing system.
-
-
-```solidity
-function kSharesRequestPull(address _sourceVault, uint256 _amount, bytes32 _batchId) external payable;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_sourceVault`|`address`||
-|`_amount`|`uint256`||
-|`_batchId`|`bytes32`||
-
-
 ### proposeSettleBatch
 
 Proposes a batch settlement for a vault with yield distribution through kToken minting/burning
@@ -314,6 +290,25 @@ protocol's 1:1 backing guarantee. Only callable before the proposal execution.
 
 ```solidity
 function cancelProposal(bytes32 _proposalId) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_proposalId`|`bytes32`||
+
+
+### acceptProposal
+
+Accepts a high-delta settlement proposal for execution
+
+Required for proposals where yield exceeded maxAllowedDelta threshold. This provides an extra
+security layer by requiring explicit guardian approval before executing potentially risky settlements.
+Only callable by guardians. The proposal must still pass the cooldown check during execution.
+
+
+```solidity
+function acceptProposal(bytes32 _proposalId) external;
 ```
 **Parameters**
 
@@ -464,6 +459,54 @@ function canExecuteProposal(bytes32 _proposalId) external view returns (bool _ca
 |`_reason`|`string`|reason Descriptive message explaining why execution is blocked (if applicable)|
 
 
+### isProposalPending
+
+Checks if a settlement proposal is still pending (not cancelled or executed)
+
+Returns true only if the proposal exists and is in the pending queue.
+Use this for simple boolean state checks without detailed reason strings.
+
+
+```solidity
+function isProposalPending(bytes32 _proposalId) external view returns (bool _isPending);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_proposalId`|`bytes32`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_isPending`|`bool`|isPending True if the proposal is pending, false if cancelled, executed, or non-existent|
+
+
+### isProposalAccepted
+
+Checks if a high-delta settlement proposal has been accepted by a guardian
+
+Returns true if the proposal required approval and has been accepted via acceptProposal.
+For proposals that don't require approval (yield within threshold), this returns false.
+
+
+```solidity
+function isProposalAccepted(bytes32 _proposalId) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_proposalId`|`bytes32`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if the proposal has been explicitly accepted by a guardian|
+
+
 ### getSettlementCooldown
 
 Gets the current security cooldown period for settlement proposals
@@ -506,12 +549,11 @@ function getMaxAllowedDelta() external view returns (uint256);
 
 ### virtualBalance
 
-Retrieves the virtual balance of assets for a vault across all its adapters
+Retrieves the virtual balance of assets for a vault's adapter
 
-This function aggregates asset balances across all adapters connected to a vault to determine
-the total virtual balance available for operations. Essential for coordination between physical
-asset locations and protocol accounting. Used for settlement calculations and ensuring sufficient
-assets are available for redemptions and transfers within the money flow system.
+Retrieves the total assets from the single adapter registered for this vault-asset pair.
+Essential for coordination between physical asset locations and protocol accounting.
+Used for settlement calculations and ensuring sufficient assets are available for redemptions.
 
 
 ```solidity
@@ -528,17 +570,16 @@ function virtualBalance(address _vault, address _asset) external view returns (u
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|balance The total virtual asset balance across all vault adapters|
+|`<none>`|`uint256`|balance The total virtual asset balance from the vault's adapter|
 
 
 ### _virtualBalance
 
-Calculates the virtual balance of assets for a vault across all its adapters
+Calculates the virtual balance of assets for a vault's adapter
 
-This function aggregates asset balances across all adapters connected to a vault to determine
-the total virtual balance available for operations. Essential for coordination between physical
-asset locations and protocol accounting. Used for settlement calculations and ensuring sufficient
-assets are available for redemptions and transfers within the money flow system.
+Retrieves the total assets from the single adapter registered for this vault-asset pair.
+Essential for coordination between physical asset locations and protocol accounting.
+Used for settlement calculations and ensuring sufficient assets are available for redemptions.
 
 
 ```solidity
@@ -549,13 +590,13 @@ function _virtualBalance(address _vault, address _asset) private view returns (u
 |Name|Type|Description|
 |----|----|-----------|
 |`_vault`|`address`|The vault address to calculate virtual balance for|
-|`_asset`|`address`||
+|`_asset`|`address`|The asset address to query balance for|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_balance`|`uint256`|The total virtual asset balance across all vault adapters|
+|`_balance`|`uint256`|The total virtual asset balance from the vault's adapter|
 
 
 ### _checkKMinter
@@ -578,10 +619,10 @@ function _checkKMinter(address _user) private view;
 
 ### _checkVault
 
-Validates that the caller is an authorized kStakingVault contract
+Validates that the caller is an authorized kStakingVault contract (not kMinter)
 
-Ensures only registered vaults can request share operations and asset transfers.
-Essential for maintaining protocol security and preventing unauthorized money flows.
+Ensures only registered staking vaults can request share operations and asset transfers.
+Excludes kMinter which has no legitimate use case for these functions.
 
 
 ```solidity
@@ -591,7 +632,7 @@ function _checkVault(address _user) private view;
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_user`|`address`|Address to validate as authorized vault|
+|`_user`|`address`|Address to validate as authorized staking vault|
 
 
 ### _checkAmountNotZero
@@ -908,12 +949,10 @@ struct kAssetRouterStorage {
     OptimizedBytes32EnumerableSetLib.Bytes32Set batchIds;
     /// @dev Maps each vault to its set of pending settlement proposal IDs awaiting execution
     mapping(address vault => OptimizedBytes32EnumerableSetLib.Bytes32Set) vaultPendingProposalIds;
-    /// @dev Virtual balance tracking for each vault-batch combination (deposited/requested amounts)
-    mapping(address account => mapping(bytes32 batchId => Balances)) vaultBatchBalances;
-    /// @dev Tracks requested shares for each vault-batch combination in share-based accounting
-    mapping(address vault => mapping(bytes32 batchId => uint256)) vaultRequestedShares;
     /// @dev Complete settlement proposal data indexed by unique proposal ID
     mapping(bytes32 proposalId => VaultSettlementProposal) settlementProposals;
+    /// @dev Tracks which high-delta proposals have been accepted by guardians
+    mapping(bytes32 proposalId => bool) acceptedProposals;
 }
 ```
 

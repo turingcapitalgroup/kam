@@ -1,5 +1,5 @@
 # kRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/802f4f9985ce14e660adbf13887a74e121b80291/src/kRegistry/kRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kRegistry/kRegistry.sol)
 
 **Inherits:**
 [IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
@@ -293,8 +293,10 @@ function isGlobalPaused() external view returns (bool);
 
 Sets the hurdle rate for a specific asset
 
-Only relayer can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
+Only admin can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
 Asset must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
+A hurdle rate of 0 is valid and means performance fees will be charged on all positive yield with no minimum
+threshold.
 
 
 ```solidity
@@ -331,21 +333,25 @@ function rescueAssets(address _asset, address _to, uint256 _amount) external pay
 |`_amount`|`uint256`||
 
 
-### setAssetBatchLimits
+### setBatchLimits
 
-Sets maximum mint and redeem amounts per batch for an asset
+Sets maximum mint/deposit and redeem/withdraw amounts per batch for an asset or vault
 
-Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume assets.
+Only callable by ADMIN_ROLE. Helps manage liquidity and risk for high-volume operations.
+Setting a limit to 0 effectively disables minting/burning or deposits/withdrawals for the target.
+Setting a limit to type(uint128).max or higher effectively removes the limit.
+Limits should be set considering the target's decimals and expected volumes.
+Target must be either a registered asset (for kMinter limits) or a registered vault (for kStakingVault limits).
 
 
 ```solidity
-function setAssetBatchLimits(address _asset, uint256 _maxMintPerBatch, uint256 _maxBurnPerBatch) external payable;
+function setBatchLimits(address _target, uint256 _maxMintPerBatch, uint256 _maxBurnPerBatch) external payable;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_asset`|`address`||
+|`_target`|`address`||
 |`_maxMintPerBatch`|`uint256`||
 |`_maxBurnPerBatch`|`uint256`||
 
@@ -390,6 +396,28 @@ function registerAsset(
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`address`|The deployed kToken contract address|
+
+
+### removeAsset
+
+Removes a registered asset from the protocol
+
+This function deregisters an asset and cleans up all associated storage mappings. Critical safety checks
+ensure the asset cannot be removed if any vaults still reference it (vaultsByAsset must be empty).
+This prevents orphaned state where vaults reference a non-existent asset. Clears: supportedAssets set,
+maxMintPerBatch, maxBurnPerBatch, assetToKToken mapping, and assetHurdleRate. Note that the kToken contract
+remains deployed but becomes orphaned - this is intentional as existing kToken holders should retain their
+tokens. Only callable by ADMIN_ROLE.
+
+
+```solidity
+function removeAsset(address _asset) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_asset`|`address`||
 
 
 ### registerVault
@@ -476,9 +504,9 @@ function removeAdapter(address _vault, address _asset, address _adapter) externa
 
 ### getMaxMintPerBatch
 
-Gets the maximum mint amount per batch for an asset
+Gets the maximum mint/deposit amount per batch for an asset or vault
 
-Used to enforce minting limits for liquidity and risk management. Reverts if asset not registered.
+Used to enforce minting/deposit limits for liquidity and risk management.
 
 
 ```solidity
@@ -494,14 +522,14 @@ function getMaxMintPerBatch(address _asset) external view returns (uint256);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|The maximum mint amount per batch|
+|`<none>`|`uint256`|The maximum mint/deposit amount per batch|
 
 
 ### getMaxBurnPerBatch
 
-Gets the maximum redeem amount per batch for an asset
+Gets the maximum burn/withdraw amount per batch for an asset or vault
 
-Used to enforce redemption limits for liquidity and risk management. Reverts if asset not registered.
+Used to enforce burn/withdrawal limits for liquidity and risk management.
 
 
 ```solidity
@@ -517,7 +545,7 @@ function getMaxBurnPerBatch(address _asset) external view returns (uint256);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|The maximum redeem amount per batch|
+|`<none>`|`uint256`|The maximum burn/withdraw amount per batch|
 
 
 ### getHurdleRate
@@ -985,6 +1013,29 @@ function isVault(address _vault) external view returns (bool);
 |`<none>`|`bool`|True if vault is registered|
 
 
+### isKToken
+
+Checks if an address is a protocol kToken
+
+Uses kTokenToAsset reverse mapping for O(1) lookup
+
+
+```solidity
+function isKToken(address _kToken) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_kToken`|`address`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if address is a registered kToken|
+
+
 ### getAdapter
 
 Gets the adapter registered for a specific vault and asset
@@ -1302,19 +1353,19 @@ struct kRegistryStorage {
     mapping(address => mapping(uint8 vaultType => address)) assetToVault;
     /// @dev Maps vault addresses to sets of assets they manage
     /// Supports multi-asset vaults (e.g., kMinter managing multiple assets)
-    mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) vaultAsset;
+    mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) vaultAssets;
     /// @dev Reverse lookup: maps assets to all vaults that support them
     /// Enables finding all vaults that can handle a specific asset
     mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) vaultsByAsset;
     /// @dev Maps underlying asset addresses to their corresponding kToken addresses
     /// Critical for minting/redemption operations and asset tracking
     mapping(address => address) assetToKToken;
+    /// @dev Reverse lookup: maps kToken addresses back to their underlying assets
+    /// Enables O(1) validation that an address is a protocol kToken
+    mapping(address => address) kTokenToAsset;
     /// @dev Maps vaults to their registered external protocol adapters
     /// Enables yield strategies through DeFi protocol integrations
     mapping(address => mapping(address => address)) vaultAdaptersByAsset;
-    /// @dev Tracks whether an adapter address is registered in the protocol
-    /// Used for validation and security checks on adapter operations
-    mapping(address => bool) registeredAdapters;
     /// @dev Maps assets to their hurdle rates in basis points (100 = 1%)
     /// Defines minimum performance thresholds for yield distribution
     mapping(address => uint16) assetHurdleRate;
