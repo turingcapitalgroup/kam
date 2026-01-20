@@ -122,6 +122,13 @@ interface IkAssetRouter is IVersioned {
     /// @param amount The quantity of assets deposited
     event Deposited(address indexed vault, address indexed asset, uint256 amount);
 
+    /// @notice Emitted when assets are withdrawn from a vault through settlement
+    /// @dev Tracks net withdrawals when more redemptions than deposits occur in a batch
+    /// @param vault The vault address from which assets are withdrawn
+    /// @param asset The underlying asset address being withdrawn
+    /// @param amount The quantity of assets withdrawn
+    event Withdrawn(address indexed vault, address indexed asset, uint256 amount);
+
     /// @notice Emitted when a new settlement proposal is created with cooldown period
     /// @dev Begins the settlement process with a security cooldown to allow verification
     /// @param proposalId The unique identifier for this settlement proposal

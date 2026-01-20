@@ -468,6 +468,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 // casting to 'uint256' is safe because _netted is positive in this branch
                 // forge-lint: disable-next-line(unsafe-typecast)
                 emit Deposited(_vault, _asset, uint256(_netted));
+            } else if (_netted < 0) {
+                // casting to 'uint256' is safe because -_netted is positive in this branch
+                // forge-lint: disable-next-line(unsafe-typecast)
+                emit Withdrawn(_vault, _asset, uint256(-_netted));
             }
 
             // Mark batch as settled in the vault
