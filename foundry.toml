@@ -15,8 +15,9 @@ dynamic_test_linking = true
 fs_permissions = [{ access = "read-write", path = "." }]
 
 [profile.deploy]
+solc_version = "0.8.30"
 via_ir = true
-optimizer=true
+optimizer = true
 optimizer_runs = 7777
 
 [profile.solx]
