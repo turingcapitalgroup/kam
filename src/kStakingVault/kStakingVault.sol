@@ -16,8 +16,8 @@ import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces/IVault.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import {
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,

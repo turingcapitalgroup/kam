@@ -9,6 +9,7 @@ import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 // Protocol contracts
 
+import { kToken } from "kToken0/kToken.sol";
 import { K_ASSET_ROUTER, K_MINTER } from "kam/src/constants/Constants.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 import { kAssetRouter } from "kam/src/kAssetRouter.sol";
@@ -16,7 +17,6 @@ import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 import { kMinter } from "kam/src/kMinter.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
-import { kToken } from "kam/src/kToken.sol";
 
 // Modules
 import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";

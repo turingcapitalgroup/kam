@@ -21,10 +21,10 @@ import {
     KREGISTRY_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
+import { IkTokenFactory } from "kToken0/interfaces/IkTokenFactory.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
-import { IkTokenFactory } from "kam/src/interfaces/IkTokenFactory.sol";
 
 import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
 import { kBaseRoles } from "kam/src/base/kBaseRoles.sol";

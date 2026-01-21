@@ -29,10 +29,10 @@ import {
     KMINTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import { kBase } from "kam/src/base/kBase.sol";
 import { K_ASSET_ROUTER } from "kam/src/constants/Constants.sol";

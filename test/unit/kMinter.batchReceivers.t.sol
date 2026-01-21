@@ -3,8 +3,8 @@ pragma solidity 0.8.30;
 
 import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { KMINTER_WRONG_ROLE, KMINTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 contract kMinterBatchReceiversTest is DeploymentBaseTest {
     address USDC;

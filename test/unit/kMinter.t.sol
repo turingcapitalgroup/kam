@@ -8,6 +8,7 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
 
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { kBase } from "kam/src/base/kBase.sol";
 import {
     KBASE_WRONG_ASSET,
@@ -26,7 +27,6 @@ import {
     KREGISTRY_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { kMinter } from "kam/src/kMinter.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
 
