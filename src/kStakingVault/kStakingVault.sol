@@ -40,8 +40,7 @@ import {
 } from "kam/src/errors/Errors.sol";
 
 import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
-import { K_MINTER, MAX_BPS } from "kam/src/constants/Constants.sol";
-import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
+import { MAX_BPS } from "kam/src/constants/Constants.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 
@@ -121,7 +120,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         $.underlyingAsset = _asset;
         $.sharePriceWatermark = (10 ** _decimals).toUint128();
         $.kToken = _registry().assetToKToken(_asset);
-        $.receiverImplementation = address(new kBatchReceiver(_registry().getContractById(K_MINTER)));
         $.maxTotalAssets = _maxTotalAssets;
 
         bytes32 _newBatchId = _createNewBatch();

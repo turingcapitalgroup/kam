@@ -96,14 +96,12 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         //7
         address registry;
         //8
-        address receiverImplementation;
-        //9
         address underlyingAsset;
-        //10
+        //9
         address kToken;
-        //11
+        //10
         string name;
-        //12
+        //11
         string symbol;
         mapping(bytes32 => BaseVaultTypes.BatchInfo) batches;
         mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;
