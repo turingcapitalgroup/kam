@@ -8,13 +8,16 @@ import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import {
     KREGISTRY_ADAPTER_ALREADY_SET,
+    KREGISTRY_ADAPTER_HAS_BALANCE,
     KREGISTRY_ALREADY_REGISTERED,
     KREGISTRY_ASSET_IN_USE,
     KREGISTRY_ASSET_NOT_SUPPORTED,
+    KREGISTRY_CANNOT_REMOVE_KMINTER,
     KREGISTRY_EMPTY_STRING,
     KREGISTRY_FEE_EXCEEDS_MAXIMUM,
     KREGISTRY_INVALID_ADAPTER,
     KREGISTRY_TRANSFER_FAILED,
+    KREGISTRY_VAULT_HAS_PENDING_PROPOSALS,
     KREGISTRY_VAULT_TYPE_ASSIGNED,
     KREGISTRY_WRONG_ASSET,
     KREGISTRY_ZERO_ADDRESS,
@@ -23,7 +26,9 @@ import {
 
 import { IkTokenFactory } from "kToken0/interfaces/IkTokenFactory.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
+import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
+import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 
 import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
@@ -461,6 +466,16 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
         kRegistryStorage storage $ = _getkRegistryStorage();
 
+        // kMinter is a singleton that handles all institutional operations across all assets
+        require(_vault != $.singletonContracts[K_MINTER], KREGISTRY_CANNOT_REMOVE_KMINTER);
+
+        address _kAssetRouter = $.singletonContracts[K_ASSET_ROUTER];
+        if (_kAssetRouter != address(0)) {
+            require(
+                IkAssetRouter(_kAssetRouter).getPendingProposalCount(_vault) == 0, KREGISTRY_VAULT_HAS_PENDING_PROPOSALS
+            );
+        }
+
         address[] memory _assets = $.vaultAssets[_vault].values();
         uint8 _vaultTypeValue = $.vaultType[_vault];
 
@@ -471,6 +486,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
             // Clean up adapter mapping for this vault-asset pair
             address _adapter = $.vaultAdaptersByAsset[_vault][_asset];
             if (_adapter != address(0)) {
+                require(IVaultAdapter(_adapter).totalAssets() == 0, KREGISTRY_ADAPTER_HAS_BALANCE);
                 delete $.vaultAdaptersByAsset[_vault][_asset];
                 emit AdapterRemoved(_vault, _asset, _adapter);
             }
@@ -535,6 +551,18 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         require($.vaultAssets[_vault].contains(_asset), KREGISTRY_ASSET_NOT_SUPPORTED);
 
         require($.vaultAdaptersByAsset[_vault][_asset] == _adapter, KREGISTRY_INVALID_ADAPTER);
+
+        // Check no pending settlement proposals for this vault
+        address _kAssetRouter = $.singletonContracts[K_ASSET_ROUTER];
+        if (_kAssetRouter != address(0)) {
+            require(
+                IkAssetRouter(_kAssetRouter).getPendingProposalCount(_vault) == 0, KREGISTRY_VAULT_HAS_PENDING_PROPOSALS
+            );
+        }
+
+        // Check adapter has no remaining balance
+        require(IVaultAdapter(_adapter).totalAssets() == 0, KREGISTRY_ADAPTER_HAS_BALANCE);
+
         delete $.vaultAdaptersByAsset[_vault][_asset];
 
         emit AdapterRemoved(_vault, _asset, _adapter);

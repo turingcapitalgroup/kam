@@ -209,16 +209,13 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         bytes32 _batchId = $.currentBatchId;
         require(_batchId != bytes32(0) && !$.batches[_batchId].isClosed, KSTAKINGVAULT_BATCH_NOT_VALID);
-        uint128 _withdrawn = _convertToAssetsWithTotals(_stkTokenAmount, _totalNetAssets(), totalSupply()).toUint128();
 
-        // Make sure we dont exceed the max withdraw per batch
+        // Enforce limit using share-based tracking
         require(
-            ($.batches[_batchId].withdrawnInBatch += _withdrawn) <= _registry().getMaxBurnPerBatch(address(this)),
+            ($.batches[_batchId].requestedSharesInBatch += _stkTokenAmount.toUint128())
+                <= _registry().getMaxBurnPerBatch(address(this)),
             KSTAKINGVAULT_BATCH_LIMIT_REACHED
         );
-
-        // Track requested shares in batch for settlement
-        $.batches[_batchId].requestedSharesInBatch += _stkTokenAmount.toUint128();
 
         // Generate request ID
         _requestId = _createStakeRequestId(_msgSender(), _stkTokenAmount, block.timestamp);

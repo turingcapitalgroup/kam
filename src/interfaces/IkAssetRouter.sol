@@ -36,6 +36,8 @@ interface IkAssetRouter is IVersioned {
         address asset;
         /// @dev The DN vault address where yield was generated
         address vault;
+        /// @dev Cached adapter address at proposal creation - prevents registry modification from breaking execution
+        address adapter;
         /// @dev The batch identifier for this settlement period
         bytes32 batchId;
         /// @dev Total asset value in the vault after yield generation
@@ -119,6 +121,13 @@ interface IkAssetRouter is IVersioned {
     /// @param asset The underlying asset address being deposited
     /// @param amount The quantity of assets deposited
     event Deposited(address indexed vault, address indexed asset, uint256 amount);
+
+    /// @notice Emitted when assets are withdrawn from a vault through settlement
+    /// @dev Tracks net withdrawals when more redemptions than deposits occur in a batch
+    /// @param vault The vault address from which assets are withdrawn
+    /// @param asset The underlying asset address being withdrawn
+    /// @param amount The quantity of assets withdrawn
+    event Withdrawn(address indexed vault, address indexed asset, uint256 amount);
 
     /// @notice Emitted when a new settlement proposal is created with cooldown period
     /// @dev Begins the settlement process with a security cooldown to allow verification
@@ -453,6 +462,12 @@ interface IkAssetRouter is IVersioned {
     /// @param batchId The batch identifier to check
     /// @return True if the batch ID is registered, false otherwise
     function isBatchIdRegistered(bytes32 batchId) external view returns (bool);
+
+    /// @notice Gets the count of pending settlement proposals for a specific vault
+    /// @dev Used by kRegistry to validate vault removal safety - vaults with pending proposals cannot be removed
+    /// @param vault_ The vault address to query for pending settlement proposals
+    /// @return count The number of pending proposals for the vault
+    function getPendingProposalCount(address vault_) external view returns (uint256 count);
 
     // contractName() and contractVersion() functions are inherited from IVersioned
 }

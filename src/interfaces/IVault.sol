@@ -153,6 +153,8 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     /// made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens from
     /// the batch receiver contract. This two-phase design ensures accurate yield calculations and prevents share
     /// price manipulation during the settlement process.
+    /// NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in stkToken (share) units, not kToken
+    /// (asset) units. This makes the limit immune to price fluctuations between request time and settlement time.
     /// @param to The recipient address that will receive the kTokens after successful settlement and claiming
     /// @param stkTokenAmount The quantity of stkTokens to unstake (must not exceed user balance, cannot be zero)
     /// @return requestId Unique identifier for tracking this unstaking request through settlement and claiming
