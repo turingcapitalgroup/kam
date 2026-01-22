@@ -155,10 +155,18 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     /// price manipulation during the settlement process.
     /// NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in stkToken (share) units, not kToken
     /// (asset) units. This makes the limit immune to price fluctuations between request time and settlement time.
+    /// @param owner The address that owns this unstake request and can claim the resulting kTokens
     /// @param to The recipient address that will receive the kTokens after successful settlement and claiming
     /// @param stkTokenAmount The quantity of stkTokens to unstake (must not exceed user balance, cannot be zero)
     /// @return requestId Unique identifier for tracking this unstaking request through settlement and claiming
-    function requestUnstake(address to, uint256 stkTokenAmount) external payable returns (bytes32 requestId);
+    function requestUnstake(
+        address owner,
+        address to,
+        uint256 stkTokenAmount
+    )
+        external
+        payable
+        returns (bytes32 requestId);
 
     /// @notice Controls the vault's operational state for emergency situations and maintenance periods
     /// @dev This function provides critical safety controls for vault operations by: (1) Enabling emergency admins

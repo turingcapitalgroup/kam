@@ -198,7 +198,15 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     }
 
     /// @inheritdoc IVault
-    function requestUnstake(address _to, uint256 _stkTokenAmount) external payable returns (bytes32 _requestId) {
+    function requestUnstake(
+        address _owner,
+        address _to,
+        uint256 _stkTokenAmount
+    )
+        external
+        payable
+        returns (bytes32 _requestId)
+    {
         // Open `nonReentrant`
         _lockReentrant();
 
@@ -218,11 +226,11 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         );
 
         // Generate request ID
-        _requestId = _createStakeRequestId(_msgSender(), _stkTokenAmount, block.timestamp);
+        _requestId = _createStakeRequestId(_owner, _stkTokenAmount, block.timestamp);
 
         // Create unstaking request
         $.unstakeRequests[_requestId] = BaseVaultTypes.UnstakeRequest({
-            user: _msgSender(),
+            user: _owner,
             stkTokenAmount: _stkTokenAmount.toUint128(),
             recipient: _to,
             requestTimestamp: uint64(block.timestamp),
@@ -231,7 +239,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         });
 
         // Add to user requests tracking
-        $.userRequests[_msgSender()].add(_requestId);
+        $.userRequests[_owner].add(_requestId);
 
         // Transfer stkTokens to contract to keep share price stable
         // It will only be burned when the assets are claimed later
@@ -239,7 +247,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         IkAssetRouter(_getKAssetRouter()).kSharesRequestPush(address(this), _stkTokenAmount, _batchId);
 
-        emit UnstakeRequestCreated(_requestId, _msgSender(), _stkTokenAmount, _to, _batchId);
+        emit UnstakeRequestCreated(_requestId, _owner, _stkTokenAmount, _to, _batchId);
 
         // Close `nonReentrant`
         _unlockReentrant();

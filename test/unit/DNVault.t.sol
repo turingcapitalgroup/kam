@@ -201,7 +201,7 @@ contract DNVaultTest is BaseVaultTest {
         bytes32 unstakeBatchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, stkBalance);
+        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, users.alice, stkBalance);
 
         vm.prank(users.relayer);
         vault.closeBatch(unstakeBatchId, true);
@@ -226,7 +226,7 @@ contract DNVaultTest is BaseVaultTest {
         _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(VAULTCLAIMS_BATCH_NOT_SETTLED));
@@ -239,7 +239,7 @@ contract DNVaultTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -261,7 +261,7 @@ contract DNVaultTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -280,7 +280,7 @@ contract DNVaultTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -336,7 +336,7 @@ contract DNVaultTest is BaseVaultTest {
         bytes32 unstakeBatchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, stkBalance);
+        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, users.alice, stkBalance);
 
         assertEq(vault.balanceOf(users.alice), 0);
         assertEq(vault.balanceOf(address(vault)), stkBalance);

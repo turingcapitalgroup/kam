@@ -245,7 +245,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 unstakeBatchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, stkBalance);
+        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, users.alice, stkBalance);
 
         // Close and settle unstaking batch
         vm.prank(users.relayer);
@@ -315,7 +315,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         vm.warp(block.timestamp + 30 days);
 
         vm.prank(users.alice);
-        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, stkBalance);
+        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, users.alice, stkBalance);
 
         sharePrice = vault.sharePrice();
         netSharePrice = vault.netSharePrice();
@@ -357,7 +357,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Try to claim without settling
         vm.prank(users.alice);
@@ -372,7 +372,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Close and settle batch
         vm.prank(users.relayer);
@@ -398,7 +398,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Close and settle batch
         vm.prank(users.relayer);
@@ -420,7 +420,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 batchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestUnstake(users.alice, 1000 * _1_USDC);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
 
         // Close and settle batch
         vm.prank(users.relayer);
@@ -491,7 +491,7 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         bytes32 unstakeBatchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, stkBalance);
+        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, users.alice, stkBalance);
 
         // Share prices should stay the same
         assertEq(vault.sharePrice(), sharePrice);
