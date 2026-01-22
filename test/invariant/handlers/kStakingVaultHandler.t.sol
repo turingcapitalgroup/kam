@@ -302,7 +302,7 @@ contract kStakingVaultHandler is BaseHandler {
         }
         uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
         kStakingVault_requestedInBatch[kStakingVault_vault.getBatchId()] -= amount;
-        bytes32 requestId = kStakingVault_vault.requestUnstake(currentActor, amount);
+        bytes32 requestId = kStakingVault_vault.requestUnstake(currentActor, currentActor, amount);
         kStakingVault_actorUnstakeRequests[currentActor].add(requestId);
         uint256 sharePriceAfter = kStakingVault_vault.sharePrice();
         kStakingVault_sharePriceDelta = int256(sharePriceAfter) - int256(sharePriceBefore);

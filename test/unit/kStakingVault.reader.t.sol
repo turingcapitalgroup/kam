@@ -491,7 +491,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         uint256 sharesToUnstake = vault.balanceOf(users.alice) / 2;
 
         vm.prank(users.alice);
-        bytes32 requestId = vault.requestUnstake(users.bob, uint128(sharesToUnstake));
+        bytes32 requestId = vault.requestUnstake(users.alice, users.bob, uint128(sharesToUnstake));
 
         BaseVaultTypes.UnstakeRequest memory request = vault.getUnstakeRequest(requestId);
 

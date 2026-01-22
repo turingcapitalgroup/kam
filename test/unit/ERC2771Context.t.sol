@@ -125,6 +125,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes memory callData = abi.encodeCall(
             vault.requestUnstake,
             (
+                users.alice, // owner
                 users.alice, // recipient
                 stkBalance // amount
             )
@@ -182,7 +183,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 unstakeBatchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, stkBalance);
+        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, users.alice, stkBalance);
 
         vm.prank(users.relayer);
         vault.closeBatch(unstakeBatchId, true);
@@ -425,7 +426,7 @@ contract ERC2771ContextTest is BaseVaultTest {
         bytes32 unstakeBatchId = vault.getBatchId();
 
         vm.prank(users.alice);
-        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, stkBalance);
+        bytes32 unstakeRequestId = vault.requestUnstake(users.alice, users.alice, stkBalance);
 
         // Verify request was created correctly
         BaseVaultTypes.UnstakeRequest memory req = vault.getUnstakeRequest(unstakeRequestId);

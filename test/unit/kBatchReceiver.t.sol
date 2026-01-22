@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import {
     KBATCHRECEIVER_ALREADY_INITIALIZED,
     KBATCHRECEIVER_INSUFFICIENT_BALANCE,
@@ -12,7 +13,6 @@ import {
     KBATCHRECEIVER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 import { IkBatchReceiver } from "kam/src/interfaces/IkBatchReceiver.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 
 contract kBatchReceiverTest is DeploymentBaseTest {

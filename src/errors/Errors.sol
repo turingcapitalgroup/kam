@@ -8,15 +8,14 @@ pragma solidity 0.8.30;
 ///      - BV*: BaseVault errors
 ///      - B*: kBatchReceiver errors
 ///      - C*: Custodial adapter errors
-///      - F*: kTokenFactory errors
 ///      - K*: kBase errors
 ///      - M*: kMinter errors
 ///      - R*: kRegistry errors
 ///      - SV*: kStakingVault errors
-///      - T*: kToken errors
 ///      - VB*: VaultBatches errors
 ///      - VC*: VaultClaims errors
 ///      - VF*: VaultFees errors
+/// Note: kToken (T*) and kTokenFactory (F*) errors are in kToken0 repo
 
 // kAssetRouter Errors
 string constant KASSETROUTER_ALREADY_REGISTERED = "A1";
@@ -125,6 +124,10 @@ string constant KREGISTRY_KTOKEN_ALREADY_SET = "R13";
 string constant KREGISTRY_EMPTY_STRING = "R14";
 string constant KREGISTRY_ASSET_IN_USE = "R15";
 string constant KREGISTRY_VAULT_TYPE_ASSIGNED = "R16";
+string constant KREGISTRY_VAULT_HAS_PENDING_PROPOSALS = "R17";
+string constant KREGISTRY_VAULT_HAS_OPEN_BATCHES = "R18";
+string constant KREGISTRY_ADAPTER_HAS_BALANCE = "R19";
+string constant KREGISTRY_CANNOT_REMOVE_KMINTER = "R20";
 
 string constant GUARDIANMODULE_UNAUTHORIZED = "GM1";
 string constant GUARDIANMODULE_NOT_ALLOWED = "GM2";
@@ -154,13 +157,6 @@ string constant KSTAKINGVAULT_ZERO_AMOUNT = "SV9";
 string constant KSTAKINGVAULT_BATCH_LIMIT_REACHED = "SV10";
 string constant KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED = "SV11";
 string constant KSTAKINGVAULT_BATCH_NOT_VALID = "SV12";
-
-// kToken Errors
-string constant KTOKEN_IS_PAUSED = "T1";
-string constant KTOKEN_TRANSFER_FAILED = "T2";
-string constant KTOKEN_ZERO_ADDRESS = "T3";
-string constant KTOKEN_ZERO_AMOUNT = "T4";
-string constant KTOKEN_WRONG_ROLE = "T5";
 
 // VaultBatches Errors
 string constant VAULTBATCHES_NOT_CLOSED = "VB1";
@@ -209,8 +205,3 @@ string constant KREMOTEREGISTRY_ZERO_ADDRESS = "RR2";
 string constant KREMOTEREGISTRY_ZERO_SELECTOR = "RR3";
 string constant KREMOTEREGISTRY_SELECTOR_ALREADY_SET = "RR4";
 string constant KREMOTEREGISTRY_SELECTOR_NOT_FOUND = "RR5";
-
-// kTokenFactory Errors
-string constant KTOKENFACTORY_ZERO_ADDRESS = "F1";
-string constant KTOKENFACTORY_DEPLOYMENT_FAILED = "F2";
-string constant KTOKENFACTORY_WRONG_ROLE = "F3";

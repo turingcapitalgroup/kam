@@ -4,9 +4,9 @@ pragma solidity ^0.8.20;
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { Script } from "forge-std/Script.sol";
 
+import { kToken } from "kToken0/kToken.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
-import { kToken } from "kam/src/kToken.sol";
 
 contract ConfigureProtocolScript is Script, DeploymentManager {
     // Asset addresses (can be overridden for tests)

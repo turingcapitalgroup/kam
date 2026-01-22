@@ -6,9 +6,9 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 import { IVaultBatch } from "kam/src/interfaces/IVaultBatch.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
 import { ExecutionLib } from "minimal-smart-account/libraries/ExecutionLib.sol";
 import { ModeLib } from "minimal-smart-account/libraries/ModeLib.sol";
@@ -178,7 +178,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _transferAmongAdapters(_minterAdapterUSDC, address(DNVaultAdapterUSDC), _amount);
 
         vm.prank(users.bob);
-        bytes32 _requestId = alphaVault.requestUnstake(users.bob, _amount / 2);
+        bytes32 _requestId = alphaVault.requestUnstake(users.bob, users.bob, _amount / 2);
 
         mockUSDC.mint(address(erc7540USDC), _1_USDC);
         _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _amount + _1_USDC, 0, 0);
@@ -240,11 +240,11 @@ contract KamIntegrationTest is DeploymentBaseTest {
 
         uint256 _stkTokenAmountAl = dnVault.balanceOf(users.alice);
         vm.prank(users.alice);
-        bytes32 _aliceReq = dnVault.requestUnstake(users.alice, _stkTokenAmountAl);
+        bytes32 _aliceReq = dnVault.requestUnstake(users.alice, users.alice, _stkTokenAmountAl);
 
         uint256 _stkTokenAmountBob = dnVault.balanceOf(users.bob);
         vm.prank(users.bob);
-        bytes32 _bobReq = dnVault.requestUnstake(users.bob, _stkTokenAmountBob);
+        bytes32 _bobReq = dnVault.requestUnstake(users.bob, users.bob, _stkTokenAmountBob);
 
         _batchId = dnVault.getBatchId();
         _closeBatch(_dnVault, _batchId);
@@ -270,7 +270,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         uint256 _stkTokenAmount = alphaVault.balanceOf(users.bob);
         _totalAssets = alphaVault.convertToAssets(_stkTokenAmount);
         vm.prank(users.bob);
-        _bobReq = alphaVault.requestUnstake(users.bob, _stkTokenAmount);
+        _bobReq = alphaVault.requestUnstake(users.bob, users.bob, _stkTokenAmount);
 
         _batchId = alphaVault.getBatchId();
         _closeBatch(_alphaVault, _batchId);

@@ -16,8 +16,8 @@ import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces/IVault.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import {
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
@@ -198,7 +198,15 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     }
 
     /// @inheritdoc IVault
-    function requestUnstake(address _to, uint256 _stkTokenAmount) external payable returns (bytes32 _requestId) {
+    function requestUnstake(
+        address _owner,
+        address _to,
+        uint256 _stkTokenAmount
+    )
+        external
+        payable
+        returns (bytes32 _requestId)
+    {
         // Open `nonReentrant`
         _lockReentrant();
 
@@ -209,23 +217,20 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         bytes32 _batchId = $.currentBatchId;
         require(_batchId != bytes32(0) && !$.batches[_batchId].isClosed, KSTAKINGVAULT_BATCH_NOT_VALID);
-        uint128 _withdrawn = _convertToAssetsWithTotals(_stkTokenAmount, _totalNetAssets(), totalSupply()).toUint128();
 
-        // Make sure we dont exceed the max withdraw per batch
+        // Enforce limit using share-based tracking
         require(
-            ($.batches[_batchId].withdrawnInBatch += _withdrawn) <= _registry().getMaxBurnPerBatch(address(this)),
+            ($.batches[_batchId].requestedSharesInBatch += _stkTokenAmount.toUint128())
+                <= _registry().getMaxBurnPerBatch(address(this)),
             KSTAKINGVAULT_BATCH_LIMIT_REACHED
         );
 
-        // Track requested shares in batch for settlement
-        $.batches[_batchId].requestedSharesInBatch += _stkTokenAmount.toUint128();
-
         // Generate request ID
-        _requestId = _createStakeRequestId(_msgSender(), _stkTokenAmount, block.timestamp);
+        _requestId = _createStakeRequestId(_owner, _stkTokenAmount, block.timestamp);
 
         // Create unstaking request
         $.unstakeRequests[_requestId] = BaseVaultTypes.UnstakeRequest({
-            user: _msgSender(),
+            user: _owner,
             stkTokenAmount: _stkTokenAmount.toUint128(),
             recipient: _to,
             requestTimestamp: uint64(block.timestamp),
@@ -234,7 +239,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         });
 
         // Add to user requests tracking
-        $.userRequests[_msgSender()].add(_requestId);
+        $.userRequests[_owner].add(_requestId);
 
         // Transfer stkTokens to contract to keep share price stable
         // It will only be burned when the assets are claimed later
@@ -242,7 +247,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         IkAssetRouter(_getKAssetRouter()).kSharesRequestPush(address(this), _stkTokenAmount, _batchId);
 
-        emit UnstakeRequestCreated(_requestId, _msgSender(), _stkTokenAmount, _to, _batchId);
+        emit UnstakeRequestCreated(_requestId, _owner, _stkTokenAmount, _to, _batchId);
 
         // Close `nonReentrant`
         _unlockReentrant();

@@ -275,7 +275,7 @@ Minimal proxy contract that holds and distributes settled assets for batch redem
 
 ### IkToken
 
-ERC20 token representing wrapped underlying assets in the KAM protocol. Implements role-restricted minting and burning with emergency pause capabilities and comprehensive role management. Deployed as UUPS upgradeable proxies with ERC-7201 namespaced storage and atomic initialization to prevent frontrunning.
+ERC20 token representing wrapped underlying assets in the KAM protocol. Implements role-restricted minting and burning with emergency pause capabilities, USDC-style account freeze/blacklist functionality, and comprehensive role management. Deployed as UUPS upgradeable proxies with ERC-7201 namespaced storage and atomic initialization to prevent frontrunning.
 
 **Token Operations**
 
@@ -302,6 +302,15 @@ ERC20 token representing wrapped underlying assets in the KAM protocol. Implemen
 - `revokeEmergencyRole(address emergency)` - Revokes emergency admin role (ADMIN_ROLE only)
 - `grantMinterRole(address minter)` - Grants minting privileges (ADMIN_ROLE only)
 - `revokeMinterRole(address minter)` - Revokes minting privileges (ADMIN_ROLE only)
+- `grantBlacklistAdminRole(address admin)` - Grants blacklist admin role (ADMIN_ROLE only)
+- `revokeBlacklistAdminRole(address admin)` - Revokes blacklist admin role (ADMIN_ROLE only)
+
+**Freeze/Blacklist Functions (USDC-style compliance)**
+
+- `freezeAccount(address account)` - Freezes an account, blocking all transfers to and from it (BLACKLIST_ADMIN_ROLE only)
+- `unfreezeAccount(address account)` - Unfreezes an account, restoring transfer capability (BLACKLIST_ADMIN_ROLE only)
+- `isFrozen(address account)` - Checks if an account is frozen
+- Note: Owner address cannot be frozen. `address(0)` cannot be frozen. Frozen accounts cannot send, receive, mint, or burn tokens.
 
 **Metadata**
 

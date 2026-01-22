@@ -6,9 +6,9 @@ import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 
+import { kTokenFactory } from "kToken0/kTokenFactory.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { ExecutionGuardianModule } from "kam/src/kRegistry/modules/ExecutionGuardianModule.sol";
-import { kTokenFactory } from "kam/src/kTokenFactory.sol";
 
 contract DeployRegistryScript is Script, DeploymentManager {
     struct RegistryDeployment {

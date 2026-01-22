@@ -32,13 +32,13 @@ import {
     KASSETROUTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { ISettleBatch, IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import { kBase } from "kam/src/base/kBase.sol";
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
@@ -311,6 +311,12 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             }
         }
 
+        // Cache the adapter address at proposal creation time to prevent registry modification
+        // from breaking execution. This ensures settlement can proceed even if vault/adapter
+        // mappings are modified after proposal creation.
+        address _adapter = _registry().getAdapter(_vault, _asset);
+        _checkAddressNotZero(_adapter);
+
         // Compute execution time in the future
         uint256 _executeAfter;
         unchecked {
@@ -321,6 +327,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         $.settlementProposals[_proposalId] = VaultSettlementProposal({
             asset: _asset,
             vault: _vault,
+            adapter: _adapter,
             batchId: _batchId,
             totalAssets: _totalAssetsAdjusted,
             netted: _netted,
@@ -440,7 +447,9 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _kToken = _getKTokenForAsset(_asset);
         IRegistry _registry = _registry();
 
-        IVaultAdapter _adapter = IVaultAdapter(_registry.getAdapter(_vault, _asset));
+        // Use cached adapter from proposal creation time - this prevents registry modification
+        // from breaking settlement execution
+        IVaultAdapter _adapter = IVaultAdapter(_proposal.adapter);
         _checkAddressNotZero(address(_adapter));
 
         // kMinter settlement
@@ -459,6 +468,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 // casting to 'uint256' is safe because _netted is positive in this branch
                 // forge-lint: disable-next-line(unsafe-typecast)
                 emit Deposited(_vault, _asset, uint256(_netted));
+            } else if (_netted < 0) {
+                // casting to 'uint256' is safe because -_netted is positive in this branch
+                // forge-lint: disable-next-line(unsafe-typecast)
+                emit Withdrawn(_vault, _asset, uint256(-_netted));
             }
 
             // Mark batch as settled in the vault
@@ -730,6 +743,12 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     function isBatchIdRegistered(bytes32 _batchId) external view returns (bool) {
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         return $.batchIds.contains(_batchId);
+    }
+
+    /// @inheritdoc IkAssetRouter
+    function getPendingProposalCount(address _vault) external view returns (uint256) {
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+        return $.vaultPendingProposalIds[_vault].length();
     }
 
     /* //////////////////////////////////////////////////////////////

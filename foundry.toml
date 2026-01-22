@@ -11,12 +11,13 @@ ffi = true
 ast = true
 build_info = true
 extra_output = ["storageLayout"]
-dynamic_test_linking = true
+dynamic_test_linking = false
 fs_permissions = [{ access = "read-write", path = "." }]
 
 [profile.deploy]
+solc_version = "0.8.30"
 via_ir = true
-optimizer=true
+optimizer = true
 optimizer_runs = 7777
 
 [profile.solx]
@@ -77,6 +78,7 @@ ignore = [
 [dependencies]
 forge-std = "1.9.7"
 minimal-smart-account = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-smart-account.git" }
+kToken0 = { version = "1.0", git = "https://github.com/turingcapitalgroup/kToken0.git" }
 
 [soldeer]
 # whether soldeer manages remappings
