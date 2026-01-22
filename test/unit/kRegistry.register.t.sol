@@ -6,11 +6,14 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import {
     KREGISTRY_ADAPTER_ALREADY_SET,
+    KREGISTRY_ADAPTER_HAS_BALANCE,
     KREGISTRY_ALREADY_REGISTERED,
     KREGISTRY_ASSET_IN_USE,
     KREGISTRY_ASSET_NOT_SUPPORTED,
+    KREGISTRY_CANNOT_REMOVE_KMINTER,
     KREGISTRY_EMPTY_STRING,
     KREGISTRY_INVALID_ADAPTER,
+    KREGISTRY_VAULT_HAS_PENDING_PROPOSALS,
     KREGISTRY_VAULT_TYPE_ASSIGNED,
     KREGISTRY_WRONG_ASSET,
     KREGISTRY_ZERO_ADDRESS,
@@ -335,59 +338,119 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
     }
 
     function test_RemoveVault_Success() public {
-        address _dnVault = address(dnVault);
+        _registerAsset();
+        _registerVault();
+
+        // Vault without adapter can be removed directly
         vm.prank(users.admin);
         vm.expectEmit(true, false, false, true);
-        emit IRegistry.VaultRemoved(_dnVault);
-        registry.removeVault(_dnVault);
+        emit IRegistry.VaultRemoved(TEST_VAULT);
+        registry.removeVault(TEST_VAULT);
 
-        assertFalse(registry.isVault(_dnVault));
-        assertEq(registry.getVaultType(_dnVault), 0);
+        assertFalse(registry.isVault(TEST_VAULT));
+        assertEq(registry.getVaultType(TEST_VAULT), 0);
 
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
-        registry.getVaultByAssetAndType(USDC, uint8(IRegistry.VaultType.DN));
+        registry.getVaultByAssetAndType(TEST_ASSET, uint8(IRegistry.VaultType.ALPHA));
 
         vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
-        registry.getVaultAssets(_dnVault);
+        registry.getVaultAssets(TEST_VAULT);
+    }
 
+    function test_RemoveVault_Require_NotKMinter() public {
+        // kMinter cannot be removed - this would break the entire protocol
         address _minter = address(minter);
         vm.prank(users.admin);
-        vm.expectEmit(true, false, false, true);
-        emit IRegistry.VaultRemoved(_minter);
+        vm.expectRevert(bytes(KREGISTRY_CANNOT_REMOVE_KMINTER));
         registry.removeVault(_minter);
+    }
 
-        assertFalse(registry.isVault(_minter));
-        assertEq(registry.getVaultType(_minter), 0);
+    function test_RemoveVault_Require_NoPendingProposals() public {
+        address _dnVault = address(dnVault);
 
-        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
-        registry.getVaultByAssetAndType(USDC, uint8(IRegistry.VaultType.DN));
+        // Close both minter and dnVault batches
+        vm.startPrank(users.relayer);
+        bytes32 _minterBatchId = minter.getBatchId(USDC);
+        minter.closeBatch(_minterBatchId, true);
 
-        vm.expectRevert(bytes(KREGISTRY_ZERO_ADDRESS));
-        registry.getVaultAssets(_minter);
+        // Also close the dnVault batch
+        bytes32 _dnBatchId = dnVault.getBatchId();
+        dnVault.closeBatch(_dnBatchId, true);
+
+        // Propose settlement for dnVault (creates pending proposal)
+        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0, 0, 0);
+        vm.stopPrank();
+
+        // Try to remove vault with pending proposal - should fail
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_VAULT_HAS_PENDING_PROPOSALS));
+        registry.removeVault(_dnVault);
+    }
+
+    function test_RemoveVault_Require_AdapterZeroBalance() public {
+        _registerAsset();
+        _registerVault();
+
+        // Deploy a mock adapter with non-zero balance
+        MockVaultAdapter mockAdapter = new MockVaultAdapter();
+        mockAdapter.setTotalAssets(1000e6); // Non-zero balance
+
+        vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+
+        // Try to remove - should fail due to non-zero adapter balance
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_ADAPTER_HAS_BALANCE));
+        registry.removeVault(TEST_VAULT);
+    }
+
+    function test_RemoveVault_Success_WithZeroBalanceAdapter() public {
+        _registerAsset();
+        _registerVault();
+
+        // Deploy a mock adapter that returns 0 for totalAssets
+        MockVaultAdapter mockAdapter = new MockVaultAdapter();
+        mockAdapter.setTotalAssets(0);
+
+        vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+
+        // Now vault can be removed since adapter has zero balance
+        vm.prank(users.admin);
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.AdapterRemoved(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.VaultRemoved(TEST_VAULT);
+        registry.removeVault(TEST_VAULT);
+
+        assertFalse(registry.isVault(TEST_VAULT));
     }
 
     function test_RemoveVault_CleansUpAdapterMappings() public {
         _registerAsset();
         _registerVault();
 
-        // Register an adapter for the vault-asset pair
+        // Register a mock adapter with zero balance for the vault-asset pair
+        MockVaultAdapter mockAdapter = new MockVaultAdapter();
+        mockAdapter.setTotalAssets(0);
+
         vm.prank(users.admin);
-        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
 
         // Verify adapter is registered
-        assertTrue(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER));
-        assertEq(registry.getAdapter(TEST_VAULT, TEST_ASSET), TEST_ADAPTER);
+        assertTrue(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, address(mockAdapter)));
+        assertEq(registry.getAdapter(TEST_VAULT, TEST_ASSET), address(mockAdapter));
 
         // Remove the vault - should also clean up adapter
         vm.prank(users.admin);
         vm.expectEmit(true, true, true, true);
-        emit IRegistry.AdapterRemoved(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+        emit IRegistry.AdapterRemoved(TEST_VAULT, TEST_ASSET, address(mockAdapter));
         vm.expectEmit(true, false, false, true);
         emit IRegistry.VaultRemoved(TEST_VAULT);
         registry.removeVault(TEST_VAULT);
 
         // Verify adapter is cleaned up
-        assertFalse(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER));
+        assertFalse(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, address(mockAdapter)));
 
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
         registry.getAdapter(TEST_VAULT, TEST_ASSET);
@@ -397,11 +460,14 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         _registerAsset();
         _registerVault();
 
-        // Register an adapter
-        vm.prank(users.admin);
-        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+        // Register a mock adapter with zero balance
+        MockVaultAdapter mockAdapter = new MockVaultAdapter();
+        mockAdapter.setTotalAssets(0);
 
-        // Remove the vault
+        vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+
+        // Remove the vault (succeeds because adapter has zero balance)
         vm.prank(users.admin);
         registry.removeVault(TEST_VAULT);
 
@@ -410,12 +476,12 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
 
         // Should be able to register adapter again (previously would fail with KREGISTRY_ADAPTER_ALREADY_SET)
-        address newAdapter = makeAddr("NEW_ADAPTER");
+        MockVaultAdapter newAdapter = new MockVaultAdapter();
         vm.prank(users.admin);
-        registry.registerAdapter(TEST_VAULT, TEST_ASSET, newAdapter);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(newAdapter));
 
-        assertTrue(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, newAdapter));
-        assertEq(registry.getAdapter(TEST_VAULT, TEST_ASSET), newAdapter);
+        assertTrue(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, address(newAdapter)));
+        assertEq(registry.getAdapter(TEST_VAULT, TEST_ASSET), address(newAdapter));
     }
 
     function test_RemoveVault_Require_Only_Admin() public {
@@ -587,15 +653,19 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         _registerAsset();
         _registerVault();
 
+        // Deploy a mock adapter with zero balance
+        MockVaultAdapter mockAdapter = new MockVaultAdapter();
+        mockAdapter.setTotalAssets(0);
+
         vm.prank(users.admin);
-        registry.registerAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
 
         vm.prank(users.admin);
         vm.expectEmit(true, true, true, true);
-        emit IRegistry.AdapterRemoved(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
-        registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
+        emit IRegistry.AdapterRemoved(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+        registry.removeAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
 
-        assertFalse(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, TEST_ADAPTER));
+        assertFalse(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, address(mockAdapter)));
 
         vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
         registry.getAdapter(TEST_VAULT, TEST_ASSET);
@@ -620,6 +690,68 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         registry.removeAdapter(TEST_VAULT, TEST_ASSET, TEST_ADAPTER);
     }
 
+    function test_RemoveAdapter_Require_NoPendingProposals() public {
+        address _dnVault = address(dnVault);
+
+        // Close both minter and dnVault batches
+        vm.startPrank(users.relayer);
+        bytes32 _minterBatchId = minter.getBatchId(USDC);
+        minter.closeBatch(_minterBatchId, true);
+
+        // Also close the dnVault batch
+        bytes32 _dnBatchId = dnVault.getBatchId();
+        dnVault.closeBatch(_dnBatchId, true);
+
+        // Propose settlement for dnVault (creates pending proposal)
+        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0, 0, 0);
+        vm.stopPrank();
+
+        // Get the adapter for this vault-asset pair
+        address _adapter = registry.getAdapter(_dnVault, USDC);
+
+        // Try to remove adapter with pending proposal - should fail
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_VAULT_HAS_PENDING_PROPOSALS));
+        registry.removeAdapter(_dnVault, USDC, _adapter);
+    }
+
+    function test_RemoveAdapter_Require_AdapterZeroBalance() public {
+        _registerAsset();
+        _registerVault();
+
+        // Deploy a mock adapter with non-zero balance
+        MockVaultAdapter mockAdapter = new MockVaultAdapter();
+        mockAdapter.setTotalAssets(1000e6); // Non-zero balance
+
+        vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+
+        // Try to remove - should fail due to non-zero adapter balance
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(KREGISTRY_ADAPTER_HAS_BALANCE));
+        registry.removeAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+    }
+
+    function test_RemoveAdapter_Success_WithZeroBalance() public {
+        _registerAsset();
+        _registerVault();
+
+        // Deploy a mock adapter with zero balance
+        MockVaultAdapter mockAdapter = new MockVaultAdapter();
+        mockAdapter.setTotalAssets(0);
+
+        vm.prank(users.admin);
+        registry.registerAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+
+        // Remove should succeed since adapter has zero balance
+        vm.prank(users.admin);
+        vm.expectEmit(true, true, true, true);
+        emit IRegistry.AdapterRemoved(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+        registry.removeAdapter(TEST_VAULT, TEST_ASSET, address(mockAdapter));
+
+        assertFalse(registry.isAdapterRegistered(TEST_VAULT, TEST_ASSET, address(mockAdapter)));
+    }
+
     /* //////////////////////////////////////////////////////////////
                             INTERNAL
     //////////////////////////////////////////////////////////////*/
@@ -634,5 +766,26 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
     function _registerVault() internal {
         vm.prank(users.admin);
         registry.registerVault(TEST_VAULT, IRegistry.VaultType.ALPHA, TEST_ASSET);
+    }
+}
+
+/// @notice Mock VaultAdapter for testing purposes
+contract MockVaultAdapter {
+    uint256 private _totalAssets;
+
+    function setTotalAssets(uint256 amount) external {
+        _totalAssets = amount;
+    }
+
+    function totalAssets() external view returns (uint256) {
+        return _totalAssets;
+    }
+
+    function contractName() external pure returns (string memory) {
+        return "MockVaultAdapter";
+    }
+
+    function contractVersion() external pure returns (string memory) {
+        return "1.0.0";
     }
 }

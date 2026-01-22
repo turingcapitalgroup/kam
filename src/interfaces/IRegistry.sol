@@ -191,9 +191,10 @@ interface IRegistry is IVersioned {
     /// @param adapter The adapter contract address
     function registerAdapter(address vault, address asset, address adapter) external payable;
 
-    /// @notice Removes an adapter from a vault's registered adapter set
-    /// @dev This disables a specific external protocol integration for the vault. Only callable by ADMIN_ROLE
-    /// to ensure proper risk assessment before removing yield strategies.
+    /// @notice Removes an adapter from a vault-asset pair with safety checks
+    /// @dev Validates no pending proposals exist and adapter has zero balance before removal.
+    /// Before calling, ensure all pending proposals are cancelled and adapter funds are withdrawn.
+    /// Only callable by ADMIN_ROLE to ensure proper risk assessment before removing yield strategies.
     /// @param vault The vault address to remove the adapter from
     /// @param asset The vault underlying asset
     /// @param adapter The adapter address to remove
@@ -375,10 +376,10 @@ interface IRegistry is IVersioned {
     /// @return The hurdle rate in basis points
     function getHurdleRate(address asset) external view returns (uint16);
 
-    /// @notice Removes a vault from the protocol registry
-    /// @dev This function deregisters a vault, removing it from the active vault set. This operation should be
-    /// used carefully as it affects routing and asset management. Only callable by ADMIN_ROLE to ensure proper
-    /// decommissioning procedures are followed. Note that this doesn't clear all vault mappings for gas efficiency.
+    /// @notice Removes a vault from the protocol registry with safety checks
+    /// @dev This function deregisters a vault. Only callable by ADMIN_ROLE.
+    /// Before calling this function, ensure all pending proposals are cancelled
+    ///via cancelProposal() and all adapter funds are withdrawn.
     /// @param vault The vault contract address to remove from the registry
     function removeVault(address vault) external payable;
 
