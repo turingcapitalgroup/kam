@@ -16,7 +16,8 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  │   ├── VENDOR_ROLE (Vendor Management)                        │
 │  │   │   └── INSTITUTION_ROLE (Institutional Access)            │
 │  │   ├── RELAYER_ROLE (Settlement Operations)                   │
-│  │   └── MANAGER_ROLE (Adapter Management)                      │
+│  │   ├── MANAGER_ROLE (Adapter Management)                      │
+│  │   └── BLACKLIST_ADMIN_ROLE (Account Freeze - kToken)         │
 │  ├── EMERGENCY_ADMIN_ROLE (Emergency Controls)                  │
 │  └── GUARDIAN_ROLE (Settlement Oversight)                       │
 │                                                                 │
@@ -141,6 +142,24 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 - **Key Functions**:
   - `VaultAdapter.execute()` - Execute calls to whitelisted targets/selectors (only function using MANAGER_ROLE)
 - **Note**: Execution is restricted by `authorizeCall()` checks enforced by registry's ExecutionGuardianModule
+
+### BLACKLIST_ADMIN_ROLE
+
+**Account Freeze/Blacklist Management (kToken)**
+
+- **Scope**: kToken
+- **Key Permissions**:
+  - Freeze accounts to block all token transfers (USDC-style compliance)
+  - Unfreeze accounts to restore transfer capability
+  - Compliance and security incident response
+- **Key Functions**:
+  - `kToken.freezeAccount()` - Freeze an account
+  - `kToken.unfreezeAccount()` - Unfreeze an account
+  - `kToken.isFrozen()` - Check if an account is frozen
+- **Restrictions**:
+  - Cannot freeze the owner address
+  - Cannot freeze `address(0)` (mint/burn sentinel)
+- **Note**: Frozen accounts cannot send, receive, mint, or burn tokens. Funds remain locked until unfrozen.
 
 ## Role Usage Flow Diagrams
 
@@ -412,10 +431,36 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │                        kToken Roles                             │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
+│  ADMIN_ROLE Functions:                                          │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │• grantMinterRole() - Grant minting privileges               ││
+│  │• revokeMinterRole() - Revoke minting privileges             ││
+│  │• grantEmergencyRole() - Grant emergency admin privileges    ││
+│  │• revokeEmergencyRole() - Revoke emergency admin privileges  ││
+│  │• grantBlacklistAdminRole() - Grant blacklist admin role     ││
+│  │• revokeBlacklistAdminRole() - Revoke blacklist admin role   ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
 │  EMERGENCY_ADMIN_ROLE Functions:                                │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │• setPaused() - Pause token operations                       ││
 │  │• emergencyWithdraw() - Emergency asset recovery             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  MINTER_ROLE Functions:                                         │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │• mint() - Mint kTokens to an address                        ││
+│  │• burn() - Burn kTokens from an address                      ││
+│  │• burnFrom() - Burn kTokens using allowance mechanism        ││
+│  │• crosschainMint() - Mint for crosschain transfers (kOFT)    ││
+│  │• crosschainBurn() - Burn for crosschain transfers (kOFT)    ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  BLACKLIST_ADMIN_ROLE Functions (USDC-style compliance):        │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │• freezeAccount() - Freeze account (blocks all transfers)    ││
+│  │• unfreezeAccount() - Unfreeze account                       ││
+│  │  Note: Owner cannot be frozen. address(0) cannot be frozen. ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘

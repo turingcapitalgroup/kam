@@ -32,13 +32,13 @@ import {
     KASSETROUTER_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
 
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { ISettleBatch, IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 
 import { kBase } from "kam/src/base/kBase.sol";
 import { MAX_BPS } from "kam/src/constants/Constants.sol";

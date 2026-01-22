@@ -6,9 +6,9 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
+import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 import { IVaultBatch } from "kam/src/interfaces/IVaultBatch.sol";
-import { IkToken } from "kam/src/interfaces/IkToken.sol";
 import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
 import { ExecutionLib } from "minimal-smart-account/libraries/ExecutionLib.sol";
 import { ModeLib } from "minimal-smart-account/libraries/ModeLib.sol";
