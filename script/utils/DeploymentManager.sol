@@ -155,7 +155,7 @@ abstract contract DeploymentManager is Script {
 
     struct ContractAddresses {
         // Core infrastructure
-        address ERC1967Factory;
+        address MinimalProxyFactory;
         address kRegistryImpl;
         address kRegistry;
         address kMinterImpl;
@@ -221,7 +221,7 @@ abstract contract DeploymentManager is Script {
     // Prefix JK_ (Json Key) to avoid shadowing protocol constants (K_MINTER, K_ASSET_ROUTER, etc.)
 
     // Core infrastructure
-    bytes32 internal constant JK_ERC1967_FACTORY = keccak256("ERC1967Factory");
+    bytes32 internal constant JK_ERC1967_FACTORY = keccak256("MinimalProxyFactory");
     bytes32 internal constant JK_REGISTRY_IMPL = keccak256("kRegistryImpl");
     bytes32 internal constant JK_REGISTRY = keccak256("kRegistry");
     bytes32 internal constant JK_MINTER_IMPL = keccak256("kMinterImpl");
@@ -549,7 +549,7 @@ abstract contract DeploymentManager is Script {
         output.timestamp = json.readUint(".timestamp");
 
         // Direct reads - JSON structure is fixed, all keys exist after first write
-        output.contracts.ERC1967Factory = json.readAddress(".contracts.ERC1967Factory");
+        output.contracts.MinimalProxyFactory = json.readAddress(".contracts.MinimalProxyFactory");
         output.contracts.kRegistryImpl = json.readAddress(".contracts.kRegistryImpl");
         output.contracts.kRegistry = json.readAddress(".contracts.kRegistry");
         output.contracts.kMinterImpl = json.readAddress(".contracts.kMinterImpl");
@@ -647,7 +647,7 @@ abstract contract DeploymentManager is Script {
 
     /// @notice Apply a single address update to the output struct using pre-computed key
     function _applyAddressUpdate(DeploymentOutput memory output, bytes32 h, address contractAddress) private pure {
-        if (h == JK_ERC1967_FACTORY) output.contracts.ERC1967Factory = contractAddress;
+        if (h == JK_ERC1967_FACTORY) output.contracts.MinimalProxyFactory = contractAddress;
         else if (h == JK_REGISTRY_IMPL) output.contracts.kRegistryImpl = contractAddress;
         else if (h == JK_REGISTRY) output.contracts.kRegistry = contractAddress;
         else if (h == JK_MINTER_IMPL) output.contracts.kMinterImpl = contractAddress;
@@ -686,7 +686,7 @@ abstract contract DeploymentManager is Script {
     function _serializeOutputWithVm(DeploymentOutput memory output) private returns (string memory) {
         // Serialize contracts object
         string memory c = "contracts";
-        vm.serializeAddress(c, "ERC1967Factory", output.contracts.ERC1967Factory);
+        vm.serializeAddress(c, "MinimalProxyFactory", output.contracts.MinimalProxyFactory);
         vm.serializeAddress(c, "kRegistryImpl", output.contracts.kRegistryImpl);
         vm.serializeAddress(c, "kRegistry", output.contracts.kRegistry);
         vm.serializeAddress(c, "kMinterImpl", output.contracts.kMinterImpl);
@@ -968,8 +968,8 @@ abstract contract DeploymentManager is Script {
         if (!verbose) return;
 
         console.log("--- DEPLOYED CONTRACT DEPENDENCIES ---");
-        if (existing.contracts.ERC1967Factory != address(0)) {
-            console.log("ERC1967Factory:   ", existing.contracts.ERC1967Factory);
+        if (existing.contracts.MinimalProxyFactory != address(0)) {
+            console.log("MinimalProxyFactory:   ", existing.contracts.MinimalProxyFactory);
         }
         if (existing.contracts.kRegistry != address(0)) {
             console.log("kRegistry:        ", existing.contracts.kRegistry);

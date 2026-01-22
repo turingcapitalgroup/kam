@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { kMinter } from "kam/src/kMinter.sol";
@@ -15,7 +15,7 @@ contract DeployMinterScript is Script, DeploymentManager {
 
     /// @notice Deploy kMinter contracts
     /// @param writeToJson If true, writes addresses to JSON (for real deployments)
-    /// @param factoryAddr Address of ERC1967Factory (if zero, reads from JSON)
+    /// @param factoryAddr Address of MinimalProxyFactory (if zero, reads from JSON)
     /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
     /// @return deployment Struct containing deployed addresses
     function run(
@@ -33,12 +33,12 @@ contract DeployMinterScript is Script, DeploymentManager {
         // If addresses not provided, read from JSON (for real deployments)
         if (factoryAddr == address(0) || registryAddr == address(0)) {
             existing = readDeploymentOutput();
-            if (factoryAddr == address(0)) factoryAddr = existing.contracts.ERC1967Factory;
+            if (factoryAddr == address(0)) factoryAddr = existing.contracts.MinimalProxyFactory;
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
         }
 
         // Populate existing for logging
-        existing.contracts.ERC1967Factory = factoryAddr;
+        existing.contracts.MinimalProxyFactory = factoryAddr;
         existing.contracts.kRegistry = registryAddr;
 
         // Log script header and configuration
@@ -48,7 +48,7 @@ contract DeployMinterScript is Script, DeploymentManager {
         logBroadcaster(config.roles.admin);
 
         // Validate dependencies
-        require(factoryAddr != address(0), "ERC1967Factory address required");
+        require(factoryAddr != address(0), "MinimalProxyFactory address required");
         require(registryAddr != address(0), "kRegistry address required");
 
         logExecutionStart();
@@ -56,7 +56,7 @@ contract DeployMinterScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.admin);
 
         // Get factory reference
-        ERC1967Factory factory = ERC1967Factory(factoryAddr);
+        MinimalProxyFactory factory = MinimalProxyFactory(factoryAddr);
 
         // Deploy kMinter implementation
         kMinter minterImpl = new kMinter();
@@ -64,8 +64,8 @@ contract DeployMinterScript is Script, DeploymentManager {
         // Deploy proxy with initialization
         bytes memory initData = abi.encodeCall(kMinter.initialize, (registryAddr, config.roles.owner));
 
-        // Factory admin must match UUPS owner to prevent upgrade bypass
-        address minterProxy = factory.deployAndCall(address(minterImpl), config.roles.owner, initData);
+        // Deploy proxy (UUPS owner controls upgrades via implementation)
+        address minterProxy = factory.deployAndCall(address(minterImpl), initData);
 
         vm.stopBroadcast();
 

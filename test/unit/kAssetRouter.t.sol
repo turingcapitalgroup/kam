@@ -28,8 +28,8 @@ import { IVaultBatch } from "kam/src/interfaces/IVaultBatch.sol";
 import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { kAssetRouter } from "kam/src/kAssetRouter.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
+import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
 
 contract kAssetRouterTest is DeploymentBaseTest {
     bytes32 internal constant TEST_BATCH_ID = bytes32(uint256(1));
@@ -79,9 +79,8 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         bytes memory initData = abi.encodeCall(kAssetRouter.initialize, (address(registry), users.owner));
 
-        ERC1967Factory factory = new ERC1967Factory();
-        // Factory admin must match UUPS owner
-        address newProxy = factory.deployAndCall(address(newAssetRouterImpl), users.owner, initData);
+        MinimalProxyFactory factory = new MinimalProxyFactory();
+        address newProxy = factory.deployAndCall(address(newAssetRouterImpl), initData);
 
         kAssetRouter newRouter = kAssetRouter(payable(newProxy));
         assertFalse(newRouter.isPaused());
@@ -99,9 +98,9 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         bytes memory initData = abi.encodeCall(kAssetRouter.initialize, (address(0), users.admin));
 
-        ERC1967Factory factory = new ERC1967Factory();
+        MinimalProxyFactory factory = new MinimalProxyFactory();
         vm.expectRevert(bytes(KBASE_INVALID_REGISTRY));
-        factory.deployAndCall(address(newAssetRouterImpl), users.admin, initData);
+        factory.deployAndCall(address(newAssetRouterImpl), initData);
     }
 
     /* //////////////////////////////////////////////////////////////

@@ -5,7 +5,7 @@ import { BaseTest } from "./BaseTest.sol";
 import { _1_USDC, _1_WBTC } from "./Constants.sol";
 import { Utilities } from "./Utilities.sol";
 import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
 
 // Protocol contracts
 
@@ -46,7 +46,7 @@ import { MockWallet } from "kam/test/mocks/MockWallet.sol";
 
 contract DeploymentBaseTest is BaseTest {
     // Core protocol contracts (proxied)
-    ERC1967Factory public factory;
+    MinimalProxyFactory public factory;
     kRegistry public registry;
     kAssetRouter public assetRouter;
     kToken public kUSD;
@@ -240,7 +240,7 @@ contract DeploymentBaseTest is BaseTest {
     }
 
     function _assignContractReferences() internal {
-        factory = ERC1967Factory(_registryDeploy.factory);
+        factory = MinimalProxyFactory(_registryDeploy.factory);
         registryImpl = kRegistry(payable(_registryDeploy.registryImpl));
         registry = kRegistry(payable(_registryDeploy.registry));
 
@@ -277,7 +277,7 @@ contract DeploymentBaseTest is BaseTest {
      * @notice Label contracts for debugging
      */
     function _labelContracts() internal {
-        vm.label(address(factory), "ERC1967Factory");
+        vm.label(address(factory), "MinimalProxyFactory");
         vm.label(address(registry), "kRegistry");
         vm.label(address(registryImpl), "kRegistryImpl");
         vm.label(address(assetRouter), "kAssetRouter");

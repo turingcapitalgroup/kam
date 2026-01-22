@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 
@@ -36,8 +36,8 @@ contract DeployRegistryScript is Script, DeploymentManager {
 
         vm.startBroadcast(config.roles.owner);
 
-        // Deploy factory for proxy deployment
-        ERC1967Factory factory = new ERC1967Factory();
+        // Deploy factory for proxy deployment (minimal proxy factory with no admin)
+        MinimalProxyFactory factory = new MinimalProxyFactory();
 
         // Deploy kRegistry implementation
         kRegistry registryImpl = new kRegistry();
@@ -55,8 +55,8 @@ contract DeployRegistryScript is Script, DeploymentManager {
             )
         );
 
-        // Factory admin must match UUPS owner to prevent upgrade bypass
-        address registryProxy = factory.deployAndCall(address(registryImpl), config.roles.owner, initData);
+        // Deploy proxy (UUPS owner controls upgrades via implementation)
+        address registryProxy = factory.deployAndCall(address(registryImpl), initData);
 
         // Deploy kTokenFactory with registry and factory (registry will call deployKToken)
         kTokenFactory tokenFactory = new kTokenFactory(registryProxy, address(factory));
@@ -72,7 +72,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
         vm.stopBroadcast();
 
         _log("=== DEPLOYMENT COMPLETE ===");
-        _log("ERC1967Factory deployed at:", address(factory));
+        _log("MinimalProxyFactory deployed at:", address(factory));
         _log("kRegistry implementation deployed at:", address(registryImpl));
         _log("kRegistry proxy deployed at:", registryProxy);
         _log("ExecutionGuardianModule deployed at:", address(executionGuardianModule));
@@ -90,7 +90,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
 
         // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            queueContractAddress("ERC1967Factory", address(factory));
+            queueContractAddress("MinimalProxyFactory", address(factory));
             queueContractAddress("kRegistryImpl", address(registryImpl));
             queueContractAddress("kRegistry", registryProxy);
             queueContractAddress("ExecutionGuardianModule", address(executionGuardianModule));

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
@@ -18,7 +18,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         address betaVault;
     }
 
-    ERC1967Factory factory;
+    MinimalProxyFactory factory;
     address stakingVaultImpl;
     NetworkConfig config;
     DeploymentOutput existing;
@@ -29,7 +29,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
     /// @notice Deploy staking vaults
     /// @param writeToJson If true, writes addresses to JSON (for real deployments)
-    /// @param factoryAddr Address of ERC1967Factory (if zero, reads from JSON)
+    /// @param factoryAddr Address of MinimalProxyFactory (if zero, reads from JSON)
     /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
     /// @param readerModuleAddr Address of ReaderModule (if zero, reads from JSON)
     /// @param kUSDAddr Address of kUSD (if zero, reads from JSON)
@@ -59,7 +59,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 || kUSDAddr == address(0) || kBTCAddr == address(0)
         ) {
             existing = readDeploymentOutput();
-            if (factoryAddr == address(0)) factoryAddr = existing.contracts.ERC1967Factory;
+            if (factoryAddr == address(0)) factoryAddr = existing.contracts.MinimalProxyFactory;
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
             if (readerModuleAddr == address(0)) readerModuleAddr = existing.contracts.readerModule;
             if (kUSDAddr == address(0)) kUSDAddr = existing.contracts.kUSD;
@@ -71,7 +71,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         _wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
 
         // Populate existing struct with provided addresses (for helper methods)
-        existing.contracts.ERC1967Factory = factoryAddr;
+        existing.contracts.MinimalProxyFactory = factoryAddr;
         existing.contracts.kRegistry = registryAddr;
         existing.contracts.readerModule = readerModuleAddr;
         existing.contracts.kUSD = kUSDAddr;
@@ -89,7 +89,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         logBroadcaster(config.roles.admin);
 
         // Validate required contracts
-        require(factoryAddr != address(0), "ERC1967Factory address required");
+        require(factoryAddr != address(0), "MinimalProxyFactory address required");
         require(registryAddr != address(0), "kRegistry address required");
         require(readerModuleAddr != address(0), "readerModule address required");
         require(kUSDAddr != address(0), "kUSD address required");
@@ -100,7 +100,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.admin);
 
         // Get factory reference and deploy implementation
-        factory = ERC1967Factory(factoryAddr);
+        factory = MinimalProxyFactory(factoryAddr);
         stakingVaultImpl = address(new kStakingVault());
 
         // Deploy vaults
@@ -207,7 +207,6 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
         return factory.deployAndCall(
             stakingVaultImpl,
-            config.roles.owner, // Factory admin must match UUPS owner to prevent bypass
             abi.encodeCall(
                 kStakingVault.initialize,
                 (
@@ -233,7 +232,6 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
         return factory.deployAndCall(
             stakingVaultImpl,
-            config.roles.owner, // Factory admin must match UUPS owner to prevent bypass
             abi.encodeCall(
                 kStakingVault.initialize,
                 (
@@ -259,7 +257,6 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
         return factory.deployAndCall(
             stakingVaultImpl,
-            config.roles.owner, // Factory admin must match UUPS owner to prevent bypass
             abi.encodeCall(
                 kStakingVault.initialize,
                 (
@@ -285,7 +282,6 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
         return factory.deployAndCall(
             stakingVaultImpl,
-            config.roles.owner, // Factory admin must match UUPS owner to prevent bypass
             abi.encodeCall(
                 kStakingVault.initialize,
                 (

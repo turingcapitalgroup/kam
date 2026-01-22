@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { MinimalSmartAccount } from "minimal-smart-account/MinimalSmartAccount.sol";
@@ -22,7 +22,7 @@ contract DeployAdaptersScript is Script, DeploymentManager {
 
     /// @notice Deploy vault adapters
     /// @param writeToJson If true, writes addresses to JSON (for real deployments)
-    /// @param factoryAddr Address of ERC1967Factory (if zero, reads from JSON)
+    /// @param factoryAddr Address of MinimalProxyFactory (if zero, reads from JSON)
     /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
     /// @return deployment Struct containing deployed adapter addresses
     function run(
@@ -40,12 +40,12 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         // If addresses not provided, read from JSON (for real deployments)
         if (factoryAddr == address(0) || registryAddr == address(0)) {
             existing = readDeploymentOutput();
-            if (factoryAddr == address(0)) factoryAddr = existing.contracts.ERC1967Factory;
+            if (factoryAddr == address(0)) factoryAddr = existing.contracts.MinimalProxyFactory;
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
         }
 
         // Populate existing for logging
-        existing.contracts.ERC1967Factory = factoryAddr;
+        existing.contracts.MinimalProxyFactory = factoryAddr;
         existing.contracts.kRegistry = registryAddr;
 
         // Log script header and configuration
@@ -55,7 +55,7 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         logBroadcaster(config.roles.admin);
 
         // Validate required contracts
-        require(factoryAddr != address(0), "ERC1967Factory address required");
+        require(factoryAddr != address(0), "MinimalProxyFactory address required");
         require(registryAddr != address(0), "kRegistry address required");
 
         logExecutionStart();
@@ -63,13 +63,12 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.admin);
 
         // Get factory reference
-        ERC1967Factory factory = ERC1967Factory(factoryAddr);
+        MinimalProxyFactory factory = MinimalProxyFactory(factoryAddr);
 
         // Deploy VaultAdapter implementation (shared by all adapters)
         VaultAdapter vaultAdapterImpl = new VaultAdapter();
 
         // Deploy DN Vault USDC Adapter
-        // Factory admin must match UUPS owner to prevent upgrade bypass
         bytes memory adapterInitDataUSDC = abi.encodeCall(
             MinimalSmartAccount.initialize,
             (
@@ -78,43 +77,37 @@ contract DeployAdaptersScript is Script, DeploymentManager {
                 "kam.dnVault.usdc"
             )
         );
-        address dnVaultAdapterUSDC =
-            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataUSDC);
+        address dnVaultAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataUSDC);
 
         // Deploy DN Vault WBTC Adapter
         bytes memory adapterInitDataWBTC = abi.encodeCall(
             MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.dnVault.wbtc")
         );
-        address dnVaultAdapterWBTC =
-            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataWBTC);
+        address dnVaultAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataWBTC);
 
         // Deploy Alpha Vault Adapter
         bytes memory adapterInitDataAlpha = abi.encodeCall(
             MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.alphaVault.usdc")
         );
-        address alphaVaultAdapter =
-            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataAlpha);
+        address alphaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataAlpha);
 
         // Deploy Beta Vault Adapter
         bytes memory adapterInitDataBeta = abi.encodeCall(
             MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.betaVault.usdc")
         );
-        address betaVaultAdapter =
-            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataBeta);
+        address betaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataBeta);
 
         // Deploy kMinter USDC Adapter
         bytes memory adapterInitDataMinterUSDC = abi.encodeCall(
             MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.minter.usdc")
         );
-        address kMinterAdapterUSDC =
-            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataMinterUSDC);
+        address kMinterAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataMinterUSDC);
 
         // Deploy kMinter WBTC Adapter
         // Note: owner is address(0) meaning it inherits from registry
         bytes memory adapterInitDataMinterWBTC =
             abi.encodeCall(MinimalSmartAccount.initialize, (address(0), IRegistry(registryAddr), "kam.minter.wbtc"));
-        address kMinterAdapterWBTC =
-            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataMinterWBTC);
+        address kMinterAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataMinterWBTC);
 
         vm.stopBroadcast();
 
