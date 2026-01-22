@@ -64,7 +64,8 @@ contract DeployMinterScript is Script, DeploymentManager {
         // Deploy proxy with initialization
         bytes memory initData = abi.encodeCall(kMinter.initialize, (registryAddr, config.roles.owner));
 
-        address minterProxy = factory.deployAndCall(address(minterImpl), msg.sender, initData);
+        // Factory admin must match UUPS owner to prevent upgrade bypass
+        address minterProxy = factory.deployAndCall(address(minterImpl), config.roles.owner, initData);
 
         vm.stopBroadcast();
 

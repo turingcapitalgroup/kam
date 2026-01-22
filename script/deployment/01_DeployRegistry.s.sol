@@ -55,7 +55,8 @@ contract DeployRegistryScript is Script, DeploymentManager {
             )
         );
 
-        address registryProxy = factory.deployAndCall(address(registryImpl), msg.sender, initData);
+        // Factory admin must match UUPS owner to prevent upgrade bypass
+        address registryProxy = factory.deployAndCall(address(registryImpl), config.roles.owner, initData);
 
         // Deploy kTokenFactory with registry and factory (registry will call deployKToken)
         kTokenFactory tokenFactory = new kTokenFactory(registryProxy, address(factory));

@@ -65,7 +65,8 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         // Deploy proxy with initialization
         bytes memory initData = abi.encodeCall(kAssetRouter.initialize, (registryAddr, config.roles.owner));
 
-        address assetRouterProxy = factory.deployAndCall(address(assetRouterImpl), msg.sender, initData);
+        // Factory admin must match UUPS owner to prevent upgrade bypass
+        address assetRouterProxy = factory.deployAndCall(address(assetRouterImpl), config.roles.owner, initData);
 
         // Set settlement cooldown from config
         kAssetRouter assetRouter = kAssetRouter(payable(assetRouterProxy));

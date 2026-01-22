@@ -69,6 +69,7 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         VaultAdapter vaultAdapterImpl = new VaultAdapter();
 
         // Deploy DN Vault USDC Adapter
+        // Factory admin must match UUPS owner to prevent upgrade bypass
         bytes memory adapterInitDataUSDC = abi.encodeCall(
             MinimalSmartAccount.initialize,
             (
@@ -77,38 +78,43 @@ contract DeployAdaptersScript is Script, DeploymentManager {
                 "kam.dnVault.usdc"
             )
         );
-        address dnVaultAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataUSDC);
+        address dnVaultAdapterUSDC =
+            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataUSDC);
 
         // Deploy DN Vault WBTC Adapter
         bytes memory adapterInitDataWBTC = abi.encodeCall(
             MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.dnVault.wbtc")
         );
-        address dnVaultAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataWBTC);
+        address dnVaultAdapterWBTC =
+            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataWBTC);
 
         // Deploy Alpha Vault Adapter
         bytes memory adapterInitDataAlpha = abi.encodeCall(
             MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.alphaVault.usdc")
         );
-        address alphaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataAlpha);
+        address alphaVaultAdapter =
+            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataAlpha);
 
         // Deploy Beta Vault Adapter
         bytes memory adapterInitDataBeta = abi.encodeCall(
             MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.betaVault.usdc")
         );
-        address betaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataBeta);
+        address betaVaultAdapter =
+            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataBeta);
 
         // Deploy kMinter USDC Adapter
         bytes memory adapterInitDataMinterUSDC = abi.encodeCall(
             MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.minter.usdc")
         );
         address kMinterAdapterUSDC =
-            factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataMinterUSDC);
+            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataMinterUSDC);
 
         // Deploy kMinter WBTC Adapter
+        // Note: owner is address(0) meaning it inherits from registry
         bytes memory adapterInitDataMinterWBTC =
             abi.encodeCall(MinimalSmartAccount.initialize, (address(0), IRegistry(registryAddr), "kam.minter.wbtc"));
         address kMinterAdapterWBTC =
-            factory.deployAndCall(address(vaultAdapterImpl), msg.sender, adapterInitDataMinterWBTC);
+            factory.deployAndCall(address(vaultAdapterImpl), config.roles.owner, adapterInitDataMinterWBTC);
 
         vm.stopBroadcast();
 

@@ -207,7 +207,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
         return factory.deployAndCall(
             stakingVaultImpl,
-            msg.sender,
+            config.roles.owner, // Factory admin must match UUPS owner to prevent bypass
             abi.encodeCall(
                 kStakingVault.initialize,
                 (
@@ -233,7 +233,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
         return factory.deployAndCall(
             stakingVaultImpl,
-            msg.sender,
+            config.roles.owner, // Factory admin must match UUPS owner to prevent bypass
             abi.encodeCall(
                 kStakingVault.initialize,
                 (
@@ -259,7 +259,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
         return factory.deployAndCall(
             stakingVaultImpl,
-            msg.sender,
+            config.roles.owner, // Factory admin must match UUPS owner to prevent bypass
             abi.encodeCall(
                 kStakingVault.initialize,
                 (
@@ -285,7 +285,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
         return factory.deployAndCall(
             stakingVaultImpl,
-            msg.sender,
+            config.roles.owner, // Factory admin must match UUPS owner to prevent bypass
             abi.encodeCall(
                 kStakingVault.initialize,
                 (

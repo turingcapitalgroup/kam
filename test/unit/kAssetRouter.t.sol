@@ -80,7 +80,8 @@ contract kAssetRouterTest is DeploymentBaseTest {
         bytes memory initData = abi.encodeCall(kAssetRouter.initialize, (address(registry), users.owner));
 
         ERC1967Factory factory = new ERC1967Factory();
-        address newProxy = factory.deployAndCall(address(newAssetRouterImpl), users.admin, initData);
+        // Factory admin must match UUPS owner
+        address newProxy = factory.deployAndCall(address(newAssetRouterImpl), users.owner, initData);
 
         kAssetRouter newRouter = kAssetRouter(payable(newProxy));
         assertFalse(newRouter.isPaused());

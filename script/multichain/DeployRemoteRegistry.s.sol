@@ -42,7 +42,8 @@ contract DeployRemoteRegistryScript is Script, DeploymentManager {
         // Deploy proxy with initialization
         bytes memory initData = abi.encodeCall(kRemoteRegistry.initialize, (config.roles.owner));
 
-        address registryProxy = factory.deployAndCall(address(registryImpl), msg.sender, initData);
+        // Factory admin must match UUPS owner to prevent upgrade bypass
+        address registryProxy = factory.deployAndCall(address(registryImpl), config.roles.owner, initData);
 
         vm.stopBroadcast();
 

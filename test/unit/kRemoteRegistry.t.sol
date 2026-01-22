@@ -40,7 +40,8 @@ contract kRemoteRegistryTest is Test {
         kRemoteRegistry impl = new kRemoteRegistry();
 
         bytes memory initData = abi.encodeCall(kRemoteRegistry.initialize, (owner));
-        address proxy = factory.deployAndCall(address(impl), address(this), initData);
+        // Factory admin must match UUPS owner
+        address proxy = factory.deployAndCall(address(impl), owner, initData);
 
         registry = kRemoteRegistry(proxy);
     }
