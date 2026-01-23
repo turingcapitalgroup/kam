@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
+import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
@@ -18,7 +18,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         address betaVault;
     }
 
-    MinimalProxyFactory factory;
+    MinimalUUPSFactory factory;
     address stakingVaultImpl;
     NetworkConfig config;
     DeploymentOutput existing;
@@ -29,7 +29,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
 
     /// @notice Deploy staking vaults
     /// @param writeToJson If true, writes addresses to JSON (for real deployments)
-    /// @param factoryAddr Address of MinimalProxyFactory (if zero, reads from JSON)
+    /// @param factoryAddr Address of MinimalUUPSFactory (if zero, reads from JSON)
     /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
     /// @param readerModuleAddr Address of ReaderModule (if zero, reads from JSON)
     /// @param kUSDAddr Address of kUSD (if zero, reads from JSON)
@@ -59,7 +59,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
                 || kUSDAddr == address(0) || kBTCAddr == address(0)
         ) {
             existing = readDeploymentOutput();
-            if (factoryAddr == address(0)) factoryAddr = existing.contracts.MinimalProxyFactory;
+            if (factoryAddr == address(0)) factoryAddr = existing.contracts.MinimalUUPSFactory;
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
             if (readerModuleAddr == address(0)) readerModuleAddr = existing.contracts.readerModule;
             if (kUSDAddr == address(0)) kUSDAddr = existing.contracts.kUSD;
@@ -71,7 +71,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         _wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
 
         // Populate existing struct with provided addresses (for helper methods)
-        existing.contracts.MinimalProxyFactory = factoryAddr;
+        existing.contracts.MinimalUUPSFactory = factoryAddr;
         existing.contracts.kRegistry = registryAddr;
         existing.contracts.readerModule = readerModuleAddr;
         existing.contracts.kUSD = kUSDAddr;
@@ -89,7 +89,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         logBroadcaster(config.roles.admin);
 
         // Validate required contracts
-        require(factoryAddr != address(0), "MinimalProxyFactory address required");
+        require(factoryAddr != address(0), "MinimalUUPSFactory address required");
         require(registryAddr != address(0), "kRegistry address required");
         require(readerModuleAddr != address(0), "readerModule address required");
         require(kUSDAddr != address(0), "kUSD address required");
@@ -100,7 +100,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.admin);
 
         // Get factory reference and deploy implementation
-        factory = MinimalProxyFactory(factoryAddr);
+        factory = MinimalUUPSFactory(factoryAddr);
         stakingVaultImpl = address(new kStakingVault());
 
         // Deploy vaults

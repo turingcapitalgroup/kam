@@ -155,7 +155,7 @@ abstract contract DeploymentManager is Script {
 
     struct ContractAddresses {
         // Core infrastructure
-        address MinimalProxyFactory;
+        address MinimalUUPSFactory;
         address kRegistryImpl;
         address kRegistry;
         address kMinterImpl;
@@ -198,7 +198,6 @@ abstract contract DeploymentManager is Script {
         // Insurance
         address erc20ExecutionValidator;
         address minimalSmartAccountImpl;
-        address minimalSmartAccountFactory;
         address insuranceSmartAccount;
     }
 
@@ -221,7 +220,7 @@ abstract contract DeploymentManager is Script {
     // Prefix JK_ (Json Key) to avoid shadowing protocol constants (K_MINTER, K_ASSET_ROUTER, etc.)
 
     // Core infrastructure
-    bytes32 internal constant JK_ERC1967_FACTORY = keccak256("MinimalProxyFactory");
+    bytes32 internal constant JK_MINIMAL_UUPS_FACTORY = keccak256("MinimalUUPSFactory");
     bytes32 internal constant JK_REGISTRY_IMPL = keccak256("kRegistryImpl");
     bytes32 internal constant JK_REGISTRY = keccak256("kRegistry");
     bytes32 internal constant JK_MINTER_IMPL = keccak256("kMinterImpl");
@@ -263,7 +262,6 @@ abstract contract DeploymentManager is Script {
     // Insurance
     bytes32 internal constant JK_ERC20_EXECUTION_VALIDATOR = keccak256("erc20ExecutionValidator");
     bytes32 internal constant JK_MINIMAL_SMART_ACCOUNT_IMPL = keccak256("minimalSmartAccountImpl");
-    bytes32 internal constant JK_MINIMAL_SMART_ACCOUNT_FACTORY = keccak256("minimalSmartAccountFactory");
     bytes32 internal constant JK_INSURANCE_SMART_ACCOUNT = keccak256("insuranceSmartAccount");
 
     // Config role keys (for resolveAddress)
@@ -549,7 +547,7 @@ abstract contract DeploymentManager is Script {
         output.timestamp = json.readUint(".timestamp");
 
         // Direct reads - JSON structure is fixed, all keys exist after first write
-        output.contracts.MinimalProxyFactory = json.readAddress(".contracts.MinimalProxyFactory");
+        output.contracts.MinimalUUPSFactory = json.readAddress(".contracts.MinimalUUPSFactory");
         output.contracts.kRegistryImpl = json.readAddress(".contracts.kRegistryImpl");
         output.contracts.kRegistry = json.readAddress(".contracts.kRegistry");
         output.contracts.kMinterImpl = json.readAddress(".contracts.kMinterImpl");
@@ -578,7 +576,6 @@ abstract contract DeploymentManager is Script {
         output.contracts.WalletUSDC = json.readAddress(".contracts.WalletUSDC");
         output.contracts.erc20ExecutionValidator = json.readAddress(".contracts.erc20ExecutionValidator");
         output.contracts.minimalSmartAccountImpl = json.readAddress(".contracts.minimalSmartAccountImpl");
-        output.contracts.minimalSmartAccountFactory = json.readAddress(".contracts.minimalSmartAccountFactory");
         output.contracts.insuranceSmartAccount = json.readAddress(".contracts.insuranceSmartAccount");
 
         return output;
@@ -647,7 +644,7 @@ abstract contract DeploymentManager is Script {
 
     /// @notice Apply a single address update to the output struct using pre-computed key
     function _applyAddressUpdate(DeploymentOutput memory output, bytes32 h, address contractAddress) private pure {
-        if (h == JK_ERC1967_FACTORY) output.contracts.MinimalProxyFactory = contractAddress;
+        if (h == JK_MINIMAL_UUPS_FACTORY) output.contracts.MinimalUUPSFactory = contractAddress;
         else if (h == JK_REGISTRY_IMPL) output.contracts.kRegistryImpl = contractAddress;
         else if (h == JK_REGISTRY) output.contracts.kRegistry = contractAddress;
         else if (h == JK_MINTER_IMPL) output.contracts.kMinterImpl = contractAddress;
@@ -676,7 +673,6 @@ abstract contract DeploymentManager is Script {
         else if (h == JK_WALLET_USDC) output.contracts.WalletUSDC = contractAddress;
         else if (h == JK_ERC20_EXECUTION_VALIDATOR) output.contracts.erc20ExecutionValidator = contractAddress;
         else if (h == JK_MINIMAL_SMART_ACCOUNT_IMPL) output.contracts.minimalSmartAccountImpl = contractAddress;
-        else if (h == JK_MINIMAL_SMART_ACCOUNT_FACTORY) output.contracts.minimalSmartAccountFactory = contractAddress;
         else if (h == JK_INSURANCE_SMART_ACCOUNT) output.contracts.insuranceSmartAccount = contractAddress;
         // Support ExecutionGuardianModule key as alias for adapterGuardianModule
         else if (h == JK_EXECUTION_GUARDIAN_MODULE) output.contracts.adapterGuardianModule = contractAddress;
@@ -686,7 +682,7 @@ abstract contract DeploymentManager is Script {
     function _serializeOutputWithVm(DeploymentOutput memory output) private returns (string memory) {
         // Serialize contracts object
         string memory c = "contracts";
-        vm.serializeAddress(c, "MinimalProxyFactory", output.contracts.MinimalProxyFactory);
+        vm.serializeAddress(c, "MinimalUUPSFactory", output.contracts.MinimalUUPSFactory);
         vm.serializeAddress(c, "kRegistryImpl", output.contracts.kRegistryImpl);
         vm.serializeAddress(c, "kRegistry", output.contracts.kRegistry);
         vm.serializeAddress(c, "kMinterImpl", output.contracts.kMinterImpl);
@@ -715,7 +711,6 @@ abstract contract DeploymentManager is Script {
         vm.serializeAddress(c, "WalletUSDC", output.contracts.WalletUSDC);
         vm.serializeAddress(c, "erc20ExecutionValidator", output.contracts.erc20ExecutionValidator);
         vm.serializeAddress(c, "minimalSmartAccountImpl", output.contracts.minimalSmartAccountImpl);
-        vm.serializeAddress(c, "minimalSmartAccountFactory", output.contracts.minimalSmartAccountFactory);
         string memory contractsJson =
             vm.serializeAddress(c, "insuranceSmartAccount", output.contracts.insuranceSmartAccount);
 
@@ -968,8 +963,8 @@ abstract contract DeploymentManager is Script {
         if (!verbose) return;
 
         console.log("--- DEPLOYED CONTRACT DEPENDENCIES ---");
-        if (existing.contracts.MinimalProxyFactory != address(0)) {
-            console.log("MinimalProxyFactory:   ", existing.contracts.MinimalProxyFactory);
+        if (existing.contracts.MinimalUUPSFactory != address(0)) {
+            console.log("MinimalUUPSFactory:", existing.contracts.MinimalUUPSFactory);
         }
         if (existing.contracts.kRegistry != address(0)) {
             console.log("kRegistry:        ", existing.contracts.kRegistry);

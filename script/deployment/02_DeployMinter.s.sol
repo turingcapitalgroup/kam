@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
+import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { kMinter } from "kam/src/kMinter.sol";
@@ -15,7 +15,7 @@ contract DeployMinterScript is Script, DeploymentManager {
 
     /// @notice Deploy kMinter contracts
     /// @param writeToJson If true, writes addresses to JSON (for real deployments)
-    /// @param factoryAddr Address of MinimalProxyFactory (if zero, reads from JSON)
+    /// @param factoryAddr Address of MinimalUUPSFactory (if zero, reads from JSON)
     /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
     /// @return deployment Struct containing deployed addresses
     function run(
@@ -33,12 +33,12 @@ contract DeployMinterScript is Script, DeploymentManager {
         // If addresses not provided, read from JSON (for real deployments)
         if (factoryAddr == address(0) || registryAddr == address(0)) {
             existing = readDeploymentOutput();
-            if (factoryAddr == address(0)) factoryAddr = existing.contracts.MinimalProxyFactory;
+            if (factoryAddr == address(0)) factoryAddr = existing.contracts.MinimalUUPSFactory;
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
         }
 
         // Populate existing for logging
-        existing.contracts.MinimalProxyFactory = factoryAddr;
+        existing.contracts.MinimalUUPSFactory = factoryAddr;
         existing.contracts.kRegistry = registryAddr;
 
         // Log script header and configuration
@@ -48,7 +48,7 @@ contract DeployMinterScript is Script, DeploymentManager {
         logBroadcaster(config.roles.admin);
 
         // Validate dependencies
-        require(factoryAddr != address(0), "MinimalProxyFactory address required");
+        require(factoryAddr != address(0), "MinimalUUPSFactory address required");
         require(registryAddr != address(0), "kRegistry address required");
 
         logExecutionStart();
@@ -56,7 +56,7 @@ contract DeployMinterScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.admin);
 
         // Get factory reference
-        MinimalProxyFactory factory = MinimalProxyFactory(factoryAddr);
+        MinimalUUPSFactory factory = MinimalUUPSFactory(factoryAddr);
 
         // Deploy kMinter implementation
         kMinter minterImpl = new kMinter();
@@ -64,7 +64,6 @@ contract DeployMinterScript is Script, DeploymentManager {
         // Deploy proxy with initialization
         bytes memory initData = abi.encodeCall(kMinter.initialize, (registryAddr, config.roles.owner));
 
-        // Deploy proxy (UUPS owner controls upgrades via implementation)
         address minterProxy = factory.deployAndCall(address(minterImpl), initData);
 
         vm.stopBroadcast();

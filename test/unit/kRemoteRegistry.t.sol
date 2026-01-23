@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import { Test } from "forge-std/Test.sol";
-import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
+import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 
 import {
     KREMOTEREGISTRY_NOT_ALLOWED,
@@ -16,7 +16,7 @@ import { kRemoteRegistry } from "kam/src/kRegistry/kRemoteRegistry.sol";
 
 contract kRemoteRegistryTest is Test {
     kRemoteRegistry public registry;
-    MinimalProxyFactory public factory;
+    MinimalUUPSFactory public factory;
 
     address public owner;
     address public executor;
@@ -36,7 +36,7 @@ contract kRemoteRegistryTest is Test {
         testSelector = bytes4(keccak256("testFunction()"));
 
         // Deploy factory and registry
-        factory = new MinimalProxyFactory();
+        factory = new MinimalUUPSFactory();
         kRemoteRegistry impl = new kRemoteRegistry();
 
         bytes memory initData = abi.encodeCall(kRemoteRegistry.initialize, (owner));

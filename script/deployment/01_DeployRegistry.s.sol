@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
+import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 
@@ -37,7 +37,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.owner);
 
         // Deploy factory for proxy deployment (minimal proxy factory with no admin)
-        MinimalProxyFactory factory = new MinimalProxyFactory();
+        MinimalUUPSFactory factory = new MinimalUUPSFactory();
 
         // Deploy kRegistry implementation
         kRegistry registryImpl = new kRegistry();
@@ -55,7 +55,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
             )
         );
 
-        // Deploy proxy (UUPS owner controls upgrades via implementation)
+        // Deploy proxy
         address registryProxy = factory.deployAndCall(address(registryImpl), initData);
 
         // Deploy kTokenFactory with registry and factory (registry will call deployKToken)
@@ -72,7 +72,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
         vm.stopBroadcast();
 
         _log("=== DEPLOYMENT COMPLETE ===");
-        _log("MinimalProxyFactory deployed at:", address(factory));
+        _log("MinimalUUPSFactory deployed at:", address(factory));
         _log("kRegistry implementation deployed at:", address(registryImpl));
         _log("kRegistry proxy deployed at:", registryProxy);
         _log("ExecutionGuardianModule deployed at:", address(executionGuardianModule));
@@ -90,7 +90,7 @@ contract DeployRegistryScript is Script, DeploymentManager {
 
         // Write to JSON only if requested (batch all writes for single I/O operation)
         if (writeToJson) {
-            queueContractAddress("MinimalProxyFactory", address(factory));
+            queueContractAddress("MinimalUUPSFactory", address(factory));
             queueContractAddress("kRegistryImpl", address(registryImpl));
             queueContractAddress("kRegistry", registryProxy);
             queueContractAddress("ExecutionGuardianModule", address(executionGuardianModule));
