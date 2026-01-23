@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import { Test } from "forge-std/Test.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 
 import {
     KREMOTEREGISTRY_NOT_ALLOWED,
@@ -16,7 +16,7 @@ import { kRemoteRegistry } from "kam/src/kRegistry/kRemoteRegistry.sol";
 
 contract kRemoteRegistryTest is Test {
     kRemoteRegistry public registry;
-    ERC1967Factory public factory;
+    MinimalUUPSFactory public factory;
 
     address public owner;
     address public executor;
@@ -36,11 +36,11 @@ contract kRemoteRegistryTest is Test {
         testSelector = bytes4(keccak256("testFunction()"));
 
         // Deploy factory and registry
-        factory = new ERC1967Factory();
+        factory = new MinimalUUPSFactory();
         kRemoteRegistry impl = new kRemoteRegistry();
 
         bytes memory initData = abi.encodeCall(kRemoteRegistry.initialize, (owner));
-        address proxy = factory.deployAndCall(address(impl), address(this), initData);
+        address proxy = factory.deployAndCall(address(impl), initData);
 
         registry = kRemoteRegistry(proxy);
     }
@@ -58,7 +58,7 @@ contract kRemoteRegistryTest is Test {
         bytes memory initData = abi.encodeCall(kRemoteRegistry.initialize, (address(0)));
 
         vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
-        factory.deployAndCall(address(impl), address(this), initData);
+        factory.deployAndCall(address(impl), initData);
     }
 
     /* //////////////////////////////////////////////////////////////

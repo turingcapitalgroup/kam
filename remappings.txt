@@ -11,6 +11,7 @@ kam/script/=script/
 kam/src/=src/
 kam/test/=test/
 minimal-smart-account/=dependencies/minimal-smart-account-1.0/src/
+minimal-uups-factory/=dependencies/minimal-uups-factory-1.0/src/
 openzeppelin/=src/vendor/openzeppelin/
 solady/=src/vendor/solady/
 solidity-bytes-utils/=dependencies/kToken0-1.0/dependencies/gnsps-solidity-bytes-utils-0.8.4/

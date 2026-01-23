@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 
@@ -34,7 +34,7 @@ contract DeployRemoteRegistryScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.owner);
 
         // Deploy factory for proxy deployment (or reuse existing one)
-        ERC1967Factory factory = new ERC1967Factory();
+        MinimalUUPSFactory factory = new MinimalUUPSFactory();
 
         // Deploy kRemoteRegistry implementation
         kRemoteRegistry registryImpl = new kRemoteRegistry();
@@ -42,12 +42,12 @@ contract DeployRemoteRegistryScript is Script, DeploymentManager {
         // Deploy proxy with initialization
         bytes memory initData = abi.encodeCall(kRemoteRegistry.initialize, (config.roles.owner));
 
-        address registryProxy = factory.deployAndCall(address(registryImpl), msg.sender, initData);
+        address registryProxy = factory.deployAndCall(address(registryImpl), initData);
 
         vm.stopBroadcast();
 
         _log("=== DEPLOYMENT COMPLETE ===");
-        _log("ERC1967Factory deployed at:", address(factory));
+        _log("MinimalUUPSFactory deployed at:", address(factory));
         _log("kRemoteRegistry implementation deployed at:", address(registryImpl));
         _log("kRemoteRegistry proxy deployed at:", registryProxy);
         _log("Network:", config.network);
@@ -59,7 +59,7 @@ contract DeployRemoteRegistryScript is Script, DeploymentManager {
 
         // Write to JSON only if requested (for real deployments)
         if (writeToJson) {
-            writeContractAddress("ERC1967Factory", address(factory));
+            writeContractAddress("MinimalUUPSFactory", address(factory));
             writeContractAddress("kRemoteRegistryImpl", address(registryImpl));
             writeContractAddress("kRemoteRegistry", registryProxy);
         }
