@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
+import { MinimalUUPSFactory } from "src/vendor/solady/utils/MinimalUUPSFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 
@@ -34,7 +34,7 @@ contract DeployRemoteRegistryScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.owner);
 
         // Deploy factory for proxy deployment (or reuse existing one)
-        MinimalProxyFactory factory = new MinimalProxyFactory();
+        MinimalUUPSFactory factory = new MinimalUUPSFactory();
 
         // Deploy kRemoteRegistry implementation
         kRemoteRegistry registryImpl = new kRemoteRegistry();
@@ -48,7 +48,7 @@ contract DeployRemoteRegistryScript is Script, DeploymentManager {
         vm.stopBroadcast();
 
         _log("=== DEPLOYMENT COMPLETE ===");
-        _log("MinimalProxyFactory deployed at:", address(factory));
+        _log("MinimalUUPSFactory deployed at:", address(factory));
         _log("kRemoteRegistry implementation deployed at:", address(registryImpl));
         _log("kRemoteRegistry proxy deployed at:", registryProxy);
         _log("Network:", config.network);
@@ -60,7 +60,7 @@ contract DeployRemoteRegistryScript is Script, DeploymentManager {
 
         // Write to JSON only if requested (for real deployments)
         if (writeToJson) {
-            writeContractAddress("MinimalProxyFactory", address(factory));
+            writeContractAddress("MinimalUUPSFactory", address(factory));
             writeContractAddress("kRemoteRegistryImpl", address(registryImpl));
             writeContractAddress("kRemoteRegistry", registryProxy);
         }

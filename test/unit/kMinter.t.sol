@@ -6,7 +6,7 @@ import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { Initializable } from "solady/utils/Initializable.sol";
-import { MinimalProxyFactory } from "src/vendor/solady/utils/MinimalProxyFactory.sol";
+import { MinimalUUPSFactory } from "src/vendor/solady/utils/MinimalUUPSFactory.sol";
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { kBase } from "kam/src/base/kBase.sol";
@@ -72,7 +72,7 @@ contract kMinterTest is DeploymentBaseTest {
 
         bytes memory initData = abi.encodeCall(kMinter.initialize, (address(0), users.admin));
 
-        MinimalProxyFactory factory = new MinimalProxyFactory();
+        MinimalUUPSFactory factory = new MinimalUUPSFactory();
 
         vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
         factory.deployAndCall(address(newMinterImpl), initData);
@@ -83,7 +83,7 @@ contract kMinterTest is DeploymentBaseTest {
 
         bytes memory initData = abi.encodeCall(kMinter.initialize, (address(registry), ZERO_ADDRESS));
 
-        MinimalProxyFactory factory = new MinimalProxyFactory();
+        MinimalUUPSFactory factory = new MinimalUUPSFactory();
 
         vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
         factory.deployAndCall(address(newMinterImpl), initData);
