@@ -306,7 +306,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 **Deployment Process**:
 
 1. Factory constructor deploys shared kToken implementation contract (reused by all kTokens)
-2. Factory constructor creates ERC1967Factory instance for proxy deployments
+2. Factory constructor receives a pre-deployed MinimalUUPSFactory for proxy deployments
 3. Registry calls `deployKToken(owner, admin, emergencyAdmin, minter, name, symbol, decimals)` when registering new asset
 4. Factory uses `proxyFactory.deployAndCall()` to atomically deploy proxy and initialize it (prevents frontrunning)
 5. Initialization grants roles: owner, admin, emergency admin, and minter role to kMinter

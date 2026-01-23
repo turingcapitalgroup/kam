@@ -197,7 +197,7 @@ verify-mainnet: print-profile
 	@echo "Verifying kAssetRouter implementation..."
 	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kAssetRouterImpl' deployments/output/mainnet/addresses.json) src/kAssetRouter.sol:kAssetRouter --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying kTokenFactory..."
-	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/mainnet/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json) $$(jq -r '.contracts.ERC1967Factory' deployments/output/mainnet/addresses.json)) --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/mainnet/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json) $$(jq -r '.contracts.MinimalUUPSFactory' deployments/output/mainnet/addresses.json)) --watch || true
 	@echo "Verifying kToken implementation (via kTokenFactory.implementation())..."
 	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(cast call $$(jq -r '.contracts.kTokenFactory' deployments/output/mainnet/addresses.json) "implementation()(address)" --rpc-url ${RPC_MAINNET}) src/kToken.sol:kToken --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo "Verifying kStakingVault implementation..."
@@ -212,8 +212,6 @@ verify-mainnet: print-profile
 	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.erc20ExecutionValidator' deployments/output/mainnet/addresses.json) src/adapters/parameters/ERC20ExecutionValidator.sol:ERC20ExecutionValidator --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/mainnet/addresses.json)) --watch || true
 	@echo "Verifying MinimalSmartAccount implementation..."
 	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.minimalSmartAccountImpl' deployments/output/mainnet/addresses.json) dependencies/minimal-smart-account-1.0/src/MinimalSmartAccount.sol:MinimalSmartAccount --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
-	@echo "Verifying MinimalSmartAccountFactory..."
-	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.minimalSmartAccountFactory' deployments/output/mainnet/addresses.json) dependencies/minimal-smart-account-1.0/src/MinimalSmartAccountFactory.sol:MinimalSmartAccountFactory --chain-id 1 --etherscan-api-key ${ETHERSCAN_MAINNET_KEY} --watch || true
 	@echo ""
 	@echo "Note: kUSD/kBTC are ERC1967 proxies - Etherscan will auto-detect them once kToken implementation is verified"
 	@echo "✅ Mainnet verification complete!"
@@ -232,7 +230,7 @@ verify-sepolia: print-profile
 	@echo "Verifying kAssetRouter implementation..."
 	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kAssetRouterImpl' deployments/output/sepolia/addresses.json) src/kAssetRouter.sol:kAssetRouter --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying kTokenFactory..."
-	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/sepolia/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json) $$(jq -r '.contracts.ERC1967Factory' deployments/output/sepolia/addresses.json)) --watch || true
+	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.kTokenFactory' deployments/output/sepolia/addresses.json) src/kTokenFactory.sol:kTokenFactory --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address,address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json) $$(jq -r '.contracts.MinimalUUPSFactory' deployments/output/sepolia/addresses.json)) --watch || true
 	@echo "Verifying kToken implementation (via kTokenFactory.implementation())..."
 	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(cast call $$(jq -r '.contracts.kTokenFactory' deployments/output/sepolia/addresses.json) "implementation()(address)" --rpc-url ${RPC_SEPOLIA}) src/kToken.sol:kToken --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo "Verifying kStakingVault implementation..."
@@ -247,8 +245,6 @@ verify-sepolia: print-profile
 	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.erc20ExecutionValidator' deployments/output/sepolia/addresses.json) src/adapters/parameters/ERC20ExecutionValidator.sol:ERC20ExecutionValidator --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --constructor-args $$(cast abi-encode "constructor(address)" $$(jq -r '.contracts.kRegistry' deployments/output/sepolia/addresses.json)) --watch || true
 	@echo "Verifying MinimalSmartAccount implementation..."
 	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.minimalSmartAccountImpl' deployments/output/sepolia/addresses.json) dependencies/minimal-smart-account-1.0/src/MinimalSmartAccount.sol:MinimalSmartAccount --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
-	@echo "Verifying MinimalSmartAccountFactory..."
-	@FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge verify-contract $$(jq -r '.contracts.minimalSmartAccountFactory' deployments/output/sepolia/addresses.json) dependencies/minimal-smart-account-1.0/src/MinimalSmartAccountFactory.sol:MinimalSmartAccountFactory --chain-id 11155111 --etherscan-api-key ${ETHERSCAN_SEPOLIA_KEY} --watch || true
 	@echo ""
 	@echo "Note: kUSD/kBTC are ERC1967 proxies - Etherscan will auto-detect them once kToken implementation is verified"
 	@echo "✅ Sepolia verification complete!"

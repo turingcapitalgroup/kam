@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { kAssetRouter } from "kam/src/kAssetRouter.sol";
@@ -15,7 +15,7 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
 
     /// @notice Deploy kAssetRouter contracts
     /// @param writeToJson If true, writes addresses to JSON (for real deployments)
-    /// @param factoryAddr Address of ERC1967Factory (if zero, reads from JSON)
+    /// @param factoryAddr Address of MinimalUUPSFactory (if zero, reads from JSON)
     /// @param registryAddr Address of kRegistry (if zero, reads from JSON)
     /// @return deployment Struct containing deployed addresses
     function run(
@@ -33,12 +33,12 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         // If addresses not provided, read from JSON (for real deployments)
         if (factoryAddr == address(0) || registryAddr == address(0)) {
             existing = readDeploymentOutput();
-            if (factoryAddr == address(0)) factoryAddr = existing.contracts.ERC1967Factory;
+            if (factoryAddr == address(0)) factoryAddr = existing.contracts.MinimalUUPSFactory;
             if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
         }
 
         // Populate existing for logging
-        existing.contracts.ERC1967Factory = factoryAddr;
+        existing.contracts.MinimalUUPSFactory = factoryAddr;
         existing.contracts.kRegistry = registryAddr;
 
         // Log script header and configuration
@@ -49,7 +49,7 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         logBroadcaster(config.roles.admin);
 
         // Validate dependencies
-        require(factoryAddr != address(0), "ERC1967Factory address required");
+        require(factoryAddr != address(0), "MinimalUUPSFactory address required");
         require(registryAddr != address(0), "kRegistry address required");
 
         logExecutionStart();
@@ -57,7 +57,7 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         vm.startBroadcast(config.roles.admin);
 
         // Get factory reference
-        ERC1967Factory factory = ERC1967Factory(factoryAddr);
+        MinimalUUPSFactory factory = MinimalUUPSFactory(factoryAddr);
 
         // Deploy kAssetRouter implementation
         kAssetRouter assetRouterImpl = new kAssetRouter();
@@ -65,7 +65,7 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         // Deploy proxy with initialization
         bytes memory initData = abi.encodeCall(kAssetRouter.initialize, (registryAddr, config.roles.owner));
 
-        address assetRouterProxy = factory.deployAndCall(address(assetRouterImpl), msg.sender, initData);
+        address assetRouterProxy = factory.deployAndCall(address(assetRouterImpl), initData);
 
         // Set settlement cooldown from config
         kAssetRouter assetRouter = kAssetRouter(payable(assetRouterProxy));

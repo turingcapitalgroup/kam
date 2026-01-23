@@ -555,11 +555,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         assertEq(maxAssets, newMax);
     }
 
-    function test_receiverImplementation_ReturnsAddress() public view {
-        address receiverImpl = vault.receiverImplementation();
-        assertNotEq(receiverImpl, address(0));
-    }
-
     /* //////////////////////////////////////////////////////////////
                         CONTRACT METADATA TESTS
     //////////////////////////////////////////////////////////////*/
@@ -625,7 +620,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         // Config
         vault.maxTotalAssets();
-        vault.receiverImplementation();
 
         // Metadata
         vault.contractName();

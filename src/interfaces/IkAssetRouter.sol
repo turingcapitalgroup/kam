@@ -469,5 +469,14 @@ interface IkAssetRouter is IVersioned {
     /// @return count The number of pending proposals for the vault
     function getPendingProposalCount(address vault_) external view returns (uint256 count);
 
+    /// @notice Gets the total pending asset requests for a source vault across all batches
+    /// @dev Used to track cumulative pending requests to prevent cross-batch over-requests.
+    /// This ensures that multiple staking vault batches cannot collectively exceed the source vault's
+    /// virtual balance. The value is incremented on kAssetTransfer and decremented on settlement.
+    /// @param sourceVault The source vault address (typically kMinter) to query
+    /// @param asset The asset address to check pending requests for
+    /// @return The total pending asset requests for this source vault and asset combination
+    function getGlobalPendingRequests(address sourceVault, address asset) external view returns (uint256);
+
     // contractName() and contractVersion() functions are inherited from IVersioned
 }

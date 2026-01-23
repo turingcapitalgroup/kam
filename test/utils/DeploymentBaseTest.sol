@@ -4,8 +4,8 @@ pragma solidity 0.8.30;
 import { BaseTest } from "./BaseTest.sol";
 import { _1_USDC, _1_WBTC } from "./Constants.sol";
 import { Utilities } from "./Utilities.sol";
+import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
 
 // Protocol contracts
 
@@ -46,7 +46,7 @@ import { MockWallet } from "kam/test/mocks/MockWallet.sol";
 
 contract DeploymentBaseTest is BaseTest {
     // Core protocol contracts (proxied)
-    ERC1967Factory public factory;
+    MinimalUUPSFactory public factory;
     kRegistry public registry;
     kAssetRouter public assetRouter;
     kToken public kUSD;
@@ -235,12 +235,12 @@ contract DeploymentBaseTest is BaseTest {
         DeployInsuranceAccountScript insuranceScript = new DeployInsuranceAccountScript();
         insuranceScript.setVerbose(false);
         DeployInsuranceAccountScript.InsuranceDeployment memory insuranceDeploy =
-            insuranceScript.run(false, _registryDeploy.registry, address(0), address(0));
+            insuranceScript.run(false, _registryDeploy.factory, _registryDeploy.registry, address(0));
         insuranceSmartAccount = insuranceDeploy.insuranceSmartAccount;
     }
 
     function _assignContractReferences() internal {
-        factory = ERC1967Factory(_registryDeploy.factory);
+        factory = MinimalUUPSFactory(_registryDeploy.factory);
         registryImpl = kRegistry(payable(_registryDeploy.registryImpl));
         registry = kRegistry(payable(_registryDeploy.registry));
 
@@ -277,7 +277,7 @@ contract DeploymentBaseTest is BaseTest {
      * @notice Label contracts for debugging
      */
     function _labelContracts() internal {
-        vm.label(address(factory), "ERC1967Factory");
+        vm.label(address(factory), "MinimalUUPSFactory");
         vm.label(address(registry), "kRegistry");
         vm.label(address(registryImpl), "kRegistryImpl");
         vm.label(address(assetRouter), "kAssetRouter");

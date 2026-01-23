@@ -411,11 +411,6 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
         return _getBaseVaultStorage().maxTotalAssets;
     }
 
-    /// @inheritdoc IVaultReader
-    function receiverImplementation() external view returns (address) {
-        return _getBaseVaultStorage().receiverImplementation;
-    }
-
     /// @inheritdoc IVersioned
     function contractName() external pure returns (string memory) {
         return "kStakingVault";
@@ -465,9 +460,8 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
         moduleSelectors[33] = this.getStakeRequest.selector;
         moduleSelectors[34] = this.getUnstakeRequest.selector;
         moduleSelectors[35] = this.maxTotalAssets.selector;
-        moduleSelectors[36] = this.receiverImplementation.selector;
-        moduleSelectors[37] = this.contractName.selector;
-        moduleSelectors[38] = this.contractVersion.selector;
+        moduleSelectors[36] = this.contractName.selector;
+        moduleSelectors[37] = this.contractVersion.selector;
         return moduleSelectors;
     }
 }
