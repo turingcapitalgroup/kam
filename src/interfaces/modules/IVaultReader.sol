@@ -238,8 +238,4 @@ interface IVaultReader is IVersioned {
     /// @notice Returns the maximum total assets (TVL cap) allowed in the vault
     /// @return The maximum total assets in underlying token terms
     function maxTotalAssets() external view returns (uint128);
-
-    /// @notice Returns the receiver implementation address used to clone batch receivers
-    /// @return The address of the receiver implementation contract
-    function receiverImplementation() external view returns (address);
 }

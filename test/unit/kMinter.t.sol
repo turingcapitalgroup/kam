@@ -5,7 +5,7 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
-import { ERC1967Factory } from "solady/utils/ERC1967Factory.sol";
+import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
@@ -72,10 +72,10 @@ contract kMinterTest is DeploymentBaseTest {
 
         bytes memory initData = abi.encodeCall(kMinter.initialize, (address(0), users.admin));
 
-        ERC1967Factory factory = new ERC1967Factory();
+        MinimalUUPSFactory factory = new MinimalUUPSFactory();
 
         vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
-        factory.deployAndCall(address(newMinterImpl), users.admin, initData);
+        factory.deployAndCall(address(newMinterImpl), initData);
     }
 
     function test_Initialize_Require_Owner_Not_Zero_Address() public {
@@ -83,10 +83,10 @@ contract kMinterTest is DeploymentBaseTest {
 
         bytes memory initData = abi.encodeCall(kMinter.initialize, (address(registry), ZERO_ADDRESS));
 
-        ERC1967Factory factory = new ERC1967Factory();
+        MinimalUUPSFactory factory = new MinimalUUPSFactory();
 
         vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
-        factory.deployAndCall(address(newMinterImpl), users.admin, initData);
+        factory.deployAndCall(address(newMinterImpl), initData);
     }
 
     function test_Initialize_Require_Not_Initialized() public {
