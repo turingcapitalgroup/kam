@@ -10,6 +10,7 @@ import { kBase } from "kam/src/base/kBase.sol";
 import {
     KASSETROUTER_BATCH_ID_PROPOSED,
     KASSETROUTER_COOLDOWN_IS_UP,
+    KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_IS_PAUSED,
     KASSETROUTER_NOT_BATCH_CLOSED,
     KASSETROUTER_ONLY_KMINTER,
@@ -280,6 +281,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
 
         vm.prank(address(alphaVault));
+        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, 1, _batchId);
     }
 
