@@ -94,6 +94,30 @@ interface IExecutionGuardian {
     /// @return targets an array of possible targets used by the executor
     function getExecutorTargets(address executor) external view returns (address[] memory targets);
 
+    /// @notice Gets all allowed selectors for an executor on a specific target
+    /// @param executor The executor address
+    /// @param target The target contract address
+    /// @return selectors An array of allowed function selectors
+    function getExecutorTargetSelectors(
+        address executor,
+        address target
+    )
+        external
+        view
+        returns (bytes4[] memory selectors);
+
+    /// @notice Gets executor targets filtered by target type
+    /// @param executor The executor address
+    /// @param targetType_ The target type to filter by (e.g., 0 = METAVAULT, 1 = CUSTODIAL)
+    /// @return targets An array of target addresses matching the specified type
+    function getExecutorTargetsByType(
+        address executor,
+        uint8 targetType_
+    )
+        external
+        view
+        returns (address[] memory targets);
+
     /// @notice Gets the type of a target
     /// @param target The target address to check the type of
     /// @return type An array of allowed target addresses for the executor
