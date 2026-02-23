@@ -126,7 +126,7 @@ interface IExecutionGuardian {
     enum TargetType {
         METAVAULT,
         CUSTODIAL,
-        TARGET_03,
+        ASSET,
         TARGET_04,
         TARGET_05,
         TARGET_06,

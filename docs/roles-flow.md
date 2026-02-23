@@ -72,7 +72,7 @@ The KAM Protocol implements a comprehensive role-based access control system usi
   - `kStakingVault.setPaused()` - Pause staking vault
   - `kToken.setPaused()` - Pause token operations
   - `VaultAdapter.setPaused()` - Pause adapter operations
-  - `kRegistry.rescueAssets()` - Emergency asset recovery
+  - `kRegistry.setGlobalPause()` - Protocol-wide pause
 
 ### GUARDIAN_ROLE
 
@@ -103,6 +103,7 @@ The KAM Protocol implements a comprehensive role-based access control system usi
   - `kMinter.createNewBatch()` - Create new minting batches
   - `kStakingVault.createNewBatch()` - Create new staking batches
   - `kStakingVault.closeBatch()` - Close staking batches
+- **Note**: `executeSettleBatch()` is permissionless (anyone can call after cooldown + optional approval)
 
 ### INSTITUTION_ROLE
 
@@ -153,8 +154,8 @@ The KAM Protocol implements a comprehensive role-based access control system usi
   - Unfreeze accounts to restore transfer capability
   - Compliance and security incident response
 - **Key Functions**:
-  - `kToken.freezeAccount()` - Freeze an account
-  - `kToken.unfreezeAccount()` - Unfreeze an account
+  - `kToken.freeze()` - Freeze an account
+  - `kToken.unfreeze()` - Unfreeze an account
   - `kToken.isFrozen()` - Check if an account is frozen
 - **Restrictions**:
   - Cannot freeze the owner address
@@ -196,22 +197,31 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 ├───────────────────────────────────────────────────────────---──────┤
 │                                                                    │
 │  RELAYER_ROLE Required:                                            │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐ │
-│  │Close Batch      │    │Propose          │    │Execute          │ │
-│  │(stop requests)  │    │Settlement       │    │Settlement       │ │
-│  │                 │    │                 │    │                 │ │
-│  │closeBatch()     │    │proposeSettle    │    │executeSettle    │ │
-│  │                 │    │Batch()          │    │Batch()          │ │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘ │
-│           │                       │                       │        │
-│           ▼                       ▼                       ▼        │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐ │
-│  │Batch State:     │    │Cooldown Period  │    │Settlement       │ │
-│  │CLOSED           │    │(1 hour default) │    │Executed         │ │
-│  │                 │    │                 │    │                 │ │
-│  │No new requests  │    │Guardian can     │    │Assets           │ │
-│  │accepted         │    │cancel proposal  │    │distributed      │ │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘ │
+│  ┌─────────────────┐    ┌─────────────────┐                        │
+│  │Close Batch      │    │Propose          │                        │
+│  │(stop requests)  │    │Settlement       │                        │
+│  │                 │    │                 │                        │
+│  │closeBatch()     │    │proposeSettle    │                        │
+│  │                 │    │Batch()          │                        │
+│  └─────────────────┘    └─────────────────┘                        │
+│           │                       │                                │
+│           ▼                       ▼                                │
+│  ┌─────────────────┐    ┌─────────────────┐                        │
+│  │Batch State:     │    │Cooldown Period  │                        │
+│  │CLOSED           │    │(1 hour default) │                        │
+│  │                 │    │                 │                        │
+│  │No new requests  │    │Guardian can     │                        │
+│  │accepted         │    │cancel proposal  │                        │
+│  └─────────────────┘    └─────────────────┘                        │
+│                                                                    │
+│  Permissionless (after cooldown + optional approval):              │
+│  ┌─────────────────┐    ┌─────────────────┐                        │
+│  │Execute          │    │Settlement       │                        │
+│  │Settlement       │    │Executed         │                        │
+│  │                 │    │                 │                        │
+│  │executeSettle    │───▶│Assets           │                        │
+│  │Batch()          │    │distributed      │                        │
+│  └─────────────────┘    └─────────────────┘                        │
 │                                                                    │
 │  GUARDIAN_ROLE (Optional):                                         │
 │  ┌─────────────────┐    ┌─────────────────┐                        │
@@ -310,7 +320,6 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  RELAYER_ROLE Functions:                                        │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │• proposeSettleBatch() - Propose settlement                  ││
-│  │• executeSettleBatch() - Execute settlement                  ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 │  GUARDIAN_ROLE Functions:                                       │
@@ -318,6 +327,18 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  │• cancelProposal() - Cancel settlement proposal              ││
 │  │• acceptProposal() - Approve high-yield-delta proposals      ││
 │  │  (proposals exceeding yield tolerance require approval)     ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  ADMIN_ROLE Functions:                                          │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │• setSettlementCooldown() - Configure cooldown period        ││
+│  │• setMaxAllowedDelta() - Configure yield tolerance           ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  Permissionless Functions:                                      │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │• executeSettleBatch() - Execute settlement after cooldown   ││
+│  │  (anyone can call once cooldown + approval is met)          ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -401,11 +422,7 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  ┌─────────────────────────────────────────────────────────────┐ │
 │  │• setHurdleRate() - Set performance thresholds per asset     │ │
 │  │• setBatchLimits() - Set max mint/redeem per batch           │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  EMERGENCY_ADMIN_ROLE Functions:                                 │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │• rescueAssets() - Emergency asset recovery                  │ │
+│  │• rescueAssets() - Emergency asset recovery (ADMIN_ROLE)     │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                  │
 └────────────────────────────────────────────────────────────────-─┘
@@ -458,8 +475,8 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │                                                                 │
 │  BLACKLIST_ADMIN_ROLE Functions (USDC-style compliance):        │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │• freezeAccount() - Freeze account (blocks all transfers)    ││
-│  │• unfreezeAccount() - Unfreeze account                       ││
+│  │• freeze() - Freeze account (blocks all transfers)            ││
+│  │• unfreeze() - Unfreeze account                              ││
 │  │  Note: Owner cannot be frozen. address(0) cannot be frozen. ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
@@ -492,11 +509,12 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │__kBaseRoles_init():                                         ││
 │  │• owner_ → OWNER                                             ││
-│  │• admin_ → ADMIN_ROLE                                        ││
+│  │• admin_ → ADMIN_ROLE + VENDOR_ROLE                          ││
 │  │• emergencyAdmin_ → EMERGENCY_ADMIN_ROLE                     ││
 │  │• guardian_ → GUARDIAN_ROLE                                  ││
-│  │• relayer_ → RELAYER_ROLE                                    ││
-│  │Note: VENDOR_ROLE and MANAGER_ROLE granted separately       ││
+│  │• relayer_ → RELAYER_ROLE + MANAGER_ROLE                     ││
+│  │Note: Admin receives VENDOR_ROLE to bootstrap institution    ││
+│  │onboarding. Relayer receives MANAGER_ROLE to execute adapters││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -586,10 +604,10 @@ function _isRelayer(address user) internal view returns (bool) {
 ```
 Day 0:              Day 1:              Day 2:              Day 3:
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│Institution  │     │RELAYER      │     │RELAYER      │     │Institution  │
+│Institution  │     │RELAYER      │     │Anyone       │     │Institution  │
 │Mints kTokens│     │Closes Batch │     │Executes     │     │Claims Assets│
-│(INSTITUTION │     │(RELAYER_ROLE│     │Settlement   │     │(INSTITUTION │
-│_ROLE)       │     │)            │     │(RELAYER_ROLE│     │_ROLE)       │
+│(INSTITUTION │     │& Proposes   │     │Settlement   │     │(INSTITUTION │
+│_ROLE)       │     │(RELAYER_ROLE│     │(Permissionl.│     │_ROLE)       │
 └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
 ```
 

@@ -66,7 +66,7 @@ Each kToken instance maintains strict peg enforcement through a sophisticated vi
 **Virtual Balance Implementation**: The virtual accounting system works as follows:
 
 - Each vault has a VaultAdapter that maintains `totalAssets()` representing virtual balance
-- kAssetRouter tracks pending deposits/withdrawals in `vaultBatchBalances[vault][batchId]`
+- kAssetRouter tracks pending deposits/withdrawals per vault per batch via `getBatchIdBalances(vault, batchId)`
 - Virtual balance = `adapter.totalAssets()` which is updated during settlement via `adapter.setTotalAssets()`
 - Settlement reconciles virtual balances with actual asset movements from external strategies
 
@@ -91,8 +91,8 @@ Each kToken instance maintains strict peg enforcement through a sophisticated vi
 │   ┌──────────────────────────────────────────────────────┐    │
 │   │ Contract calculates:                                 │    │
 │   │ netted = 200 - 50 = +150                             │    │
-│   │ totalAssetsAdjusted = 1100 - 150 = 950               │    │
-│   │ yield = 950 - 1000 = -50 (loss)                      │    │
+│   │ yield = 1100 - 1000 = +100 (profit)                  │    │
+│   │ totalAssetsAdjusted = 1100 + 150 = 1250              │    │
 │   │ executeAfter = now + cooldown                        │    │
 │   └──────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────-┘
@@ -112,11 +112,11 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
 
 **Settlement Proposal Mechanism**: The kAssetRouter implements a secure two-phase settlement:
 
-1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, chargeManagementFees, chargePerformanceFees)` providing the current total assets from external strategies and fee charging flags. The kAssetRouter contract automatically calculates:
+1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, lastFeesChargedManagement, lastFeesChargedPerformance)` providing the current total assets from external strategies and fee charge timestamps (`uint64`, 0 = no fees to charge). The kAssetRouter contract automatically calculates:
    - `netted` = deposited - requested amounts from batch balances
    - `lastTotalAssets` = current virtual balance via `adapter.totalAssets()`
-   - `totalAssetsAdjusted` = totalAssets_ - netted
-   - `yield` = totalAssetsAdjusted - lastTotalAssets
+   - `yield` = totalAssets_ - lastTotalAssets
+   - `totalAssetsAdjusted` = totalAssets_ + netted (stored as proposal's totalAssets for settlement execution)
    - `profit` = whether yield is positive or negative
    - Emits `YieldExceedsMaxDeltaWarning` if yield exceeds configured threshold (warning only, does not revert)
 
@@ -198,11 +198,11 @@ The VaultAdapter system provides secure, permission-based integration with exter
 │                                                               │
 │  1. Registration Phase                                        │
 │     kRegistry.registerAdapter(vault, asset, adapter)          │
-│     kRegistry.setAdapterAllowedSelector(adapter, target, f()) │
-│     kRegistry.setAdapterParametersChecker(adapter, checker)   │
+│     kRegistry.setAllowedSelector(adapter, target, type, f())  │
+│     kRegistry.setExecutionValidator(adapter, target, f(), v)  │
 │                                                               │
 │  2. Execution Phase                                           │
-│     Relayer ──calls──▶ VaultAdapter.execute(target, data)     │
+│     Manager ──calls──▶ VaultAdapter.execute(mode, calldata)   │
 │                      │                                        │
 │                      ▼                                        │
 │                 Permission Check:                             │
@@ -215,6 +215,34 @@ The VaultAdapter system provides secure, permission-based integration with exter
 │                                                               │
 │  3. Virtual Balance Update                                    │
 │     adapter.setTotalAssets() ←─ kAssetRouter (settlement)     │
+│                                                               │
+└─────────────────────────────────────────────────────────────--┘
+```
+
+### Target Type Classification
+
+The ExecutionGuardianModule assigns a `TargetType` to each target contract address. This enables type-based discovery — for example, the backend can query `getExecutorTargetsByType(adapter, 0)` to find all MetaWallet targets for a given adapter, without needing to know the addresses in advance.
+
+```
+┌─────────────────────────────────────────────────────────────--┐
+│                    Target Type System                          │
+├─────────────────────────────────────────────────────────────--┤
+│                                                               │
+│  Type 0 (METAVAULT): MetaWallet contracts (ERC-7540 vaults)   │
+│  Type 1 (CUSTODIAL): Custodial wallets (e.g., CEFFU)          │
+│  Type 2 (ASSET):     ERC20 token contracts (USDC, WBTC)       │
+│  Type 3-255:         Reserved for future use                  │
+│                                                               │
+│  Usage: targetType is a global property per target address.   │
+│  Set via setAllowedSelector(executor, target, type, sel, t/f) │
+│  Query via getTargetType(target) or                           │
+│         getExecutorTargetsByType(executor, type)              │
+│                                                               │
+│  Example - Backend Discovery Flow:                            │
+│  1. getAdapter(vault, asset)           → adapter address      │
+│  2. getExecutorTargetsByType(adapter,0)→ metawallet addresses  │
+│  3. getExecutorTargetsByType(adapter,1)→ custodial addresses   │
+│  4. getExecutorTargetsByType(adapter,2)→ asset addresses       │
 │                                                               │
 └─────────────────────────────────────────────────────────────--┘
 ```
@@ -246,7 +274,7 @@ The kAssetRouter serves as the central coordinator for all asset movements withi
 │                                                             │
 │  Admin Configuration:                                       │
 │  • setSettlementCooldown() - Configure cooldown period      │
-│  • updateYieldTolerance() - Configure yield limits          │
+│  • setMaxAllowedDelta() - Configure yield limits            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -310,7 +338,7 @@ During settlement execution, the system handles kMinter versus regular vault set
 │ ┌──────────────┐                            Phase 3 is only required                    │
 │ │ kAssetRouter │  Contract calculates:      when |yield| > maxAllowedDelta              │
 │ │              │  • netted = deposited - requested                                      │
-│ │              │  • yield = totalAssets - netted - lastTotalAssets                      │
+│ │              │  • yield = totalAssets - lastTotalAssets                               │
 │ │              │  • profit = yield > 0                                                  │
 │ │              │  • requiresApproval = (|yield| > tolerance)                            │
 │ └──────────────┘                                                                        │
@@ -325,7 +353,7 @@ Single vault contract implementation deployed per asset type, enabling retail us
 
 The kStakingVault is implemented as a unified contract that inherits from multiple base contracts to provide comprehensive staking functionality. The contract combines BaseVault, Initializable, UUPSUpgradeable, Ownable, and MultiFacetProxy to create a complete staking solution.
 
-**Core Architecture**: The vault implements all staking functionality directly within the main contract, including batch processing, fee management, and claim processing. It uses ERC-7201 namespaced storage for upgrade safety, integrates with kRegistry for system-wide configuration, implements role-based permissions, and uses ReentrancyGuardTransient for gas-efficient protection.
+**Core Architecture**: The vault implements all staking functionality directly within the main contract, including batch processing, fee management, and claim processing. It uses ERC-7201 namespaced storage for upgrade safety, integrates with kRegistry for system-wide configuration, implements role-based permissions, and uses OptimizedReentrancyGuardTransient for gas-efficient protection.
 
 **BaseVault Integration**: Provides foundational vault logic including ERC20 token functionality for stkTokens. These tokens represent staked positions and automatically accrue yield through share price appreciation. The BaseVault handles core mathematical operations for asset-to-share conversions and fee calculations.
 
@@ -354,12 +382,13 @@ Secure execution proxy contracts deployed per vault for controlled external stra
 **Deployment Architecture:**
 
 - **One adapter per vault per asset**: Each vault-asset combination gets its own VaultAdapter for isolated operations
-- **Granular Permission System**: Each adapter has specific target contracts and function selectors it can call, validated via `registry.isAdapterSelectorAllowed(adapter, target, selector)`
-- **Parameter Validation**: Optional parameter checkers can be configured per adapter to validate call data parameters
+- **Granular Permission System**: Each adapter has specific target contracts and function selectors it can call, validated via `registry.isSelectorAllowed(adapter, target, selector)` through the ExecutionGuardianModule
+- **Parameter Validation**: Optional execution validators can be configured per adapter-target-selector combination to validate call data parameters
+- **Target Type Classification**: Each target is classified by type (METAVAULT=0, CUSTODIAL=1, ASSET=2) enabling type-based queries via `getExecutorTargetsByType()`
 
 **Core Functions:**
 
-- **`execute(target, data, value)`**: Manager-only function (via MANAGER_ROLE) that validates permissions through registry and executes calls to external strategies
+- **`execute(ModeCode mode, bytes calldata executionCalldata)`**: Manager-only function (via MANAGER_ROLE) using ERC-7579 execution model that validates permissions through registry and executes calls to external strategies
 - **`setTotalAssets(uint256)`**: kAssetRouter-only function to update virtual balance tracking for settlement calculations  
 - **`totalAssets()`**: Returns current virtual balance for vault accounting
 - **`pull(asset, amount)`**: kAssetRouter-only function to transfer assets during settlement
@@ -373,8 +402,8 @@ Secure execution proxy contracts deployed per vault for controlled external stra
 **Security Model:**
 
 - Only addresses with MANAGER_ROLE can execute calls through adapters
-- kRegistry validates each target contract and function selector via `isAdapterSelectorAllowed()`
-- Optional parameter checkers can enforce additional validation rules
+- kRegistry validates each target contract and function selector via `isSelectorAllowed()` (ExecutionGuardianModule)
+- Optional execution validators can enforce additional parameter validation rules (e.g., ERC20ExecutionValidator for transfer allowlists)
 - Emergency pause (EMERGENCY_ADMIN_ROLE) and asset rescue (ADMIN_ROLE) capabilities for risk management
 - kAssetRouter has exclusive access to `setTotalAssets()` and `pull()` functions
 
@@ -553,22 +582,24 @@ The protocol implements a multi-layered emergency response system with global pa
 
 Management fees accrue continuously on assets under management, calculated on a per-second basis, collected during settlement operations, and are configurable per vault to accommodate different strategy types.
 
-**Default Configuration:**
+**Configuration:**
 
-- **Rate**: 2% annually (200 basis points)
-- **Calculation**: Continuous accrual based on `(totalAssets * managementFee * timeElapsed) / (365 days * 10000)`
+- **Rate**: Configurable per vault in basis points (initialized to 0, set operationally e.g. 200 bp = 2%)
+- **Calculation**: Continuous accrual based on `(totalAssets * managementFee * timeElapsed) / (SECS_PER_YEAR * 10000)` where `SECS_PER_YEAR = 31_556_952` (365.2425 days / Gregorian year)
 - **Collection**: During batch settlement via fee deduction from gross yield
 
 ### Performance Fees
 
 Performance fees are charged only on positive yield generation, calculated as a percentage of profits, distributed to the designated fee collector, with no fees charged on losses to align incentives properly.
 
-**Default Configuration:**
+**Configuration:**
 
-- **Rate**: 10% of profits (1000 basis points)
-- **Hurdle Rate**: Configurable threshold (default 0%) - fees only charged above this minimum return
+- **Rate**: Configurable per vault in basis points (initialized to 0, set operationally e.g. 1000 bp = 10%)
+- **Hurdle Rate**: Configurable threshold per asset (default 0%) - fees only charged above this minimum return
 - **Watermark**: High watermark system ensures fees only charged on net new profits
-- **Calculation**: `(positiveYield - hurdleAmount) * performanceFee / 10000` where yield exceeds watermark
+- **Hard Hurdle** (default): `(positiveYield - hurdleAmount) * performanceFee / 10000` — fees only on excess above hurdle
+- **Soft Hurdle**: `positiveYield * performanceFee / 10000` when yield exceeds hurdle — fees on all profits once hurdle is met
+- **Mode**: Configurable via `setHardHurdleRate(bool)` per vault
 
 ### Fee Calculation
 
@@ -578,7 +609,7 @@ The system uses precise mathematical calculations to determine fees based on tim
 
 ### Permission-Based Execution Model
 
-VaultAdapters use a secure execution model where only relayers can call external strategies through the `execute()` function. Each adapter has specific permissions configured in kRegistry:
+VaultAdapters use a secure execution model where only addresses with MANAGER_ROLE can call external strategies through the `execute()` function. Each adapter has specific permissions configured in kRegistry:
 
 - **Target Contract Validation**: Only whitelisted target contracts can be called
 - **Function Selector Validation**: Only approved function selectors are allowed per target
@@ -588,15 +619,15 @@ VaultAdapters use a secure execution model where only relayers can call external
 
 Each VaultAdapter integrates with kRegistry for:
 
-- **Role Verification**: Validates relayer, admin, and emergency admin roles
-- **Permission Checking**: Authorizes specific target/selector combinations through `setAdapterAllowedSelector()`
-- **Parameter Validation**: Routes calls through configured parameter checkers for additional security
+- **Role Verification**: Validates manager, admin, and emergency admin roles
+- **Permission Checking**: Authorizes specific target/selector combinations through `setAllowedSelector()` in the ExecutionGuardianModule
+- **Parameter Validation**: Routes calls through configured execution validators (via `setExecutionValidator()`) for additional security
 
 ### Virtual Balance Reporting
 
 VaultAdapters maintain virtual balance tracking for settlement operations:
 
-- **`setTotalAssets()`**: Admin-only function to update virtual balance after external strategy interactions
+- **`setTotalAssets()`**: kAssetRouter-only function to update virtual balance during settlement
 - **`totalAssets()`**: Returns current virtual balance for kAssetRouter settlement calculations
 - **Settlement Integration**: Virtual balances aggregated by kAssetRouter for accurate yield distribution
 
@@ -618,7 +649,7 @@ This ensures that:
 
 ### Transient Reentrancy Protection
 
-The protocol uses Solady's `ReentrancyGuardTransient` which leverages Solidity 0.8.30's transient storage opcodes (TSTORE/TLOAD) for gas-efficient reentrancy protection. This provides:
+The protocol uses Solady's `OptimizedReentrancyGuardTransient` which leverages Solidity 0.8.30's transient storage opcodes (TSTORE/TLOAD) for gas-efficient reentrancy protection. This provides:
 
 - Cheaper reentrancy protection than traditional storage-based guards  
 - Automatic cleanup after transaction completion
