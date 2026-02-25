@@ -214,16 +214,19 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         address[] memory _all = $.executorTargets[_executor].values();
         uint256 _len = _all.length;
 
-        _filtered = new address[](_len);
         uint256 _count;
         for (uint256 _i; _i < _len; ++_i) {
             if ($.targetType[_all[_i]] == _targetType) {
-                _filtered[_count++] = _all[_i];
+                ++_count;
             }
         }
-        
-        assembly {
-            mstore(_filtered, _count)
+
+        _filtered = new address[](_count);
+        uint256 _idx;
+        for (uint256 _i; _i < _len; ++_i) {
+            if ($.targetType[_all[_i]] == _targetType) {
+                _filtered[_idx++] = _all[_i];
+            }
         }
     }
 
