@@ -20,8 +20,8 @@
         "WBTC": "0x39169D95AD1cC822C3A2c5ca523DDa7666Cd65FC"
     },
     "custodialTargets": {
-        "walletUSDC": "0x0000000000000000000000000000000000000000",
-        "walletWBTC": "0x0000000000000000000000000000000000000000"
+        "walletUSDC": "0xB1Ff792A9eFCd1DaA951701b5860421259098d05",
+        "walletWBTC": "0xB1Ff792A9eFCd1DaA951701b5860421259098d05"
     },
     "kTokens": {
         "kUSD": {
@@ -173,7 +173,7 @@
     },
     "mockAssets": {
         "enabled": true,
-        "WalletUSDC": "0x0000000000000000000000000000000000000000",
+        "WalletUSDC": "0xB1Ff792A9eFCd1DaA951701b5860421259098d05",
         "mintAmounts": {
             "USDC": "10000000000000",
             "WBTC": "100000000000"

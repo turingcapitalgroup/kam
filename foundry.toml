@@ -67,6 +67,7 @@ sepolia = "${RPC_SEPOLIA}"
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_MAINNET_KEY}" }
+sepolia = { key = "${ETHERSCAN_SEPOLIA_KEY}" }
 
 [doc]
 out = "foundry-docs/"

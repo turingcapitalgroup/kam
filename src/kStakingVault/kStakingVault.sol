@@ -5,8 +5,6 @@ import { Ownable } from "solady/auth/Ownable.sol";
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 
-import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
-
 import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
 import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
 
@@ -62,7 +60,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     using OptimizedSafeCastLib for uint256;
     using OptimizedSafeCastLib for uint128;
     using OptimizedSafeCastLib for uint64;
-    using OptimizedFixedPointMathLib for uint256;
 
     /* //////////////////////////////////////////////////////////////
                               CONSTRUCTOR

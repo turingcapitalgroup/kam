@@ -39,11 +39,13 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
             bytes4 depositSelector = bytes4(abi.encodeWithSignature("deposit(uint256,address,address)"));
             bytes4 requestRedeemSelector = IERC7540.requestRedeem.selector;
             bytes4 redeemSelector = IERC7540.redeem.selector;
+            bytes4 withdrawSelector = IERC7540.withdraw.selector;
 
             registry.setAllowedSelector(executor, vault, 0, requestDepositSelector, true);
             registry.setAllowedSelector(executor, vault, 0, depositSelector, true);
             registry.setAllowedSelector(executor, vault, 0, requestRedeemSelector, true);
             registry.setAllowedSelector(executor, vault, 0, redeemSelector, true);
+            registry.setAllowedSelector(executor, vault, 0, withdrawSelector, true);
 
             registry.setAllowedSelector(executor, asset, 0, transferSelector, true);
             registry.setAllowedSelector(executor, asset, 0, approveSelector, true);
