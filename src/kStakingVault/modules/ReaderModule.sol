@@ -3,10 +3,8 @@ pragma solidity 0.8.30;
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { OptimizedDateTimeLib } from "solady/utils/OptimizedDateTimeLib.sol";
-import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { Extsload } from "uniswap/Extsload.sol";
 
-import { MAX_BPS } from "kam/src/constants/Constants.sol";
 import {
     KSTAKINGVAULT_NOT_INITIALIZED,
     KSTAKINGVAULT_VAULT_CLOSED,
@@ -16,15 +14,13 @@ import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IModule } from "kam/src/interfaces/modules/IModule.sol";
 import { BaseVaultTypes, IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
+import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 /// @title ReaderModule
 /// @notice Contains all the public getters for the Staking Vault
 contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
-    using OptimizedFixedPointMathLib for uint256;
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
 
-    /// @notice Number of seconds in a year
-    uint256 constant SECS_PER_YEAR = 31_556_952;
     /// @notice Number of months in a year
     uint256 constant MONTHS_PER_YEAR = 12;
 
@@ -55,63 +51,18 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
         returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        uint256 _lastSharePrice = $.sharePriceWatermark;
-
-        uint256 _lastFeesChargedManagement = _getLastFeesChargedManagement($);
-        uint256 _lastFeesChargedPerformance = _getLastFeesChargedPerformance($);
-
-        uint256 _durationManagement = block.timestamp - _lastFeesChargedManagement;
-        uint256 _durationPerformance = block.timestamp - _lastFeesChargedPerformance;
-        uint256 _currentTotalAssets = _totalAssets();
-        uint256 _lastTotalAssets = totalSupply().fullMulDiv(_lastSharePrice, 10 ** _getDecimals($));
-
-        // Calculate time-based fees (management)
-        // These are charged on total assets, prorated for the time period
-        managementFees =
-            (_currentTotalAssets * _durationManagement).fullMulDiv(_getManagementFee($), SECS_PER_YEAR) / MAX_BPS;
-        _currentTotalAssets -= managementFees;
-        totalFees = managementFees;
-
-        // Calculate the asset's value change since entry
-        // This gives us the raw profit/loss in asset terms after management fees
-        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
-        // forge-lint: disable-next-line(unsafe-typecast)
-        int256 _assetsDelta = int256(_currentTotalAssets) - int256(_lastTotalAssets);
-
-        // Only calculate fees if there's a profit
-        if (_assetsDelta > 0) {
-            uint256 _excessReturn;
-
-            // Calculate returns relative to hurdle rate
-            uint256 _hurdleReturn =
-                (_lastTotalAssets * _getHurdleRate($)).fullMulDiv(_durationPerformance, SECS_PER_YEAR) / MAX_BPS;
-
-            // Calculate returns relative to hurdle rate
-            // casting to 'uint256' is safe because _assetsDelta is positive in this branch
-            // forge-lint: disable-next-line(unsafe-typecast)
-            uint256 _totalReturn = uint256(_assetsDelta);
-
-            // Only charge performance fees if:
-            // 1. Current share price is not below
-            // 2. Returns exceed hurdle rate
-            if (_totalReturn > _hurdleReturn) {
-                // Only charge performance fees on returns above hurdle rate
-                _excessReturn = _totalReturn - _hurdleReturn;
-
-                // If its a hard hurdle rate, only charge fees above the hurdle performance
-                // Otherwise, charge fees to all return if its above hurdle return
-                if (_getIsHardHurdleRate($)) {
-                    performanceFees = (_excessReturn * _getPerformanceFee($)) / MAX_BPS;
-                } else {
-                    performanceFees = (_totalReturn * _getPerformanceFee($)) / MAX_BPS;
-                }
-            }
-
-            // Calculate total fees
-            totalFees += performanceFees;
-        }
-
-        return (managementFees, performanceFees, totalFees);
+        return VaultMathLib.computeFees(
+            _totalAssets(),
+            totalSupply(),
+            $.sharePriceWatermark,
+            10 ** _getDecimals($),
+            _getManagementFee($),
+            _getHurdleRate($),
+            _getPerformanceFee($),
+            _getIsHardHurdleRate($),
+            _getLastFeesChargedManagement($),
+            _getLastFeesChargedPerformance($)
+        );
     }
 
     /// @inheritdoc IVaultReader

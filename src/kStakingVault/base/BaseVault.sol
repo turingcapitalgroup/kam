@@ -4,7 +4,6 @@ pragma solidity 0.8.30;
 import { ERC20 } from "solady/tokens/ERC20.sol";
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
-import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentrancyGuardTransient.sol";
@@ -14,6 +13,7 @@ import { K_ASSET_ROUTER, K_MINTER } from "kam/src/constants/Constants.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
+import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 import {
     BASEVAULT_ALREADY_INITIALIZED,
@@ -36,7 +36,6 @@ import {
 /// calculations. All inheriting vault implementations leverage these utilities to maintain protocol integrity
 /// while reducing code duplication and ensuring consistent behavior across the vault network.
 abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771Context {
-    using OptimizedFixedPointMathLib for uint256;
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
     using SafeTransferLib for address;
 
@@ -69,8 +68,6 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_SHIFT = 43;
     uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_MASK = 0xFFFFFFFFFFFFFFFF;
     uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 107;
-    uint256 internal constant VIRTUAL_SHARES = 1e6;
-    uint256 internal constant VIRTUAL_ASSETS = 1e6;
 
     /* //////////////////////////////////////////////////////////////
                               STORAGE
@@ -329,7 +326,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         pure
         returns (uint256 _assets)
     {
-        return _shares.fullMulDiv(_totalAssetsValue + VIRTUAL_ASSETS, _totalSupply + VIRTUAL_SHARES);
+        return VaultMathLib.convertToAssets(_shares, _totalAssetsValue, _totalSupply);
     }
 
     /// @notice Converts underlying asset amount to equivalent stkToken shares at current vault valuation
@@ -353,7 +350,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         pure
         returns (uint256 _shares)
     {
-        return _assets.fullMulDiv(_totalSupply + VIRTUAL_SHARES, _totalAssetsValue + VIRTUAL_ASSETS);
+        return VaultMathLib.convertToShares(_assets, _totalAssetsValue, _totalSupply);
     }
 
     /// @notice Calculates net share price per stkToken after deducting accumulated fees
