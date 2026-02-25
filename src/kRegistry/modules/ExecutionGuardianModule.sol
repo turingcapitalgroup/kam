@@ -7,7 +7,6 @@ import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/
 import {
     GUARDIANMODULE_INVALID_EXECUTOR,
     GUARDIANMODULE_NOT_ALLOWED,
-    GUARDIANMODULE_SELECTOR_ALREADY_SET,
     GUARDIANMODULE_SELECTOR_NOT_FOUND
 } from "kam/src/errors/Errors.sol";
 
@@ -43,6 +42,8 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         mapping(address => uint8 targetType) targetType;
         /// @dev Counts allowed selectors per executor-target pair for accurate target tracking
         mapping(address => mapping(address => uint256)) executorTargetSelectorCount;
+        /// @dev Tracks all allowed selectors for each executor-target pair
+        mapping(address => mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set)) executorTargetSelectors;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.ExecutionGuardianModule")) - 1)) & ~bytes32(uint256(0xff))
@@ -82,21 +83,21 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
 
         ExecutionGuardianModuleStorage storage $ = _getExecutionGuardianModuleStorage();
 
-        // Check if trying to set to the same value
-        bool _currentlyAllowed = $.executorAllowedSelectors[_executor][_target][_selector];
-        if (_currentlyAllowed && _isAllowed) {
-            revert(GUARDIANMODULE_SELECTOR_ALREADY_SET);
-        }
-
         $.executorAllowedSelectors[_executor][_target][_selector] = _isAllowed;
         $.targetType[_target] = _targetType;
 
-        // Update tracking sets with reference counting
+        // Update tracking sets using return values for idempotent migration support
         if (_isAllowed) {
-            $.executorTargetSelectorCount[_executor][_target]++;
+            // add() returns true only if the element was newly added to the set
+            if ($.executorTargetSelectors[_executor][_target].add(bytes32(_selector))) {
+                $.executorTargetSelectorCount[_executor][_target]++;
+            }
             $.executorTargets[_executor].add(_target);
         } else {
-            $.executorTargetSelectorCount[_executor][_target]--;
+            // remove() returns true only if the element was present and removed
+            if ($.executorTargetSelectors[_executor][_target].remove(bytes32(_selector))) {
+                $.executorTargetSelectorCount[_executor][_target]--;
+            }
             // Only remove target when no selectors remain
             if ($.executorTargetSelectorCount[_executor][_target] == 0) {
                 $.executorTargets[_executor].remove(_target);
@@ -183,6 +184,53 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
     }
 
     /// @inheritdoc IExecutionGuardian
+    function getExecutorTargetSelectors(
+        address _executor,
+        address _target
+    )
+        external
+        view
+        returns (bytes4[] memory _selectors)
+    {
+        ExecutionGuardianModuleStorage storage $ = _getExecutionGuardianModuleStorage();
+        bytes32[] memory _rawSelectors = $.executorTargetSelectors[_executor][_target].values();
+        uint256 _length = _rawSelectors.length;
+        _selectors = new bytes4[](_length);
+        for (uint256 _i; _i < _length; ++_i) {
+            _selectors[_i] = bytes4(_rawSelectors[_i]);
+        }
+    }
+
+    /// @inheritdoc IExecutionGuardian
+    function getExecutorTargetsByType(
+        address _executor,
+        uint8 _targetType
+    )
+        external
+        view
+        returns (address[] memory _filtered)
+    {
+        ExecutionGuardianModuleStorage storage $ = _getExecutionGuardianModuleStorage();
+        address[] memory _all = $.executorTargets[_executor].values();
+        uint256 _len = _all.length;
+
+        uint256 _count;
+        for (uint256 _i; _i < _len; ++_i) {
+            if ($.targetType[_all[_i]] == _targetType) {
+                ++_count;
+            }
+        }
+
+        _filtered = new address[](_count);
+        uint256 _idx;
+        for (uint256 _i; _i < _len; ++_i) {
+            if ($.targetType[_all[_i]] == _targetType) {
+                _filtered[_idx++] = _all[_i];
+            }
+        }
+    }
+
+    /// @inheritdoc IExecutionGuardian
     function getTargetType(address _target) external view returns (uint8) {
         ExecutionGuardianModuleStorage storage $ = _getExecutionGuardianModuleStorage();
         return $.targetType[_target];
@@ -194,14 +242,16 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](7);
+        bytes4[] memory moduleSelectors = new bytes4[](9);
         moduleSelectors[0] = this.setAllowedSelector.selector;
         moduleSelectors[1] = this.setExecutionValidator.selector;
         moduleSelectors[2] = this.authorizeCall.selector;
         moduleSelectors[3] = this.isSelectorAllowed.selector;
         moduleSelectors[4] = this.getExecutionValidator.selector;
         moduleSelectors[5] = this.getExecutorTargets.selector;
-        moduleSelectors[6] = this.getTargetType.selector;
+        moduleSelectors[6] = this.getExecutorTargetSelectors.selector;
+        moduleSelectors[7] = this.getExecutorTargetsByType.selector;
+        moduleSelectors[8] = this.getTargetType.selector;
         return moduleSelectors;
     }
 }

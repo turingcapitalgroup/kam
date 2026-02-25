@@ -39,6 +39,7 @@ The institutional gateway for minting and burning kTokens. Implements a push-pul
 - `getRequestCounter()` - Returns current counter used for generating unique request IDs
 - `getTotalLockedAssets(address asset)` - Returns total amount of assets locked through mint operations
 - `rescueReceiverAssets(address batchReceiver, address asset, address to, uint256 amount)` - Recovers stuck assets from BatchReceiver contracts (ADMIN_ROLE required)
+- `receiverImplementation()` - Returns the receiver implementation address used to clone batch receivers
 
 ### IkAssetRouter
 
@@ -77,6 +78,15 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `getSettlementCooldown()` - Gets current cooldown period in seconds before proposals can be executed
 - `getMaxAllowedDelta()` - Gets current yield tolerance threshold in basis points (exceeding emits warning event)
 - `virtualBalance(address vault, address asset)` - Returns virtual asset balance from vault's adapter
+- `isProposalExecuted(bytes32 proposalId)` - Checks if a settlement proposal has been executed
+- `isBatchIdRegistered(bytes32 batchId)` - Checks if a batch ID has been registered in the router
+- `getPendingProposalCount(address vault_)` - Returns count of pending proposals for a vault (used by kRegistry for vault removal safety)
+- `getGlobalPendingRequests(address sourceVault, address asset)` - Returns total pending asset requests for a source vault across all batches
+
+**Admin Functions**
+
+- `setSettlementCooldown(uint256 cooldown)` - Sets the security cooldown period in seconds for settlement proposals (ADMIN_ROLE required)
+- `setMaxAllowedDelta(uint256 tolerance_)` - Updates yield tolerance threshold in basis points (ADMIN_ROLE required)
 
 ### IkRegistry
 
@@ -84,8 +94,10 @@ Central registry managing protocol contracts, supported assets, vault registrati
 
 **Contract Management**
 
-- `setContractById(bytes32 id, address contractAddress)` - Registers core protocol contracts
+- `setSingletonContract(bytes32 id, address contractAddress)` - Registers core singleton protocol contracts (ADMIN_ROLE required)
 - `getContractById(bytes32 id)` - Retrieves singleton contract addresses by identifier
+- `getCoreContracts()` - Returns kMinter and kAssetRouter addresses in one call
+- `rescueAssets(address asset_, address to_, uint256 amount_)` - Emergency recovery of accidentally sent assets (use address(0) for ETH) (ADMIN_ROLE required)
 - Maintains protocol-wide contract mappings with uniqueness validation
 
 **Asset Management**
@@ -106,7 +118,11 @@ Central registry managing protocol contracts, supported assets, vault registrati
 
 - `registerVault(address vault, VaultType type_, address asset)` - Registers new vault with type classification for single asset
 - `getVaultsByAsset(address asset)` - Returns all vaults managing a specific asset
-- `getVaultByAssetAndType(address asset, VaultType vaultType)` - Retrieves vault by asset and type combination
+- `getVaultByAssetAndType(address asset, uint8 vaultType)` - Retrieves vault by asset and type combination
+- `getVaultType(address vault)` - Returns the VaultType classification (uint8) of a vault
+- `isVault(address vault)` - Checks if a vault is registered in the protocol
+- `getAllVaults()` - Returns all registered vault addresses
+- `removeVault(address vault)` - Removes a vault from the registry (requires no pending proposals, ADMIN_ROLE required)
 - `getVaultAssets(address vault)` - Returns assets managed by a vault
 
 **Adapter Coordination**
@@ -143,6 +159,11 @@ Central registry managing protocol contracts, supported assets, vault registrati
 - `grantRelayerRole(address relayer)` - Grants relayer role (ADMIN_ROLE required)
 - `grantManagerRole(address manager)` - Grants manager role (ADMIN_ROLE required)
 - `revokeGivenRoles(address user, uint256 role)` - Revokes specified roles (ADMIN_ROLE required)
+
+**Global Pause**
+
+- `setGlobalPause(bool paused_)` - Sets the global pause state for the entire protocol (EMERGENCY_ADMIN_ROLE required)
+- `isGlobalPaused()` - Returns true if the protocol is globally paused
 
 ## Vault Interfaces
 
@@ -182,7 +203,9 @@ Core interface for vault staking operations. Combines IVaultBatch, IVaultClaim, 
 **Staking Operations**
 
 - `requestStake(address owner, address to, uint256 kTokensAmount)` - Request to stake kTokens for stkTokens
-- `requestUnstake(address to, uint256 stkTokenAmount)` - Request to unstake stkTokens for kTokens plus yield
+- `requestUnstake(address owner, address to, uint256 stkTokenAmount)` - Request to unstake stkTokens for kTokens plus yield
+- `setPaused(bool paused_)` - Emergency pause mechanism for risk management (EMERGENCY_ADMIN_ROLE required)
+- `setMaxTotalAssets(uint128 maxTotalAssets_)` - Sets the TVL cap for the vault (ADMIN_ROLE required)
 
 ### IVaultBatch
 
@@ -200,8 +223,8 @@ Interface for claiming settled staking rewards and unstaking assets after batch 
 
 **Claim Processing**
 
-- `claimStakedShares(bytes32 batchId, bytes32 requestId)` - Claims stkTokens from settled stake requests
-- `claimUnstakedAssets(bytes32 batchId, bytes32 requestId)` - Claims kTokens from settled unstake requests
+- `claimStakedShares(bytes32 requestId)` - Claims stkTokens from a settled staking batch at the finalized share price
+- `claimUnstakedAssets(bytes32 requestId)` - Claims kTokens plus accrued yield from a settled unstaking batch
 
 ### IVaultFees
 
@@ -214,7 +237,6 @@ Interface for vault fee management including performance and management fees.
 - `setHardHurdleRate(bool isHard)` - Configures hurdle rate mechanism (ADMIN_ROLE required)
 - `notifyManagementFeesCharged(uint64 timestamp)` - Updates management fee timestamp (kAssetRouter only)
 - `notifyPerformanceFeesCharged(uint64 timestamp)` - Updates performance fee timestamp (kAssetRouter only)
-- `burnFees(uint256 shares)` - Burns fee shares during settlement (kAssetRouter only)
 
 ### IVaultReader
 
@@ -228,43 +250,66 @@ Read-only interface for querying vault state, calculations, and metrics without 
 
 **Financial Metrics**
 
-- `sharePrice()` - Current share price in underlying asset terms
+- `sharePrice()` - Current gross share price in underlying asset terms (before fee deductions)
+- `netSharePrice()` - Current net share price after fee deductions
 - `totalAssets()` - Total assets under management
 - `totalNetAssets()` - Net assets after fee deductions
 - `computeLastBatchFees()` - Calculates accumulated fees (management, performance, total)
+- `convertToShares(uint256 shares)` - Converts shares to equivalent asset amount
+- `convertToAssets(uint256 assets)` - Converts assets to equivalent share amount
+- `convertToAssetsWithTotals(uint256 shares, uint256 totalAssets, uint256 totalSupply)` - Converts shares to assets with specified totals
+- `convertToSharesWithTotals(uint256 assets, uint256 totalAssets, uint256 totalSupply)` - Converts assets to shares with specified totals
 
 **Batch Information**
 
 - `getBatchId()` - Current active batch identifier
 - `getSafeBatchId()` - Batch ID with safety validation
-- `getCurrentBatchInfo()` - Comprehensive batch information
+- `getCurrentBatchInfo()` - Comprehensive batch information (batchId, batchReceiver, isClosed, isSettled)
+- `getBatchIdInfo(bytes32 batchId)` - Detailed batch information including share prices, total assets, supply, and deposit/request amounts
 - `getBatchReceiver(bytes32 batchId)` - Batch receiver address
+- `getSafeBatchReceiver(bytes32 batchId)` - Batch receiver address with validation (guaranteed non-zero)
 - `isBatchClosed()` - Check if current batch is closed
 - `isBatchSettled()` - Check if current batch is settled
+- `isClosed(bytes32 batchId_)` - Check if a specific batch is closed
+
+**Request Information**
+
+- `getUserRequests(address user)` - Returns all request IDs (both stake and unstake) for a user
+- `getStakeRequest(bytes32 requestId)` - Returns the full StakeRequest struct for a specific request
+- `getUnstakeRequest(bytes32 requestId)` - Returns the full UnstakeRequest struct for a specific request
+- `getTotalPendingStake()` - Returns total pending stake amount
+- `getTotalPendingUnstake()` - Returns total pending unstake amount (claimable kTokens for settled requests)
 
 **Fee Information**
 
 - `managementFee()` - Current management fee rate
 - `performanceFee()` - Current performance fee rate
 - `hurdleRate()` - Hurdle rate threshold
+- `isHardHurdleRate()` - Whether the current hurdle rate is a hard hurdle rate
 - `sharePriceWatermark()` - High watermark for performance fees
 - `lastFeesChargedManagement()` - Last management fee timestamp
 - `lastFeesChargedPerformance()` - Last performance fee timestamp
+- `nextManagementFeeTimestamp()` - Projected timestamp for next management fee evaluation
+- `nextPerformanceFeeTimestamp()` - Projected timestamp for next performance fee evaluation
+
+**Capacity**
+
+- `maxTotalAssets()` - Returns the maximum total assets (TVL cap) allowed in the vault
 
 ### IkBatchReceiver
 
 Minimal proxy contract that holds and distributes settled assets for batch redemptions. Deployed per batch to isolate asset distribution and enable efficient settlement.
 
-**Initialization**
+**Getters**
 
-- `initialize(bytes32 batchId, address asset)` - Sets batch parameters after deployment
-- One-time initialization prevents reuse across different batches
-- Validates asset address and prevents double initialization
+- `K_MINTER()` - Returns the immutable kMinter address authorized to interact with this receiver
+- `asset()` - Returns the underlying asset contract address this receiver distributes
+- `batchId()` - Returns the unique batch identifier this receiver serves
 
 **Asset Distribution**
 
 - `pullAssets(address receiver, uint256 amount)` - Transfers assets from contract to specified receiver (kMinter only)
-- `rescueAssets(address asset, address to, uint256 amount)` - Rescues stuck assets not designated for batch settlement (kMinter only)
+- `rescueAssets(address asset, address to, uint256 amount)` - Rescues stuck assets or ETH (use address(0) for ETH) not designated for batch settlement (kMinter only)
 
 **Access Control**
 
@@ -307,8 +352,8 @@ ERC20 token representing wrapped underlying assets in the KAM protocol. Implemen
 
 **Freeze/Blacklist Functions (USDC-style compliance)**
 
-- `freezeAccount(address account)` - Freezes an account, blocking all transfers to and from it (BLACKLIST_ADMIN_ROLE only)
-- `unfreezeAccount(address account)` - Unfreezes an account, restoring transfer capability (BLACKLIST_ADMIN_ROLE only)
+- `freeze(address account)` - Freezes an account, blocking all transfers to and from it (BLACKLIST_ADMIN_ROLE only)
+- `unfreeze(address account)` - Unfreezes an account, restoring transfer capability (BLACKLIST_ADMIN_ROLE only)
 - `isFrozen(address account)` - Checks if an account is frozen
 - Note: Owner address cannot be frozen. `address(0)` cannot be frozen. Frozen accounts cannot send, receive, mint, or burn tokens.
 
@@ -325,64 +370,52 @@ Interface for vault adapter contracts that manage external strategy integrations
 
 **Core Operations**
 
-- `execute(address target, bytes calldata data, uint256 value)` - Executes permissioned calls to external contracts (MANAGER_ROLE required, validated via registry.authorizeCall())
+- `setPaused(bool paused_)` - Emergency pause mechanism for risk management (EMERGENCY_ADMIN_ROLE required)
 - `setTotalAssets(uint256 totalAssets_)` - Updates the last recorded total assets for accounting (kAssetRouter only)
 - `totalAssets()` - Returns current total assets under management (virtual balance)
-- `pull(address asset, uint256 amount)` - Transfers assets to kAssetRouter (kAssetRouter only)
+- `pull(address asset_, uint256 amount_)` - Transfers assets to kAssetRouter (kAssetRouter only)
 
-**Emergency Functions**
-
-- `setPaused(bool paused_)` - Emergency pause mechanism for risk management (EMERGENCY_ADMIN_ROLE required)
+**Note**: The `execute()` function (permissioned calls to external contracts) is implemented on the concrete `SmartAdapterAccount` contract using ERC-7579 `execute(ModeCode mode, bytes calldata executionCalldata)`, not on the `IVaultAdapter` interface. MANAGER_ROLE calls are validated via `registry.authorizeCall()` before execution.
 
 ## Module Interfaces
 
 ### IExecutionGuardian
 
-Interface for managing executor permissions and security controls. Part of the kRegistry module system that validates executor calls to external protocols.
+Interface for managing executor permissions and security controls. Part of the kRegistry module system (via MultiFacetProxy) that validates executor calls to external protocols. The module is registered on kRegistry and provides 9 function selectors.
 
 **Permission Management**
 
-- `setAllowedSelector(address executor, address target, uint8 targetType, bytes4 selector, bool allowed)` - Configures which function selectors an executor can call on a target contract (ADMIN_ROLE required)
-- `setExecutionValidator(address executor, address target, bytes4 selector, address validator)` - Sets an execution validator contract for specific executor-target-selector combinations (ADMIN_ROLE required)
+- `setAllowedSelector(address executor, address target, uint8 targetType_, bytes4 selector, bool isAllowed)` - Configures which function selectors an executor can call on a target contract. Also sets the `targetType` for the target address. The operation is **idempotent**: calling with `true` on an already-allowed selector will not revert and will not double-count in the internal tracking sets, making it safe to use for migration/backfill scenarios. (ADMIN_ROLE required)
+- `setExecutionValidator(address executor, address target, bytes4 selector, address executionValidator)` - Sets an execution validator contract for specific executor-target-selector combinations. The selector must already be allowed. Set to `address(0)` to remove. (ADMIN_ROLE required)
 
 **Validation Functions**
 
-- `authorizeCall(address target, bytes4 selector, bytes calldata params)` - Validates if the calling executor can execute a specific call, reverting if not allowed. Called by VaultAdapter before external protocol interactions.
+- `authorizeCall(address target, bytes4 selector, bytes calldata params)` - Validates if the calling executor (`msg.sender`) can execute a specific call, reverting if not allowed. If an execution validator is configured, it delegates parameter validation to it. Called by VaultAdapter before external protocol interactions.
 - `isSelectorAllowed(address executor, address target, bytes4 selector)` - Checks if a specific selector is allowed for an executor-target pair
-- `getExecutionValidator(address executor, address target, bytes4 selector)` - Returns the execution validator contract for a given combination
-- `getExecutorTargets(address executor)` - Returns all target contracts registered for an executor
-- `getTargetType(address target)` - Returns the type classification of a target contract
+- `getExecutionValidator(address executor, address target, bytes4 selector)` - Returns the execution validator contract for a given combination (`address(0)` if none)
+- `getExecutorTargets(address executor)` - Returns all target contract addresses registered for an executor
+- `getExecutorTargetSelectors(address executor, address target)` - Returns all allowed function selectors (as `bytes4[]`) for an executor on a specific target contract
+- `getExecutorTargetsByType(address executor, uint8 targetType_)` - Returns executor targets filtered by target type (e.g., `0` = METAVAULT, `1` = CUSTODIAL, `2` = ASSET). Uses a single-pass filter with assembly array trim for gas efficiency.
+- `getTargetType(address target)` - Returns the type classification (`uint8`) of a target contract address
+
+**TargetType Enum**
+
+The `TargetType` enum classifies target contracts by their role in the protocol:
+
+| Value | Name | Description |
+|-------|------|-------------|
+| 0 | `METAVAULT` | MetaWallet contracts (ERC-7540 vaults) |
+| 1 | `CUSTODIAL` | Custodial wallets (e.g., CEFFU) |
+| 2 | `ASSET` | ERC20 token contracts (e.g., USDC, WBTC) |
+| 3-255 | `TARGET_04`..`TARGET_255` | Reserved for future use |
+
+Target type is a **global property** of the target address (not per-executor). Setting it via `setAllowedSelector` updates the type for all executors that reference that target.
 
 ### IExecutionValidator
 
 Interface for execution validation contracts used in executor call validation. Implementations validate call parameters to ensure executor operations are safe and authorized.
 
 - `authorizeCall(address executor, address target, bytes4 selector, bytes calldata params)` - Validates parameters for an executor call, reverting if invalid
-
-## Module Interfaces
-
-### IAdapterGuardian
-
-Interface for managing adapter permissions and security controls. Part of the kRegistry module system that validates adapter calls to external protocols.
-
-**Permission Management**
-
-- `setAdapterAllowedSelector(address adapter, address target, uint8 targetType, bytes4 selector, bool allowed)` - Configures which function selectors an adapter can call on a target contract (ADMIN_ROLE required)
-- `setAdapterParametersChecker(address adapter, address target, bytes4 selector, address parametersChecker)` - Sets a parameter validation contract for specific adapter-target-selector combinations (ADMIN_ROLE required)
-
-**Validation Functions**
-
-- `validateAdapterCall(address target, bytes4 selector, bytes calldata params)` - Validates if the calling adapter can execute a specific call, reverting if not allowed. Called by VaultAdapter before external protocol interactions.
-- `isAdapterSelectorAllowed(address adapter, address target, bytes4 selector)` - Checks if a specific selector is allowed for an adapter-target pair
-- `getAdapterParametersChecker(address adapter, address target, bytes4 selector)` - Returns the parameter checker contract for a given combination
-- `getAdapterTargets(address adapter)` - Returns all target contracts registered for an adapter
-- `getTargetType(address target)` - Returns the type classification of a target contract
-
-### IParametersChecker
-
-Interface for parameter validation contracts used in adapter call validation. Implementations validate call parameters to ensure adapter operations are safe.
-
-- `validateAdapterCall(address adapter, address target, bytes4 selector, bytes calldata params)` - Validates parameters for an adapter call, reverting if invalid
 
 ## Utility Interfaces
 

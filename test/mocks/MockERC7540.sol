@@ -206,4 +206,10 @@ contract MockERC7540 is IERC7540, ERC20 {
     function lastDeposit(address) external pure returns (uint256) {
         return 0; // Not used in mock
     }
+
+    /// @notice Mock implementation of settleTotalAssets from VaultModule
+    /// @dev No-op in mock - just accepts the call without reverting
+    function settleTotalAssets(uint256, bytes32) external {
+        // No-op for testing
+    }
 }
