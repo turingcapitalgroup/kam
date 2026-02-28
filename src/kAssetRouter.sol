@@ -400,7 +400,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         _lockReentrant();
         _checkPaused();
 
-        require(_isGuardian(msg.sender), KASSETROUTER_WRONG_ROLE);
+        require(_isGuardian(msg.sender) || _isEmergencyAdmin(msg.sender), KASSETROUTER_WRONG_ROLE);
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
 
