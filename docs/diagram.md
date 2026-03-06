@@ -47,7 +47,7 @@ graph TB
     end
 
     subgraph "EXTERNAL PROTOCOLS"
-        ERC7540[📊 ERC7540 Vaults<br/>Lending/Yield]
+        ERC4626[📊 ERC4626 Vaults<br/>Lending/Yield]
         DEFI_A[🌐 DeFi Protocol A<br/>Strategy Integration]
         DEFI_B[🌐 DeFi Protocol B<br/>Strategy Integration]
     end
@@ -126,11 +126,11 @@ graph TB
     ADAPTER_EXEC --> ADAPTER_BAL
     
     %% External Protocol Integration
-    ADAPTER_EXEC -->|Call| ERC7540
+    ADAPTER_EXEC -->|Call| ERC4626
     ADAPTER_EXEC -->|Call| DEFI_A
     ADAPTER_EXEC -->|Call| DEFI_B
     
-    ERC7540 -.->|Yield| ADAPTER_BAL
+    ERC4626 -.->|Yield| ADAPTER_BAL
     DEFI_A -.->|Yield| ADAPTER_BAL
     DEFI_B -.->|Yield| ADAPTER_BAL
     

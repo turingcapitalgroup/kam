@@ -471,7 +471,7 @@ These are just number updates! No `safeTransfer` calls in settlement.
 
 ### 2. Physical Transfers via Adapter.execute()
 
-Adapters inherit from `ERC7579Minimal` which has an `execute()` function.
+Adapters inherit from `MinimalSmartAccount` which has an `execute()` function.
 Relayers call this to:
 
 - Deploy to strategies

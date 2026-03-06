@@ -585,7 +585,7 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │  ┌─────────────────┐                                                                            │
 │  │Adapters         │                                                                            │
 │  │                 │                                                                            │
-│  │• MetaVault      │                                                                            │
+│  │• MetaWallet     │                                                                            │
 │  │• CEFFU          │                                                                            │
 │  │                 │                                                                            │
 │  └─────────┬───────┘                                                                            │

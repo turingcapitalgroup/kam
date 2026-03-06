@@ -228,7 +228,7 @@ The ExecutionGuardianModule assigns a `TargetType` to each target contract addre
 │                    Target Type System                          │
 ├─────────────────────────────────────────────────────────────--┤
 │                                                               │
-│  Type 0 (METAVAULT): MetaWallet contracts (ERC-7540 vaults)   │
+│  Type 0 (METAWALLET): MetaWallet contracts (ERC-4626 vaults)  │
 │  Type 1 (CUSTODIAL): Custodial wallets (e.g., CEFFU)          │
 │  Type 2 (ASSET):     ERC20 token contracts (USDC, WBTC)       │
 │  Type 3-255:         Reserved for future use                  │
@@ -384,7 +384,7 @@ Secure execution proxy contracts deployed per vault for controlled external stra
 - **One adapter per vault per asset**: Each vault-asset combination gets its own VaultAdapter for isolated operations
 - **Granular Permission System**: Each adapter has specific target contracts and function selectors it can call, validated via `registry.isSelectorAllowed(adapter, target, selector)` through the ExecutionGuardianModule
 - **Parameter Validation**: Optional execution validators can be configured per adapter-target-selector combination to validate call data parameters
-- **Target Type Classification**: Each target is classified by type (METAVAULT=0, CUSTODIAL=1, ASSET=2) enabling type-based queries via `getExecutorTargetsByType()`
+- **Target Type Classification**: Each target is classified by type (METAWALLET=0, CUSTODIAL=1, ASSET=2) enabling type-based queries via `getExecutorTargetsByType()`
 
 **Core Functions:**
 

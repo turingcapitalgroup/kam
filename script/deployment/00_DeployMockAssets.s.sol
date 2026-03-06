@@ -6,15 +6,15 @@ import { Script } from "forge-std/Script.sol";
 import { console2 as console } from "forge-std/console2.sol";
 
 import { MockERC20 } from "kam/test/mocks/MockERC20.sol";
-import { MockERC7540 } from "kam/test/mocks/MockERC7540.sol";
+import { MockERC4626 } from "kam/test/mocks/MockERC4626.sol";
 import { MockWallet } from "kam/test/mocks/MockWallet.sol";
 
 contract DeployMockAssetsScript is Script, DeploymentManager {
     struct MockAssets {
         address USDC;
         address WBTC;
-        address ERC7540USDC;
-        address ERC7540WBTC;
+        address metawalletUSDC;
+        address metawalletWBTC;
         address WalletUSDC;
     }
 
@@ -38,8 +38,8 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
             return MockAssets({
                 USDC: address(0),
                 WBTC: address(0),
-                ERC7540USDC: address(0),
-                ERC7540WBTC: address(0),
+                metawalletUSDC: address(0),
+                metawalletWBTC: address(0),
                 WalletUSDC: address(0)
             });
         }
@@ -62,8 +62,8 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
                 return MockAssets({
                     USDC: config.assets.USDC,
                     WBTC: config.assets.WBTC,
-                    ERC7540USDC: address(0),
-                    ERC7540WBTC: address(0),
+                    metawalletUSDC: address(0),
+                    metawalletWBTC: address(0),
                     WalletUSDC: address(0)
                 });
             }
@@ -76,9 +76,9 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         MockERC20 mockUSDC = new MockERC20("Mock USDC", "USDC", 6);
         MockERC20 mockWBTC = new MockERC20("Mock WBTC", "WBTC", 8);
 
-        // Deploy mock ERC7540 vaults
-        MockERC7540 mockERC7540USDC = new MockERC7540(address(mockUSDC), "Mock ERC7540 USDC", "mERC7540USDC", 6);
-        MockERC7540 mockERC7540WBTC = new MockERC7540(address(mockWBTC), "Mock ERC7540 WBTC", "mERC7540WBTC", 8);
+        // Deploy mock ERC4626 vaults
+        MockERC4626 mockERC4626USDC = new MockERC4626(address(mockUSDC), "Mock ERC4626 USDC", "mERC4626USDC", 6);
+        MockERC4626 mockERC4626WBTC = new MockERC4626(address(mockWBTC), "Mock ERC4626 WBTC", "mERC4626WBTC", 8);
 
         // Deploy mock wallet for USDC
         MockWallet mockWalletUSDC = new MockWallet("Mock USDC Wallet");
@@ -87,8 +87,8 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
 
         _log("Mock USDC deployed at:", address(mockUSDC));
         _log("Mock WBTC deployed at:", address(mockWBTC));
-        _log("Mock ERC7540 USDC deployed at:", address(mockERC7540USDC));
-        _log("Mock ERC7540 WBTC deployed at:", address(mockERC7540WBTC));
+        _log("Mock ERC4626 USDC deployed at:", address(mockERC4626USDC));
+        _log("Mock ERC4626 WBTC deployed at:", address(mockERC4626WBTC));
         _log("Mock Wallet USDC deployed at:", address(mockWalletUSDC));
 
         // Write to JSON only if requested (batch all writes for single I/O operation)
@@ -98,14 +98,14 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
                 config.network,
                 address(mockUSDC),
                 address(mockWBTC),
-                address(mockERC7540USDC),
-                address(mockERC7540WBTC),
+                address(mockERC4626USDC),
+                address(mockERC4626WBTC),
                 address(mockWalletUSDC)
             );
 
             // Write mock target addresses to deployment output (batched)
-            queueContractAddress("ERC7540USDC", address(mockERC7540USDC));
-            queueContractAddress("ERC7540WBTC", address(mockERC7540WBTC));
+            queueContractAddress("metawalletUSDC", address(mockERC4626USDC));
+            queueContractAddress("metawalletWBTC", address(mockERC4626WBTC));
             queueContractAddress("WalletUSDC", address(mockWalletUSDC));
             flushContractAddresses();
         }
@@ -114,13 +114,13 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         _mintTokensForTesting(mockUSDC, mockWBTC, config);
 
         // Also mint tokens to mock targets for testing
-        _mintTokensToMockTargets(mockUSDC, mockWBTC, mockERC7540USDC, mockERC7540WBTC, mockWalletUSDC, config);
+        _mintTokensToMockTargets(mockUSDC, mockWBTC, mockERC4626USDC, mockERC4626WBTC, mockWalletUSDC, config);
 
         _log("=== MOCK ASSET DEPLOYMENT COMPLETE ===");
         _log("Mock USDC:", address(mockUSDC));
         _log("Mock WBTC:", address(mockWBTC));
-        _log("Mock ERC7540 USDC:", address(mockERC7540USDC));
-        _log("Mock ERC7540 WBTC:", address(mockERC7540WBTC));
+        _log("Mock ERC4626 USDC:", address(mockERC4626USDC));
+        _log("Mock ERC4626 WBTC:", address(mockERC4626WBTC));
         _log("Mock Wallet USDC:", address(mockWalletUSDC));
         _log("Config updated at: deployments/config/", string.concat(config.network, ".json"));
 
@@ -128,8 +128,8 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         assets = MockAssets({
             USDC: address(mockUSDC),
             WBTC: address(mockWBTC),
-            ERC7540USDC: address(mockERC7540USDC),
-            ERC7540WBTC: address(mockERC7540WBTC),
+            metawalletUSDC: address(mockERC4626USDC),
+            metawalletWBTC: address(mockERC4626WBTC),
             WalletUSDC: address(mockWalletUSDC)
         });
 
@@ -153,8 +153,8 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         string memory network,
         address mockUSDC,
         address mockWBTC,
-        address mockERC7540USDC,
-        address mockERC7540WBTC,
+        address mockERC4626USDC,
+        address mockERC4626WBTC,
         address mockWalletUSDC
     )
         internal
@@ -166,8 +166,8 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         vm.writeJson(vm.toString(mockWBTC), configPath, ".assets.WBTC");
 
         // 2. Update Metawallet Addresses
-        vm.writeJson(vm.toString(mockERC7540USDC), configPath, ".metawallets.USDC");
-        vm.writeJson(vm.toString(mockERC7540WBTC), configPath, ".metawallets.WBTC");
+        vm.writeJson(vm.toString(mockERC4626USDC), configPath, ".metawallets.USDC");
+        vm.writeJson(vm.toString(mockERC4626WBTC), configPath, ".metawallets.WBTC");
 
         // 3. Update the MockWallet Address (both locations for consistency)
         vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".mockAssets.WalletUSDC");
@@ -235,8 +235,8 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
     function _mintTokensToMockTargets(
         MockERC20 mockUSDC,
         MockERC20 mockWBTC,
-        MockERC7540 mockERC7540USDC,
-        MockERC7540 mockERC7540WBTC,
+        MockERC4626 mockERC4626USDC,
+        MockERC4626 mockERC4626WBTC,
         MockWallet mockWalletUSDC,
         NetworkConfig memory config
     )
@@ -255,14 +255,14 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
             console.log(wbtcAmount, "WBTC per account");
         }
 
-        mockUSDC.mint(address(mockERC7540USDC), usdcAmount);
-        mockWBTC.mint(address(mockERC7540WBTC), wbtcAmount);
+        mockUSDC.mint(address(mockERC4626USDC), usdcAmount);
+        mockWBTC.mint(address(mockERC4626WBTC), wbtcAmount);
         mockUSDC.mint(address(mockWalletUSDC), usdcAmount);
 
         vm.stopBroadcast();
 
-        _log("Minted to Mock ERC7540 USDC vault");
-        _log("Minted to Mock ERC7540 WBTC vault");
+        _log("Minted to Mock ERC4626 USDC vault");
+        _log("Minted to Mock ERC4626 WBTC vault");
         _log("Minted to Mock Wallet");
     }
 }

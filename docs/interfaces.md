@@ -395,7 +395,7 @@ Interface for managing executor permissions and security controls. Part of the k
 - `getExecutionValidator(address executor, address target, bytes4 selector)` - Returns the execution validator contract for a given combination (`address(0)` if none)
 - `getExecutorTargets(address executor)` - Returns all target contract addresses registered for an executor
 - `getExecutorTargetSelectors(address executor, address target)` - Returns all allowed function selectors (as `bytes4[]`) for an executor on a specific target contract
-- `getExecutorTargetsByType(address executor, uint8 targetType_)` - Returns executor targets filtered by target type (e.g., `0` = METAVAULT, `1` = CUSTODIAL, `2` = ASSET). Uses a single-pass filter with assembly array trim for gas efficiency.
+- `getExecutorTargetsByType(address executor, uint8 targetType_)` - Returns executor targets filtered by target type (e.g., `0` = METAWALLET, `1` = CUSTODIAL, `2` = ASSET). Uses a single-pass filter with assembly array trim for gas efficiency.
 - `getTargetType(address target)` - Returns the type classification (`uint8`) of a target contract address
 
 **TargetType Enum**
@@ -404,7 +404,7 @@ The `TargetType` enum classifies target contracts by their role in the protocol:
 
 | Value | Name | Description |
 |-------|------|-------------|
-| 0 | `METAVAULT` | MetaWallet contracts (ERC-7540 vaults) |
+| 0 | `METAWALLET` | MetaWallet contracts (ERC-4626 vaults) |
 | 1 | `CUSTODIAL` | Custodial wallets (e.g., CEFFU) |
 | 2 | `ASSET` | ERC20 token contracts (e.g., USDC, WBTC) |
 | 3-255 | `TARGET_04`..`TARGET_255` | Reserved for future use |

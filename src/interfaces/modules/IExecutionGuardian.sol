@@ -108,7 +108,7 @@ interface IExecutionGuardian {
 
     /// @notice Gets executor targets filtered by target type
     /// @param executor The executor address
-    /// @param targetType_ The target type to filter by (e.g., 0 = METAVAULT, 1 = CUSTODIAL)
+    /// @param targetType_ The target type to filter by (e.g., 0 = METAWALLET, 1 = CUSTODIAL)
     /// @return targets An array of target addresses matching the specified type
     function getExecutorTargetsByType(
         address executor,
@@ -124,7 +124,7 @@ interface IExecutionGuardian {
     function getTargetType(address target) external view returns (uint8);
 
     enum TargetType {
-        METAVAULT,
+        METAWALLET,
         CUSTODIAL,
         ASSET,
         TARGET_04,

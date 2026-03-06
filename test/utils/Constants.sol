@@ -20,7 +20,7 @@ uint256 constant _10_ETHER = 10 ether;
 uint256 constant _100_ETHER = 100 ether;
 
 // Mock vault address
-address constant METAVAULT_USDC = 0x349c996C4a53208b6EB09c103782D86a3F1BB57E;
+address constant METAWALLET_USDC = 0x349c996C4a53208b6EB09c103782D86a3F1BB57E;
 
 // Role constants (matching Solady OptimizedOwnableRoles pattern)
 uint256 constant ADMIN_ROLE = 1; // _ROLE_0

@@ -41,7 +41,7 @@ import { DeployInsuranceAccountScript } from "kam/script/deployment/09_DeployIns
 import { ConfigureProtocolScript } from "kam/script/deployment/10_ConfigureProtocol.s.sol";
 import { ConfigureExecutorPermissionsScript } from "kam/script/deployment/11_ConfigureExecutorPermissions.s.sol";
 
-import { MockERC7540 } from "kam/test/mocks/MockERC7540.sol";
+import { MockERC4626 } from "kam/test/mocks/MockERC4626.sol";
 import { MockWallet } from "kam/test/mocks/MockWallet.sol";
 
 contract DeploymentBaseTest is BaseTest {
@@ -72,8 +72,8 @@ contract DeploymentBaseTest is BaseTest {
     // Insurance
     address public insuranceSmartAccount;
 
-    MockERC7540 public erc7540USDC;
-    MockERC7540 public erc7540WBTC;
+    MockERC4626 public metawalletUSDC;
+    MockERC4626 public metawalletWBTC;
 
     MockWallet public wallet;
 
@@ -223,8 +223,8 @@ contract DeploymentBaseTest is BaseTest {
             _adaptersDeploy.dnVaultAdapterWBTC,
             _adaptersDeploy.alphaVaultAdapter,
             _adaptersDeploy.betaVaultAdapter,
-            _mocks.ERC7540USDC,
-            _mocks.ERC7540WBTC,
+            _mocks.metawalletUSDC,
+            _mocks.metawalletWBTC,
             _mocks.WalletUSDC,
             _mocks.USDC,
             _mocks.WBTC
@@ -267,8 +267,8 @@ contract DeploymentBaseTest is BaseTest {
         ALPHAVaultAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.alphaVaultAdapter));
         BETHAVaultAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.betaVaultAdapter));
 
-        erc7540USDC = MockERC7540(_mocks.ERC7540USDC);
-        erc7540WBTC = MockERC7540(_mocks.ERC7540WBTC);
+        metawalletUSDC = MockERC4626(_mocks.metawalletUSDC);
+        metawalletWBTC = MockERC4626(_mocks.metawalletWBTC);
 
         wallet = MockWallet(payable(_mocks.WalletUSDC));
     }
