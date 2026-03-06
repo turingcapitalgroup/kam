@@ -37,6 +37,7 @@ library VaultMathLib {
     /// @param _isHardHurdleRate If true, fees only on excess above hurdle; if false, fees on all profit
     /// @param _lastFeesChargedManagement Timestamp of last management fee charge
     /// @param _lastFeesChargedPerformance Timestamp of last performance fee charge
+    /// @param _endOfPeriod Timestamp to use as end of fee period (e.g. block.timestamp for current, or a past timestamp)
     /// @return managementFees Management fees in asset terms
     /// @return performanceFees Performance fees in asset terms
     /// @return totalFees Total fees (management + performance) in asset terms
@@ -50,14 +51,15 @@ library VaultMathLib {
         uint256 _performanceFee,
         bool _isHardHurdleRate,
         uint256 _lastFeesChargedManagement,
-        uint256 _lastFeesChargedPerformance
+        uint256 _lastFeesChargedPerformance,
+        uint256 _endOfPeriod
     )
         internal
-        view
+        pure
         returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
     {
-        uint256 durationManagement = block.timestamp - _lastFeesChargedManagement;
-        uint256 durationPerformance = block.timestamp - _lastFeesChargedPerformance;
+        uint256 durationManagement = _endOfPeriod - _lastFeesChargedManagement;
+        uint256 durationPerformance = _endOfPeriod - _lastFeesChargedPerformance;
         uint256 currentTotalAssets = _totalAssets;
         uint256 lastTotalAssets = _totalSupply.fullMulDiv(_sharePriceWatermark, _vaultDecimals);
 
@@ -115,13 +117,15 @@ library VaultMathLib {
     /// @param vault The staking vault to compute fees for
     /// @param _totalAssets Current total assets in the vault
     /// @param _totalSupply Current total supply of vault shares
+    /// @param _endOfPeriod Timestamp to use as end of fee period
     /// @return managementFees Management fees in asset terms
     /// @return performanceFees Performance fees in asset terms
     /// @return totalFees Total fees (management + performance) in asset terms
     function computeLastBatchFeesWithAssetsAndSupply(
         IkStakingVault vault,
         uint256 _totalAssets,
-        uint256 _totalSupply
+        uint256 _totalSupply,
+        uint256 _endOfPeriod
     )
         internal
         view
@@ -137,7 +141,8 @@ library VaultMathLib {
             vault.performanceFee(),
             vault.isHardHurdleRate(),
             vault.lastFeesChargedManagement(),
-            vault.lastFeesChargedPerformance()
+            vault.lastFeesChargedPerformance(),
+            _endOfPeriod
         );
     }
 

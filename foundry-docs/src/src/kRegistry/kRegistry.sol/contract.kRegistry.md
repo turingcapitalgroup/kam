@@ -1,8 +1,8 @@
 # kRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kRegistry/kRegistry.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kRegistry/kRegistry.sol)
 
 **Inherits:**
-[IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
+[IRegistry](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
 
 Central configuration hub and contract registry for the KAM protocol ecosystem
 
@@ -446,11 +446,11 @@ function registerVault(address _vault, VaultType _type, address _asset) external
 
 ### removeVault
 
-Removes a vault from the protocol registry
+Removes a vault from the protocol registry with safety checks
 
-This function deregisters a vault, removing it from the active vault set. This operation should be
-used carefully as it affects routing and asset management. Only callable by ADMIN_ROLE to ensure proper
-decommissioning procedures are followed. Note that this doesn't clear all vault mappings for gas efficiency.
+This function deregisters a vault. Only callable by ADMIN_ROLE.
+Before calling this function, ensure all pending proposals are cancelled
+via cancelProposal() and all adapter funds are withdrawn.
 
 
 ```solidity
@@ -484,10 +484,11 @@ function registerAdapter(address _vault, address _asset, address _adapter) exter
 
 ### removeAdapter
 
-Removes an adapter from a vault's registered adapter set
+Removes an adapter from a vault-asset pair with safety checks
 
-This disables a specific external protocol integration for the vault. Only callable by ADMIN_ROLE
-to ensure proper risk assessment before removing yield strategies.
+Validates no pending proposals exist and adapter has zero balance before removal.
+Before calling, ensure all pending proposals are cancelled and adapter funds are withdrawn.
+Only callable by ADMIN_ROLE to ensure proper risk assessment before removing yield strategies.
 
 
 ```solidity

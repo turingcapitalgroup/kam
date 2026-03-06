@@ -277,7 +277,7 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
         kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
         (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
-            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
+            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply, block.timestamp
         );
         kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
@@ -362,7 +362,7 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_expectedTotalAssets -= totalKTokensNet;
         kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
         (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
-            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
+            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply, block.timestamp
         );
         kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
@@ -565,7 +565,7 @@ contract kStakingVaultHandler is BaseHandler {
 
         kStakingVault_expectedSupply -= expectedSharesToBurn;
         (,, uint256 expectedFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
-            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
+            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply, block.timestamp
         );
         kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
         kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedFees;

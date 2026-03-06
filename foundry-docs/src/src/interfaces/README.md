@@ -3,7 +3,6 @@
 # Contents
 - [modules](/src/interfaces/modules)
 - [IERC2771](IERC2771.sol/interface.IERC2771.md)
-- [IERC7540](IERC7540.sol/interface.IERC7540.md)
 - [IExtsload](IExtsload.sol/interface.IExtsload.md)
 - [IRegistry](IRegistry.sol/interface.IRegistry.md)
 - [IVault](IVault.sol/interface.IVault.md)
@@ -19,5 +18,3 @@
 - [IkRegistry](IkRegistry.sol/interface.IkRegistry.md)
 - [IkRemoteRegistry](IkRemoteRegistry.sol/interface.IkRemoteRegistry.md)
 - [IkStakingVault](IkStakingVault.sol/interface.IkStakingVault.md)
-- [IkToken](IkToken.sol/interface.IkToken.md)
-- [IkTokenFactory](IkTokenFactory.sol/interface.IkTokenFactory.md)

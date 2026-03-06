@@ -1,5 +1,5 @@
 # Initializable
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/vendor/solady/utils/Initializable.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/vendor/solady/utils/Initializable.sol)
 
 **Authors:**
 Solady (https://github.com/vectorized/solady/blob/main/src/utils/Initializable.sol), Modified from OpenZeppelin
@@ -57,7 +57,7 @@ through a function guarded with `initializer`.
 This is similar to `reinitializer(1)`, except that in the context of a constructor,
 an `initializer` guarded function can be invoked multiple times.
 This can be useful during testing and is not expected to be used in production.
-Emits an [Initialized](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md#initialized) event.
+Emits an [Initialized](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md#initialized) event.
 
 
 ```solidity
@@ -69,7 +69,7 @@ modifier initializer() virtual;
 Guards a reinitializer function so that it can be invoked at most once.
 You can guard a function with `onlyInitializing` such that it can be called
 through a function guarded with `reinitializer`.
-Emits an [Initialized](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md#initialized) event.
+Emits an [Initialized](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md#initialized) event.
 
 
 ```solidity
@@ -101,7 +101,7 @@ Locks any future initializations by setting the initialized version to `2**64 - 
 Calling this in the constructor will prevent the contract from being initialized
 or reinitialized. It is recommended to use this to lock implementation contracts
 that are designed to be called through proxies.
-Emits an [Initialized](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md#initialized) event the first time it is successfully called.
+Emits an [Initialized](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md#initialized) event the first time it is successfully called.
 
 
 ```solidity

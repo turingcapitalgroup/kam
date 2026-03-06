@@ -1,8 +1,8 @@
 # kAssetRouter
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kAssetRouter.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kAssetRouter.sol)
 
 **Inherits:**
-[IkAssetRouter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.IkAssetRouter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
+[IkAssetRouter](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.IkAssetRouter.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
 
 Central money flow coordinator for the KAM protocol, orchestrating all asset movements and yield
 distribution
@@ -861,6 +861,55 @@ function isBatchIdRegistered(bytes32 _batchId) external view returns (bool);
 |`<none>`|`bool`|True if the batch ID is registered, false otherwise|
 
 
+### getPendingProposalCount
+
+Gets the count of pending settlement proposals for a specific vault
+
+Used by kRegistry to validate vault removal safety - vaults with pending proposals cannot be removed
+
+
+```solidity
+function getPendingProposalCount(address _vault) external view returns (uint256);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_vault`|`address`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|count The number of pending proposals for the vault|
+
+
+### getGlobalPendingRequests
+
+Gets the total pending asset requests for a source vault across all batches
+
+Used to track cumulative pending requests to prevent cross-batch over-requests.
+This ensures that multiple staking vault batches cannot collectively exceed the source vault's
+virtual balance. The value is incremented on kAssetTransfer and decremented on settlement.
+
+
+```solidity
+function getGlobalPendingRequests(address _sourceVault, address _asset) external view returns (uint256);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_sourceVault`|`address`||
+|`_asset`|`address`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The total pending asset requests for this source vault and asset combination|
+
+
 ### _authorizeUpgrade
 
 Authorize contract upgrade
@@ -953,6 +1002,9 @@ struct kAssetRouterStorage {
     mapping(bytes32 proposalId => VaultSettlementProposal) settlementProposals;
     /// @dev Tracks which high-delta proposals have been accepted by guardians
     mapping(bytes32 proposalId => bool) acceptedProposals;
+    /// @dev Tracks total pending asset requests per source vault across ALL batches to prevent cross-batch
+    /// over-requests
+    mapping(address sourceVault => mapping(address asset => uint256)) globalPendingRequests;
 }
 ```
 

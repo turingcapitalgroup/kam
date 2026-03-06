@@ -1,8 +1,8 @@
 # IVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IVault.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IVault.sol)
 
 **Inherits:**
-[IERC2771](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVaultBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
+[IERC2771](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVaultBatch](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
 
 Core interface for retail staking operations enabling kToken holders to earn yield through vault strategies
 
@@ -64,15 +64,25 @@ remain locked in the vault until settlement when they are burned and equivalent 
 made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens from
 the batch receiver contract. This two-phase design ensures accurate yield calculations and prevents share
 price manipulation during the settlement process.
+NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in stkToken (share) units, not kToken
+(asset) units. This makes the limit immune to price fluctuations between request time and settlement time.
 
 
 ```solidity
-function requestUnstake(address to, uint256 stkTokenAmount) external payable returns (bytes32 requestId);
+function requestUnstake(
+    address owner,
+    address to,
+    uint256 stkTokenAmount
+)
+    external
+    payable
+    returns (bytes32 requestId);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
+|`owner`|`address`|The address that owns this unstake request and can claim the resulting kTokens|
 |`to`|`address`|The recipient address that will receive the kTokens after successful settlement and claiming|
 |`stkTokenAmount`|`uint256`|The quantity of stkTokens to unstake (must not exceed user balance, cannot be zero)|
 

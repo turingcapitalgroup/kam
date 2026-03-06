@@ -61,7 +61,8 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
             _getPerformanceFee($),
             _getIsHardHurdleRate($),
             _getLastFeesChargedManagement($),
-            _getLastFeesChargedPerformance($)
+            _getLastFeesChargedPerformance($),
+            block.timestamp
         );
     }
 

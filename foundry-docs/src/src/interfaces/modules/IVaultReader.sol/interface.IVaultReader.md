@@ -1,8 +1,8 @@
 # IVaultReader
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/modules/IVaultReader.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/modules/IVaultReader.sol)
 
 **Inherits:**
-[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Read-only interface for querying vault state, calculations, and metrics without modifying contract state
 
@@ -695,20 +695,5 @@ function maxTotalAssets() external view returns (uint128);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`uint128`|The maximum total assets in underlying token terms|
-
-
-### receiverImplementation
-
-Returns the receiver implementation address used to clone batch receivers
-
-
-```solidity
-function receiverImplementation() external view returns (address);
-```
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`address`|The address of the receiver implementation contract|
 
 
