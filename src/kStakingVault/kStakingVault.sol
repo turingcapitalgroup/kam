@@ -41,6 +41,7 @@ import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
+import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 /// @title kStakingVault
 /// @notice Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
@@ -549,7 +550,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedManagement($));
         _setLastFeesChargedManagement($, _timestamp);
-        _updateGlobalWatermark();
         emit ManagementFeesCharged(_timestamp);
     }
 
@@ -559,15 +559,35 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedPerformance($));
         _setLastFeesChargedPerformance($, _timestamp);
-        _updateGlobalWatermark();
+        _updateGlobalWatermark(_timestamp);
         emit PerformanceFeesCharged(_timestamp);
     }
 
-    /// @notice Updates the share price watermark
-    /// @dev Updates the high water mark if the current share price exceeds the previous mark
-    function _updateGlobalWatermark() private {
-        uint256 _sp = _netSharePrice();
+    /// @notice Updates the share price watermark using the share price at a specific timestamp
+    /// @dev Updates the high water mark if the share price at _timestamp exceeds the previous mark.
+    ///      Uses VaultMathLib to compute fees at the given timestamp for accurate historical pricing.
+    /// @param _timestamp The timestamp at which to evaluate the share price for watermark comparison
+    function _updateGlobalWatermark(uint64 _timestamp) private {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
+        uint256 _totalAssetsVal = _totalAssets();
+        uint256 _totalSupplyVal = totalSupply();
+        uint8 _decimals = _getDecimals($);
+
+        (,, uint256 totalFees) = VaultMathLib.computeFees(
+            _totalAssetsVal,
+            _totalSupplyVal,
+            $.sharePriceWatermark,
+            10 ** _decimals,
+            _getManagementFee($),
+            _getHurdleRate($),
+            _getPerformanceFee($),
+            _getIsHardHurdleRate($),
+            _getLastFeesChargedManagement($),
+            _getLastFeesChargedPerformance($),
+            _timestamp
+        );
+
+        uint256 _sp = _convertToAssetsWithTotals(10 ** _decimals, _totalAssetsVal - totalFees, _totalSupplyVal);
         if (_sp > $.sharePriceWatermark) {
             $.sharePriceWatermark = _sp.toUint128();
             emit SharePriceWatermarkUpdated(_sp);

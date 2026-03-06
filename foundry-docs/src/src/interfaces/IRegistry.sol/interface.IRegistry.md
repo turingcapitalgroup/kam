@@ -1,8 +1,8 @@
 # IRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IRegistry.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IRegistry.sol)
 
 **Inherits:**
-[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Core protocol registry interface for managing assets, vaults, adapters, and access control.
 
@@ -161,10 +161,11 @@ function registerAdapter(address vault, address asset, address adapter) external
 
 ### removeAdapter
 
-Removes an adapter from a vault's registered adapter set
+Removes an adapter from a vault-asset pair with safety checks
 
-This disables a specific external protocol integration for the vault. Only callable by ADMIN_ROLE
-to ensure proper risk assessment before removing yield strategies.
+Validates no pending proposals exist and adapter has zero balance before removal.
+Before calling, ensure all pending proposals are cancelled and adapter funds are withdrawn.
+Only callable by ADMIN_ROLE to ensure proper risk assessment before removing yield strategies.
 
 
 ```solidity
@@ -800,11 +801,11 @@ function getHurdleRate(address asset) external view returns (uint16);
 
 ### removeVault
 
-Removes a vault from the protocol registry
+Removes a vault from the protocol registry with safety checks
 
-This function deregisters a vault, removing it from the active vault set. This operation should be
-used carefully as it affects routing and asset management. Only callable by ADMIN_ROLE to ensure proper
-decommissioning procedures are followed. Note that this doesn't clear all vault mappings for gas efficiency.
+This function deregisters a vault. Only callable by ADMIN_ROLE.
+Before calling this function, ensure all pending proposals are cancelled
+via cancelProposal() and all adapter funds are withdrawn.
 
 
 ```solidity

@@ -186,13 +186,13 @@ abstract contract DeploymentManager is Script {
         address kMinterAdapterUSDC;
         address kMinterAdapterWBTC;
         // Mock contracts (unused but kept for struct layout)
-        address mockERC7540USDC;
-        address mockERC7540WBTC;
+        address mockMetawalletUSDC;
+        address mockMetawalletWBTC;
         address mockWalletUSDC;
         address mockWalletWBTC;
         // External contracts
-        address ERC7540USDC;
-        address ERC7540WBTC;
+        address metawalletUSDC;
+        address metawalletWBTC;
         address WalletUSDC;
         address WalletWBTC; // unused but kept for struct layout
         // Insurance
@@ -255,8 +255,8 @@ abstract contract DeploymentManager is Script {
     bytes32 internal constant JK_MINTER_ADAPTER_WBTC = keccak256("kMinterAdapterWBTC");
 
     // External contracts (metawallets, wallets)
-    bytes32 internal constant JK_ERC7540_USDC = keccak256("ERC7540USDC");
-    bytes32 internal constant JK_ERC7540_WBTC = keccak256("ERC7540WBTC");
+    bytes32 internal constant JK_METAWALLET_USDC = keccak256("metawalletUSDC");
+    bytes32 internal constant JK_METAWALLET_WBTC = keccak256("metawalletWBTC");
     bytes32 internal constant JK_WALLET_USDC = keccak256("WalletUSDC");
 
     // Insurance
@@ -272,8 +272,6 @@ abstract contract DeploymentManager is Script {
     bytes32 internal constant JK_GUARDIAN = keccak256("guardian");
 
     // Alias keys (for resolveAddress compatibility)
-    bytes32 internal constant JK_METAWALLET_USDC = keccak256("metawalletUSDC");
-    bytes32 internal constant JK_METAWALLET_WBTC = keccak256("metawalletWBTC");
     bytes32 internal constant JK_WALLET_USDC_ALIAS = keccak256("walletUSDC");
     bytes32 internal constant JK_WALLET_WBTC_ALIAS = keccak256("walletWBTC");
 
@@ -509,8 +507,8 @@ abstract contract DeploymentManager is Script {
         if (h == JK_BETA_VAULT_ADAPTER) return existing.contracts.betaVaultAdapter;
 
         // Metawallets
-        if (h == JK_METAWALLET_USDC) return existing.contracts.ERC7540USDC;
-        if (h == JK_METAWALLET_WBTC) return existing.contracts.ERC7540WBTC;
+        if (h == JK_METAWALLET_USDC) return existing.contracts.metawalletUSDC;
+        if (h == JK_METAWALLET_WBTC) return existing.contracts.metawalletWBTC;
 
         // Custodial wallets
         if (h == JK_WALLET_USDC_ALIAS) return existing.contracts.WalletUSDC;
@@ -571,8 +569,8 @@ abstract contract DeploymentManager is Script {
         output.contracts.betaVaultAdapter = json.readAddress(".contracts.betaVaultAdapter");
         output.contracts.kMinterAdapterUSDC = json.readAddress(".contracts.kMinterAdapterUSDC");
         output.contracts.kMinterAdapterWBTC = json.readAddress(".contracts.kMinterAdapterWBTC");
-        output.contracts.ERC7540USDC = json.readAddress(".contracts.ERC7540USDC");
-        output.contracts.ERC7540WBTC = json.readAddress(".contracts.ERC7540WBTC");
+        output.contracts.metawalletUSDC = json.readAddress(".contracts.metawalletUSDC");
+        output.contracts.metawalletWBTC = json.readAddress(".contracts.metawalletWBTC");
         output.contracts.WalletUSDC = json.readAddress(".contracts.WalletUSDC");
         output.contracts.erc20ExecutionValidator = json.readAddress(".contracts.erc20ExecutionValidator");
         output.contracts.minimalSmartAccountImpl = json.readAddress(".contracts.minimalSmartAccountImpl");
@@ -668,8 +666,8 @@ abstract contract DeploymentManager is Script {
         else if (h == JK_BETA_VAULT_ADAPTER) output.contracts.betaVaultAdapter = contractAddress;
         else if (h == JK_MINTER_ADAPTER_USDC) output.contracts.kMinterAdapterUSDC = contractAddress;
         else if (h == JK_MINTER_ADAPTER_WBTC) output.contracts.kMinterAdapterWBTC = contractAddress;
-        else if (h == JK_ERC7540_USDC) output.contracts.ERC7540USDC = contractAddress;
-        else if (h == JK_ERC7540_WBTC) output.contracts.ERC7540WBTC = contractAddress;
+        else if (h == JK_METAWALLET_USDC) output.contracts.metawalletUSDC = contractAddress;
+        else if (h == JK_METAWALLET_WBTC) output.contracts.metawalletWBTC = contractAddress;
         else if (h == JK_WALLET_USDC) output.contracts.WalletUSDC = contractAddress;
         else if (h == JK_ERC20_EXECUTION_VALIDATOR) output.contracts.erc20ExecutionValidator = contractAddress;
         else if (h == JK_MINIMAL_SMART_ACCOUNT_IMPL) output.contracts.minimalSmartAccountImpl = contractAddress;
@@ -706,8 +704,8 @@ abstract contract DeploymentManager is Script {
         vm.serializeAddress(c, "betaVaultAdapter", output.contracts.betaVaultAdapter);
         vm.serializeAddress(c, "kMinterAdapterUSDC", output.contracts.kMinterAdapterUSDC);
         vm.serializeAddress(c, "kMinterAdapterWBTC", output.contracts.kMinterAdapterWBTC);
-        vm.serializeAddress(c, "ERC7540USDC", output.contracts.ERC7540USDC);
-        vm.serializeAddress(c, "ERC7540WBTC", output.contracts.ERC7540WBTC);
+        vm.serializeAddress(c, "metawalletUSDC", output.contracts.metawalletUSDC);
+        vm.serializeAddress(c, "metawalletWBTC", output.contracts.metawalletWBTC);
         vm.serializeAddress(c, "WalletUSDC", output.contracts.WalletUSDC);
         vm.serializeAddress(c, "erc20ExecutionValidator", output.contracts.erc20ExecutionValidator);
         vm.serializeAddress(c, "minimalSmartAccountImpl", output.contracts.minimalSmartAccountImpl);
@@ -741,8 +739,8 @@ abstract contract DeploymentManager is Script {
         require(existing.contracts.dnVaultAdapterWBTC != address(0), "dnVaultAdapterWBTC not deployed");
         require(existing.contracts.alphaVaultAdapter != address(0), "alphaVaultAdapter not deployed");
         require(existing.contracts.betaVaultAdapter != address(0), "betaVaultAdapter not deployed");
-        require(existing.contracts.ERC7540USDC != address(0), "ERC7540USDC not deployed");
-        require(existing.contracts.ERC7540WBTC != address(0), "ERC7540WBTC not deployed");
+        require(existing.contracts.metawalletUSDC != address(0), "metawalletUSDC not deployed");
+        require(existing.contracts.metawalletWBTC != address(0), "metawalletWBTC not deployed");
         require(existing.contracts.WalletUSDC != address(0), "WalletUSDC not deployed");
     }
 
@@ -1020,11 +1018,11 @@ abstract contract DeploymentManager is Script {
         if (existing.contracts.kMinterAdapterWBTC != address(0)) {
             console.log("kMinterAdapterWBTC:", existing.contracts.kMinterAdapterWBTC);
         }
-        if (existing.contracts.ERC7540USDC != address(0)) {
-            console.log("metawalletUSDC:   ", existing.contracts.ERC7540USDC);
+        if (existing.contracts.metawalletUSDC != address(0)) {
+            console.log("metawalletUSDC:   ", existing.contracts.metawalletUSDC);
         }
-        if (existing.contracts.ERC7540WBTC != address(0)) {
-            console.log("metawalletWBTC:   ", existing.contracts.ERC7540WBTC);
+        if (existing.contracts.metawalletWBTC != address(0)) {
+            console.log("metawalletWBTC:   ", existing.contracts.metawalletWBTC);
         }
         if (existing.contracts.WalletUSDC != address(0)) {
             console.log("WalletUSDC:       ", existing.contracts.WalletUSDC);

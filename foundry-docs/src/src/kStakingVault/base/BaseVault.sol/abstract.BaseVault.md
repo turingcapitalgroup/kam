@@ -1,8 +1,8 @@
 # BaseVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kStakingVault/base/BaseVault.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kStakingVault/base/BaseVault.sol)
 
 **Inherits:**
-[ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
+[ERC20](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
 
 Foundation contract providing essential shared functionality for all kStakingVault implementations
 
@@ -131,20 +131,6 @@ uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_MASK = 0xFFFFFFFFFFFFFFF
 
 ```solidity
 uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 107
-```
-
-
-### VIRTUAL_SHARES
-
-```solidity
-uint256 internal constant VIRTUAL_SHARES = 1e6
-```
-
-
-### VIRTUAL_ASSETS
-
-```solidity
-uint256 internal constant VIRTUAL_ASSETS = 1e6
 ```
 
 
@@ -755,14 +741,12 @@ struct BaseVaultStorage {
     //7
     address registry;
     //8
-    address receiverImplementation;
-    //9
     address underlyingAsset;
-    //10
+    //9
     address kToken;
-    //11
+    //10
     string name;
-    //12
+    //11
     string symbol;
     mapping(bytes32 => BaseVaultTypes.BatchInfo) batches;
     mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;

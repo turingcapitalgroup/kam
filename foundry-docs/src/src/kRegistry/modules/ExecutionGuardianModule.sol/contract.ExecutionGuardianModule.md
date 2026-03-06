@@ -1,8 +1,8 @@
 # ExecutionGuardianModule
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kRegistry/modules/ExecutionGuardianModule.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kRegistry/modules/ExecutionGuardianModule.sol)
 
 **Inherits:**
-[IExecutionGuardian](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
+[IExecutionGuardian](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md), [IModule](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
 
 Module for managing executor permissions and parameter checking in kRegistry
 
@@ -200,6 +200,62 @@ function getExecutorTargets(address _executor) external view returns (address[] 
 |`_targets`|`address[]`|An array of allowed target addresses for the executor|
 
 
+### getExecutorTargetSelectors
+
+Gets all allowed selectors for an executor on a specific target
+
+
+```solidity
+function getExecutorTargetSelectors(
+    address _executor,
+    address _target
+)
+    external
+    view
+    returns (bytes4[] memory _selectors);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_executor`|`address`||
+|`_target`|`address`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_selectors`|`bytes4[]`|selectors An array of allowed function selectors|
+
+
+### getExecutorTargetsByType
+
+Gets executor targets filtered by target type
+
+
+```solidity
+function getExecutorTargetsByType(
+    address _executor,
+    uint8 _targetType
+)
+    external
+    view
+    returns (address[] memory _filtered);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_executor`|`address`||
+|`_targetType`|`uint8`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_filtered`|`address[]`|targets An array of target addresses matching the specified type|
+
+
 ### getTargetType
 
 Gets the type of a target
@@ -260,6 +316,8 @@ struct ExecutionGuardianModuleStorage {
     mapping(address => uint8 targetType) targetType;
     /// @dev Counts allowed selectors per executor-target pair for accurate target tracking
     mapping(address => mapping(address => uint256)) executorTargetSelectorCount;
+    /// @dev Tracks all allowed selectors for each executor-target pair
+    mapping(address => mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set)) executorTargetSelectors;
 }
 ```
 

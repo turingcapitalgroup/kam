@@ -26,8 +26,8 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
     /// @param dnVaultAdapterWBTCAddr Address of dnVaultAdapterWBTC
     /// @param alphaVaultAdapterAddr Address of alphaVaultAdapter
     /// @param betaVaultAdapterAddr Address of betaVaultAdapter
-    /// @param erc7540USDCAddr Address of ERC7540USDC (metawallet)
-    /// @param erc7540WBTCAddr Address of ERC7540WBTC (metawallet)
+    /// @param metawalletUSDCAddr Address of metawalletUSDC (metawallet)
+    /// @param metawalletWBTCAddr Address of metawalletWBTC (metawallet)
     function run(
         address registryAddr,
         address kMinterAdapterUSDCAddr,
@@ -36,8 +36,8 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         address dnVaultAdapterWBTCAddr,
         address alphaVaultAdapterAddr,
         address betaVaultAdapterAddr,
-        address erc7540USDCAddr,
-        address erc7540WBTCAddr
+        address metawalletUSDCAddr,
+        address metawalletWBTCAddr
     )
         public
     {
@@ -58,18 +58,18 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         if (betaVaultAdapterAddr == address(0)) betaVaultAdapterAddr = existing.contracts.betaVaultAdapter;
 
         // For metawallets: prefer config file (production), fallback to addresses.json (mocks)
-        if (erc7540USDCAddr == address(0)) {
+        if (metawalletUSDCAddr == address(0)) {
             if (config.metawallets.USDC != address(0)) {
-                erc7540USDCAddr = config.metawallets.USDC;
+                metawalletUSDCAddr = config.metawallets.USDC;
             } else {
-                erc7540USDCAddr = existing.contracts.ERC7540USDC;
+                metawalletUSDCAddr = existing.contracts.metawalletUSDC;
             }
         }
-        if (erc7540WBTCAddr == address(0)) {
+        if (metawalletWBTCAddr == address(0)) {
             if (config.metawallets.WBTC != address(0)) {
-                erc7540WBTCAddr = config.metawallets.WBTC;
+                metawalletWBTCAddr = config.metawallets.WBTC;
             } else {
-                erc7540WBTCAddr = existing.contracts.ERC7540WBTC;
+                metawalletWBTCAddr = existing.contracts.metawalletWBTC;
             }
         }
 
@@ -81,8 +81,8 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         existing.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
         existing.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
         existing.contracts.betaVaultAdapter = betaVaultAdapterAddr;
-        existing.contracts.ERC7540USDC = erc7540USDCAddr;
-        existing.contracts.ERC7540WBTC = erc7540WBTCAddr;
+        existing.contracts.metawalletUSDC = metawalletUSDCAddr;
+        existing.contracts.metawalletWBTC = metawalletWBTCAddr;
 
         // Log script header and configuration
         logScriptHeader("12_ConfigureAdapterApprovals");
@@ -95,8 +95,8 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         require(registryAddr != address(0), "kRegistry address required");
         require(kMinterAdapterUSDCAddr != address(0), "kMinterAdapterUSDC address required");
         require(kMinterAdapterWBTCAddr != address(0), "kMinterAdapterWBTC address required");
-        require(erc7540USDCAddr != address(0), "ERC7540USDC (metawallet) address required");
-        require(erc7540WBTCAddr != address(0), "ERC7540WBTC (metawallet) address required");
+        require(metawalletUSDCAddr != address(0), "metawalletUSDC (metawallet) address required");
+        require(metawalletWBTCAddr != address(0), "metawalletWBTC (metawallet) address required");
 
         logExecutionStart();
 
@@ -116,34 +116,34 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         _log("");
         _log("1. Approving metawallets to spend underlying assets from kMinter adapters...");
         // kMinterAdapterUSDC approves metawalletUSDC to spend USDC (for deposits)
-        _executeApproval(kMinterAdapterUSDCAddr, usdc, erc7540USDCAddr, maxApproval);
+        _executeApproval(kMinterAdapterUSDCAddr, usdc, metawalletUSDCAddr, maxApproval);
         _log("   - kMinterAdapterUSDC approved metawalletUSDC to spend USDC");
 
         // kMinterAdapterWBTC approves metawalletWBTC to spend WBTC (for deposits)
-        _executeApproval(kMinterAdapterWBTCAddr, wbtc, erc7540WBTCAddr, maxApproval);
+        _executeApproval(kMinterAdapterWBTCAddr, wbtc, metawalletWBTCAddr, maxApproval);
         _log("   - kMinterAdapterWBTC approved metawalletWBTC to spend WBTC");
 
         _log("");
         _log("2. Approving DN vault adapters to spend metawallet shares from kMinter adapters...");
         // kMinterAdapterUSDC approves dnVaultAdapterUSDC to spend metawallet USDC shares
-        _executeApproval(kMinterAdapterUSDCAddr, erc7540USDCAddr, dnVaultAdapterUSDCAddr, maxApproval);
+        _executeApproval(kMinterAdapterUSDCAddr, metawalletUSDCAddr, dnVaultAdapterUSDCAddr, maxApproval);
         _log("   - kMinterAdapterUSDC approved dnVaultAdapterUSDC to spend metawallet shares");
 
         // kMinterAdapterWBTC approves dnVaultAdapterWBTC to spend metawallet WBTC shares
-        _executeApproval(kMinterAdapterWBTCAddr, erc7540WBTCAddr, dnVaultAdapterWBTCAddr, maxApproval);
+        _executeApproval(kMinterAdapterWBTCAddr, metawalletWBTCAddr, dnVaultAdapterWBTCAddr, maxApproval);
         _log("   - kMinterAdapterWBTC approved dnVaultAdapterWBTC to spend metawallet shares");
 
         _log("");
         _log("3. Approving Alpha/Beta vault adapters to spend metawallet shares from kMinter adapters...");
         // kMinterAdapterUSDC approves alphaVaultAdapter to spend metawallet USDC shares
         if (alphaVaultAdapterAddr != address(0)) {
-            _executeApproval(kMinterAdapterUSDCAddr, erc7540USDCAddr, alphaVaultAdapterAddr, maxApproval);
+            _executeApproval(kMinterAdapterUSDCAddr, metawalletUSDCAddr, alphaVaultAdapterAddr, maxApproval);
             _log("   - kMinterAdapterUSDC approved alphaVaultAdapter to spend metawallet shares");
         }
 
         // kMinterAdapterUSDC approves betaVaultAdapter to spend metawallet USDC shares
         if (betaVaultAdapterAddr != address(0)) {
-            _executeApproval(kMinterAdapterUSDCAddr, erc7540USDCAddr, betaVaultAdapterAddr, maxApproval);
+            _executeApproval(kMinterAdapterUSDCAddr, metawalletUSDCAddr, betaVaultAdapterAddr, maxApproval);
             _log("   - kMinterAdapterUSDC approved betaVaultAdapter to spend metawallet shares");
         }
 

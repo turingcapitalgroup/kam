@@ -1,5 +1,5 @@
 # Constants
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/errors/Errors.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/errors/Errors.sol)
 
 ### KASSETROUTER_ALREADY_REGISTERED
 KAM Protocol Error Codes - Centralized error code constants for the KAM protocol.
@@ -9,15 +9,14 @@ All error codes use contract-specific prefixes for easier debugging:
 - BV*: BaseVault errors
 - B*: kBatchReceiver errors
 - C*: Custodial adapter errors
-- F*: kTokenFactory errors
 - K*: kBase errors
 - M*: kMinter errors
 - R*: kRegistry errors
 - SV*: kStakingVault errors
-- T*: kToken errors
 - VB*: VaultBatches errors
 - VC*: VaultClaims errors
 - VF*: VaultFees errors
+Note: kToken (T*) and kTokenFactory (F*) errors are in kToken0 repo
 
 
 ```solidity
@@ -160,6 +159,12 @@ string constant KASSETROUTER_NO_APPROVAL_REQUIRED = "A23"
 
 ```solidity
 string constant KASSETROUTER_PROPOSAL_ALREADY_ACCEPTED = "A24"
+```
+
+### KASSETROUTER_ASSET_MISMATCH
+
+```solidity
+string constant KASSETROUTER_ASSET_MISMATCH = "A25"
 ```
 
 ### ADAPTER_ALREADY_INITIALIZED
@@ -576,6 +581,30 @@ string constant KREGISTRY_ASSET_IN_USE = "R15"
 string constant KREGISTRY_VAULT_TYPE_ASSIGNED = "R16"
 ```
 
+### KREGISTRY_VAULT_HAS_PENDING_PROPOSALS
+
+```solidity
+string constant KREGISTRY_VAULT_HAS_PENDING_PROPOSALS = "R17"
+```
+
+### KREGISTRY_VAULT_HAS_OPEN_BATCHES
+
+```solidity
+string constant KREGISTRY_VAULT_HAS_OPEN_BATCHES = "R18"
+```
+
+### KREGISTRY_ADAPTER_HAS_BALANCE
+
+```solidity
+string constant KREGISTRY_ADAPTER_HAS_BALANCE = "R19"
+```
+
+### KREGISTRY_CANNOT_REMOVE_KMINTER
+
+```solidity
+string constant KREGISTRY_CANNOT_REMOVE_KMINTER = "R20"
+```
+
 ### GUARDIANMODULE_UNAUTHORIZED
 
 ```solidity
@@ -718,36 +747,6 @@ string constant KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED = "SV11"
 
 ```solidity
 string constant KSTAKINGVAULT_BATCH_NOT_VALID = "SV12"
-```
-
-### KTOKEN_IS_PAUSED
-
-```solidity
-string constant KTOKEN_IS_PAUSED = "T1"
-```
-
-### KTOKEN_TRANSFER_FAILED
-
-```solidity
-string constant KTOKEN_TRANSFER_FAILED = "T2"
-```
-
-### KTOKEN_ZERO_ADDRESS
-
-```solidity
-string constant KTOKEN_ZERO_ADDRESS = "T3"
-```
-
-### KTOKEN_ZERO_AMOUNT
-
-```solidity
-string constant KTOKEN_ZERO_AMOUNT = "T4"
-```
-
-### KTOKEN_WRONG_ROLE
-
-```solidity
-string constant KTOKEN_WRONG_ROLE = "T5"
 ```
 
 ### VAULTBATCHES_NOT_CLOSED
@@ -964,23 +963,5 @@ string constant KREMOTEREGISTRY_SELECTOR_ALREADY_SET = "RR4"
 
 ```solidity
 string constant KREMOTEREGISTRY_SELECTOR_NOT_FOUND = "RR5"
-```
-
-### KTOKENFACTORY_ZERO_ADDRESS
-
-```solidity
-string constant KTOKENFACTORY_ZERO_ADDRESS = "F1"
-```
-
-### KTOKENFACTORY_DEPLOYMENT_FAILED
-
-```solidity
-string constant KTOKENFACTORY_DEPLOYMENT_FAILED = "F2"
-```
-
-### KTOKENFACTORY_WRONG_ROLE
-
-```solidity
-string constant KTOKENFACTORY_WRONG_ROLE = "F3"
 ```
 

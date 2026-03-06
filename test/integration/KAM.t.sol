@@ -69,11 +69,11 @@ contract KamIntegrationTest is DeploymentBaseTest {
         assertEq(mockUSDC.balanceOf(users.bob), 0);
         vm.stopPrank();
 
-        uint256 vaultBalance = mockUSDC.balanceOf(address(erc7540USDC));
+        uint256 vaultBalance = mockUSDC.balanceOf(address(metawalletUSDC));
         if (vaultBalance > 0) {
-            mockUSDC.burn(address(erc7540USDC), vaultBalance);
+            mockUSDC.burn(address(metawalletUSDC), vaultBalance);
         }
-        assertEq(erc7540USDC.totalAssets(), 0);
+        assertEq(metawalletUSDC.totalAssets(), 0);
     }
 
     function test_KAM_Integration_Success() public {
@@ -104,7 +104,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
 
         uint256 _minterTotalAssets = minterAdapterUSDC.totalAssets();
         _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets, 0, 0);
-        assertEq(mockUSDC.balanceOf(address(erc7540USDC)), _mintAmount);
+        assertEq(mockUSDC.balanceOf(address(metawalletUSDC)), _mintAmount);
         assertEq(minterAdapterUSDC.totalAssets(), _mintAmount);
 
         // This is what we need to do, for all the kStakingVaults and RequestBurn (kMinter) start working.
@@ -180,7 +180,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         vm.prank(users.bob);
         bytes32 _requestId = alphaVault.requestUnstake(users.bob, users.bob, _amount / 2);
 
-        mockUSDC.mint(address(erc7540USDC), _1_USDC);
+        mockUSDC.mint(address(metawalletUSDC), _1_USDC);
         _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _amount + _1_USDC, 0, 0);
 
         assertEq(DNVaultAdapterUSDC.totalAssets(), ((_amount * 2) + _1_USDC));
@@ -250,7 +250,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _closeBatch(_dnVault, _batchId);
 
         uint256 _totalAssets = dnVault.convertToAssets(_stkTokenAmountAl + _stkTokenAmountBob);
-        uint256 _transferAmount = erc7540USDC.balanceOf(address(DNVaultAdapterUSDC));
+        uint256 _transferAmount = metawalletUSDC.balanceOf(address(DNVaultAdapterUSDC));
 
         _transferAmongAdapters(address(DNVaultAdapterUSDC), _minterAdapterUSDC, _transferAmount);
         _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _totalAssets, 0, 0);
@@ -261,7 +261,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         vm.prank(users.bob);
         dnVault.claimUnstakedAssets(_bobReq);
 
-        assertEq(erc7540USDC.balanceOf(address(DNVaultAdapterUSDC)), 0);
+        assertEq(metawalletUSDC.balanceOf(address(DNVaultAdapterUSDC)), 0);
 
         uint256 _kTokenAmount = kUSD.balanceOf(users.alice);
         vm.prank(users.alice);
@@ -350,18 +350,13 @@ contract KamIntegrationTest is DeploymentBaseTest {
 
     function _approveAndDeposit(address _adapter, uint256 _amount) internal {
         bytes memory _approveCallData =
-            abi.encodeWithSignature("approve(address,uint256)", address(erc7540USDC), _amount);
+            abi.encodeWithSignature("approve(address,uint256)", address(metawalletUSDC), _amount);
 
-        bytes memory _requestDepositCallData =
-            abi.encodeWithSignature("requestDeposit(uint256,address,address)", _amount, _adapter, _adapter);
+        bytes memory _depositCallData = abi.encodeWithSignature("deposit(uint256,address)", _amount, _adapter);
 
-        bytes memory _depositCallData =
-            abi.encodeWithSignature("deposit(uint256,address,address)", _amount, _adapter, _adapter);
-
-        Execution[] memory _executions = new Execution[](3);
+        Execution[] memory _executions = new Execution[](2);
         _executions[0] = Execution({ target: address(mockUSDC), value: 0, callData: _approveCallData });
-        _executions[1] = Execution({ target: address(erc7540USDC), value: 0, callData: _requestDepositCallData });
-        _executions[2] = Execution({ target: address(erc7540USDC), value: 0, callData: _depositCallData });
+        _executions[1] = Execution({ target: address(metawalletUSDC), value: 0, callData: _depositCallData });
 
         bytes memory _executionCalldata = ExecutionLib.encodeBatch(_executions);
 
@@ -373,7 +368,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         bytes memory _transferCallData = abi.encodeWithSignature("transfer(address,uint256)", _to, _amount);
 
         Execution[] memory _executions = new Execution[](1);
-        _executions[0] = Execution({ target: address(erc7540USDC), value: 0, callData: _transferCallData });
+        _executions[0] = Execution({ target: address(metawalletUSDC), value: 0, callData: _transferCallData });
 
         bytes memory _executionCalldata = ExecutionLib.encodeBatch(_executions);
 
@@ -382,26 +377,22 @@ contract KamIntegrationTest is DeploymentBaseTest {
     }
 
     function _requestAndRedeem(address _adapter, address _to, uint256 _amount) internal {
-        uint256 _convertedAmount = erc7540USDC.convertToShares(_amount);
+        uint256 _convertedAmount = metawalletUSDC.convertToShares(_amount);
 
-        bytes memory _requestRedeemCallData =
-            abi.encodeWithSignature("requestRedeem(uint256,address,address)", _convertedAmount, _adapter, _adapter);
-
-        uint256 _numberOfExecutions = 2;
-        if (_to != address(0)) _numberOfExecutions = 3;
+        uint256 _numberOfExecutions = 1;
+        if (_to != address(0)) _numberOfExecutions = 2;
 
         Execution[] memory _executions = new Execution[](_numberOfExecutions);
-        _executions[0] = Execution({ target: address(erc7540USDC), value: 0, callData: _requestRedeemCallData });
 
         bytes memory _redeemCallData =
             abi.encodeWithSignature("redeem(uint256,address,address)", _convertedAmount, _adapter, _adapter);
 
-        _executions[1] = Execution({ target: address(erc7540USDC), value: 0, callData: _redeemCallData });
+        _executions[0] = Execution({ target: address(metawalletUSDC), value: 0, callData: _redeemCallData });
 
-        if (_numberOfExecutions == 3) {
+        if (_numberOfExecutions == 2) {
             bytes memory _transferCallData = abi.encodeWithSignature("transfer(address,uint256)", _to, _amount);
 
-            _executions[2] = Execution({ target: USDC, value: 0, callData: _transferCallData });
+            _executions[1] = Execution({ target: USDC, value: 0, callData: _transferCallData });
         }
 
         bytes memory _executionCalldata = ExecutionLib.encodeBatch(_executions);

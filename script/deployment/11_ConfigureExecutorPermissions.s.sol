@@ -5,7 +5,8 @@ import { DeploymentManager } from "../utils/DeploymentManager.sol";
 import { Script } from "forge-std/Script.sol";
 import { ERC20ExecutionValidator } from "kam/src/adapters/parameters/ERC20ExecutionValidator.sol";
 
-import { IERC7540 } from "kam/src/interfaces/IERC7540.sol";
+import { IERC20 } from "forge-std/interfaces/IERC20.sol";
+import { IERC4626 } from "forge-std/interfaces/IERC4626.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
 
 contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
@@ -26,24 +27,20 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
     )
         internal
     {
-        bytes4 approveSelector = IERC7540.approve.selector;
-        bytes4 transferSelector = IERC7540.transfer.selector;
-        bytes4 transferFromSelector = IERC7540.transferFrom.selector;
+        bytes4 approveSelector = IERC20.approve.selector;
+        bytes4 transferSelector = IERC20.transfer.selector;
+        bytes4 transferFromSelector = IERC20.transferFrom.selector;
 
         registry.setAllowedSelector(executor, vault, 0, approveSelector, true);
         registry.setAllowedSelector(executor, vault, 0, transferSelector, true);
         registry.setAllowedSelector(executor, vault, 0, transferFromSelector, true);
 
         if (isKMinterAdapter) {
-            bytes4 requestDepositSelector = IERC7540.requestDeposit.selector;
-            bytes4 depositSelector = bytes4(abi.encodeWithSignature("deposit(uint256,address,address)"));
-            bytes4 requestRedeemSelector = IERC7540.requestRedeem.selector;
-            bytes4 redeemSelector = IERC7540.redeem.selector;
-            bytes4 withdrawSelector = IERC7540.withdraw.selector;
+            bytes4 depositSelector = IERC4626.deposit.selector;
+            bytes4 redeemSelector = IERC4626.redeem.selector;
+            bytes4 withdrawSelector = IERC4626.withdraw.selector;
 
-            registry.setAllowedSelector(executor, vault, 0, requestDepositSelector, true);
             registry.setAllowedSelector(executor, vault, 0, depositSelector, true);
-            registry.setAllowedSelector(executor, vault, 0, requestRedeemSelector, true);
             registry.setAllowedSelector(executor, vault, 0, redeemSelector, true);
             registry.setAllowedSelector(executor, vault, 0, withdrawSelector, true);
 
@@ -61,8 +58,8 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
     )
         internal
     {
-        bytes4 approveSelector = IERC7540.approve.selector;
-        bytes4 transferSelector = IERC7540.transfer.selector;
+        bytes4 approveSelector = IERC20.approve.selector;
+        bytes4 transferSelector = IERC20.transfer.selector;
 
         registry.setAllowedSelector(executor, custodialAddress, 1, transferSelector, true);
         registry.setAllowedSelector(executor, custodialAddress, 1, approveSelector, true);
@@ -77,14 +74,14 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
     )
         internal
     {
-        bytes4 transferSelector = IERC7540.transfer.selector;
-        bytes4 approveSelector = IERC7540.approve.selector;
+        bytes4 transferSelector = IERC20.transfer.selector;
+        bytes4 approveSelector = IERC20.approve.selector;
 
         registry.setExecutionValidator(executor, target, transferSelector, validator);
         registry.setExecutionValidator(executor, target, approveSelector, validator);
 
         if (isTransferFrom) {
-            bytes4 transferFromSelector = IERC7540.transferFrom.selector;
+            bytes4 transferFromSelector = IERC20.transferFrom.selector;
             registry.setExecutionValidator(executor, target, transferFromSelector, validator);
         }
     }
@@ -98,8 +95,8 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
     /// @param dnVaultAdapterWBTCAddr Address of dnVaultAdapterWBTC
     /// @param alphaVaultAdapterAddr Address of alphaVaultAdapter
     /// @param betaVaultAdapterAddr Address of betaVaultAdapter
-    /// @param erc7540USDCAddr Address of ERC7540USDC mock vault
-    /// @param erc7540WBTCAddr Address of ERC7540WBTC mock vault
+    /// @param metawalletUSDCAddr Address of metawalletUSDC mock vault
+    /// @param metawalletWBTCAddr Address of metawalletWBTC mock vault
     /// @param walletUSDCAddr Address of WalletUSDC mock
     /// @param usdcAddr Address of USDC asset (if zero, reads from JSON)
     /// @param wbtcAddr Address of WBTC asset (if zero, reads from JSON)
@@ -112,8 +109,8 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         address dnVaultAdapterWBTCAddr,
         address alphaVaultAdapterAddr,
         address betaVaultAdapterAddr,
-        address erc7540USDCAddr,
-        address erc7540WBTCAddr,
+        address metawalletUSDCAddr,
+        address metawalletWBTCAddr,
         address walletUSDCAddr,
         address usdcAddr,
         address wbtcAddr
@@ -143,28 +140,28 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         if (walletUSDCAddr == address(0)) walletUSDCAddr = existing.contracts.WalletUSDC;
 
         // For metawallet addresses: prefer config file (production), fallback to addresses.json (mocks)
-        if (erc7540USDCAddr == address(0)) {
+        if (metawalletUSDCAddr == address(0)) {
             // Try config first (production deployments set this manually)
             if (config.metawallets.USDC != address(0)) {
-                erc7540USDCAddr = config.metawallets.USDC;
+                metawalletUSDCAddr = config.metawallets.USDC;
             } else {
                 // Fallback to addresses.json (mock deployments)
-                erc7540USDCAddr = existing.contracts.ERC7540USDC;
+                metawalletUSDCAddr = existing.contracts.metawalletUSDC;
             }
         }
-        if (erc7540WBTCAddr == address(0)) {
+        if (metawalletWBTCAddr == address(0)) {
             // Try config first (production deployments set this manually)
             if (config.metawallets.WBTC != address(0)) {
-                erc7540WBTCAddr = config.metawallets.WBTC;
+                metawalletWBTCAddr = config.metawallets.WBTC;
             } else {
                 // Fallback to addresses.json (mock deployments)
-                erc7540WBTCAddr = existing.contracts.ERC7540WBTC;
+                metawalletWBTCAddr = existing.contracts.metawalletWBTC;
             }
         }
 
         // Validate metawallet assets match expected underlying assets
-        _validateMetawalletAsset(erc7540USDCAddr, _usdc, "metawalletUSDC", "USDC");
-        _validateMetawalletAsset(erc7540WBTCAddr, _wbtc, "metawalletWBTC", "WBTC");
+        _validateMetawalletAsset(metawalletUSDCAddr, _usdc, "metawalletUSDC", "USDC");
+        _validateMetawalletAsset(metawalletWBTCAddr, _wbtc, "metawalletWBTC", "WBTC");
 
         // Populate existing for logging
         existing.contracts.kRegistry = registryAddr;
@@ -174,8 +171,8 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         existing.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
         existing.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
         existing.contracts.betaVaultAdapter = betaVaultAdapterAddr;
-        existing.contracts.ERC7540USDC = erc7540USDCAddr;
-        existing.contracts.ERC7540WBTC = erc7540WBTCAddr;
+        existing.contracts.metawalletUSDC = metawalletUSDCAddr;
+        existing.contracts.metawalletWBTC = metawalletWBTCAddr;
         existing.contracts.WalletUSDC = walletUSDCAddr;
 
         // Log script header and configuration
@@ -206,31 +203,31 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
 
         _log("");
         _log("1. Configuring Executor permissions...");
-        configureExecutorPermissions(registry, kMinterAdapterUSDCAddr, erc7540USDCAddr, usdc, true);
-        configureExecutorPermissions(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, wbtc, true);
-        configureExecutorPermissions(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, usdc, false);
-        configureExecutorPermissions(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, wbtc, false);
+        configureExecutorPermissions(registry, kMinterAdapterUSDCAddr, metawalletUSDCAddr, usdc, true);
+        configureExecutorPermissions(registry, kMinterAdapterWBTCAddr, metawalletWBTCAddr, wbtc, true);
+        configureExecutorPermissions(registry, dnVaultAdapterUSDCAddr, metawalletUSDCAddr, usdc, false);
+        configureExecutorPermissions(registry, dnVaultAdapterWBTCAddr, metawalletWBTCAddr, wbtc, false);
         // Alpha/Beta adapters for custodial targets
         configureCustodialExecutorPermissions(registry, alphaVaultAdapterAddr, walletUSDCAddr);
         configureCustodialExecutorPermissions(registry, betaVaultAdapterAddr, walletUSDCAddr);
-        // Alpha/Beta adapters for metawallets (ERC7540 share transfers)
-        configureExecutorPermissions(registry, alphaVaultAdapterAddr, erc7540USDCAddr, usdc, false);
-        configureExecutorPermissions(registry, betaVaultAdapterAddr, erc7540USDCAddr, usdc, false);
+        // Alpha/Beta adapters for metawallets (ERC4626 share transfers)
+        configureExecutorPermissions(registry, alphaVaultAdapterAddr, metawalletUSDCAddr, usdc, false);
+        configureExecutorPermissions(registry, betaVaultAdapterAddr, metawalletUSDCAddr, usdc, false);
 
         _log("");
         _log("2. Configuring execution validators...");
         address validator = address(erc20ExecutionValidator);
         configureExecutionValidator(registry, kMinterAdapterUSDCAddr, usdc, validator, true);
         configureExecutionValidator(registry, kMinterAdapterWBTCAddr, wbtc, validator, true);
-        configureExecutionValidator(registry, kMinterAdapterUSDCAddr, erc7540USDCAddr, validator, true);
-        configureExecutionValidator(registry, kMinterAdapterWBTCAddr, erc7540WBTCAddr, validator, true);
-        configureExecutionValidator(registry, dnVaultAdapterUSDCAddr, erc7540USDCAddr, validator, false);
-        configureExecutionValidator(registry, dnVaultAdapterWBTCAddr, erc7540WBTCAddr, validator, false);
+        configureExecutionValidator(registry, kMinterAdapterUSDCAddr, metawalletUSDCAddr, validator, true);
+        configureExecutionValidator(registry, kMinterAdapterWBTCAddr, metawalletWBTCAddr, validator, true);
+        configureExecutionValidator(registry, dnVaultAdapterUSDCAddr, metawalletUSDCAddr, validator, false);
+        configureExecutionValidator(registry, dnVaultAdapterWBTCAddr, metawalletWBTCAddr, validator, false);
         configureExecutionValidator(registry, alphaVaultAdapterAddr, walletUSDCAddr, validator, false);
         configureExecutionValidator(registry, betaVaultAdapterAddr, walletUSDCAddr, validator, false);
         // Alpha/Beta adapters for metawallets
-        configureExecutionValidator(registry, alphaVaultAdapterAddr, erc7540USDCAddr, validator, true);
-        configureExecutionValidator(registry, betaVaultAdapterAddr, erc7540USDCAddr, validator, true);
+        configureExecutionValidator(registry, alphaVaultAdapterAddr, metawalletUSDCAddr, validator, true);
+        configureExecutionValidator(registry, betaVaultAdapterAddr, metawalletUSDCAddr, validator, true);
 
         _log("");
         _log("3. Configuring execution validator permissions from config...");
@@ -242,19 +239,19 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         existing.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
         existing.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
         existing.contracts.betaVaultAdapter = betaVaultAdapterAddr;
-        existing.contracts.ERC7540USDC = erc7540USDCAddr;
-        existing.contracts.ERC7540WBTC = erc7540WBTCAddr;
+        existing.contracts.metawalletUSDC = metawalletUSDCAddr;
+        existing.contracts.metawalletWBTC = metawalletWBTCAddr;
         existing.contracts.WalletUSDC = walletUSDCAddr;
 
         // Set allowed receivers from config
-        _configureAllowedReceivers(erc20ExecutionValidator, config, existing, usdc, erc7540USDCAddr, walletUSDCAddr);
+        _configureAllowedReceivers(erc20ExecutionValidator, config, existing, usdc, metawalletUSDCAddr, walletUSDCAddr);
 
         // Set allowed sources from config
-        _configureAllowedSources(erc20ExecutionValidator, config, existing, erc7540USDCAddr, erc7540WBTCAddr);
+        _configureAllowedSources(erc20ExecutionValidator, config, existing, metawalletUSDCAddr, metawalletWBTCAddr);
 
         // Set allowed spenders from config
         _configureAllowedSpenders(
-            erc20ExecutionValidator, config, existing, usdc, wbtc, erc7540USDCAddr, erc7540WBTCAddr
+            erc20ExecutionValidator, config, existing, usdc, wbtc, metawalletUSDCAddr, metawalletWBTCAddr
         );
 
         // Set max transfer limits from config
@@ -262,10 +259,10 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         erc20ExecutionValidator.setMaxSingleTransfer(usdc, config.parameterChecker.maxSingleTransfer.USDC);
         erc20ExecutionValidator.setMaxSingleTransfer(wbtc, config.parameterChecker.maxSingleTransfer.WBTC);
         erc20ExecutionValidator.setMaxSingleTransfer(
-            erc7540USDCAddr, config.parameterChecker.maxSingleTransfer.metawalletUSDC
+            metawalletUSDCAddr, config.parameterChecker.maxSingleTransfer.metawalletUSDC
         );
         erc20ExecutionValidator.setMaxSingleTransfer(
-            erc7540WBTCAddr, config.parameterChecker.maxSingleTransfer.metawalletWBTC
+            metawalletWBTCAddr, config.parameterChecker.maxSingleTransfer.metawalletWBTC
         );
 
         vm.stopBroadcast();
@@ -295,8 +292,8 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         address dnVaultAdapterWBTCAddr,
         address alphaVaultAdapterAddr,
         address betaVaultAdapterAddr,
-        address erc7540USDCAddr,
-        address erc7540WBTCAddr,
+        address metawalletUSDCAddr,
+        address metawalletWBTCAddr,
         address walletUSDCAddr
     )
         public
@@ -311,8 +308,8 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
             dnVaultAdapterWBTCAddr,
             alphaVaultAdapterAddr,
             betaVaultAdapterAddr,
-            erc7540USDCAddr,
-            erc7540WBTCAddr,
+            metawalletUSDCAddr,
+            metawalletWBTCAddr,
             walletUSDCAddr,
             address(0),
             address(0)
@@ -380,7 +377,7 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
             address receiver =
                 _resolveAddress(config.parameterChecker.allowedReceivers.metawalletWBTC[i], config, existing);
             if (receiver != address(0)) {
-                validator.setAllowedReceiver(existing.contracts.ERC7540WBTC, receiver, true);
+                validator.setAllowedReceiver(existing.contracts.metawalletWBTC, receiver, true);
             }
         }
     }
@@ -475,7 +472,7 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
     }
 
     /// @notice Validate that a metawallet's underlying asset matches the expected asset
-    /// @param metawallet Address of the metawallet (ERC7540 vault)
+    /// @param metawallet Address of the metawallet (ERC4626 vault)
     /// @param expectedAsset Address of the expected underlying asset
     /// @param metawalletName Name of the metawallet for error messages
     /// @param assetName Name of the expected asset for error messages
@@ -492,7 +489,7 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
             return; // Skip validation if metawallet not set
         }
 
-        address actualAsset = IERC7540(metawallet).asset();
+        address actualAsset = IERC4626(metawallet).asset();
         require(
             actualAsset == expectedAsset,
             string.concat(

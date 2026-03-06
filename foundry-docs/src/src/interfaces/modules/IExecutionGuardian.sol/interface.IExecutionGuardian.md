@@ -1,5 +1,5 @@
 # IExecutionGuardian
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/modules/IExecutionGuardian.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/modules/IExecutionGuardian.sol)
 
 Interface for managing executor permissions and security controls.
 
@@ -145,6 +145,62 @@ function getExecutorTargets(address executor) external view returns (address[] m
 |`targets`|`address[]`|an array of possible targets used by the executor|
 
 
+### getExecutorTargetSelectors
+
+Gets all allowed selectors for an executor on a specific target
+
+
+```solidity
+function getExecutorTargetSelectors(
+    address executor,
+    address target
+)
+    external
+    view
+    returns (bytes4[] memory selectors);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`executor`|`address`|The executor address|
+|`target`|`address`|The target contract address|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`selectors`|`bytes4[]`|An array of allowed function selectors|
+
+
+### getExecutorTargetsByType
+
+Gets executor targets filtered by target type
+
+
+```solidity
+function getExecutorTargetsByType(
+    address executor,
+    uint8 targetType_
+)
+    external
+    view
+    returns (address[] memory targets);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`executor`|`address`|The executor address|
+|`targetType_`|`uint8`|The target type to filter by (e.g., 0 = METAWALLET, 1 = CUSTODIAL)|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`targets`|`address[]`|An array of target addresses matching the specified type|
+
+
 ### getTargetType
 
 Gets the type of a target
@@ -198,9 +254,9 @@ event ExecutionValidatorSet(
 
 ```solidity
 enum TargetType {
-    METAVAULT,
+    METAWALLET,
     CUSTODIAL,
-    TARGET_03,
+    ASSET,
     TARGET_04,
     TARGET_05,
     TARGET_06,

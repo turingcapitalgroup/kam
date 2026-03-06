@@ -1,8 +1,8 @@
 # kStakingVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/kStakingVault/kStakingVault.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kStakingVault/kStakingVault.sol)
 
 **Inherits:**
-[IVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
+[IVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [BaseVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
 
 Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
 
@@ -117,15 +117,25 @@ remain locked in the vault until settlement when they are burned and equivalent 
 made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens from
 the batch receiver contract. This two-phase design ensures accurate yield calculations and prevents share
 price manipulation during the settlement process.
+NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in stkToken (share) units, not kToken
+(asset) units. This makes the limit immune to price fluctuations between request time and settlement time.
 
 
 ```solidity
-function requestUnstake(address _to, uint256 _stkTokenAmount) external payable returns (bytes32 _requestId);
+function requestUnstake(
+    address _owner,
+    address _to,
+    uint256 _stkTokenAmount
+)
+    external
+    payable
+    returns (bytes32 _requestId);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
+|`_owner`|`address`||
 |`_to`|`address`||
 |`_stkTokenAmount`|`uint256`||
 
@@ -536,14 +546,21 @@ function notifyPerformanceFeesCharged(uint64 _timestamp) external;
 
 ### _updateGlobalWatermark
 
-Updates the share price watermark
+Updates the share price watermark using the share price at a specific timestamp
 
-Updates the high water mark if the current share price exceeds the previous mark
+Updates the high water mark if the share price at _timestamp exceeds the previous mark.
+Uses VaultMathLib to compute fees at the given timestamp for accurate historical pricing.
 
 
 ```solidity
-function _updateGlobalWatermark() private;
+function _updateGlobalWatermark(uint64 _timestamp) private;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_timestamp`|`uint64`|The timestamp at which to evaluate the share price for watermark comparison|
+
 
 ### _createStakeRequestId
 

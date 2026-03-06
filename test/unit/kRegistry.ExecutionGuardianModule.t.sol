@@ -15,7 +15,7 @@ import { IExecutionGuardian } from "kam/src/interfaces/modules/IExecutionGuardia
 contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
     address internal constant ZERO_ADDRESS = address(0);
     uint8 internal constant TEST_TARGET_TYPE = 1;
-    uint8 internal constant METAVAULT_TARGET_TYPE = 0;
+    uint8 internal constant METAWALLET_TARGET_TYPE = 0;
     address internal constant MOCK_METAWALLET = 0x1A008E7a5b1DFf54Ec91D11757fe58f2AA18aA09;
 
     IExecutionGuardian internal guardianModule;
@@ -279,7 +279,7 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         bytes4 _selector = bytes4(keccak256("transfer(address,uint256)"));
 
         vm.prank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector, true);
 
         bytes4[] memory _selectors = guardianModule.getExecutorTargetSelectors(testExecutor, MOCK_METAWALLET);
         assertEq(_selectors.length, 1);
@@ -292,9 +292,9 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         bytes4 _selector3 = bytes4(keccak256("deposit(uint256)"));
 
         vm.startPrank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector1, true);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector2, true);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector3, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector1, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector2, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector3, true);
         vm.stopPrank();
 
         bytes4[] memory _selectors = guardianModule.getExecutorTargetSelectors(testExecutor, MOCK_METAWALLET);
@@ -317,9 +317,9 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         bytes4 _selector = bytes4(keccak256("deposit(uint256)"));
 
         vm.prank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector, true);
 
-        assertEq(guardianModule.getTargetType(MOCK_METAWALLET), METAVAULT_TARGET_TYPE, "Should be METAVAULT type (0)");
+        assertEq(guardianModule.getTargetType(MOCK_METAWALLET), METAWALLET_TARGET_TYPE, "Should be METAWALLET type (0)");
     }
 
     function test_GetExecutorTargetSelectors_AddAndRemove() public {
@@ -329,9 +329,9 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
 
         // Add all three
         vm.startPrank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector1, true);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector2, true);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector3, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector1, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector2, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector3, true);
         vm.stopPrank();
 
         bytes4[] memory _selectors = guardianModule.getExecutorTargetSelectors(testExecutor, MOCK_METAWALLET);
@@ -339,7 +339,7 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
 
         // Remove selector2
         vm.prank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector2, false);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector2, false);
 
         _selectors = guardianModule.getExecutorTargetSelectors(testExecutor, MOCK_METAWALLET);
         assertEq(_selectors.length, 2, "Should have 2 selectors after removal");
@@ -360,8 +360,8 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         bytes4 _selector2 = bytes4(keccak256("function2()"));
 
         vm.startPrank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector1, true);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector2, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector1, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector2, true);
         vm.stopPrank();
 
         // Verify target exists
@@ -370,8 +370,8 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
 
         // Remove all selectors
         vm.startPrank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector1, false);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector2, false);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector1, false);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector2, false);
         vm.stopPrank();
 
         // Selectors should be empty
@@ -385,17 +385,17 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
 
     function test_GetExecutorTargetSelectors_FullBackendFlow() public {
         address _custodialTarget = makeAddr("CustodialTarget");
-        bytes4 _metavaultSelector1 = bytes4(keccak256("deposit(uint256)"));
-        bytes4 _metavaultSelector2 = bytes4(keccak256("withdraw(uint256)"));
+        bytes4 _metawalletSelector1 = bytes4(keccak256("deposit(uint256)"));
+        bytes4 _metawalletSelector2 = bytes4(keccak256("withdraw(uint256)"));
         bytes4 _custodialSelector = bytes4(keccak256("execute(bytes)"));
 
         vm.startPrank(users.admin);
-        // Set up metawallet target (type 0 = METAVAULT)
+        // Set up metawallet target (type 0 = METAWALLET)
         guardianModule.setAllowedSelector(
-            testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _metavaultSelector1, true
+            testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _metawalletSelector1, true
         );
         guardianModule.setAllowedSelector(
-            testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _metavaultSelector2, true
+            testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _metawalletSelector2, true
         );
         // Set up custodial target (type 1 = CUSTODIAL)
         guardianModule.setAllowedSelector(testExecutor, _custodialTarget, TEST_TARGET_TYPE, _custodialSelector, true);
@@ -416,22 +416,22 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
 
         // Step 2: getTargetType - verify types
         assertEq(
-            guardianModule.getTargetType(MOCK_METAWALLET), METAVAULT_TARGET_TYPE, "Metawallet should be METAVAULT (0)"
+            guardianModule.getTargetType(MOCK_METAWALLET), METAWALLET_TARGET_TYPE, "Metawallet should be METAWALLET (0)"
         );
         assertEq(guardianModule.getTargetType(_custodialTarget), TEST_TARGET_TYPE, "Custodial should be CUSTODIAL (1)");
 
         // Step 3: getExecutorTargetSelectors - verify metawallet selectors
-        bytes4[] memory _metavaultSelectors = guardianModule.getExecutorTargetSelectors(testExecutor, MOCK_METAWALLET);
-        assertEq(_metavaultSelectors.length, 2, "Metawallet should have 2 selectors");
+        bytes4[] memory _metawalletSelectors = guardianModule.getExecutorTargetSelectors(testExecutor, MOCK_METAWALLET);
+        assertEq(_metawalletSelectors.length, 2, "Metawallet should have 2 selectors");
 
         bool _hasSel1;
         bool _hasSel2;
-        for (uint256 _i; _i < _metavaultSelectors.length; _i++) {
-            if (_metavaultSelectors[_i] == _metavaultSelector1) _hasSel1 = true;
-            if (_metavaultSelectors[_i] == _metavaultSelector2) _hasSel2 = true;
+        for (uint256 _i; _i < _metawalletSelectors.length; _i++) {
+            if (_metawalletSelectors[_i] == _metawalletSelector1) _hasSel1 = true;
+            if (_metawalletSelectors[_i] == _metawalletSelector2) _hasSel2 = true;
         }
-        assertTrue(_hasSel1, "Missing metavault selector1");
-        assertTrue(_hasSel2, "Missing metavault selector2");
+        assertTrue(_hasSel1, "Missing metawallet selector1");
+        assertTrue(_hasSel2, "Missing metawallet selector2");
 
         // Step 4: getExecutorTargetSelectors - verify custodial selectors
         bytes4[] memory _custodialSelectors = guardianModule.getExecutorTargetSelectors(testExecutor, _custodialTarget);
@@ -445,8 +445,8 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         bytes4 _selector2 = bytes4(keccak256("function2()"));
 
         vm.startPrank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector1, true);
-        guardianModule.setAllowedSelector(_executor2, MOCK_METAWALLET, METAVAULT_TARGET_TYPE, _selector2, true);
+        guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector1, true);
+        guardianModule.setAllowedSelector(_executor2, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector2, true);
         vm.stopPrank();
 
         // Each executor should only see their own selectors

@@ -1,8 +1,8 @@
 # IkAssetRouter
-[Git Source](https://github.com/VerisLabs/KAM/blob/ee79211268af43ace88134525ab3a518754a1e4e/src/interfaces/IkAssetRouter.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IkAssetRouter.sol)
 
 **Inherits:**
-[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Central money flow coordinator for the KAM protocol managing all asset movements and settlements
 
@@ -605,6 +605,55 @@ function isBatchIdRegistered(bytes32 batchId) external view returns (bool);
 |`<none>`|`bool`|True if the batch ID is registered, false otherwise|
 
 
+### getPendingProposalCount
+
+Gets the count of pending settlement proposals for a specific vault
+
+Used by kRegistry to validate vault removal safety - vaults with pending proposals cannot be removed
+
+
+```solidity
+function getPendingProposalCount(address vault_) external view returns (uint256 count);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`vault_`|`address`|The vault address to query for pending settlement proposals|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`count`|`uint256`|The number of pending proposals for the vault|
+
+
+### getGlobalPendingRequests
+
+Gets the total pending asset requests for a source vault across all batches
+
+Used to track cumulative pending requests to prevent cross-batch over-requests.
+This ensures that multiple staking vault batches cannot collectively exceed the source vault's
+virtual balance. The value is incremented on kAssetTransfer and decremented on settlement.
+
+
+```solidity
+function getGlobalPendingRequests(address sourceVault, address asset) external view returns (uint256);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`sourceVault`|`address`|The source vault address (typically kMinter) to query|
+|`asset`|`address`|The asset address to check pending requests for|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The total pending asset requests for this source vault and asset combination|
+
+
 ## Events
 ### TotalAssetsSet
 Emitted when the kAssetRouter contract is initialized with registry configuration
@@ -765,6 +814,24 @@ event Deposited(address indexed vault, address indexed asset, uint256 amount);
 |`vault`|`address`|The vault address receiving the deposit|
 |`asset`|`address`|The underlying asset address being deposited|
 |`amount`|`uint256`|The quantity of assets deposited|
+
+### Withdrawn
+Emitted when assets are withdrawn from a vault through settlement
+
+Tracks net withdrawals when more redemptions than deposits occur in a batch
+
+
+```solidity
+event Withdrawn(address indexed vault, address indexed asset, uint256 amount);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`vault`|`address`|The vault address from which assets are withdrawn|
+|`asset`|`address`|The underlying asset address being withdrawn|
+|`amount`|`uint256`|The quantity of assets withdrawn|
 
 ### SettlementProposed
 Emitted when a new settlement proposal is created with cooldown period
@@ -927,6 +994,8 @@ struct VaultSettlementProposal {
     address asset;
     /// @dev The DN vault address where yield was generated
     address vault;
+    /// @dev Cached adapter address at proposal creation - prevents registry modification from breaking execution
+    address adapter;
     /// @dev The batch identifier for this settlement period
     bytes32 batchId;
     /// @dev Total asset value in the vault after yield generation
