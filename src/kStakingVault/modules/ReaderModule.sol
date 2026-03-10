@@ -211,8 +211,8 @@ contract ReaderModule is BaseVault, Extsload, IVaultReader, IModule {
         uint256 _totalSupply = batch.totalSupply;
         uint8 decimals = _getDecimals($);
 
-        sharePrice_ = _convertToSharesWithTotals(10 ** decimals, batch.totalAssets, _totalSupply);
-        netSharePrice_ = _convertToSharesWithTotals(10 ** decimals, batch.totalNetAssets, _totalSupply);
+        sharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalAssets, _totalSupply);
+        netSharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalNetAssets, _totalSupply);
 
         return (
             batch.batchReceiver,
