@@ -5,6 +5,7 @@ import { IERC2771 } from "./IERC2771.sol";
 import { IVaultBatch } from "./IVaultBatch.sol";
 import { IVaultClaim } from "./IVaultClaim.sol";
 import { IVaultFees } from "./IVaultFees.sol";
+import { IVersioned } from "./IVersioned.sol";
 
 /// @title IVault
 /// @notice Core interface for retail staking operations enabling kToken holders to earn yield through vault strategies
@@ -18,7 +19,7 @@ import { IVaultFees } from "./IVaultFees.sol";
 /// system for gas-efficient operations, and automated yield distribution through share price appreciation rather
 /// than token rebasing. This approach maintains compatibility with existing DeFi infrastructure while providing
 /// transparent yield accrual for retail participants.
-interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
+interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /* //////////////////////////////////////////////////////////////
                               EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -191,4 +192,96 @@ interface IVault is IERC2771, IVaultBatch, IVaultClaim, IVaultFees {
     /// @dev Only callable by admin. Set to address(0) to disable meta-transactions.
     /// @param trustedForwarder_ The new trusted forwarder address (address(0) to disable)
     function setTrustedForwarder(address trustedForwarder_) external;
+
+    /* //////////////////////////////////////////////////////////////
+                          ESSENTIAL VAULT GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the protocol registry address
+    function registry() external view returns (address);
+
+    /// @notice Returns the vault's kToken address
+    function asset() external view returns (address);
+
+    /// @notice Returns the underlying asset address
+    function underlyingAsset() external view returns (address);
+
+    /// @notice Returns total assets under management
+    function totalAssets() external view returns (uint256);
+
+    /// @notice Returns net assets after fees
+    function totalNetAssets() external view returns (uint256);
+
+    /// @notice Returns gross share price
+    function sharePrice() external view returns (uint256);
+
+    /// @notice Returns net share price after fees
+    function netSharePrice() external view returns (uint256);
+
+    /// @notice Converts assets to shares at current price
+    function convertToShares(uint256 shares) external view returns (uint256);
+
+    /// @notice Converts shares to assets at current price
+    function convertToAssets(uint256 assets) external view returns (uint256);
+
+    /// @notice Converts shares to assets with specified totals
+    function convertToAssetsWithTotals(
+        uint256 shares,
+        uint256 totalAssets_,
+        uint256 totalSupply_
+    )
+        external
+        pure
+        returns (uint256);
+
+    /// @notice Converts assets to shares with specified totals
+    function convertToSharesWithTotals(
+        uint256 assets,
+        uint256 totalAssets_,
+        uint256 totalSupply_
+    )
+        external
+        pure
+        returns (uint256);
+
+    /// @notice Returns the current active batch ID
+    function getBatchId() external view returns (bytes32);
+
+    /// @notice Returns current batch ID with safety validation
+    function getSafeBatchId() external view returns (bytes32);
+
+    /// @notice Returns the close state of a given batch
+    function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
+
+    /// @notice Returns whether the current batch is closed
+    function isBatchClosed() external view returns (bool);
+
+    /// @notice Returns whether the current batch is settled
+    function isBatchSettled() external view returns (bool);
+
+    /// @notice Returns comprehensive info about the current batch
+    function getCurrentBatchInfo()
+        external
+        view
+        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
+
+    /// @notice Returns comprehensive info about a specific batch
+    function getBatchIdInfo(bytes32 batchId)
+        external
+        view
+        returns (
+            address batchReceiver,
+            bool isClosed_,
+            bool isSettled,
+            uint256 sharePrice_,
+            uint256 netSharePrice_,
+            uint256 totalAssets_,
+            uint256 totalNetAssets_,
+            uint256 totalSupply_,
+            uint256 depositedInBatch,
+            uint256 requestedSharesInBatch
+        );
+
+    /// @notice Returns the maximum total assets (TVL cap)
+    function maxTotalAssets() external view returns (uint128);
 }

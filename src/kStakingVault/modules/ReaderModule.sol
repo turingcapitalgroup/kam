@@ -25,6 +25,10 @@ contract ReaderModule is BaseVault, Extsload, IModule {
                             FEE GETTERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Calculates accumulated fees for the current period
+    /// @return managementFees Accrued management fees in underlying asset terms
+    /// @return performanceFees Accrued performance fees in underlying asset terms
+    /// @return totalFees Combined management and performance fees
     function computeLastBatchFees()
         external
         view
@@ -46,91 +50,92 @@ contract ReaderModule is BaseVault, Extsload, IModule {
         );
     }
 
+    /// @notice Returns the timestamp when management fees were last processed
+    /// @return Timestamp of last management fee charge
     function lastFeesChargedManagement() public view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getLastFeesChargedManagement($);
     }
 
+    /// @notice Returns the timestamp when performance fees were last processed
+    /// @return Timestamp of last performance fee charge
     function lastFeesChargedPerformance() public view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getLastFeesChargedPerformance($);
     }
 
+    /// @notice Returns the hurdle rate threshold for performance fee calculations
+    /// @return Hurdle rate in basis points
     function hurdleRate() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getHurdleRate($);
     }
 
+    /// @notice Returns whether the current hurdle rate is a hard hurdle rate
+    /// @return True if hard hurdle rate, false otherwise
     function isHardHurdleRate() external view returns (bool) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getIsHardHurdleRate($);
     }
 
+    /// @notice Returns the current performance fee rate
+    /// @return Performance fee in basis points
     function performanceFee() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getPerformanceFee($);
     }
 
+    /// @notice Calculates the next timestamp when performance fees can be charged
+    /// @return Projected timestamp for next performance fee evaluation
     function nextPerformanceFeeTimestamp() external view returns (uint256) {
         uint256 _lastCharged = _getLastFeesChargedPerformance(_getBaseVaultStorage());
 
-        // Get the date components from the last charged timestamp
         (uint256 _year, uint256 _month, uint256 _day) = OptimizedDateTimeLib.timestampToDate(_lastCharged);
-
-        // Get the last day of the month
         uint256 _lastDay = OptimizedDateTimeLib.daysInMonth(_year, _month);
 
-        // Add 3 months
         uint256 _targetMonth = _day != _lastDay ? _month + 2 : _month + 3;
         uint256 _targetYear = _year;
 
-        // Handle year overflow
         if (_targetMonth > MONTHS_PER_YEAR) {
             _targetYear += (_targetMonth - 1) / MONTHS_PER_YEAR;
             _targetMonth = ((_targetMonth - 1) % MONTHS_PER_YEAR) + 1;
         }
 
-        // Get the last day of the target month
         _lastDay = OptimizedDateTimeLib.daysInMonth(_targetYear, _targetMonth);
-
-        // Return timestamp for end of day (23:59:59) on the last day of the month
         return OptimizedDateTimeLib.dateTimeToTimestamp(_targetYear, _targetMonth, _lastDay, 23, 59, 59);
     }
 
+    /// @notice Calculates the next timestamp when management fees can be charged
+    /// @return Projected timestamp for next management fee evaluation
     function nextManagementFeeTimestamp() external view returns (uint256) {
         uint256 _lastCharged = _getLastFeesChargedManagement(_getBaseVaultStorage());
 
-        // Get the date components from the last charged timestamp
         (uint256 _year, uint256 _month, uint256 _day) = OptimizedDateTimeLib.timestampToDate(_lastCharged);
-
-        // Get the last day of the month
         uint256 _lastDay = OptimizedDateTimeLib.daysInMonth(_year, _month);
 
-        // If its the same month return the last day of the current month
         if (_day != _lastDay) return OptimizedDateTimeLib.dateTimeToTimestamp(_year, _month, _lastDay, 23, 59, 59);
 
-        // Add 1 month
         uint256 _targetMonth = _month + 1;
         uint256 _targetYear = _year;
 
-        // Handle year overflow
         if (_targetMonth > MONTHS_PER_YEAR) {
             _targetYear += 1;
             _targetMonth = 1;
         }
 
-        // Get the last day of the target month
         _lastDay = OptimizedDateTimeLib.daysInMonth(_targetYear, _targetMonth);
-
-        // Return timestamp for end of day (23:59:59) on the last day of the month
         return OptimizedDateTimeLib.dateTimeToTimestamp(_targetYear, _targetMonth, _lastDay, 23, 59, 59);
     }
 
+    /// @notice Returns the current management fee rate
+    /// @return Management fee in basis points
     function managementFee() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getManagementFee($);
     }
 
+    /// @notice Returns the high watermark used for performance fee calculations
+    /// @return Current high watermark share price
     function sharePriceWatermark() external view returns (uint256) {
         return _getBaseVaultStorage().sharePriceWatermark;
     }
@@ -139,10 +144,16 @@ contract ReaderModule is BaseVault, Extsload, IModule {
                         BATCH RECEIVER GETTERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the batch receiver address for a specific batch ID
+    /// @param _batchId The batch identifier to query
+    /// @return Address of the batch receiver
     function getBatchReceiver(bytes32 _batchId) external view returns (address) {
         return _getBaseVaultStorage().batches[_batchId].batchReceiver;
     }
 
+    /// @notice Returns batch receiver address with validation
+    /// @param _batchId The batch identifier to query
+    /// @return Address of the batch receiver
     function getSafeBatchReceiver(bytes32 _batchId) external view returns (address) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require(!$.batches[_batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
@@ -153,11 +164,17 @@ contract ReaderModule is BaseVault, Extsload, IModule {
                         REQUEST GETTERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Gets all request IDs associated with a user
+    /// @param _user The address to query requests for
+    /// @return requestIds An array of all request IDs for the user
     function getUserRequests(address _user) external view returns (bytes32[] memory requestIds) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return $.userRequests[_user].values();
     }
 
+    /// @notice Gets the details of a specific stake request
+    /// @param _requestId The unique identifier of the stake request
+    /// @return stakeRequest The stake request struct
     function getStakeRequest(bytes32 _requestId)
         external
         view
@@ -167,6 +184,9 @@ contract ReaderModule is BaseVault, Extsload, IModule {
         return $.stakeRequests[_requestId];
     }
 
+    /// @notice Gets the details of a specific unstake request
+    /// @param _requestId The unique identifier of the unstake request
+    /// @return unstakeRequest The unstake request struct
     function getUnstakeRequest(bytes32 _requestId)
         external
         view
@@ -180,10 +200,14 @@ contract ReaderModule is BaseVault, Extsload, IModule {
                         PENDING AMOUNTS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the total pending stake amount
+    /// @return Total pending stake amount
     function getTotalPendingStake() external view returns (uint256) {
         return _getBaseVaultStorage().totalPendingStake;
     }
 
+    /// @notice Returns the total pending unstake amount
+    /// @return Total pending unstake amount
     function getTotalPendingUnstake() external view returns (uint256) {
         return _getBaseVaultStorage().totalPendingUnstake;
     }
