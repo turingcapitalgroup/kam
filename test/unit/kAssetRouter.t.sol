@@ -562,9 +562,9 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
     function test_CanExecuteProposal() public {
         bytes32 fakeProposalId = keccak256("Banana");
-        (bool canExecute, string memory reason) = assetRouter.canExecuteProposal(fakeProposalId);
+        (bool canExecute, IkAssetRouter.ProposalStatus status) = assetRouter.canExecuteProposal(fakeProposalId);
         assertFalse(canExecute);
-        assertEq(reason, "Proposal not found");
+        assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.NOT_FOUND));
 
         bytes32 _batchId = dnVault.getBatchId();
         vm.prank(users.relayer);
@@ -573,15 +573,15 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
 
-        (canExecute, reason) = assetRouter.canExecuteProposal(testProposalId);
+        (canExecute, status) = assetRouter.canExecuteProposal(testProposalId);
         assertFalse(canExecute);
-        assertEq(reason, "Cooldown not passed");
+        assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.COOLDOWN_NOT_PASSED));
 
         vm.warp(block.timestamp + 2);
 
-        (canExecute, reason) = assetRouter.canExecuteProposal(testProposalId);
+        (canExecute, status) = assetRouter.canExecuteProposal(testProposalId);
         assertTrue(canExecute);
-        assertEq(reason, "");
+        assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.EXECUTABLE));
     }
 
     function test_CanExecuteProposal_Cancelled() public {
@@ -596,7 +596,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.warp(block.timestamp + 2);
 
         // Verify can execute before cancellation
-        (bool canExecute, string memory reason) = assetRouter.canExecuteProposal(proposalId);
+        (bool canExecute, IkAssetRouter.ProposalStatus status) = assetRouter.canExecuteProposal(proposalId);
         assertTrue(canExecute);
 
         // Cancel the proposal
@@ -604,9 +604,9 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assetRouter.cancelProposal(proposalId);
 
         // Verify canExecuteProposal returns false for cancelled proposal
-        (canExecute, reason) = assetRouter.canExecuteProposal(proposalId);
+        (canExecute, status) = assetRouter.canExecuteProposal(proposalId);
         assertFalse(canExecute);
-        assertEq(reason, "Proposal cancelled");
+        assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.CANCELLED));
     }
 
     function test_CanExecuteProposal_AlreadyExecuted() public {
@@ -622,9 +622,9 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assetRouter.executeSettleBatch(proposalId);
 
         // Verify canExecuteProposal returns false for executed proposal
-        (bool canExecute, string memory reason) = assetRouter.canExecuteProposal(proposalId);
+        (bool canExecute, IkAssetRouter.ProposalStatus status) = assetRouter.canExecuteProposal(proposalId);
         assertFalse(canExecute);
-        assertEq(reason, "Proposal already executed");
+        assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.ALREADY_EXECUTED));
     }
 
     function test_IsProposalPending() public {

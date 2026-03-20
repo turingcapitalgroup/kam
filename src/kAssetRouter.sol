@@ -597,27 +597,27 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     }
 
     /// @inheritdoc IkAssetRouter
-    function canExecuteProposal(bytes32 _proposalId) external view returns (bool _canExecute, string memory _reason) {
+    function canExecuteProposal(bytes32 _proposalId) external view returns (bool _canExecute, ProposalStatus _status) {
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         VaultSettlementProposal storage _proposal = $.settlementProposals[_proposalId];
 
         if (_proposal.executeAfter == 0) {
-            return (false, "Proposal not found");
+            return (false, ProposalStatus.NOT_FOUND);
         }
         if ($.executedProposalIds.contains(_proposalId)) {
-            return (false, "Proposal already executed");
+            return (false, ProposalStatus.ALREADY_EXECUTED);
         }
         if (!$.vaultPendingProposalIds[_proposal.vault].contains(_proposalId)) {
-            return (false, "Proposal cancelled");
+            return (false, ProposalStatus.CANCELLED);
         }
         if (block.timestamp < _proposal.executeAfter) {
-            return (false, "Cooldown not passed");
+            return (false, ProposalStatus.COOLDOWN_NOT_PASSED);
         }
         if (_proposal.requiresApproval && !$.acceptedProposals[_proposalId]) {
-            return (false, "Proposal requires guardian approval");
+            return (false, ProposalStatus.REQUIRES_APPROVAL);
         }
 
-        return (true, "");
+        return (true, ProposalStatus.EXECUTABLE);
     }
 
     /// @inheritdoc IkAssetRouter

@@ -24,6 +24,20 @@ interface ISettleBatch {
 /// through precise yield distribution and loss management across the protocol's vault network.
 interface IkAssetRouter is IVersioned {
     /* ///////////////////////////////////////////////////////////////
+                                ENUMS
+    ///////////////////////////////////////////////////////////////*/
+
+    /// @notice Status codes for proposal execution readiness checks
+    enum ProposalStatus {
+        EXECUTABLE,
+        NOT_FOUND,
+        ALREADY_EXECUTED,
+        CANCELLED,
+        COOLDOWN_NOT_PASSED,
+        REQUIRES_APPROVAL
+    }
+
+    /* ///////////////////////////////////////////////////////////////
                                 STRUCTS
     ///////////////////////////////////////////////////////////////*/
 
@@ -410,8 +424,8 @@ interface IkAssetRouter is IVersioned {
     /// human-readable reason for failures, enabling better error handling and user feedback.
     /// @param proposalId The unique identifier of the proposal to check
     /// @return canExecute True if the proposal can be executed immediately
-    /// @return reason Descriptive message explaining why execution is blocked (if applicable)
-    function canExecuteProposal(bytes32 proposalId) external view returns (bool canExecute, string memory reason);
+    /// @return status The proposal status code indicating the current state
+    function canExecuteProposal(bytes32 proposalId) external view returns (bool canExecute, ProposalStatus status);
 
     /// @notice Checks if a settlement proposal is still pending (not cancelled or executed)
     /// @dev Returns true only if the proposal exists and is in the pending queue.
