@@ -6,6 +6,7 @@ import { Script } from "forge-std/Script.sol";
 
 import { kToken } from "kToken0/kToken.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
+import { kAssetRouter } from "kam/src/kAssetRouter.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 
 contract ConfigureProtocolScript is Script, DeploymentManager {
@@ -158,6 +159,14 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         registry.setBatchLimits(
             betaVaultAddr, config.betaVault.maxDepositPerBatch, config.betaVault.maxWithdrawPerBatch
         );
+
+        // Set max allowed delta per vault
+        kAssetRouter assetRouter = kAssetRouter(payable(assetRouterAddr));
+        assetRouter.setMaxAllowedDelta(minterAddr, config.assetRouter.maxAllowedDelta);
+        assetRouter.setMaxAllowedDelta(dnVaultUSDCAddr, config.assetRouter.maxAllowedDelta);
+        assetRouter.setMaxAllowedDelta(dnVaultWBTCAddr, config.assetRouter.maxAllowedDelta);
+        assetRouter.setMaxAllowedDelta(alphaVaultAddr, config.assetRouter.maxAllowedDelta);
+        assetRouter.setMaxAllowedDelta(betaVaultAddr, config.assetRouter.maxAllowedDelta);
 
         _log("");
         _log("2. Setting hurdle rates for assets...");
