@@ -182,12 +182,13 @@ interface IkAssetRouter is IVersioned {
     /// @param newCooldown The new cooldown period in seconds
     event SettlementCooldownUpdated(uint256 oldCooldown, uint256 newCooldown);
 
-    /// @notice Emitted when the yield tolerance threshold is updated by protocol governance
+    /// @notice Emitted when the yield tolerance threshold for a vault is updated by protocol governance
     /// @dev Yield tolerance acts as a safety mechanism to prevent settlement proposals with excessive
     /// yield deviations that could indicate calculation errors or potential manipulation attempts
+    /// @param vault The vault address for which the tolerance was updated
     /// @param oldTolerance The previous yield tolerance in basis points
     /// @param newTolerance The new yield tolerance in basis points
-    event MaxAllowedDeltaUpdated(uint256 oldTolerance, uint256 newTolerance);
+    event MaxAllowedDeltaUpdated(address indexed vault, uint256 oldTolerance, uint256 newTolerance);
 
     /// @notice Emitted when yield exceeds the tolerance threshold
     /// @param vault The DN vault address
@@ -339,7 +340,7 @@ interface IkAssetRouter is IVersioned {
     /// operational flexibility, allowing normal yield fluctuations while blocking suspicious proposals.
     /// Only admin roles can modify this parameter as it affects protocol safety.
     /// @param tolerance_ The new yield tolerance in basis points (e.g., 1000 = 10%)
-    function setMaxAllowedDelta(uint256 tolerance_) external;
+    function setMaxAllowedDelta(address vault_, uint256 tolerance_) external;
 
     /* //////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
@@ -440,7 +441,7 @@ interface IkAssetRouter is IVersioned {
     /// with excessive yield values that could indicate calculation errors or potential manipulation. The tolerance
     /// is expressed in basis points where 10000 equals 100%.
     /// @return tolerance The current yield tolerance in basis points
-    function getMaxAllowedDelta() external view returns (uint256 tolerance);
+    function getMaxAllowedDelta(address vault_) external view returns (uint256 tolerance);
 
     /// @notice Retrieves the virtual balance of assets for a vault's adapter
     /// @dev Retrieves the total assets from the single adapter registered for this vault-asset pair.

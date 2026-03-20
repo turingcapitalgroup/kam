@@ -70,7 +70,7 @@ contract DeployAssetRouterScript is Script, DeploymentManager {
         // Set settlement cooldown from config
         kAssetRouter assetRouter = kAssetRouter(payable(assetRouterProxy));
         assetRouter.setSettlementCooldown(config.assetRouter.settlementCooldown);
-        assetRouter.setMaxAllowedDelta(config.assetRouter.maxAllowedDelta);
+        // maxAllowedDelta is now per-vault, set after vault deployment via setMaxAllowedDelta(vault, delta)
 
         vm.stopBroadcast();
 

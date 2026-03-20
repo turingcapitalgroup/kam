@@ -96,8 +96,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         uint256 proposalCounter;
         /// @dev Current cooldown period in seconds before settlement proposals can be executed
         uint256 vaultSettlementCooldown;
-        /// @dev Maximum allowed yield deviation in basis points before settlement proposal is rejected
-        uint256 maxAllowedDelta;
+        /// @dev Maximum allowed yield deviation in basis points per vault before settlement proposal is rejected
+        mapping(address vault => uint256) maxAllowedDelta;
         /// @dev Set of proposal IDs that have been executed to prevent double-execution
         OptimizedBytes32EnumerableSetLib.Bytes32Set executedProposalIds;
         /// @dev Set of all batch IDs processed by the router for tracking and management
@@ -151,7 +151,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         $.vaultSettlementCooldown = DEFAULT_VAULT_SETTLEMENT_COOLDOWN;
-        $.maxAllowedDelta = DEFAULT_MAX_DELTA;
+        // maxAllowedDelta is now per-vault, set via setMaxAllowedDelta(vault, delta)
 
         emit ContractInitialized(_registry);
     }
@@ -315,7 +315,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // If exceeded, require guardian approval before execution
         bool _requiresApproval = false;
         if (_lastTotalAssets > 0) {
-            uint256 _maxAllowedYield = _lastTotalAssets * $.maxAllowedDelta / MAX_BPS;
+            uint256 _maxAllowedYield = _lastTotalAssets * $.maxAllowedDelta[_vault] / MAX_BPS;
             if (_yield.abs() > _maxAllowedYield) {
                 _requiresApproval = true;
                 emit YieldExceedsMaxDeltaWarning(_vault, _asset, _batchId, _yield, _maxAllowedYield);
@@ -565,14 +565,14 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// or potential manipulation attempts. Setting an appropriate tolerance balances protocol safety with
     /// operational flexibility, allowing normal yield fluctuations while blocking suspicious proposals.
     /// @param _maxDelta The new yield tolerance in basis points (e.g., 1000 = 10%)
-    function setMaxAllowedDelta(uint256 _maxDelta) external {
+    function setMaxAllowedDelta(address _vault, uint256 _maxDelta) external {
         _checkAdmin(msg.sender);
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-        uint256 _oldTolerance = $.maxAllowedDelta;
-        $.maxAllowedDelta = _maxDelta;
+        uint256 _oldTolerance = $.maxAllowedDelta[_vault];
+        $.maxAllowedDelta[_vault] = _maxDelta;
 
-        emit MaxAllowedDeltaUpdated(_oldTolerance, _maxDelta);
+        emit MaxAllowedDeltaUpdated(_vault, _oldTolerance, _maxDelta);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -641,9 +641,9 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     }
 
     /// @inheritdoc IkAssetRouter
-    function getMaxAllowedDelta() external view returns (uint256) {
+    function getMaxAllowedDelta(address _vault) external view returns (uint256) {
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-        return $.maxAllowedDelta;
+        return $.maxAllowedDelta[_vault];
     }
 
     /// @inheritdoc IkAssetRouter
