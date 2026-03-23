@@ -23,7 +23,10 @@ import {
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
     KSTAKINGVAULT_IS_PAUSED,
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
+    KSTAKINGVAULT_NOT_INITIALIZED,
     KSTAKINGVAULT_REQUEST_NOT_FOUND,
+    KSTAKINGVAULT_VAULT_CLOSED,
+    KSTAKINGVAULT_VAULT_SETTLED,
     KSTAKINGVAULT_WRONG_ROLE,
     KSTAKINGVAULT_ZERO_ADDRESS,
     KSTAKINGVAULT_ZERO_AMOUNT,
@@ -214,12 +217,11 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         bytes32 _batchId = $.currentBatchId;
         require(_batchId != bytes32(0) && !$.batches[_batchId].isClosed, KSTAKINGVAULT_BATCH_NOT_VALID);
 
-        // Enforce limit using share-based tracking
-        require(
-            ($.batches[_batchId].requestedSharesInBatch += _stkTokenAmount.toUint128())
-                <= _registry().getMaxBurnPerBatch(address(this)),
-            KSTAKINGVAULT_BATCH_LIMIT_REACHED
+        // Enforce limit using asset-based tracking
+        uint256 _requestedAssets = _convertToAssetsWithTotals(
+            $.batches[_batchId].requestedSharesInBatch += _stkTokenAmount.toUint128(), _totalNetAssets(), totalSupply()
         );
+        require(_requestedAssets <= _registry().getMaxBurnPerBatch(address(this)), KSTAKINGVAULT_BATCH_LIMIT_REACHED);
 
         // Generate request ID
         _requestId = _createStakeRequestId(_owner, _stkTokenAmount, block.timestamp);
@@ -657,6 +659,160 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         override
     {
         _checkOwner();
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                          ESSENTIAL VAULT GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function registry() external view returns (address) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        require(_getInitialized($), KSTAKINGVAULT_NOT_INITIALIZED);
+        return $.registry;
+    }
+
+    function asset() external view returns (address) {
+        return _getBaseVaultStorage().kToken;
+    }
+
+    function underlyingAsset() external view returns (address) {
+        return _getBaseVaultStorage().underlyingAsset;
+    }
+
+    function totalAssets() external view returns (uint256) {
+        return _totalAssets();
+    }
+
+    function totalNetAssets() external view returns (uint256) {
+        return _totalNetAssets();
+    }
+
+    function sharePrice() external view returns (uint256) {
+        return _sharePrice();
+    }
+
+    function netSharePrice() external view returns (uint256) {
+        return _netSharePrice();
+    }
+
+    function convertToShares(uint256 _shares) external view returns (uint256) {
+        return _convertToSharesWithTotals(_shares, _totalNetAssets(), totalSupply());
+    }
+
+    function convertToAssets(uint256 _assets) external view returns (uint256) {
+        return _convertToAssetsWithTotals(_assets, _totalNetAssets(), totalSupply());
+    }
+
+    function convertToSharesWithTotals(
+        uint256 _shares,
+        uint256 _totalAssetsVal,
+        uint256 _totalSupplyVal
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _convertToSharesWithTotals(_shares, _totalAssetsVal, _totalSupplyVal);
+    }
+
+    function convertToAssetsWithTotals(
+        uint256 _assets,
+        uint256 _totalAssetsVal,
+        uint256 _totalSupplyVal
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _convertToAssetsWithTotals(_assets, _totalAssetsVal, _totalSupplyVal);
+    }
+
+    function getBatchId() public view returns (bytes32) {
+        return _getBaseVaultStorage().currentBatchId;
+    }
+
+    function getSafeBatchId() external view returns (bytes32) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = getBatchId();
+        require(!$.batches[_batchId].isClosed, KSTAKINGVAULT_VAULT_CLOSED);
+        require(!$.batches[_batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        return _batchId;
+    }
+
+    function isClosed(bytes32 _batchId) external view returns (bool isClosed_) {
+        isClosed_ = _getBaseVaultStorage().batches[_batchId].isClosed;
+    }
+
+    function isBatchClosed() external view returns (bool) {
+        return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed;
+    }
+
+    function isBatchSettled() external view returns (bool) {
+        return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled;
+    }
+
+    function getCurrentBatchInfo()
+        external
+        view
+        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled)
+    {
+        return (
+            _getBaseVaultStorage().currentBatchId,
+            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].batchReceiver,
+            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed,
+            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled
+        );
+    }
+
+    function getBatchIdInfo(bytes32 _batchId)
+        external
+        view
+        returns (
+            address batchReceiver,
+            bool isClosed_,
+            bool isSettled,
+            uint256 sharePrice_,
+            uint256 netSharePrice_,
+            uint256 totalAssets_,
+            uint256 totalNetAssets_,
+            uint256 totalSupply_,
+            uint256 depositedInBatch,
+            uint256 requestedSharesInBatch
+        )
+    {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
+
+        uint256 _totalSupply = batch.totalSupply;
+        uint8 decimals = _getDecimals($);
+
+        sharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalAssets, _totalSupply);
+        netSharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalNetAssets, _totalSupply);
+
+        return (
+            batch.batchReceiver,
+            batch.isClosed,
+            batch.isSettled,
+            sharePrice_,
+            netSharePrice_,
+            batch.totalAssets,
+            batch.totalNetAssets,
+            batch.totalSupply,
+            batch.depositedInBatch,
+            batch.requestedSharesInBatch
+        );
+    }
+
+    function maxTotalAssets() external view returns (uint128) {
+        return _getBaseVaultStorage().maxTotalAssets;
+    }
+
+    function contractName() external pure returns (string memory) {
+        return "kStakingVault";
+    }
+
+    function contractVersion() external pure returns (string memory) {
+        return "1.0.0";
     }
 
     /// @notice Receive ether function

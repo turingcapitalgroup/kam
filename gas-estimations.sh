@@ -37,46 +37,11 @@ CR='┼'  # Cross
 echo -e "${CYAN}${BOLD}⛽ Running forge test --gas-report...${RESET}"
 forge test --gas-report > "$TEMP_FILE" 2>&1 || true
 
-# Fetch current mainnet gas price from Etherscan API
-echo -e "${CYAN}📡 Fetching current mainnet gas price...${RESET}"
-GAS_PRICE_GWEI=""
-
-# Try with API key first
-if [ -n "$ETHERSCAN_MAINNET_KEY" ]; then
-    GAS_RESPONSE=$(curl -s "https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=$ETHERSCAN_MAINNET_KEY" 2>/dev/null || echo "{}")
-    if echo "$GAS_RESPONSE" | jq -e '.result.ProposeGasPrice' >/dev/null 2>&1; then
-        GAS_PRICE_GWEI=$(echo "$GAS_RESPONSE" | jq -r '.result.ProposeGasPrice')
-    fi
-fi
-
-# Fallback to public API if no API key or failed
-if [ -z "$GAS_PRICE_GWEI" ] || [ "$GAS_PRICE_GWEI" = "null" ]; then
-    GAS_RESPONSE=$(curl -s "https://api.etherscan.io/api?module=gastracker&action=gasoracle" 2>/dev/null || echo "{}")
-    if echo "$GAS_RESPONSE" | jq -e '.result.ProposeGasPrice' >/dev/null 2>&1; then
-        GAS_PRICE_GWEI=$(echo "$GAS_RESPONSE" | jq -r '.result.ProposeGasPrice')
-    fi
-fi
-
-# Default fallback
-if [ -z "$GAS_PRICE_GWEI" ] || [ "$GAS_PRICE_GWEI" = "null" ]; then
-    GAS_PRICE_GWEI="0.052"
-    echo -e "${YELLOW}⚠️  Could not fetch gas price, using default: ${GAS_PRICE_GWEI} gwei${RESET}"
-fi
-
-# Fetch current ETH price
-echo -e "${CYAN}💰 Fetching current ETH price...${RESET}"
-ETH_PRICE=""
-
-ETH_RESPONSE=$(curl -s "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd" 2>/dev/null || echo "{}")
-if echo "$ETH_RESPONSE" | jq -e '.ethereum.usd' >/dev/null 2>&1; then
-    ETH_PRICE=$(echo "$ETH_RESPONSE" | jq -r '.ethereum.usd')
-fi
-
-# Default fallback
-if [ -z "$ETH_PRICE" ] || [ "$ETH_PRICE" = "null" ]; then
-    ETH_PRICE="3500"
-    echo -e "${YELLOW}⚠️  Could not fetch ETH price, using default: \$${ETH_PRICE}${RESET}"
-fi
+# Hardcoded mainnet gas price and ETH price (2026-03-20)
+GAS_PRICE_GWEI="0.12"
+ETH_PRICE="2135"
+echo -e "${CYAN}📡 Using mainnet gas price: ${GAS_PRICE_GWEI} gwei${RESET}"
+echo -e "${CYAN}💰 Using ETH price: \$${ETH_PRICE}${RESET}"
 
 echo -e "${CYAN}📊 Parsing gas report and generating estimates...${RESET}"
 echo ""
