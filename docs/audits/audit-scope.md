@@ -6,7 +6,7 @@ The KAM protocol is an institutional-grade tokenization system that bridges trad
 
 KAM implements a **hub-and-spoke model** where kAssetRouter serves as the central coordinator managing asset flows between institutional operations (kMinter) and retail yield generation (kStakingVault). The system uses **virtual balance accounting** to enable capital efficiency—assets remain productively deployed in yield strategies while maintaining instant liquidity for institutional operations.
 
-The protocol's **two-phase settlement system** with mandatory cooldown periods provides security through guardian oversight while maintaining operational efficiency through batch processing. This enables the protocol to maintain 1:1 backing guarantees while supporting complex multi-vault yield distribution.
+The protocol's **multi-phase settlement system** (proposal, cooldown, optional approval, execution) with mandatory cooldown periods provides security through guardian oversight while maintaining operational efficiency through batch processing. This enables the protocol to maintain 1:1 backing guarantees while supporting complex multi-vault yield distribution.
 
 **Security-First Design**: Every component implements defense-in-depth principles with role-based access control, transient reentrancy protection, ERC-7201 upgrade-safe storage, and explicit approval patterns for external integrations.
 
@@ -135,7 +135,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 **Settlement Workflow**:
 
 1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, lastFeesChargedManagement, lastFeesChargedPerformance)`
-   - Contract automatically calculates: `netted = deposited - requested`, then `yield = totalAssets - netted - lastTotalAssets`
+   - Contract automatically calculates: `netted = deposited - requested`, then `yield = totalAssets - lastTotalAssets`
    - Validates yield against configurable tolerance limits
    - Creates proposal with mandatory cooldown period (default 1 hour, max 1 day)
    - Records fee timestamps for vault fee tracking synchronization

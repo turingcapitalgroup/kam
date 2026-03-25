@@ -1,6 +1,6 @@
 # KAM Protocol Interfaces
 
-This document describes the interfaces that make up the KAM protocol. The protocol implements a dual-track institutional/retail system with batch processing, two-phase settlements, and virtual balance accounting.
+This document describes the interfaces that make up the KAM protocol. The protocol implements a dual-track institutional/retail system with batch processing, multi-phase settlements, and virtual balance accounting.
 
 ## Core Protocol Interfaces
 

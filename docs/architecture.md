@@ -110,7 +110,7 @@ The protocol operates on a sophisticated batch settlement system where operation
 
 The kMinter contract manages batches on a per-asset basis using `currentBatchIds[asset]` mapping, meaning USDC batches operate independently from WBTC batches.
 
-**Settlement Proposal Mechanism**: The kAssetRouter implements a secure two-phase settlement:
+**Settlement Proposal Mechanism**: The kAssetRouter implements a secure multi-phase settlement:
 
 1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, lastFeesChargedManagement, lastFeesChargedPerformance)` providing the current total assets from external strategies and fee charge timestamps (`uint64`, 0 = no fees to charge). The kAssetRouter contract automatically calculates:
    - `netted` = deposited - requested amounts from batch balances
@@ -499,7 +499,7 @@ Retail User          kStakingVault         kAssetRouter           Batch
 
 ### Settlement Process
 
-Settlement is the critical synchronization point between virtual and actual balances, implemented through a secure three-phase process. During the proposal phase, relayers query external strategies to obtain current totalAssets values and submit them via `proposeSettleBatch()`. The kAssetRouter contract automatically calculates all other parameters: netted amounts (deposited minus requested), yield amounts (totalAssets minus netted minus lastTotalAssets), and profit/loss determination.
+Settlement is the critical synchronization point between virtual and actual balances, implemented through a secure multi-phase process (proposal, cooldown, optional approval, execution). During the proposal phase, relayers query external strategies to obtain current totalAssets values and submit them via `proposeSettleBatch()`. The kAssetRouter contract automatically calculates all other parameters: netted amounts (deposited minus requested), yield amounts (totalAssets minus lastTotalAssets), and profit/loss determination.
 
 The cooldown phase provides a mandatory waiting period (default 1 hour, configurable up to 1 day) where proposals can be reviewed and cancelled if errors are detected.
 
@@ -533,7 +533,7 @@ The protocol implements granular permissions via Solady's OptimizedOwnableRoles 
 
 ### Settlement Security
 
-The two-phase commit system provides multiple safeguards:
+The multi-phase commit system provides multiple safeguards:
 
 ### Timelock Protection ###
 

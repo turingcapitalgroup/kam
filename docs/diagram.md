@@ -23,12 +23,12 @@ graph TB
         subgraph "kSTAKINGVAULT"
             STAKE_OPS[STAKE OPERATIONS<br/>1. requestStake<br/>2. Lock kTokens<br/>3. Settlement<br/>4. claimStakedShares]
             UNSTAKE_OPS[UNSTAKE OPERATIONS<br/>1. requestUnstake<br/>2. Lock stkTokens<br/>3. Settlement<br/>4. claimUnstakedAssets]
-            FEE_MGR[FEE MANAGER<br/>Management: 1% annual<br/>Performance: 20% profit<br/>Hurdle Rate: 5%<br/>Watermark Tracking]
+            FEE_MGR[FEE MANAGER<br/>Management Fee: configurable<br/>Performance Fee: configurable<br/>Hurdle Rate: configurable<br/>Watermark Tracking]
         end
 
         subgraph "kASSETROUTER"
             VIRTUAL_BAL[VIRTUAL ACCOUNTING<br/>Virtual Balances:<br/>kMinter: 1000<br/>DNVault: 500<br/>AlphaVault: 300<br/>BetaVault: 200<br/><br/>Pending Ops:<br/>Deposits: +150<br/>Withdrawals: -50<br/>Net: +100]
-            SETTLE_PROP[SETTLEMENT PROPOSAL<br/>1. Relayer provides totalAssets<br/>2. Contract calculates:<br/>netted deposits minus requests<br/>yield totalAssets minus netted minus lastTotal<br/>profit yield greater than 0<br/>3. Apply yield tolerance check<br/>4. Set cooldown timer]
+            SETTLE_PROP[SETTLEMENT PROPOSAL<br/>1. Relayer provides totalAssets<br/>2. Contract calculates:<br/>netted deposits minus requests<br/>yield totalAssets minus lastTotalAssets<br/>profit yield greater than 0<br/>3. Apply yield tolerance check<br/>4. Set cooldown timer]
             SETTLE_EXEC[SETTLEMENT EXECUTION<br/>After cooldown:<br/>1. Clear batch balances<br/>2. Distribute yield<br/>Mint kTokens or Burn kTokens<br/>3. Deploy net assets<br/>4. Update adapters<br/>5. Mark settled]
         end
     end
