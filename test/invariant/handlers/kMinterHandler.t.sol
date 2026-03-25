@@ -109,9 +109,26 @@ contract kMinterHandler is BaseHandler {
 
         // Check cumulative requested amount, not just this request
         // The contract checks: virtualBalance >= alreadyRequested + newAmount
+        // Additionally, it considers pending proposal's netted value
         bytes32 batchId = kMinter_minter.getBatchId(kMinter_token);
         (, uint256 alreadyRequested) = kMinter_assetRouter.getBatchIdBalances(address(kMinter_minter), batchId);
         uint256 virtualBal = kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token);
+
+        // Mirror _checkSufficientVirtualBalance: add pending proposal's netted value
+        if (kMinter_assetRouter.getPendingProposalCount(address(kMinter_minter)) > 0) {
+            bytes32[] memory pendingProposals = kMinter_assetRouter.getPendingProposals(address(kMinter_minter));
+            IkAssetRouter.VaultSettlementProposal memory openProposal =
+                kMinter_assetRouter.getSettlementProposal(pendingProposals[0]);
+            int256 virtualBalInt = int256(virtualBal) + openProposal.netted;
+            // Contract reverts if virtual balance would go negative
+            if (virtualBalInt < 0) {
+                vm.expectRevert();
+                kMinter_minter.requestBurn(kMinter_token, currentActor, amount);
+                vm.stopPrank();
+                return;
+            }
+            virtualBal = uint256(virtualBalInt);
+        }
 
         if (virtualBal < alreadyRequested + amount) {
             vm.expectRevert();
@@ -414,5 +431,19 @@ contract kMinterHandler is BaseHandler {
             totalLocked,
             "KMINTER: INVARIANT_G - kToken supply less than locked assets - 1:1 backing violated"
         );
+    }
+
+    /// @notice Invariant: Virtual balance + pending netted must never be negative
+    /// @dev Ensures the adjusted virtual balance check never underflows
+    function INVARIANT_H_VIRTUAL_BALANCE_NON_NEGATIVE() public view {
+        uint256 virtualBal = kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token);
+
+        if (kMinter_assetRouter.getPendingProposalCount(address(kMinter_minter)) > 0) {
+            bytes32[] memory pendingProposals = kMinter_assetRouter.getPendingProposals(address(kMinter_minter));
+            IkAssetRouter.VaultSettlementProposal memory openProposal =
+                kMinter_assetRouter.getSettlementProposal(pendingProposals[0]);
+            int256 adjustedVirtualBal = int256(virtualBal) + openProposal.netted;
+            assertGe(adjustedVirtualBal, int256(0), "KMINTER: INVARIANT_H - Virtual balance + netted is negative");
+        }
     }
 }

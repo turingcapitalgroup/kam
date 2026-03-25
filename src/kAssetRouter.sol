@@ -28,6 +28,7 @@ import {
     KASSETROUTER_PROPOSAL_EXISTS,
     KASSETROUTER_PROPOSAL_NOT_ACCEPTED,
     KASSETROUTER_PROPOSAL_NOT_FOUND,
+    KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE,
     KASSETROUTER_WRONG_ROLE,
     KASSETROUTER_ZERO_ADDRESS,
     KASSETROUTER_ZERO_AMOUNT
@@ -697,10 +698,24 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     }
 
     /// @notice Check if virtual balance is sufficient
+    /// @dev Checks if the virtual balance is sufficient to cover the required amount,
+    /// taking into account any pending proposals
     /// @param _vault Vault address
     /// @param _requiredAmount Required amount
     function _checkSufficientVirtualBalance(address _vault, address _asset, uint256 _requiredAmount) private view {
-        require(_virtualBalance(_vault, _asset) >= _requiredAmount, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+        uint256 _virtualBalance = _virtualBalance(_vault, _asset);
+        uint256 _length = $.vaultPendingProposalIds[_vault].length();
+
+        if (_length > 0) {
+            VaultSettlementProposal memory _openProposal =
+                $.settlementProposals[$.vaultPendingProposalIds[_vault].values()[0]];
+            int256 _virtualBalanceInt = int256(_virtualBalance) + _openProposal.netted;
+            require(_virtualBalanceInt >= 0, KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE);
+            _virtualBalance = uint256(_virtualBalanceInt);
+        }
+
+        require(_virtualBalance >= _requiredAmount, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
     }
 
     /// @notice Check if caller is an admin
