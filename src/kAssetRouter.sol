@@ -393,6 +393,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         _lockReentrant();
         _checkPaused();
 
+        require(_isRelayer(msg.sender), KASSETROUTER_WRONG_ROLE);
+
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
 
         VaultSettlementProposal storage _proposal = $.settlementProposals[_proposalId];

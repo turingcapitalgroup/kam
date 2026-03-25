@@ -448,6 +448,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         bytes32 _setupProposalId =
             assetRouter.proposeSettleBatch(USDC, _minter, _batchIdSetup, _adapterTotalAssets, 0, 0);
         vm.warp(block.timestamp + 2);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_setupProposalId);
 
         uint256 _virtualBal = assetRouter.virtualBalance(_minter, USDC);
@@ -517,6 +518,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         bytes32 _setupProp = assetRouter.proposeSettleBatch(USDC, _minter, _setupBatch, _adapterTotalAssets, 0, 0);
         vm.warp(block.timestamp + 2);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_setupProp);
 
         assertEq(assetRouter.virtualBalance(_minter, USDC), _mintAmount);
@@ -595,6 +597,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         uint256 _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _seedProp = assetRouter.proposeSettleBatch(USDC, _minter, _seedBatch, _ta, 0, 0);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_seedProp);
 
         assertEq(assetRouter.virtualBalance(_minter, USDC), _seed);
@@ -692,7 +695,9 @@ contract kAssetRouterTest is DeploymentBaseTest {
         minter.requestBurn(USDC, users.institution, 140_001 * _1_USDC);
 
         // ---- Execute p1 and p3, leave batch2 unsettled ----
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_p1);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_p3);
 
         assertEq(assetRouter.getPendingProposalCount(_minter), 0);
@@ -705,6 +710,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         bytes32 _p2b = assetRouter.proposeSettleBatch(USDC, _minter, _b2, _ta, 0, 0);
 
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_p2b);
         assertEq(assetRouter.getPendingProposalCount(_minter), 0);
     }
@@ -736,6 +742,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         uint256 _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _sp = assetRouter.proposeSettleBatch(USDC, _minter, _seedBatch, _ta, 0, 0);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_sp);
 
         // Bound burns to fit within VB and kToken balance
@@ -795,7 +802,9 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), uint256(_burn2));
 
         // Execute the other two
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_p1);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_p3);
 
         // globalPending should still be burn2 (only the cancelled batch's requests remain)
@@ -806,6 +815,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         bytes32 _p2b = assetRouter.proposeSettleBatch(USDC, _minter, _b2, _ta, 0, 0);
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_p2b);
 
         // Final state: everything settled, globalPending == 0
@@ -822,6 +832,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(users.relayer);
         testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(testProposalId);
 
         vm.prank(users.relayer);
@@ -918,6 +929,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         bytes32 _setupProp = assetRouter.proposeSettleBatch(USDC, _minter, _setupBatch, _adapterTotalAssets, 0, 0);
         vm.warp(block.timestamp + 2);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_setupProp);
 
         vm.prank(users.admin);
@@ -992,9 +1004,25 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.warp(block.timestamp + 2);
 
-        vm.prank(users.alice);
+        vm.prank(users.relayer);
         vm.expectEmit(true, true, true, true);
-        emit IkAssetRouter.SettlementExecuted(testProposalId, address(dnVault), batchId, users.alice);
+        emit IkAssetRouter.SettlementExecuted(testProposalId, address(dnVault), batchId, users.relayer);
+        assetRouter.executeSettleBatch(testProposalId);
+    }
+
+    function test_ExecuteSettleBatch_Require_Only_Relayer() public {
+        bytes32 batchId = dnVault.getBatchId();
+
+        vm.prank(users.relayer);
+        dnVault.closeBatch(batchId, true);
+
+        vm.prank(users.relayer);
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
+
+        vm.warp(block.timestamp + 2);
+
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KASSETROUTER_WRONG_ROLE));
         assetRouter.executeSettleBatch(testProposalId);
     }
 
@@ -1021,7 +1049,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         bytes32 fakeProposalId = keccak256("Banana");
 
         vm.warp(block.timestamp + 2);
-        vm.prank(users.alice);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_PROPOSAL_NOT_FOUND));
         assetRouter.executeSettleBatch(fakeProposalId);
     }
@@ -1035,7 +1063,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), batchId, TEST_TOTAL_ASSETS, 0, 0);
 
-        vm.prank(users.alice);
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_COOLDOWN_IS_UP));
         assetRouter.executeSettleBatch(testProposalId);
     }
@@ -1099,6 +1127,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         // Warp past cooldown and execute
         vm.warp(block.timestamp + 2);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
         // Verify canExecuteProposal returns false for executed proposal
@@ -1144,6 +1173,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         // Execute
         vm.warp(block.timestamp + 2);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
         // Not pending after execution

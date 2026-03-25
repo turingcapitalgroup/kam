@@ -179,6 +179,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         );
 
         // Execute settlement which internally calls settleBatch
+        vm.prank(users.relayer);
         vm.expectEmit(true, false, false, true);
         emit IVault.BatchSettled(batchId);
         assetRouter.executeSettleBatch(proposalId);
@@ -228,6 +229,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         );
 
         // Should revert with Settled error
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_PROPOSAL_NOT_FOUND));
         assetRouter.executeSettleBatch(proposalId);
     }

@@ -302,6 +302,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vm.prank(users.guardian);
         assetRouter.acceptProposal(proposalId);
 
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
         uint256 newWatermark = vault.sharePriceWatermark();
@@ -335,6 +336,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vm.prank(users.guardian);
         assetRouter.acceptProposal(proposalId);
 
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
         uint256 highWatermark = vault.sharePriceWatermark();
@@ -706,6 +708,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
         // The watermark update happens during settlement when notifyFeesCharged is called
         // We need to calculate what the expected new watermark will be
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
         // Verify watermark was updated

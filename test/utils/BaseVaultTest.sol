@@ -126,6 +126,7 @@ contract BaseVaultTest is DeploymentBaseTest {
         }
 
         // Wait for cooldown period(0 for testing)
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
     }
 }

@@ -347,6 +347,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         bytes32 _proposalId = assetRouter.proposeSettleBatch(
             _asset, _vault, _batchId, _totalAssets, _lastFeesChargedManagement, _lastFeesChargedPerformance
         );
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_proposalId);
     }
 
