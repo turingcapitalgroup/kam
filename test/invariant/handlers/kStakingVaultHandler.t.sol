@@ -27,6 +27,7 @@ contract kStakingVaultHandler is BaseHandler {
     IVaultAdapter kStakingVault_vaultAdapter;
     IVaultAdapter kStakingVault_minterAdapter;
     kMinterHandler kStakingVault_minterHandler;
+    address kStakingVault_minter;
     address kStakingVault_token;
     address kStakingVault_kToken;
     address kStakingVault_relayer;
@@ -108,6 +109,7 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_vaultAdapter = IVaultAdapter(_vaultAdapter);
         kStakingVault_minterAdapter = IVaultAdapter(_minterAdapter);
         kStakingVault_minterHandler = kMinterHandler(_minterHandler);
+        kStakingVault_minter = kStakingVault_minterHandler.get_kMinter_minter();
         kStakingVault_token = _token;
         kStakingVault_kToken = _kToken;
         kStakingVault_relayer = _relayer;
@@ -143,7 +145,24 @@ contract kStakingVaultHandler is BaseHandler {
         }
         uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
         kStakingVault_kToken.safeApprove(address(kStakingVault_vault), amount);
-        if (kStakingVault_minterAdapter.totalAssets() < amount) vm.expectRevert();
+
+        int256 effectiveVirtualBal = _effectiveMinterVirtualBalance();
+        uint256 globalPending = kStakingVault_assetRouter.getGlobalPendingRequests(kStakingVault_minter, kStakingVault_token);
+        bool requestOverflows;
+        unchecked {
+            requestOverflows = globalPending + amount < globalPending;
+        }
+        bool shouldRevert = effectiveVirtualBal < 0
+            || requestOverflows
+            || uint256(effectiveVirtualBal) < globalPending + amount;
+
+        if (shouldRevert) {
+            vm.expectRevert();
+            kStakingVault_vault.requestStake(currentActor, currentActor, amount);
+            vm.stopPrank();
+            return;
+        }
+
         bytes32 requestId = kStakingVault_vault.requestStake(currentActor, currentActor, amount);
         kStakingVault_actorStakeRequests[currentActor].add(requestId);
         kStakingVault_depositedInBatch[kStakingVault_vault.getBatchId()] += amount;
@@ -164,6 +183,21 @@ contract kStakingVaultHandler is BaseHandler {
         vm.prank(institution);
         kStakingVault_kToken.safeTransfer(currentActor, amount);
         return amount;
+    }
+
+    function _effectiveMinterVirtualBalance() internal view returns (int256 _effectiveVirtualBal) {
+        _effectiveVirtualBal = int256(kStakingVault_assetRouter.virtualBalance(kStakingVault_minter, kStakingVault_token));
+        uint256 pendingCount = kStakingVault_assetRouter.getPendingProposalCount(kStakingVault_minter);
+        if (pendingCount == 0) return _effectiveVirtualBal;
+
+        bytes32[] memory pendingProposals = kStakingVault_assetRouter.getPendingProposals(kStakingVault_minter);
+        for (uint256 i = 0; i < pendingProposals.length; i++) {
+            IkAssetRouter.VaultSettlementProposal memory openProposal =
+                kStakingVault_assetRouter.getSettlementProposal(pendingProposals[i]);
+            if (openProposal.asset == kStakingVault_token) {
+                _effectiveVirtualBal += openProposal.netted;
+            }
+        }
     }
 
     function kStakingVault_gain(uint256 amount) public {
@@ -295,13 +329,13 @@ contract kStakingVaultHandler is BaseHandler {
 
     function kStakingVault_requestUnstake(uint256 actorSeed, uint256 amount) public useActor(actorSeed) {
         vm.startPrank(currentActor);
-        amount = bound(amount, 0, kStakingVault_kToken.balanceOf(currentActor));
+        amount = bound(amount, 0, kStakingVault_vault.balanceOf(currentActor));
         if (amount == 0) {
             vm.stopPrank();
             return;
         }
         uint256 sharePriceBefore = kStakingVault_vault.sharePrice();
-        kStakingVault_requestedInBatch[kStakingVault_vault.getBatchId()] -= amount;
+        kStakingVault_requestedInBatch[kStakingVault_vault.getBatchId()] += amount;
         bytes32 requestId = kStakingVault_vault.requestUnstake(currentActor, currentActor, amount);
         kStakingVault_actorUnstakeRequests[currentActor].add(requestId);
         uint256 sharePriceAfter = kStakingVault_vault.sharePrice();

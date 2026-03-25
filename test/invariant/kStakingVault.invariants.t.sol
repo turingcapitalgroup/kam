@@ -5,7 +5,9 @@ import { SetUp } from "kam/test/invariant/helpers/SetUp.t.sol";
 
 contract kStakingVaultInvariants is SetUp {
     function setUp() public override {
+        useMinter = true;
         _setUp();
+        _setUpkMinterHandler();
         _setUpkStakingVaultHandlerAlpha();
         _setUpInstitutionalMint();
         _setUpVaultFees(alphaVault);

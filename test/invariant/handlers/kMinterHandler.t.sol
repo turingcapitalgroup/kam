@@ -107,19 +107,22 @@ contract kMinterHandler is BaseHandler {
         }
         kMinter_kToken.safeApprove(address(kMinter_minter), amount);
 
-        // Check cumulative requested amount, not just this request
-        // The contract checks: virtualBalance >= alreadyRequested + newAmount
-        // Additionally, it considers pending proposal's netted value
-        bytes32 batchId = kMinter_minter.getBatchId(kMinter_token);
-        (, uint256 alreadyRequested) = kMinter_assetRouter.getBatchIdBalances(address(kMinter_minter), batchId);
+        // Check cumulative requested amount using global pending requests across batches
+        uint256 globalPending = kMinter_assetRouter.getGlobalPendingRequests(address(kMinter_minter), kMinter_token);
+        uint256 totalRequested = globalPending + amount;
         uint256 virtualBal = kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token);
 
-        // Mirror _checkSufficientVirtualBalance: add pending proposal's netted value
+        // Mirror _checkSufficientVirtualBalance: add all pending proposals' netted values for this asset
         if (kMinter_assetRouter.getPendingProposalCount(address(kMinter_minter)) > 0) {
             bytes32[] memory pendingProposals = kMinter_assetRouter.getPendingProposals(address(kMinter_minter));
-            IkAssetRouter.VaultSettlementProposal memory openProposal =
-                kMinter_assetRouter.getSettlementProposal(pendingProposals[0]);
-            int256 virtualBalInt = int256(virtualBal) + openProposal.netted;
+            int256 virtualBalInt = int256(virtualBal);
+            for (uint256 i = 0; i < pendingProposals.length; i++) {
+                IkAssetRouter.VaultSettlementProposal memory openProposal =
+                    kMinter_assetRouter.getSettlementProposal(pendingProposals[i]);
+                if (openProposal.asset == kMinter_token) {
+                    virtualBalInt += openProposal.netted;
+                }
+            }
             // Contract reverts if virtual balance would go negative
             if (virtualBalInt < 0) {
                 vm.expectRevert();
@@ -130,7 +133,7 @@ contract kMinterHandler is BaseHandler {
             virtualBal = uint256(virtualBalInt);
         }
 
-        if (virtualBal < alreadyRequested + amount) {
+        if (virtualBal < totalRequested) {
             vm.expectRevert();
             kMinter_minter.requestBurn(kMinter_token, currentActor, amount);
             vm.stopPrank();
@@ -194,6 +197,34 @@ contract kMinterHandler is BaseHandler {
             vm.stopPrank();
             return;
         }
+
+        // Mirror router guard: skip this transition if proposal would violate global pending coverage
+        {
+            int256 effectiveVirtualBal = int256(kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token));
+            if (kMinter_assetRouter.getPendingProposalCount(address(kMinter_minter)) > 0) {
+                bytes32[] memory pendingProposals = kMinter_assetRouter.getPendingProposals(address(kMinter_minter));
+                for (uint256 i = 0; i < pendingProposals.length; i++) {
+                    IkAssetRouter.VaultSettlementProposal memory openProposal =
+                        kMinter_assetRouter.getSettlementProposal(pendingProposals[i]);
+                    if (openProposal.asset == kMinter_token) {
+                        effectiveVirtualBal += openProposal.netted;
+                    }
+                }
+            }
+            effectiveVirtualBal += kMinter_nettedInBatch;
+            uint256 globalPending = kMinter_assetRouter.getGlobalPendingRequests(address(kMinter_minter), kMinter_token);
+            uint256 requestedInBatch = kMinter_minter.getBatchInfo(batchId).requestedSharesInBatch;
+            if (globalPending < requestedInBatch) {
+                vm.stopPrank();
+                return;
+            }
+            uint256 globalPendingAfterProposal = globalPending - requestedInBatch;
+            if (effectiveVirtualBal < 0 || uint256(effectiveVirtualBal) < globalPendingAfterProposal) {
+                vm.stopPrank();
+                return;
+            }
+        }
+
         vm.startPrank(kMinter_relayer);
         kMinter_minter.closeBatch(batchId, true);
 
@@ -287,6 +318,10 @@ contract kMinterHandler is BaseHandler {
 
     function set_kMinter_relayer(address _relayer) public {
         kMinter_relayer = _relayer;
+    }
+
+    function get_kMinter_minter() public view returns (address) {
+        return address(kMinter_minter);
     }
 
     // Ghost var setters
@@ -436,14 +471,46 @@ contract kMinterHandler is BaseHandler {
     /// @notice Invariant: Virtual balance + pending netted must never be negative
     /// @dev Ensures the adjusted virtual balance check never underflows
     function INVARIANT_H_VIRTUAL_BALANCE_NON_NEGATIVE() public view {
-        uint256 virtualBal = kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token);
+        int256 adjustedVirtualBal = int256(kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token));
 
         if (kMinter_assetRouter.getPendingProposalCount(address(kMinter_minter)) > 0) {
             bytes32[] memory pendingProposals = kMinter_assetRouter.getPendingProposals(address(kMinter_minter));
-            IkAssetRouter.VaultSettlementProposal memory openProposal =
-                kMinter_assetRouter.getSettlementProposal(pendingProposals[0]);
-            int256 adjustedVirtualBal = int256(virtualBal) + openProposal.netted;
-            assertGe(adjustedVirtualBal, int256(0), "KMINTER: INVARIANT_H - Virtual balance + netted is negative");
+            for (uint256 i = 0; i < pendingProposals.length; i++) {
+                IkAssetRouter.VaultSettlementProposal memory openProposal =
+                    kMinter_assetRouter.getSettlementProposal(pendingProposals[i]);
+                if (openProposal.asset == kMinter_token) {
+                    adjustedVirtualBal += openProposal.netted;
+                }
+            }
         }
+
+        assertGe(adjustedVirtualBal, int256(0), "KMINTER: INVARIANT_H - Virtual balance + netted is negative");
+    }
+
+    /// @notice Invariant: Global pending requests must be covered by effective virtual balance
+    /// @dev effectiveVirtualBalance = virtualBalance + sum(pendingProposal.netted for kMinter token)
+    function INVARIANT_I_GLOBAL_PENDING_COVERED() public view {
+        int256 adjustedVirtualBal = int256(kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token));
+
+        if (kMinter_assetRouter.getPendingProposalCount(address(kMinter_minter)) > 0) {
+            bytes32[] memory pendingProposals = kMinter_assetRouter.getPendingProposals(address(kMinter_minter));
+            for (uint256 i = 0; i < pendingProposals.length; i++) {
+                IkAssetRouter.VaultSettlementProposal memory openProposal =
+                    kMinter_assetRouter.getSettlementProposal(pendingProposals[i]);
+                if (openProposal.asset == kMinter_token) {
+                    adjustedVirtualBal += openProposal.netted;
+                }
+            }
+        }
+
+        // Must be non-negative before casting to uint256
+        assertGe(adjustedVirtualBal, int256(0), "KMINTER: INVARIANT_I - Effective virtual balance is negative");
+
+        uint256 globalPending = kMinter_assetRouter.getGlobalPendingRequests(address(kMinter_minter), kMinter_token);
+        assertLe(
+            globalPending,
+            uint256(adjustedVirtualBal),
+            "KMINTER: INVARIANT_I - Global pending requests exceed effective virtual balance"
+        );
     }
 }

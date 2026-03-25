@@ -186,9 +186,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _kMinter = msg.sender;
         _checkKMinter(_kMinter);
 
-        // Validate cumulative total doesn't exceed virtual balance
-        uint256 _totalRequested = IkMinter(_kMinter).getBatchInfo(_batchId).requestedSharesInBatch;
-        _checkSufficientVirtualBalance(_kMinter, _asset, _totalRequested);
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+        // Accumulate global pending requests to cap cross-batch burn capacity
+        uint256 _totalGlobalPending = $.globalPendingRequests[_kMinter][_asset] += _amount;
+        _checkSufficientVirtualBalance(_kMinter, _asset, _totalGlobalPending);
 
         emit AssetsRequestPulled(_kMinter, _asset, _amount);
         _unlockReentrant();
@@ -264,6 +265,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         require($.batchIds.add(_batchId), KASSETROUTER_BATCH_ID_PROPOSED);
         require(IkMinter(_vault).isClosed(_batchId), KASSETROUTER_NOT_BATCH_CLOSED);
 
+        bool _isMinter = _isKMinter(_vault);
+
         // Increase the counter to generate unique proposal id
         unchecked {
             $.proposalCounter++;
@@ -273,25 +276,30 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             uint256(uint160(_vault)), uint256(uint160(_asset)), uint256(_batchId), block.timestamp, $.proposalCounter
         );
 
-        // At the moment we only allow one proposal per vault to make sure nothing breaks
-        require($.vaultPendingProposalIds[_vault].length() == 0, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME);
+        // For staking vaults we allow only one pending proposal at a time.
+        // kMinter can have multiple closed/unsettled batches, so it needs multiple pending proposals.
+        if (!_isMinter) {
+            require($.vaultPendingProposalIds[_vault].length() == 0, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME);
+        }
 
         // Check if proposal already exists
         require(!$.executedProposalIds.contains(_proposalId), KASSETROUTER_PROPOSAL_EXECUTED);
-        require($.vaultPendingProposalIds[_vault].add(_proposalId), KASSETROUTER_PROPOSAL_EXISTS);
 
         int256 _netted;
         int256 _yield;
+        uint256 _requestedInBatch;
         uint256 _lastTotalAssets = _virtualBalance(_vault, _asset);
 
-        if (_isKMinter(_vault)) {
+        if (_isMinter) {
             IkMinter.BatchInfo memory _batchInfo = IkMinter(_vault).getBatchInfo(_batchId);
             require(_asset == _batchInfo.asset, KASSETROUTER_ASSET_MISMATCH);
+            _requestedInBatch = _batchInfo.requestedSharesInBatch;
             _netted = int256(uint256(_batchInfo.depositedInBatch)) - int256(uint256(_batchInfo.requestedSharesInBatch));
         } else {
             require(_asset == IkStakingVault(_vault).underlyingAsset(), KASSETROUTER_ASSET_MISMATCH);
             (,,,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
+            _requestedInBatch = _requestedSharesInBatch;
             uint256 _totalSupply = IkStakingVault(_vault).totalSupply();
             // When _totalSupply == 0, use 1:1 ratio; otherwise math handles _totalAssets == 0 naturally (returns 0)
             uint256 _requestedAssets = _totalSupply == 0
@@ -335,7 +343,23 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _executeAfter = block.timestamp + $.vaultSettlementCooldown;
         }
 
-        // Store the proposal
+        // Validate global pending coverage for kMinter BEFORE adding proposal to the set,
+        // so _effectiveVirtualBalanceInt doesn't iterate this uninitialized proposal slot.
+        if (_isMinter) {
+            uint256 _globalPendingBefore = $.globalPendingRequests[_vault][_asset];
+            require(_globalPendingBefore >= _requestedInBatch, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
+            uint256 _globalPendingAfterProposal = _globalPendingBefore - _requestedInBatch;
+            int256 _effectiveVirtualBalanceAfterProposal = _effectiveVirtualBalanceInt(_vault, _asset) + _netted;
+            require(_effectiveVirtualBalanceAfterProposal >= 0, KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE);
+            require(
+                uint256(_effectiveVirtualBalanceAfterProposal) >= _globalPendingAfterProposal,
+                KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE
+            );
+            $.globalPendingRequests[_vault][_asset] = _globalPendingAfterProposal;
+        }
+
+        require($.vaultPendingProposalIds[_vault].add(_proposalId), KASSETROUTER_PROPOSAL_EXISTS);
+
         $.settlementProposals[_proposalId] = VaultSettlementProposal({
             asset: _asset,
             vault: _vault,
@@ -410,6 +434,13 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _vault = _proposal.vault;
         // Remove proposal from vault queue
         require($.vaultPendingProposalIds[_vault].remove(_proposalId), KASSETROUTER_PROPOSAL_NOT_FOUND);
+
+        // Restore globalPendingRequests that were decremented at propose time.
+        // The batch is closed so requestedSharesInBatch is immutable.
+        if (_isKMinter(_vault)) {
+            uint256 _requestedInBatch = IkMinter(_vault).getBatchInfo(_proposal.batchId).requestedSharesInBatch;
+            $.globalPendingRequests[_vault][_proposal.asset] += _requestedInBatch;
+        }
 
         $.batchIds.remove(_proposal.batchId);
 
@@ -497,6 +528,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             // forge-lint: disable-next-line(unsafe-typecast)
             _adapter.setTotalAssets(uint256(_kMinterNewTotalAssets));
             emit TotalAssetsSet(address(_adapter), uint256(_kMinterNewTotalAssets));
+
         } else {
             // kMinter yield is sent to insuranceFund, cannot be minted.
             if (_yield != 0) {
@@ -703,19 +735,34 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// @param _vault Vault address
     /// @param _requiredAmount Required amount
     function _checkSufficientVirtualBalance(address _vault, address _asset, uint256 _requiredAmount) private view {
+        int256 _effectiveVirtualBalanceSigned = _effectiveVirtualBalanceInt(_vault, _asset);
+        require(_effectiveVirtualBalanceSigned >= 0, KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE);
+        uint256 _effectiveVirtualBalance = uint256(_effectiveVirtualBalanceSigned);
+        require(_effectiveVirtualBalance >= _requiredAmount, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
+    }
+
+    /// @notice Computes effective virtual balance including all pending proposal netting for an asset
+    /// @param _vault Vault address
+    /// @param _asset Asset address
+    /// @return _effectiveVirtualBalanceSigned Effective virtual balance as signed integer
+    function _effectiveVirtualBalanceInt(address _vault, address _asset)
+        private
+        view
+        returns (int256 _effectiveVirtualBalanceSigned)
+    {
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-        uint256 _virtualBalance = _virtualBalance(_vault, _asset);
+        _effectiveVirtualBalanceSigned = int256(_virtualBalance(_vault, _asset));
         uint256 _length = $.vaultPendingProposalIds[_vault].length();
 
-        if (_length > 0) {
-            VaultSettlementProposal memory _openProposal =
-                $.settlementProposals[$.vaultPendingProposalIds[_vault].values()[0]];
-            int256 _virtualBalanceInt = int256(_virtualBalance) + _openProposal.netted;
-            require(_virtualBalanceInt >= 0, KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE);
-            _virtualBalance = uint256(_virtualBalanceInt);
-        }
+        if (_length == 0) return _effectiveVirtualBalanceSigned;
 
-        require(_virtualBalance >= _requiredAmount, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
+        bytes32[] memory _pendingProposalIds = $.vaultPendingProposalIds[_vault].values();
+        for (uint256 i = 0; i < _length; i++) {
+            VaultSettlementProposal memory _openProposal = $.settlementProposals[_pendingProposalIds[i]];
+            if (_openProposal.asset == _asset) {
+                _effectiveVirtualBalanceSigned += _openProposal.netted;
+            }
+        }
     }
 
     /// @notice Check if caller is an admin

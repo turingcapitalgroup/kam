@@ -29,6 +29,14 @@ contract IntegrationInvariants is SetUp {
         minterHandler.INVARIANT_C_ADAPTER_TOTAL_ASSETS();
     }
 
+    function invariant_INTEGRATION_kMinterVirtualBalanceNonNegative() public view {
+        minterHandler.INVARIANT_H_VIRTUAL_BALANCE_NON_NEGATIVE();
+    }
+
+    function invariant_INTEGRATION_kMinterGlobalPendingCovered() public view {
+        minterHandler.INVARIANT_I_GLOBAL_PENDING_COVERED();
+    }
+
     function invariant_INTEGRATION_kStakingVaultTotalAssets() public view {
         vaultHandlerDeltaNeutral.INVARIANT_A_TOTAL_ASSETS();
         vaultHandlerAlpha.INVARIANT_A_TOTAL_ASSETS();

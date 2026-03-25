@@ -303,11 +303,13 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _requestId = minter.requestBurn(USDC, users.institution, _kTokenAmount);
 
         _batchId = minter.getBatchId(USDC);
+        (, uint256 _finalRequested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         _closeBatch(_minter, _batchId);
 
-        _requestAndRedeem(_minterAdapterUSDC, address(0), (_mintAmount - _amount + (2 * _1_USDC)));
+        // Redeem against the real requested amount in this batch. Add 1 unit for share rounding safety.
+        _requestAndRedeem(_minterAdapterUSDC, address(0), _finalRequested + 1);
 
-        _proposeAndExecuteSettle(USDC, _minter, _batchId, (_mintAmount - _amount + (2 * _1_USDC)), 0, 0);
+        _proposeAndExecuteSettle(USDC, _minter, _batchId, minterAdapterUSDC.totalAssets(), 0, 0);
 
         vm.prank(users.institution);
         minter.burn(_requestId);
