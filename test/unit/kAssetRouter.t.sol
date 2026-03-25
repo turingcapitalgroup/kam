@@ -515,8 +515,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         uint256 _adapterTotalAssets = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
-        bytes32 _setupProp =
-            assetRouter.proposeSettleBatch(USDC, _minter, _setupBatch, _adapterTotalAssets, 0, 0);
+        bytes32 _setupProp = assetRouter.proposeSettleBatch(USDC, _minter, _setupBatch, _adapterTotalAssets, 0, 0);
         vm.warp(block.timestamp + 2);
         assetRouter.executeSettleBatch(_setupProp);
 
@@ -917,8 +916,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         uint256 _adapterTotalAssets = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
-        bytes32 _setupProp =
-            assetRouter.proposeSettleBatch(USDC, _minter, _setupBatch, _adapterTotalAssets, 0, 0);
+        bytes32 _setupProp = assetRouter.proposeSettleBatch(USDC, _minter, _setupBatch, _adapterTotalAssets, 0, 0);
         vm.warp(block.timestamp + 2);
         assetRouter.executeSettleBatch(_setupProp);
 
@@ -940,8 +938,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Propose -- globalPending decremented by requestedInBatch (60k)
         _adapterTotalAssets = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
-        bytes32 _proposalId =
-            assetRouter.proposeSettleBatch(USDC, _minter, _batch1, _adapterTotalAssets, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batch1, _adapterTotalAssets, 0, 0);
 
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);
 
@@ -950,9 +947,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assetRouter.cancelProposal(_proposalId);
 
         assertEq(
-            assetRouter.getGlobalPendingRequests(_minter, USDC),
-            _burnAmount,
-            "cancel should restore globalPending"
+            assetRouter.getGlobalPendingRequests(_minter, USDC), _burnAmount, "cancel should restore globalPending"
         );
 
         // Mint extra kUSD so the kMinter balance check passes and the revert reaches the router

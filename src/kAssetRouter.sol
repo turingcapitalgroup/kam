@@ -528,7 +528,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             // forge-lint: disable-next-line(unsafe-typecast)
             _adapter.setTotalAssets(uint256(_kMinterNewTotalAssets));
             emit TotalAssetsSet(address(_adapter), uint256(_kMinterNewTotalAssets));
-
         } else {
             // kMinter yield is sent to insuranceFund, cannot be minted.
             if (_yield != 0) {
@@ -745,7 +744,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// @param _vault Vault address
     /// @param _asset Asset address
     /// @return _effectiveVirtualBalanceSigned Effective virtual balance as signed integer
-    function _effectiveVirtualBalanceInt(address _vault, address _asset)
+    function _effectiveVirtualBalanceInt(
+        address _vault,
+        address _asset
+    )
         private
         view
         returns (int256 _effectiveVirtualBalanceSigned)

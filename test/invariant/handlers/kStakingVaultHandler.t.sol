@@ -147,14 +147,14 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_kToken.safeApprove(address(kStakingVault_vault), amount);
 
         int256 effectiveVirtualBal = _effectiveMinterVirtualBalance();
-        uint256 globalPending = kStakingVault_assetRouter.getGlobalPendingRequests(kStakingVault_minter, kStakingVault_token);
+        uint256 globalPending =
+            kStakingVault_assetRouter.getGlobalPendingRequests(kStakingVault_minter, kStakingVault_token);
         bool requestOverflows;
         unchecked {
             requestOverflows = globalPending + amount < globalPending;
         }
-        bool shouldRevert = effectiveVirtualBal < 0
-            || requestOverflows
-            || uint256(effectiveVirtualBal) < globalPending + amount;
+        bool shouldRevert =
+            effectiveVirtualBal < 0 || requestOverflows || uint256(effectiveVirtualBal) < globalPending + amount;
 
         if (shouldRevert) {
             vm.expectRevert();
@@ -186,7 +186,8 @@ contract kStakingVaultHandler is BaseHandler {
     }
 
     function _effectiveMinterVirtualBalance() internal view returns (int256 _effectiveVirtualBal) {
-        _effectiveVirtualBal = int256(kStakingVault_assetRouter.virtualBalance(kStakingVault_minter, kStakingVault_token));
+        _effectiveVirtualBal =
+            int256(kStakingVault_assetRouter.virtualBalance(kStakingVault_minter, kStakingVault_token));
         uint256 pendingCount = kStakingVault_assetRouter.getPendingProposalCount(kStakingVault_minter);
         if (pendingCount == 0) return _effectiveVirtualBal;
 

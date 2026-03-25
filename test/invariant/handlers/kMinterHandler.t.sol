@@ -200,7 +200,8 @@ contract kMinterHandler is BaseHandler {
 
         // Mirror router guard: skip this transition if proposal would violate global pending coverage
         {
-            int256 effectiveVirtualBal = int256(kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token));
+            int256 effectiveVirtualBal =
+                int256(kMinter_assetRouter.virtualBalance(address(kMinter_minter), kMinter_token));
             if (kMinter_assetRouter.getPendingProposalCount(address(kMinter_minter)) > 0) {
                 bytes32[] memory pendingProposals = kMinter_assetRouter.getPendingProposals(address(kMinter_minter));
                 for (uint256 i = 0; i < pendingProposals.length; i++) {
