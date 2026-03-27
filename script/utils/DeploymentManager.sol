@@ -79,17 +79,13 @@ abstract contract DeploymentManager is Script {
         uint256 maxDepositPerBatch;
         uint256 maxWithdrawPerBatch;
         address trustedForwarder;
+        uint16 hurdleRate;
+        bool isHardHurdleRate;
     }
 
     struct RegistryConfig {
-        HurdleRateConfig hurdleRate;
         uint16 treasuryBps;
         uint16 insuranceBps;
-    }
-
-    struct HurdleRateConfig {
-        uint16 USDC;
-        uint16 WBTC;
     }
 
     struct AssetRouterConfig {
@@ -357,8 +353,6 @@ abstract contract DeploymentManager is Script {
 
     function _readRouterAndMocks(string memory json, NetworkConfig memory config) private pure {
         // Parse registry config
-        config.registry.hurdleRate.USDC = uint16(json.readUint(".registry.hurdleRate.USDC"));
-        config.registry.hurdleRate.WBTC = uint16(json.readUint(".registry.hurdleRate.WBTC"));
         config.registry.treasuryBps = uint16(json.readUint(".registry.treasuryBps"));
         config.registry.insuranceBps = uint16(json.readUint(".registry.insuranceBps"));
 
@@ -403,6 +397,8 @@ abstract contract DeploymentManager is Script {
         config.maxDepositPerBatch = uint128(json.readUint(string.concat(path, ".maxDepositPerBatch")));
         config.maxWithdrawPerBatch = uint128(json.readUint(string.concat(path, ".maxWithdrawPerBatch")));
         config.trustedForwarder = json.readAddress(string.concat(path, ".trustedForwarder"));
+        config.hurdleRate = uint16(json.readUint(string.concat(path, ".hurdleRate")));
+        config.isHardHurdleRate = json.readBool(string.concat(path, ".isHardHurdleRate"));
         return config;
     }
 
@@ -888,8 +884,6 @@ abstract contract DeploymentManager is Script {
         if (!verbose) return;
 
         console.log("--- REGISTRY CONFIG ---");
-        console.log("Hurdle Rate USDC: ", config.registry.hurdleRate.USDC);
-        console.log("Hurdle Rate WBTC: ", config.registry.hurdleRate.WBTC);
         console.log("Treasury BPS:     ", config.registry.treasuryBps);
         console.log("Insurance BPS:    ", config.registry.insuranceBps);
         console.log("");

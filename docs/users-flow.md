@@ -480,7 +480,7 @@ Request Status Flow:
 │  │  Balance - pending stakes │      ┌───────────────────────────┐   │
 │  │                           │      │• setManagementFee()       │   │
 │  │• _totalNetAssets()        │      │• setPerformanceFee()      │   │
-│  │  Assets - fees            │      │• setHardHurdleRate()      │   │
+│  │  Assets - fees            │      │  (hurdle rates in registry)│   │
 │  └───────────────────────────┘      └───────────────────────────┘   │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘

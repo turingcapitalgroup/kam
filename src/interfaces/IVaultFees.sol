@@ -8,23 +8,12 @@ pragma solidity ^0.8.4;
 /// periodically on assets under management regardless of performance, compensating vault operators for operational
 /// costs and risk management, (2) Performance Fees: Charged on excess returns above hurdle rates, aligning operator
 /// incentives with user returns. The hurdle rate mechanism can operate in two modes: soft hurdle (fees on all profits)
-/// or hard hurdle (fees only on excess above hurdle). Fee calculations integrate with the batch settlement system,
+/// or hard hurdle (fees only on excess above hurdle). Hurdle rate values and modes are configured per vault in the
+/// registry via setHurdleRate() and setIsHardHurdleRate(). Fee calculations integrate with the batch settlement system,
 /// ensuring accurate deductions from user returns during share price calculations. Backend coordination allows for
 /// off-chain fee processing with on-chain validation and tracking. All fees are expressed in basis points (1% = 100 bp)
 /// for precision and standard financial terminology alignment.
 interface IVaultFees {
-    /// @notice Configures the hurdle rate fee calculation mechanism for performance fee determination
-    /// @dev This function switches between soft and hard hurdle rate modes affecting performance fee calculations.
-    /// Hurdle Rate Modes: (1) Soft Hurdle (_isHard = false): Performance fees are charged on all profits when returns
-    /// exceed the hurdle rate threshold, providing simpler fee calculation while maintaining performance incentives,
-    /// (2) Hard Hurdle (_isHard = true): Performance fees are only charged on the excess return above the hurdle rate,
-    /// ensuring users keep the full hurdle rate return before any performance fees. The hurdle rate itself is set
-    /// globally in the registry per asset, providing consistent benchmarks across vaults. This mechanism ensures
-    /// vault operators are only rewarded for generating returns above market expectations, protecting user interests
-    /// while incentivizing superior performance.
-    /// @param _isHard True for hard hurdle (fees only on excess), false for soft hurdle (fees on all profits)
-    function setHardHurdleRate(bool _isHard) external;
-
     /// @notice Sets the annual management fee rate charged on assets under management
     /// @dev This function configures the periodic fee charged regardless of vault performance, compensating operators
     /// for ongoing vault management, risk monitoring, and operational costs. Management fees are calculated based on

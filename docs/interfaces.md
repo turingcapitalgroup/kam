@@ -111,8 +111,10 @@ Central registry managing protocol contracts, supported assets, vault registrati
 - `setBatchLimits(address target, uint256 maxMintPerBatch_, uint256 maxBurnPerBatch_)` - Sets maximum amounts per batch for asset or vault
 - `getMaxMintPerBatch(address target)` - Returns maximum mint/deposit amount per batch for an asset or vault
 - `getMaxBurnPerBatch(address target)` - Returns maximum burn/withdraw amount per batch for an asset or vault
-- `setHurdleRate(address asset, uint16 hurdleRate)` - Sets performance threshold for an asset (0 = no minimum threshold)
-- `getHurdleRate(address asset)` - Returns hurdle rate for an asset in basis points
+- `setHurdleRate(address vault, uint16 hurdleRate)` - Sets performance threshold for a vault (0 = no minimum threshold)
+- `setIsHardHurdleRate(address vault, bool isHard)` - Sets hard/soft hurdle rate mode for a vault
+- `getHurdleRate(address vault)` - Returns hurdle rate for a vault in basis points
+- `getIsHardHurdleRate(address vault)` - Returns whether vault uses hard hurdle rate mode
 
 **Vault Registry**
 
@@ -234,7 +236,6 @@ Interface for vault fee management including performance and management fees.
 
 - `setManagementFee(uint16 fee)` - Sets management fee in basis points (ADMIN_ROLE required, max 10000 bp)
 - `setPerformanceFee(uint16 fee)` - Sets performance fee in basis points (ADMIN_ROLE required, max 10000 bp)
-- `setHardHurdleRate(bool isHard)` - Configures hurdle rate mechanism (ADMIN_ROLE required)
 - `notifyManagementFeesCharged(uint64 timestamp)` - Updates management fee timestamp (kAssetRouter only)
 - `notifyPerformanceFeesCharged(uint64 timestamp)` - Updates performance fee timestamp (kAssetRouter only)
 

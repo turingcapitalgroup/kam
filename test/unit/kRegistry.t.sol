@@ -299,35 +299,55 @@ contract kRegistryTest is DeploymentBaseTest {
     function test_SetHurdleRate_Success() public {
         vm.prank(users.admin);
         vm.expectEmit(true, true, false, true);
-        emit IRegistry.HurdleRateSet(USDC, TEST_HURDLE_RATE);
-        registry.setHurdleRate(USDC, TEST_HURDLE_RATE);
-        assertEq(registry.getHurdleRate(USDC), TEST_HURDLE_RATE);
+        emit IRegistry.HurdleRateSet(address(dnVault), TEST_HURDLE_RATE);
+        registry.setHurdleRate(address(dnVault), TEST_HURDLE_RATE);
+        assertEq(registry.getHurdleRate(address(dnVault)), TEST_HURDLE_RATE);
     }
 
     function test_SetHurdleRate_Require_Only_Admin() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.setHurdleRate(USDC, TEST_HURDLE_RATE);
+        registry.setHurdleRate(address(dnVault), TEST_HURDLE_RATE);
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.setHurdleRate(USDC, TEST_HURDLE_RATE);
+        registry.setHurdleRate(address(dnVault), TEST_HURDLE_RATE);
 
         vm.prank(users.bob);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.setHurdleRate(USDC, TEST_HURDLE_RATE);
+        registry.setHurdleRate(address(dnVault), TEST_HURDLE_RATE);
     }
 
     function test_SetHurdleRate_Require_Rate_Not_to_Exceed_Maximum() public {
         vm.prank(users.admin);
         vm.expectRevert(bytes(KREGISTRY_FEE_EXCEEDS_MAXIMUM));
-        registry.setHurdleRate(USDC, uint16(MAX_BPS + 1));
+        registry.setHurdleRate(address(dnVault), uint16(MAX_BPS + 1));
     }
 
-    function test_SetHurdleRate_Require_Valid_Asset() public {
-        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
+    function test_SetHurdleRate_Require_Valid_Vault() public {
         vm.prank(users.admin);
-        registry.setHurdleRate(TEST_ASSET, TEST_HURDLE_RATE);
+        vm.expectRevert();
+        registry.setHurdleRate(makeAddr("UnregisteredVault"), TEST_HURDLE_RATE);
+    }
+
+    function test_SetIsHardHurdleRate_Success() public {
+        vm.prank(users.admin);
+        vm.expectEmit(true, false, false, true);
+        emit IRegistry.IsHardHurdleRateSet(address(dnVault), true);
+        registry.setIsHardHurdleRate(address(dnVault), true);
+        assertTrue(registry.getIsHardHurdleRate(address(dnVault)));
+    }
+
+    function test_SetIsHardHurdleRate_Require_Only_Admin() public {
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.setIsHardHurdleRate(address(dnVault), true);
+    }
+
+    function test_SetIsHardHurdleRate_Require_Valid_Vault() public {
+        vm.prank(users.admin);
+        vm.expectRevert();
+        registry.setIsHardHurdleRate(makeAddr("UnregisteredVault"), true);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -536,11 +556,22 @@ contract kRegistryTest is DeploymentBaseTest {
     }
 
     function test_GetHurdleRate() public {
-        uint16 _hurdleRate = registry.getHurdleRate(USDC);
+        uint16 _hurdleRate = registry.getHurdleRate(address(dnVault));
         assertEq(_hurdleRate, TEST_HURDLE_RATE);
 
-        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
-        registry.getHurdleRate(TEST_ASSET);
+        vm.expectRevert();
+        registry.getHurdleRate(makeAddr("UnregisteredVault"));
+    }
+
+    function test_GetIsHardHurdleRate() public {
+        assertFalse(registry.getIsHardHurdleRate(address(dnVault)));
+
+        vm.prank(users.admin);
+        registry.setIsHardHurdleRate(address(dnVault), true);
+        assertTrue(registry.getIsHardHurdleRate(address(dnVault)));
+
+        vm.expectRevert();
+        registry.getIsHardHurdleRate(makeAddr("UnregisteredVault"));
     }
 
     function test_GetContractById() public {

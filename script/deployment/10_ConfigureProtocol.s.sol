@@ -169,13 +169,21 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         assetRouter.setMaxAllowedDelta(betaVaultAddr, config.assetRouter.maxAllowedDelta);
 
         _log("");
-        _log("2. Setting hurdle rates for assets...");
+        _log("2. Setting hurdle rates for vaults...");
 
-        // Set hurdle rates from config
-        registry.setHurdleRate(_usdc, config.registry.hurdleRate.USDC);
-        _log("   - Set hurdle rate for USDC:", config.registry.hurdleRate.USDC);
-        registry.setHurdleRate(_wbtc, config.registry.hurdleRate.WBTC);
-        _log("   - Set hurdle rate for WBTC:", config.registry.hurdleRate.WBTC);
+        // Set hurdle rates per vault from config
+        registry.setHurdleRate(dnVaultUSDCAddr, config.dnVaultUSDC.hurdleRate);
+        registry.setIsHardHurdleRate(dnVaultUSDCAddr, config.dnVaultUSDC.isHardHurdleRate);
+        _log("   - Set hurdle rate for DN USDC vault:", config.dnVaultUSDC.hurdleRate);
+        registry.setHurdleRate(dnVaultWBTCAddr, config.dnVaultWBTC.hurdleRate);
+        registry.setIsHardHurdleRate(dnVaultWBTCAddr, config.dnVaultWBTC.isHardHurdleRate);
+        _log("   - Set hurdle rate for DN WBTC vault:", config.dnVaultWBTC.hurdleRate);
+        registry.setHurdleRate(alphaVaultAddr, config.alphaVault.hurdleRate);
+        registry.setIsHardHurdleRate(alphaVaultAddr, config.alphaVault.isHardHurdleRate);
+        _log("   - Set hurdle rate for Alpha vault:", config.alphaVault.hurdleRate);
+        registry.setHurdleRate(betaVaultAddr, config.betaVault.hurdleRate);
+        registry.setIsHardHurdleRate(betaVaultAddr, config.betaVault.isHardHurdleRate);
+        _log("   - Set hurdle rate for Beta vault:", config.betaVault.hurdleRate);
 
         _log("");
         _log("3. Registering adapters with vaults...");

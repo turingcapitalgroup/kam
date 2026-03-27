@@ -276,9 +276,20 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             uint256(uint160(_vault)), uint256(uint160(_asset)), uint256(_batchId), block.timestamp, $.proposalCounter
         );
 
-        // For staking vaults we allow only one pending proposal at a time.
-        // kMinter can have multiple closed/unsettled batches, so it needs multiple pending proposals.
-        if (!_isMinter) {
+        // For staking vaults: only one pending proposal at a time.
+        // For kMinter: only one pending proposal per asset at a time.
+        if (_isMinter) {
+            uint256 _pendingCount = $.vaultPendingProposalIds[_vault].length();
+            if (_pendingCount > 0) {
+                bytes32[] memory _pendingIds = $.vaultPendingProposalIds[_vault].values();
+                for (uint256 i; i < _pendingCount; i++) {
+                    require(
+                        $.settlementProposals[_pendingIds[i]].asset != _asset,
+                        KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME
+                    );
+                }
+            }
+        } else {
             require($.vaultPendingProposalIds[_vault].length() == 0, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME);
         }
 

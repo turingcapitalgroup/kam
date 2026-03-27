@@ -420,7 +420,7 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │                                                                  │
 │  ADMIN_ROLE Functions (continued):                               │
 │  ┌─────────────────────────────────────────────────────────────┐ │
-│  │• setHurdleRate() - Set performance thresholds per asset     │ │
+│  │• setHurdleRate() - Set performance thresholds per vault      │ │
 │  │• setBatchLimits() - Set max mint/redeem per batch           │ │
 │  │• rescueAssets() - Emergency asset recovery (ADMIN_ROLE)     │ │
 │  └─────────────────────────────────────────────────────────────┘ │

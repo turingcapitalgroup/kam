@@ -595,11 +595,11 @@ Performance fees are charged only on positive yield generation, calculated as a 
 **Configuration:**
 
 - **Rate**: Configurable per vault in basis points (initialized to 0, set operationally e.g. 1000 bp = 10%)
-- **Hurdle Rate**: Configurable threshold per asset (default 0%) - fees only charged above this minimum return
+- **Hurdle Rate**: Configurable threshold per vault in registry (default 0%) - fees only charged above this minimum return
 - **Watermark**: High watermark system ensures fees only charged on net new profits
 - **Hard Hurdle** (default): `(positiveYield - hurdleAmount) * performanceFee / 10000` — fees only on excess above hurdle
 - **Soft Hurdle**: `positiveYield * performanceFee / 10000` when yield exceeds hurdle — fees on all profits once hurdle is met
-- **Mode**: Configurable via `setHardHurdleRate(bool)` per vault
+- **Mode**: Configurable via `registry.setIsHardHurdleRate(vault, bool)` per vault
 
 ### Fee Calculation
 

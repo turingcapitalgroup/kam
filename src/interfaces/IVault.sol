@@ -69,10 +69,6 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /// @param newFee New performance fee in basis points
     event PerformanceFeeSet(uint16 oldFee, uint16 newFee);
 
-    /// @notice Emitted when the hard hurdle rate is set
-    /// @param isHard True for hard hurdle, false for soft hurdle
-    event HardHurdleRateSet(bool isHard);
-
     /// @notice Emitted when management fees are charged
     /// @param timestamp Timestamp of the fee charge
     event ManagementFeesCharged(uint256 timestamp);

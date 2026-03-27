@@ -109,9 +109,12 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         /// @dev Maps vaults to their registered external protocol adapters
         /// Enables yield strategies through DeFi protocol integrations
         mapping(address => mapping(address => address)) vaultAdaptersByAsset;
-        /// @dev Maps assets to their hurdle rates in basis points (100 = 1%)
-        /// Defines minimum performance thresholds for yield distribution
-        mapping(address => uint16) assetHurdleRate;
+        /// @dev Maps vaults to their hurdle rates in basis points (100 = 1%)
+        /// Defines minimum performance thresholds for yield distribution per vault
+        mapping(address => uint16) vaultHurdleRate;
+        /// @dev Maps vaults to their hurdle rate mode (true = hard, false = soft)
+        /// Hard hurdle: fees only on excess above hurdle. Soft hurdle: fees on all profit once hurdle exceeded
+        mapping(address => bool) vaultIsHardHurdleRate;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.kRegistry")) - 1)) & ~bytes32(uint256(0xff))
@@ -273,18 +276,28 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     }
 
     /// @inheritdoc IRegistry
-    function setHurdleRate(address _asset, uint16 _hurdleRate) external payable {
+    function setHurdleRate(address _vault, uint16 _hurdleRate) external payable {
         _checkAdmin(msg.sender);
         // Ensure hurdle rate doesn't exceed 100% (10,000 basis points)
         // Note: A hurdle rate of 0 is valid - it means performance fees apply to all positive yield
         require(_hurdleRate <= MAX_BPS, KREGISTRY_FEE_EXCEEDS_MAXIMUM);
 
         kRegistryStorage storage $ = _getkRegistryStorage();
-        // Asset must be registered before setting hurdle rate
-        _checkAssetRegistered(_asset);
+        _checkVaultRegistered(_vault);
 
-        $.assetHurdleRate[_asset] = _hurdleRate;
-        emit HurdleRateSet(_asset, _hurdleRate);
+        $.vaultHurdleRate[_vault] = _hurdleRate;
+        emit HurdleRateSet(_vault, _hurdleRate);
+    }
+
+    /// @inheritdoc IRegistry
+    function setIsHardHurdleRate(address _vault, bool _isHard) external payable {
+        _checkAdmin(msg.sender);
+
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        _checkVaultRegistered(_vault);
+
+        $.vaultIsHardHurdleRate[_vault] = _isHard;
+        emit IsHardHurdleRateSet(_vault, _isHard);
     }
 
     /// @inheritdoc IRegistry
@@ -404,8 +417,6 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         delete $.maxMintPerBatch[_asset];
         delete $.maxBurnPerBatch[_asset];
         delete $.assetToKToken[_asset];
-        delete $.assetHurdleRate[_asset];
-
         emit AssetRemoved(_asset);
     }
 
@@ -497,6 +508,8 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         }
 
         delete $.vaultType[_vault];
+        delete $.vaultHurdleRate[_vault];
+        delete $.vaultIsHardHurdleRate[_vault];
         $.allVaults.remove(_vault);
 
         emit VaultRemoved(_vault);
@@ -584,13 +597,22 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         return $.maxBurnPerBatch[_asset];
     }
 
-    /// @notice Gets the hurdle rate for a specific asset
-    /// @param _asset The asset address
+    /// @notice Gets the hurdle rate for a specific vault
+    /// @param _vault The vault address
     /// @return The hurdle rate in basis points
-    function getHurdleRate(address _asset) external view returns (uint16) {
+    function getHurdleRate(address _vault) external view returns (uint16) {
         kRegistryStorage storage $ = _getkRegistryStorage();
-        _checkAssetRegistered(_asset);
-        return $.assetHurdleRate[_asset];
+        _checkVaultRegistered(_vault);
+        return $.vaultHurdleRate[_vault];
+    }
+
+    /// @notice Gets the hard hurdle rate mode for a specific vault
+    /// @param _vault The vault address
+    /// @return True if hard hurdle rate, false if soft hurdle rate
+    function getIsHardHurdleRate(address _vault) external view returns (bool) {
+        kRegistryStorage storage $ = _getkRegistryStorage();
+        _checkVaultRegistered(_vault);
+        return $.vaultIsHardHurdleRate[_vault];
     }
 
     /// @inheritdoc IRegistry

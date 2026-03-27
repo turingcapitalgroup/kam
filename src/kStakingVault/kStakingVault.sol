@@ -519,14 +519,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IVaultFees
-    function setHardHurdleRate(bool _isHard) external {
-        _checkAdmin(_msgSender());
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        _setIsHardHurdleRate($, _isHard);
-        emit HardHurdleRateSet(_isHard);
-    }
-
-    /// @inheritdoc IVaultFees
     function setManagementFee(uint16 _managementFee) external {
         _checkAdmin(_msgSender());
         _checkValidBPS(_managementFee);

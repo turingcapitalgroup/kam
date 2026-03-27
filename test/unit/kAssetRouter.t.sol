@@ -410,23 +410,19 @@ contract kAssetRouterTest is DeploymentBaseTest {
         testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0);
     }
 
-    function test_ProposeSettleBatch_KMinter_Allows_Multiple_Pending_Proposals() public {
+    function test_ProposeSettleBatch_KMinter_Reverts_If_Same_Asset_Already_Pending() public {
         bytes32 _batchIdOne = minter.getBatchId(USDC);
         _closeBatch(address(minter), _batchIdOne);
 
         vm.prank(users.relayer);
-        bytes32 _proposalOne = assetRouter.proposeSettleBatch(USDC, address(minter), _batchIdOne, 0, 0, 0);
+        assetRouter.proposeSettleBatch(USDC, address(minter), _batchIdOne, 0, 0, 0);
 
         bytes32 _batchIdTwo = minter.getBatchId(USDC);
         _closeBatch(address(minter), _batchIdTwo);
 
         vm.prank(users.relayer);
-        bytes32 _proposalTwo = assetRouter.proposeSettleBatch(USDC, address(minter), _batchIdTwo, 0, 0, 0);
-
-        bytes32[] memory _pending = assetRouter.getPendingProposals(address(minter));
-        assertEq(_pending.length, 2);
-        assertTrue(_pending[0] == _proposalOne || _pending[1] == _proposalOne);
-        assertTrue(_pending[0] == _proposalTwo || _pending[1] == _proposalTwo);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME));
+        assetRouter.proposeSettleBatch(USDC, address(minter), _batchIdTwo, 0, 0, 0);
     }
 
     function test_GlobalPendingRequests_CrossBatch_Exhaustion_Blocks_NextBatch() public {
@@ -576,7 +572,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         minter.requestBurn(USDC, users.institution, 1);
     }
 
-    function test_KMinter_MultiBatch_ConcurrentProposals_StressTest() public {
+    function test_KMinter_MultiBatch_Sequential_StressTest() public {
         address _minter = address(minter);
 
         vm.prank(users.admin);
@@ -639,79 +635,49 @@ contract kAssetRouterTest is DeploymentBaseTest {
         _closeBatch(_minter, _b3);
 
         // Total burned across batches: 80k + 50k + 40k = 170k
-        // globalPending should be 170k
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 170_000 * _1_USDC);
 
-        // ---- Propose all 3 batches concurrently ----
-        // batch1: netted = 0 - 80k = -80k
-        // batch2: netted = 20k - 50k = -30k
-        // batch3: netted = 10k - 40k = -30k
+        // ---- Propose and execute batch 1 (only 1 per asset at a time) ----
         _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _p1 = assetRouter.proposeSettleBatch(USDC, _minter, _b1, _ta, 0, 0);
-
-        // After p1: globalPending = 170k - 80k = 90k
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 90_000 * _1_USDC);
 
+        // Cannot propose batch 2 while batch 1 is pending for the same asset
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME));
+        assetRouter.proposeSettleBatch(USDC, _minter, _b2, _ta, 0, 0);
+
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(_p1);
+
+        // ---- Propose batch 2, cancel, re-propose ----
         _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _p2 = assetRouter.proposeSettleBatch(USDC, _minter, _b2, _ta, 0, 0);
-
-        // After p2: globalPending = 90k - 50k = 40k
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 40_000 * _1_USDC);
 
-        _ta = minterAdapterUSDC.totalAssets();
-        vm.prank(users.relayer);
-        bytes32 _p3 = assetRouter.proposeSettleBatch(USDC, _minter, _b3, _ta, 0, 0);
-
-        // After p3: globalPending = 40k - 40k = 0
-        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);
-        assertEq(assetRouter.getPendingProposalCount(_minter), 3);
-
-        // ---- Cancel p2, verify globalPending restored ----
         vm.prank(users.guardian);
         assetRouter.cancelProposal(_p2);
+        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 90_000 * _1_USDC);
 
-        // globalPending restored by batch2's requestedInBatch = 50k
-        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 50_000 * _1_USDC);
-        assertEq(assetRouter.getPendingProposalCount(_minter), 2);
-
-        // effectiveVB = 300k + netted_p1(-80k) + netted_p3(-30k) = 190k
-        // remaining capacity = 190k - 50k(globalPending) = 140k
-        // Institution has 130k kUSD (300k - 80k - 50k - 40k), mint 11k more to pass kMinter balance check
-        uint256 _topUp = 11_000 * _1_USDC;
-        mockUSDC.mint(users.institution, _topUp);
-        vm.prank(users.institution);
-        mockUSDC.approve(_minter, _topUp);
-        vm.prank(users.institution);
-        minter.mint(USDC, users.institution, _topUp);
-
-        vm.prank(users.institution);
-        kUSD.approve(_minter, type(uint256).max);
-
-        // Requesting 140k + 1 should fail at the router (virtual balance exhausted)
-        vm.prank(users.institution);
-        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
-        minter.requestBurn(USDC, users.institution, 140_001 * _1_USDC);
-
-        // ---- Execute p1 and p3, leave batch2 unsettled ----
-        vm.prank(users.relayer);
-        assetRouter.executeSettleBatch(_p1);
-        vm.prank(users.relayer);
-        assetRouter.executeSettleBatch(_p3);
-
-        assertEq(assetRouter.getPendingProposalCount(_minter), 0);
-        // globalPending still 50k from the cancelled/unsettled batch2 requests
-        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 50_000 * _1_USDC);
-
-        // Re-propose batch2 (cancel removed batchId from set, so it can be re-added)
+        // Re-propose batch 2 after cancel
         _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _p2b = assetRouter.proposeSettleBatch(USDC, _minter, _b2, _ta, 0, 0);
-
-        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_p2b);
+
+        // ---- Propose and execute batch 3 ----
+        _ta = minterAdapterUSDC.totalAssets();
+        vm.prank(users.relayer);
+        bytes32 _p3 = assetRouter.proposeSettleBatch(USDC, _minter, _b3, _ta, 0, 0);
+        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(_p3);
+
+        // Final state: everything settled
+        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);
         assertEq(assetRouter.getPendingProposalCount(_minter), 0);
     }
 
@@ -775,48 +741,39 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // INVARIANT: globalPending == sum of all burns
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), _totalBurns);
 
-        // Propose all 3
+        // ---- Propose and execute sequentially (1 per asset at a time) ----
         _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _p1 = assetRouter.proposeSettleBatch(USDC, _minter, _b1, _ta, 0, 0);
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), _totalBurns - _burn1);
 
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(_p1);
+
+        // ---- Propose batch 2, cancel, re-propose ----
         _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _p2 = assetRouter.proposeSettleBatch(USDC, _minter, _b2, _ta, 0, 0);
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), _totalBurns - _burn1 - _burn2);
 
+        vm.prank(users.guardian);
+        assetRouter.cancelProposal(_p2);
+        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), _totalBurns - _burn1);
+
+        // Re-propose and execute
+        _ta = minterAdapterUSDC.totalAssets();
+        vm.prank(users.relayer);
+        bytes32 _p2b = assetRouter.proposeSettleBatch(USDC, _minter, _b2, _ta, 0, 0);
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(_p2b);
+
+        // ---- Propose and execute batch 3 ----
         _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _p3 = assetRouter.proposeSettleBatch(USDC, _minter, _b3, _ta, 0, 0);
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);
-
-        // INVARIANT: effectiveVB >= globalPending (0 >= 0)
-        // INVARIANT: effectiveVB = seed + sum(netted) = seed - totalBurns >= 0
-        uint256 _effectiveVB = _seed - _totalBurns;
-        assertGe(_effectiveVB, 0);
-
-        // Cancel middle proposal, verify exact restoration
-        vm.prank(users.guardian);
-        assetRouter.cancelProposal(_p2);
-        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), uint256(_burn2));
-
-        // Execute the other two
-        vm.prank(users.relayer);
-        assetRouter.executeSettleBatch(_p1);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_p3);
-
-        // globalPending should still be burn2 (only the cancelled batch's requests remain)
-        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), uint256(_burn2));
-
-        // Re-propose and execute the cancelled batch
-        _ta = minterAdapterUSDC.totalAssets();
-        vm.prank(users.relayer);
-        bytes32 _p2b = assetRouter.proposeSettleBatch(USDC, _minter, _b2, _ta, 0, 0);
-        assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);
-        vm.prank(users.relayer);
-        assetRouter.executeSettleBatch(_p2b);
 
         // Final state: everything settled, globalPending == 0
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), 0);

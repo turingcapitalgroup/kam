@@ -49,7 +49,9 @@
             "maxTotalAssets": 500000000000000,
             "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
             "maxWithdrawPerBatch": 50000000000000,
-            "trustedForwarder": "0x0000000000000000000000000000000000000000"
+            "trustedForwarder": "0x0000000000000000000000000000000000000000",
+            "hurdleRate": 500,
+            "isHardHurdleRate": false
         },
         "dnVaultWBTC": {
             "name": "KAM DN Vault BTC",
@@ -60,7 +62,9 @@
             "maxTotalAssets": 20000000000,
             "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
             "maxWithdrawPerBatch": 2000000000,
-            "trustedForwarder": "0x0000000000000000000000000000000000000000"
+            "trustedForwarder": "0x0000000000000000000000000000000000000000",
+            "hurdleRate": 500,
+            "isHardHurdleRate": false
         },
         "alphaVault": {
             "name": "KAM Alpha Vault USD",
@@ -71,7 +75,9 @@
             "maxTotalAssets": "200000000000000",
             "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
             "maxWithdrawPerBatch": 20000000000000,
-            "trustedForwarder": "0x0000000000000000000000000000000000000000"
+            "trustedForwarder": "0x0000000000000000000000000000000000000000",
+            "hurdleRate": 500,
+            "isHardHurdleRate": false
         },
         "betaVault": {
             "name": "KAM Beta Vault USD",
@@ -82,14 +88,12 @@
             "maxTotalAssets": 200000000000000,
             "maxDepositPerBatch": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
             "maxWithdrawPerBatch": 20000000000000,
-            "trustedForwarder": "0x0000000000000000000000000000000000000000"
+            "trustedForwarder": "0x0000000000000000000000000000000000000000",
+            "hurdleRate": 500,
+            "isHardHurdleRate": false
         }
     },
     "registry": {
-        "hurdleRate": {
-            "USDC": 500,
-            "WBTC": 500
-        },
         "treasuryBps": 1000,
         "insuranceBps": 500
     },

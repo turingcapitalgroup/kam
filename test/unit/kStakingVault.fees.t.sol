@@ -87,9 +87,9 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
     function test_SetHardHurdleRate() public {
         vm.prank(users.admin);
-        vault.setHardHurdleRate(true);
+        registry.setIsHardHurdleRate(address(vault), true);
 
-        // No direct getter, but we can test behavior in fee calculation
+        assertTrue(vault.isHardHurdleRate());
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -177,7 +177,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
         // Set soft hurdle (default)
         vm.prank(users.admin);
-        vault.setHardHurdleRate(false);
+        registry.setIsHardHurdleRate(address(vault), false);
 
         // Add significant yield (20%)
         uint256 yieldAmount = 200_000 * _1_USDC;
@@ -203,7 +203,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
         // Set hard hurdle
         vm.prank(users.admin);
-        vault.setHardHurdleRate(true);
+        registry.setIsHardHurdleRate(address(vault), true);
 
         // Add significant yield (20%)
         uint256 yieldAmount = 200_000 * _1_USDC;
@@ -588,7 +588,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vault.setPerformanceFee(TEST_PERFORMANCE_FEE);
 
         vm.prank(users.admin);
-        registry.setHurdleRate(tokens.usdc, 0); // No hurdle
+        registry.setHurdleRate(address(vault), 0); // No hurdle
 
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 
@@ -612,7 +612,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vault.setPerformanceFee(0); // No performance fee
         vm.stopPrank();
 
-        assertEq(registry.getHurdleRate(tokens.usdc), TEST_HURDLE_RATE);
+        assertEq(registry.getHurdleRate(address(vault)), TEST_HURDLE_RATE);
 
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 
@@ -647,7 +647,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
     event ManagementFeeSet(uint16 oldFee, uint16 newFee);
     event PerformanceFeeSet(uint16 oldFee, uint16 newFee);
-    event HardHurdleRateSet(bool isHard);
+    event IsHardHurdleRateSet(address indexed vault, bool isHard);
     event SharePriceWatermarkUpdated(uint256 newWatermark);
     event ManagementFeesCharged(uint256 timestamp);
     event PerformanceFeesCharged(uint256 timestamp);
@@ -672,12 +672,12 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vault.setPerformanceFee(TEST_PERFORMANCE_FEE);
     }
 
-    function test_HardHurdleRateSet_Event() public {
-        vm.expectEmit(false, false, false, true);
-        emit HardHurdleRateSet(true);
+    function test_IsHardHurdleRateSet_Event() public {
+        vm.expectEmit(true, false, false, true);
+        emit IsHardHurdleRateSet(address(vault), true);
 
         vm.prank(users.admin);
-        vault.setHardHurdleRate(true);
+        registry.setIsHardHurdleRate(address(vault), true);
     }
 
     function test_SharePriceWatermarkUpdated_Event() public {

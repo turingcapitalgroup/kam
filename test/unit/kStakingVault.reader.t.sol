@@ -78,7 +78,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
     function test_isHardHurdleRate_ReturnsTrue_WhenSet() public {
         vm.prank(users.admin);
-        vault.setHardHurdleRate(true);
+        registry.setIsHardHurdleRate(address(vault), true);
 
         bool isHard = vault.isHardHurdleRate();
         assertTrue(isHard);

@@ -62,12 +62,10 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     uint256 internal constant INITIALIZED_SHIFT = 40;
     uint256 internal constant PAUSED_MASK = 0x1;
     uint256 internal constant PAUSED_SHIFT = 41;
-    uint256 internal constant IS_HARD_HURDLE_RATE_MASK = 0x1;
-    uint256 internal constant IS_HARD_HURDLE_RATE_SHIFT = 42;
     uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_MASK = 0xFFFFFFFFFFFFFFFF;
-    uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_SHIFT = 43;
+    uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_SHIFT = 42;
     uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_MASK = 0xFFFFFFFFFFFFFFFF;
-    uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 107;
+    uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 106;
 
     /* //////////////////////////////////////////////////////////////
                               STORAGE
@@ -77,7 +75,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     struct BaseVaultStorage {
         //1
         uint256 config; // decimals, performance fee, management fee, initialized, paused,
-        // isHardHurdleRate, lastFeesChargedManagement, lastFeesChargedPerformance
+        // lastFeesChargedManagement, lastFeesChargedPerformance
         //2 - packed together for gas efficiency (both read in _totalAssets)
         uint128 totalPendingStake;
         uint128 totalPendingUnstake;
@@ -133,7 +131,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     }
 
     function _getHurdleRate(BaseVaultStorage storage $) internal view returns (uint16) {
-        return _registry().getHurdleRate($.underlyingAsset);
+        return _registry().getHurdleRate(address(this));
     }
 
     function _getPerformanceFee(BaseVaultStorage storage $) internal view returns (uint16) {
@@ -176,12 +174,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     }
 
     function _getIsHardHurdleRate(BaseVaultStorage storage $) internal view returns (bool) {
-        return (($.config >> IS_HARD_HURDLE_RATE_SHIFT) & IS_HARD_HURDLE_RATE_MASK) != 0;
-    }
-
-    function _setIsHardHurdleRate(BaseVaultStorage storage $, bool _value) internal {
-        $.config = ($.config & ~(IS_HARD_HURDLE_RATE_MASK << IS_HARD_HURDLE_RATE_SHIFT))
-            | (uint256(_value ? 1 : 0) << IS_HARD_HURDLE_RATE_SHIFT);
+        return _registry().getIsHardHurdleRate(address(this));
     }
 
     function _getLastFeesChargedManagement(BaseVaultStorage storage $) internal view returns (uint64) {
