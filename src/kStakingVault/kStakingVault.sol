@@ -552,8 +552,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedPerformance($));
-        _setLastFeesChargedPerformance($, _timestamp);
         _updateGlobalWatermark(_timestamp);
+        _setLastFeesChargedPerformance($, _timestamp);
         emit PerformanceFeesCharged(_timestamp);
     }
 
