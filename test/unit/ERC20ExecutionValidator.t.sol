@@ -185,6 +185,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         validator.setAllowedReceiver(testToken, testReceiver, true);
 
         bytes memory _params = abi.encode(testReceiver, _amount);
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params);
     }
 
@@ -197,6 +198,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params);
     }
 
@@ -209,6 +211,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_RECEIVER_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params);
     }
 
@@ -228,6 +231,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         validator.setAllowedSource(testToken, testSource, true);
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _params);
     }
 
@@ -240,6 +244,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _params);
     }
 
@@ -252,6 +257,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_RECEIVER_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _params);
     }
 
@@ -266,6 +272,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_SOURCE_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _params);
     }
 
@@ -280,6 +287,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         validator.setAllowedSpender(testToken, testSpender, true);
 
         bytes memory _params = abi.encode(testSpender, _amount);
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.approve.selector, _params);
     }
 
@@ -288,6 +296,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSpender, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_SPENDER_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.approve.selector, _params);
     }
 
@@ -300,6 +309,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         bytes memory _params = "";
 
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_SELECTOR_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, _invalidSelector, _params);
     }
 

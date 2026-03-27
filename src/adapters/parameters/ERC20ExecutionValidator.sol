@@ -118,6 +118,7 @@ contract ERC20ExecutionValidator is IExecutionValidator {
     )
         external
     {
+        require(msg.sender == address(registry), EXECUTIONVALIDATOR_NOT_ALLOWED);
         if (_selector == ERC20.transfer.selector) {
             (address _to, uint256 _amount) = abi.decode(_params, (address, uint256));
             uint256 _blockAmount = _amountTransferredPerBlock[_token][block.number] += _amount;

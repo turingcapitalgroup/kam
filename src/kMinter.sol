@@ -524,7 +524,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Authorizes contract upgrades
-    /// @dev Only callable by ADMIN_ROLE
+    /// @dev Only callable by contract owner
     /// @param _newImplementation New implementation address
     function _authorizeUpgrade(address _newImplementation) internal view override {
         _checkOwner();
