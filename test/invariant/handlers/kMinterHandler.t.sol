@@ -173,8 +173,6 @@ contract kMinterHandler is BaseHandler {
         vm.stopPrank();
         // INVARIANT_E: Decrement user request count on successful burn
         kMinter_expectedUserRequestCount[currentActor]--;
-        kMinter_expectedTotalLockedAssets -= amount;
-        kMinter_actualTotalLockedAssets = kMinter_minter.getTotalLockedAssets(kMinter_token);
 
         kMinter_actualAdapterBalance = kMinter_token.balanceOf(address(kMinter_adapter));
 
@@ -289,6 +287,11 @@ contract kMinterHandler is BaseHandler {
         kMinter_actualAdapterBalance = kMinter_token.balanceOf(address(kMinter_adapter));
 
         kMinter_actualAdapterTotalAssets = kMinter_adapter.totalAssets();
+
+        // totalLockedAssets is now decremented in settleBatch (called by executeSettleBatch)
+        IkMinter.BatchInfo memory batchInfo = kMinter_minter.getBatchInfo(proposal.batchId);
+        kMinter_expectedTotalLockedAssets -= batchInfo.requestedSharesInBatch;
+        kMinter_actualTotalLockedAssets = kMinter_minter.getTotalLockedAssets(kMinter_token);
     }
 
     // //////////////////////////////////////////////////////////////

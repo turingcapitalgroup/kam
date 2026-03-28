@@ -152,19 +152,12 @@ interface IkMinter is IVersioned {
     /// @return requestId A unique bytes32 identifier for tracking and executing this redemption request
     function requestBurn(address asset, address to, uint256 amount) external payable returns (bytes32 requestId);
 
-    /// @notice Completes the second phase of institutional redemption by executing a settled batch request
+    /// @notice Completes the second phase of institutional redemption by claiming assets from a settled batch
     /// @dev This function finalizes the redemption process initiated by requestBurn(). It can only be called after
-    /// the batch containing this request has been settled through the kAssetRouter settlement process. The execution
-    /// involves: (1) validating the request exists and is in PENDING status, (2) updating the request status to
-    /// REDEEMED,
-    /// (3) removing the request from tracking, (4) burning the escrowed kTokens permanently, (5) instructing the
-    /// kBatchReceiver contract to transfer the underlying assets to the recipient. The kBatchReceiver is a minimal
-    /// proxy
-    /// deployed per batch that holds the settled assets and ensures isolated distribution. This function will revert if
-    /// the batch is not yet settled, ensuring assets are only distributed when available. The separation between
-    /// request
-    /// and redemption phases allows for efficient batch processing of multiple redemptions while maintaining asset
-    /// safety.
+    /// the batch containing this request has been settled through the kAssetRouter settlement process. The kTokens
+    /// have already been burned during settleBatch(). The execution involves: (1) validating the request exists and
+    /// is in PENDING status, (2) updating the request status to REDEEMED, (3) removing the request from tracking,
+    /// (4) instructing the kBatchReceiver contract to transfer the underlying assets to the recipient.
     /// @param requestId The unique identifier of the redemption request to execute (obtained from requestBurn)
     function burn(bytes32 requestId) external payable;
 
@@ -178,7 +171,8 @@ interface IkMinter is IVersioned {
     /// @param _create Whether to create a new batch for the same asset
     function closeBatch(bytes32 _batchId, bool _create) external;
 
-    /// @notice Marks a batch as settled after processing
+    /// @notice Marks a batch as settled after processing and burns all escrowed kTokens for the batch
+    /// @dev Burns all `requestedSharesInBatch` kTokens at once and decrements `totalLockedAssets`
     /// @param _batchId The batch ID to settle
     function settleBatch(bytes32 _batchId) external;
 

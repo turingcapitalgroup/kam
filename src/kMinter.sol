@@ -247,15 +247,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         // Mark request as burned to prevent double-spending
         _burnRequest.status = RequestStatus.REDEEMED;
 
-        // Clean up request tracking and update accounting
-        // This will be 0 wen the last withdrawals amount are the yield generated on the kStakingVaults
-        // since its not accounted into totalLocaledAssets. - if not minted here, wont count.
-        // kToken.totalSupply() = totalLockedAssets + sum(generated yield on kTokens for same asset kStakingVaults)
-        $.totalLockedAssets[_asset] = OptimizedFixedPointMathLib.zeroFloorSub($.totalLockedAssets[_asset], _amount);
-
-        // Permanently burn the escrowed kTokens to reduce total supply
         address _kToken = _getKTokenForAsset(_asset);
-        IkToken(_kToken).burn(address(this), _amount);
 
         // Pull assets from batch receiver
         kBatchReceiver(_batchReceiver).pullAssets(_recipient, _amount);
@@ -301,6 +293,16 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         require($.batches[_batchId].isClosed, KMINTER_BATCH_NOT_CLOSED);
         require(!$.batches[_batchId].isSettled, KMINTER_BATCH_SETTLED);
         $.batches[_batchId].isSettled = true;
+
+        // Burn all requested kTokens for the batch at once (mirrors kStakingVault pattern)
+        uint128 _requestedShares = $.batches[_batchId].requestedSharesInBatch;
+        if (_requestedShares != 0) {
+            address _asset = $.batches[_batchId].asset;
+            address _kToken = _getKTokenForAsset(_asset);
+            IkToken(_kToken).burn(address(this), _requestedShares);
+            $.totalLockedAssets[_asset] =
+                OptimizedFixedPointMathLib.zeroFloorSub($.totalLockedAssets[_asset], _requestedShares);
+        }
 
         emit BatchSettled(_batchId);
     }
