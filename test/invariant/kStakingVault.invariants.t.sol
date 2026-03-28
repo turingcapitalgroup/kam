@@ -45,10 +45,6 @@ contract kStakingVaultInvariants is SetUp {
         vaultHandlerAlpha.INVARIANT_H_CLAIM_STABLE_SHARE_PRICE();
     }
 
-    function invariant_kStakingVaultPendingStakeSettlement() public view {
-        vaultHandlerAlpha.INVARIANT_I_PENDING_STAKE_SETTLEMENT();
-    }
-
     function invariant_kStakingVaultUnstakeClaimAccuracy() public view {
         vaultHandlerAlpha.INVARIANT_J_UNSTAKE_CLAIM_ACCURACY();
     }

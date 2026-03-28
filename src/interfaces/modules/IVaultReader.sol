@@ -81,12 +81,4 @@ interface IVaultReader {
         external
         view
         returns (BaseVaultTypes.UnstakeRequest memory unstakeRequest);
-
-    /// @notice Returns the total pending stake amount
-    /// @return Total pending stake amount
-    function getTotalPendingStake() external view returns (uint256);
-
-    /// @notice Returns the total pending unstake amount
-    /// @return Total pending unstake amount
-    function getTotalPendingUnstake() external view returns (uint256);
 }

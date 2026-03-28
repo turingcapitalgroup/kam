@@ -67,8 +67,7 @@ contract kStakingVaultHandler is BaseHandler {
     uint256 kStakingVault_sharePriceAfterLastClaim;
     bool kStakingVault_lastActionWasClaim;
 
-    // INVARIANT_I: Pending Stake Settlement tracking
-    uint256 kStakingVault_totalPendingStakeBeforeSettlement;
+    // INVARIANT_I: Settlement tracking
     uint256 kStakingVault_depositedInLastSettledBatch;
     bool kStakingVault_lastActionWasSettlement;
 
@@ -566,8 +565,6 @@ contract kStakingVaultHandler is BaseHandler {
             kStakingVault_assetRouter.getRequestedShares(address(kStakingVault_vault), proposal.batchId);
         int256 netted = proposal.netted;
 
-        // INVARIANT_I: Track pending stake before settlement
-        kStakingVault_totalPendingStakeBeforeSettlement = kStakingVault_vault.getTotalPendingStake();
         kStakingVault_depositedInLastSettledBatch = kStakingVault_depositedInBatch[proposal.batchId];
 
         kStakingVault_assetRouter.executeSettleBatch(proposalId);
@@ -860,20 +857,6 @@ contract kStakingVaultHandler is BaseHandler {
                 kStakingVault_sharePriceAfterLastClaim,
                 kStakingVault_sharePriceBeforeLastClaim,
                 "KSTAKING_VAULT: INVARIANT_H_CLAIM_STABLE_SHARE_PRICE - claim changed share price!"
-            );
-        }
-    }
-
-    /// @notice Invariant: totalPendingStake must decrease by depositedInBatch after settlement
-    /// @dev Ensures pending stake tracking is correctly reduced at settlement
-    function INVARIANT_I_PENDING_STAKE_SETTLEMENT() public view {
-        if (kStakingVault_lastActionWasSettlement && kStakingVault_depositedInLastSettledBatch > 0) {
-            uint256 expectedPendingStake =
-                kStakingVault_totalPendingStakeBeforeSettlement - kStakingVault_depositedInLastSettledBatch;
-            assertEq(
-                kStakingVault_vault.getTotalPendingStake(),
-                expectedPendingStake,
-                "KSTAKING_VAULT: INVARIANT_I - totalPendingStake not reduced correctly at settlement"
             );
         }
     }

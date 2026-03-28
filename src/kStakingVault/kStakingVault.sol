@@ -169,11 +169,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         IkAssetRouter(_getKAssetRouter())
             .kAssetTransfer(_getKMinter(), address(this), $.underlyingAsset, _amount, _batchId);
 
-        // Deposit ktokens
+        // Deposit ktokens (held by vault but not counted in totalBalance until settlement)
         $.kToken.safeTransferFrom(_msgSender(), address(this), _amount);
-
-        // Increase pending stakt
-        $.totalPendingStake += _amount.toUint128();
 
         // Add to user requests tracking
         $.userRequests[_owner].add(_requestId);
@@ -315,8 +312,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
 
-        // Reduce totalPendingUnstake - shares were already burned at settlement time
-        $.totalPendingUnstake -= _totalKTokensNet.toUint128();
+        // Internal balance was already decreased during settlement - just transfer kTokens out
 
         emit UnstakingAssetsClaimed(batchId, _requestId, user, _totalKTokensNet);
         emit KTokenUnstaked(user, stkTokenAmount, _totalKTokensNet);
@@ -372,10 +368,11 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         if (batchDeposited != 0) {
             uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalNetAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
-            $.totalPendingStake -= batchDeposited;
+            // Deposits become active assets in internal balance
+            $.totalBalance += batchDeposited;
         }
 
-        // Burn all unstake shares and track claimable kTokens
+        // Burn all unstake shares and deduct from internal balance
         uint128 requestedShares = $.batches[_batchId].requestedSharesInBatch;
 
         if (requestedShares != 0) {
@@ -398,8 +395,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
                 _getBaseVaultStorage().kToken.safeTransfer(_registry().getTreasury(), _feeAssets);
             }
 
-            // Track claimable kTokens in global tracking
-            $.totalPendingUnstake += _claimableKTokens.toUint128();
+            // Deduct total gross kTokens from internal balance (claimable + fees leave active management)
+            $.totalBalance -= _totalKTokensForShares.toUint128();
 
             emit UnstakeSharesBurned(_batchId, requestedShares, _claimableKTokens);
         }
@@ -591,6 +588,23 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /* //////////////////////////////////////////////////////////////
                           INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc BaseVault
+    function increaseBalance(uint128 _amount) external override(IVault, BaseVault) {
+        _authorizeModifyBalance();
+        _getBaseVaultStorage().totalBalance += _amount;
+    }
+
+    /// @inheritdoc BaseVault
+    function decreaseBalance(uint128 _amount) external override(IVault, BaseVault) {
+        _authorizeModifyBalance();
+        _getBaseVaultStorage().totalBalance -= _amount;
+    }
+
+    /// @notice Authorizes balance modifications to router only
+    function _authorizeModifyBalance() internal view override {
+        _checkRouter(_msgSender());
+    }
 
     /// @notice Creates a unique request ID for a staking request
     /// @param _user User address

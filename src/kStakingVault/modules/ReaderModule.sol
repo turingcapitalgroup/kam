@@ -197,28 +197,12 @@ contract ReaderModule is BaseVault, Extsload, IModule {
     }
 
     /* //////////////////////////////////////////////////////////////
-                        PENDING AMOUNTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Returns the total pending stake amount
-    /// @return Total pending stake amount
-    function getTotalPendingStake() external view returns (uint256) {
-        return _getBaseVaultStorage().totalPendingStake;
-    }
-
-    /// @notice Returns the total pending unstake amount
-    /// @return Total pending unstake amount
-    function getTotalPendingUnstake() external view returns (uint256) {
-        return _getBaseVaultStorage().totalPendingUnstake;
-    }
-
-    /* //////////////////////////////////////////////////////////////
                         MODULE INFO
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](17);
+        bytes4[] memory moduleSelectors = new bytes4[](15);
         moduleSelectors[0] = this.computeLastBatchFees.selector;
         moduleSelectors[1] = this.lastFeesChargedManagement.selector;
         moduleSelectors[2] = this.lastFeesChargedPerformance.selector;
@@ -234,8 +218,6 @@ contract ReaderModule is BaseVault, Extsload, IModule {
         moduleSelectors[12] = this.getUserRequests.selector;
         moduleSelectors[13] = this.getStakeRequest.selector;
         moduleSelectors[14] = this.getUnstakeRequest.selector;
-        moduleSelectors[15] = this.getTotalPendingStake.selector;
-        moduleSelectors[16] = this.getTotalPendingUnstake.selector;
         return moduleSelectors;
     }
 }

@@ -76,12 +76,11 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         //1
         uint256 config; // decimals, performance fee, management fee, initialized, paused,
         // lastFeesChargedManagement, lastFeesChargedPerformance
-        //2 - packed together for gas efficiency (both read in _totalAssets)
-        uint128 totalPendingStake;
-        uint128 totalPendingUnstake;
+        //2 - asset tracking (both read in _totalAssets hot path)
+        uint128 totalBalance;
+        uint128 maxTotalAssets;
         //3
         uint128 sharePriceWatermark;
-        uint128 maxTotalAssets;
         //4
         uint256 currentBatch;
         //5
@@ -373,17 +372,39 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalAssets(), totalSupply());
     }
 
-    /// @notice Calculates total assets under management including pending stakes and accrued yields
-    /// @dev This function determines the complete asset base managed by the vault for share price calculations.
-    /// The calculation: (1) Starts with total kToken balance held by the vault contract, (2) Subtracts pending
-    /// stakes that haven't yet been converted to stkTokens to avoid double-counting during settlement periods,
-    /// (3) Includes all accrued yields and performance gains. The pending stake adjustment is crucial for accurate
-    /// share pricing during batch processing periods when assets are deposited but shares haven't been issued.
-    /// This total forms the basis for both gross and net share price calculations.
-    /// @return Total asset value managed by the vault including yields but excluding pending operations
+    /// @notice Returns the internally tracked total assets under management
+    /// @dev Uses internal accounting (`totalBalance`) instead of relying on `kToken.balanceOf`.
+    /// The balance is updated via `increaseBalance`/`decreaseBalance` (authorized by router) and
+    /// internally during settlement. This approach is immune to balance manipulation attacks.
+    /// @return Total asset value managed by the vault
     function _totalAssets() internal view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return $.kToken.balanceOf(address(this)) - $.totalPendingStake - $.totalPendingUnstake;
+        return _getBaseVaultStorage().totalBalance;
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        BALANCE MODIFICATION
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Increases the vault's internal balance
+    /// @dev Only callable by authorized addresses (router). Used for yield distribution.
+    /// @param _amount The amount to increase the balance by
+    function increaseBalance(uint128 _amount) external virtual {
+        _authorizeModifyBalance();
+        _getBaseVaultStorage().totalBalance += _amount;
+    }
+
+    /// @notice Decreases the vault's internal balance
+    /// @dev Only callable by authorized addresses (router). Used for yield distribution.
+    /// @param _amount The amount to decrease the balance by
+    function decreaseBalance(uint128 _amount) external virtual {
+        _authorizeModifyBalance();
+        _getBaseVaultStorage().totalBalance -= _amount;
+    }
+
+    /// @notice Authorization hook for balance modifications
+    /// @dev Override in inheriting contracts to implement access control. Reverts by default.
+    function _authorizeModifyBalance() internal virtual {
+        revert();
     }
 
     /// @notice Calculates net assets available to users after deducting accumulated fees
