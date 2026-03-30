@@ -47,6 +47,14 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @param paused The new paused state
     event Paused(bool paused);
 
+    /// @notice Emitted when the vault's internal balance is increased
+    /// @param amount The amount the balance was increased by
+    event BalanceIncreased(uint128 amount);
+
+    /// @notice Emitted when the vault's internal balance is decreased
+    /// @param amount The amount the balance was decreased by
+    event BalanceDecreased(uint128 amount);
+
     /* //////////////////////////////////////////////////////////////
                               CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -130,7 +138,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     }
 
     function _getHurdleRate(BaseVaultStorage storage $) internal view returns (uint16) {
-        return _registry().getHurdleRate(address(this));
+        return IkRegistry($.registry).getHurdleRate(address(this));
     }
 
     function _getPerformanceFee(BaseVaultStorage storage $) internal view returns (uint16) {
@@ -386,25 +394,19 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Increases the vault's internal balance
-    /// @dev Only callable by authorized addresses (router). Used for yield distribution.
+    /// @dev Used for yield distribution. Authorization must be handled by the calling contract.
     /// @param _amount The amount to increase the balance by
-    function increaseBalance(uint128 _amount) external virtual {
-        _authorizeModifyBalance();
+    function _increaseBalance(uint128 _amount) internal {
         _getBaseVaultStorage().totalBalance += _amount;
+        emit BalanceIncreased(_amount);
     }
 
     /// @notice Decreases the vault's internal balance
-    /// @dev Only callable by authorized addresses (router). Used for yield distribution.
+    /// @dev Used for yield distribution. Authorization must be handled by the calling contract.
     /// @param _amount The amount to decrease the balance by
-    function decreaseBalance(uint128 _amount) external virtual {
-        _authorizeModifyBalance();
+    function _decreaseBalance(uint128 _amount) internal {
         _getBaseVaultStorage().totalBalance -= _amount;
-    }
-
-    /// @notice Authorization hook for balance modifications
-    /// @dev Override in inheriting contracts to implement access control. Reverts by default.
-    function _authorizeModifyBalance() internal virtual {
-        revert();
+        emit BalanceDecreased(_amount);
     }
 
     /// @notice Calculates net assets available to users after deducting accumulated fees

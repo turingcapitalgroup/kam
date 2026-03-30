@@ -18,7 +18,7 @@ fs_permissions = [{ access = "read-write", path = "." }]
 solc_version = "0.8.30"
 via_ir = true
 optimizer = true
-optimizer_runs = 7777
+optimizer_runs = 5000
 
 [profile.solx]
 gas_limit = 100_000_000

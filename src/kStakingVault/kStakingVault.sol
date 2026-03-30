@@ -369,7 +369,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalNetAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
             // Deposits become active assets in internal balance
-            $.totalBalance += batchDeposited;
+            _increaseBalance(batchDeposited);
         }
 
         // Burn all unstake shares and deduct from internal balance
@@ -396,7 +396,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             }
 
             // Deduct total gross kTokens from internal balance (claimable + fees leave active management)
-            $.totalBalance -= _totalKTokensForShares.toUint128();
+            _decreaseBalance(_totalKTokensForShares.toUint128());
 
             emit UnstakeSharesBurned(_batchId, requestedShares, _claimableKTokens);
         }
@@ -589,21 +589,16 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
                           INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc BaseVault
-    function increaseBalance(uint128 _amount) external override(IVault, BaseVault) {
-        _authorizeModifyBalance();
-        _getBaseVaultStorage().totalBalance += _amount;
-    }
-
-    /// @inheritdoc BaseVault
-    function decreaseBalance(uint128 _amount) external override(IVault, BaseVault) {
-        _authorizeModifyBalance();
-        _getBaseVaultStorage().totalBalance -= _amount;
-    }
-
-    /// @notice Authorizes balance modifications to router only
-    function _authorizeModifyBalance() internal view override {
+    /// @inheritdoc IVault
+    function increaseBalance(uint128 _amount) external {
         _checkRouter(_msgSender());
+        _increaseBalance(_amount);
+    }
+
+    /// @inheritdoc IVault
+    function decreaseBalance(uint128 _amount) external {
+        _checkRouter(_msgSender());
+        _decreaseBalance(_amount);
     }
 
     /// @notice Creates a unique request ID for a staking request

@@ -549,11 +549,11 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                     // forge-lint: disable-next-line(unsafe-typecast)
                     uint256 _absYield = uint256(_yield);
                     IkToken(_kToken).mint(_vault, _absYield);
-                    IkStakingVault(_vault).increaseBalance(uint128(_absYield));
+                    IkStakingVault(_vault).increaseBalance(_absYield.toUint128());
                 } else {
                     uint256 _absYield = _yield.abs();
                     IkToken(_kToken).burn(_vault, _absYield);
-                    IkStakingVault(_vault).decreaseBalance(uint128(_absYield));
+                    IkStakingVault(_vault).decreaseBalance(_absYield.toUint128());
                 }
                 emit YieldDistributed(_vault, _yield);
             }
