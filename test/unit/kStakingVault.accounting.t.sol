@@ -298,6 +298,8 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         uint256 yieldAmount = 200_000 * _1_USDC; // 20% yield
         vm.prank(address(minter));
         kUSD.mint(address(vault), yieldAmount);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(yieldAmount));
 
         // Alice's 1M stkTokens should now be worth 1.2M USDC (with small rounding tolerance due to virtual offset)
         uint256 aliceShares = vault.balanceOf(users.alice);

@@ -502,39 +502,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         assertGt(request.requestTimestamp, 0);
     }
 
-    function test_getTotalPendingStake_ReturnsZero_WhenNoPendingStakes() public view {
-        uint256 pending = vault.getTotalPendingStake();
-        assertEq(pending, 0);
-    }
-
-    function test_getTotalPendingStake_ReturnsPendingAmount() public {
-        vm.prank(users.alice);
-        kUSD.approve(address(vault), SMALL_DEPOSIT);
-
-        vm.prank(users.alice);
-        vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
-
-        uint256 pending = vault.getTotalPendingStake();
-        assertEq(pending, SMALL_DEPOSIT);
-    }
-
-    function test_getTotalPendingStake_AccumulatesMultipleStakes() public {
-        vm.prank(users.alice);
-        kUSD.approve(address(vault), SMALL_DEPOSIT);
-
-        vm.prank(users.bob);
-        kUSD.approve(address(vault), SMALL_DEPOSIT);
-
-        vm.prank(users.alice);
-        vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
-
-        vm.prank(users.bob);
-        vault.requestStake(users.bob, users.bob, SMALL_DEPOSIT);
-
-        uint256 pending = vault.getTotalPendingStake();
-        assertEq(pending, SMALL_DEPOSIT * 2);
-    }
-
     /* //////////////////////////////////////////////////////////////
                         VAULT CONFIGURATION TESTS
     //////////////////////////////////////////////////////////////*/
@@ -616,7 +583,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         // Request getters
         vault.getUserRequests(users.alice);
-        vault.getTotalPendingStake();
 
         // Config
         vault.maxTotalAssets();

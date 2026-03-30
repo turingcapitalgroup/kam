@@ -280,4 +280,14 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
 
     /// @notice Returns the maximum total assets (TVL cap)
     function maxTotalAssets() external view returns (uint128);
+
+    /// @notice Increases the vault's internal balance
+    /// @dev Only callable by authorized addresses (router)
+    /// @param amount The amount to increase the balance by
+    function increaseBalance(uint128 amount) external;
+
+    /// @notice Decreases the vault's internal balance
+    /// @dev Only callable by authorized addresses (router)
+    /// @param amount The amount to decrease the balance by
+    function decreaseBalance(uint128 amount) external;
 }

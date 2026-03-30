@@ -143,6 +143,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 yieldAmount = 200_000 * _1_USDC; // 20% yield
         vm.prank(address(minter));
         kUSD.mint(address(vault), yieldAmount);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(yieldAmount));
 
         // Fast forward one year
         vm.warp(block.timestamp + 365 days);
@@ -183,6 +185,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 yieldAmount = 200_000 * _1_USDC;
         vm.prank(address(minter));
         kUSD.mint(address(vault), yieldAmount);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(yieldAmount));
 
         // Fast forward one year
         vm.warp(block.timestamp + 365 days);
@@ -209,6 +213,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 yieldAmount = 200_000 * _1_USDC;
         vm.prank(address(minter));
         kUSD.mint(address(vault), yieldAmount);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(yieldAmount));
 
         // Fast forward one year
         vm.warp(block.timestamp + 365 days);
@@ -235,6 +241,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 smallYield = 20_000 * _1_USDC;
         vm.prank(address(minter));
         kUSD.mint(address(vault), smallYield);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(smallYield));
 
         // Fast forward one year
         vm.warp(block.timestamp + 365 days);
@@ -417,6 +425,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 yieldAmount = 300_000 * _1_USDC; // 30% yield
         vm.prank(address(minter));
         kUSD.mint(address(vault), yieldAmount);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(yieldAmount));
 
         // Fast forward one year
         vm.warp(block.timestamp + 365 days);
@@ -538,6 +548,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 yieldAmount = 200_000 * _1_USDC;
         vm.prank(address(minter));
         kUSD.mint(address(vault), yieldAmount);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(yieldAmount));
 
         // Fast forward time to accrue fees
         vm.warp(block.timestamp + 365 days);
@@ -560,6 +572,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 yieldAmount = 200_000 * _1_USDC;
         vm.prank(address(minter));
         kUSD.mint(address(vault), yieldAmount);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(yieldAmount));
 
         // Fast forward time
         vm.warp(block.timestamp + 365 days);
@@ -596,6 +610,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 smallYield = 10_000 * _1_USDC; //1%
         vm.prank(address(minter));
         kUSD.mint(address(vault), smallYield);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(smallYield));
 
         vm.warp(block.timestamp + 365 days);
 
@@ -620,6 +636,8 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         uint256 yieldAmount = 500_000 * _1_USDC;
         vm.prank(address(minter));
         kUSD.mint(address(vault), yieldAmount);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(yieldAmount));
 
         vm.warp(block.timestamp + 365 days);
 
