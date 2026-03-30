@@ -48,7 +48,7 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.ExecutionGuardianModule")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant EXECUTIONGUARDIANMODULE_STORAGE_LOCATION =
-        0xd14aec45f1b64da194d5b24d6a4dfb8fd6ac8faca4e3d35f6c5e6d5e6f748f00;
+        0x1cf339485c663c819058b30a6fe2837d9e6929a0f830fe23d7a50344bd0f3a00;
 
     /// @notice Retrieves the ExecutionGuardianModule storage struct from its designated storage slot
     /// @dev Uses ERC-7201 namespaced storage pattern to access the storage struct at a deterministic location.

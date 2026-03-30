@@ -19,7 +19,7 @@ import { IERC2771 } from "kam/src/interfaces/IERC2771.sol";
 abstract contract ERC2771Context is IERC2771 {
     // keccak256(abi.encode(uint256(keccak256("erc2771.context")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 internal constant ERC2771_CONTEXT_STORAGE_LOCATION =
-        0x4b8f1be850ba8944bb65aafc52e97e45326b89aafdae45bf4d91f44bccce2a00;
+        0xba2f0ae948a4eb908f5f0547b704687724ea5adcc0786d0931a59ceee5c5ce00;
 
     struct ERC2771ContextStorage {
         address trustedForwarder;
