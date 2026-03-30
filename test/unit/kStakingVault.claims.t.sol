@@ -165,6 +165,42 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         vault.claimStakedShares(requestId);
     }
 
+    function test_ClaimStakedShares_WhenGlobalPaused() public {
+        // Setup: Create and settle a staking request
+        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
+
+        // Close and settle batch
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        uint256 lastTotalAssets = vault.totalAssets();
+        _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
+
+        // Global pause via registry (vault is NOT locally paused)
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        // Try to claim while globally paused
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KSTAKINGVAULT_IS_PAUSED));
+        vault.claimStakedShares(requestId);
+
+        // Unpause globally, claim should succeed
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(false);
+
+        vm.prank(users.alice);
+        vault.claimStakedShares(requestId);
+    }
+
     function test_ClaimStakedShares_MultipleUsers() public {
         // Setup: Create staking requests for multiple users
         _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
@@ -436,6 +472,39 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         // Try to claim while paused
         vm.prank(users.alice);
         vm.expectRevert(bytes(KSTAKINGVAULT_IS_PAUSED));
+        vault.claimUnstakedAssets(requestId);
+    }
+
+    function test_ClaimUnstakedAssets_WhenGlobalPaused() public {
+        // Setup: Get stkTokens and create unstaking request
+        _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
+
+        // Close and settle batch
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        uint256 lastTotalAssets = vault.totalAssets();
+        _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
+
+        // Global pause via registry (vault is NOT locally paused)
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        // Try to claim while globally paused
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KSTAKINGVAULT_IS_PAUSED));
+        vault.claimUnstakedAssets(requestId);
+
+        // Unpause globally, claim should succeed
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(false);
+
+        vm.prank(users.alice);
         vault.claimUnstakedAssets(requestId);
     }
 

@@ -172,8 +172,9 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
             ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT)) | (uint256(_value ? 1 : 0) << INITIALIZED_SHIFT);
     }
 
+    /// @dev Returns true if the vault is paused either locally (via packed config) or globally (via registry).
     function _getPaused(BaseVaultStorage storage $) internal view returns (bool) {
-        return (($.config >> PAUSED_SHIFT) & PAUSED_MASK) != 0;
+        return (($.config >> PAUSED_SHIFT) & PAUSED_MASK) != 0 || IkRegistry($.registry).isGlobalPaused();
     }
 
     function _setPaused(BaseVaultStorage storage $, bool _value) internal {
@@ -288,13 +289,15 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Updates the vault's operational pause state for emergency risk management
+    /// @notice Updates the vault's local operational pause state for emergency risk management
     /// @dev This internal function enables vault implementations to halt operations during emergencies or maintenance.
     /// The pause mechanism: (1) Validates vault initialization to prevent invalid state changes, (2) Updates the
     /// packed config storage with new pause state, (3) Emits event for monitoring and user notification. When paused,
     /// state-changing operations should be blocked while view functions remain accessible for monitoring. The pause
     /// state is stored in packed config for gas efficiency. This function provides the foundation for emergency
     /// controls while maintaining transparency through event emission.
+    /// Note: Even if the vault is locally unpaused, it will still be considered paused if the registry's global
+    /// pause is active (see `_getPaused`).
     /// @param _paused The desired pause state (true = halt operations, false = resume normal operation)
     function _setPaused(bool _paused) internal {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
