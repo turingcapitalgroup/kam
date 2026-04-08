@@ -320,6 +320,68 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         assertEq(newWatermark, vault.netSharePrice());
     }
 
+    function test_WatermarkAccuracy() public {
+        vm.startPrank(users.admin);
+        // 0 management fee for clarity
+        vault.setManagementFee(0);
+        vault.setPerformanceFee(2000);
+        vm.stopPrank();
+        _performStakeAndSettle(users.alice, 800_000 * _1_USDC, 0);
+
+        uint256 initialWatermark = vault.sharePriceWatermark();
+
+        vm.warp(block.timestamp + 2);
+
+        // Add yield to increase share price
+        uint256 yieldAmount = 200_000 * _1_USDC;
+
+        vm.startPrank(users.relayer);
+        bytes32 batchId = vault.getBatchId();
+        vault.closeBatch(batchId, true);
+
+        bytes32 proposalId = assetRouter.proposeSettleBatch(
+            tokens.usdc, address(vault), batchId, vault.totalAssets() + yieldAmount, 0, 0
+        );
+        vm.stopPrank();
+
+        // Accept proposal (high delta requires guardian approval)
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(proposalId);
+
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(proposalId);
+
+        uint256 newWatermark = vault.sharePriceWatermark();
+
+        // Watermark should have not increased
+        assertEq(newWatermark, initialWatermark);
+
+        // Go to 3 months forward for charging performance fees
+        uint256 nextFeeTimestamp = vault.nextPerformanceFeeTimestamp();
+        vm.warp(nextFeeTimestamp);
+        (,, uint256 accruedFees) = vault.computeLastBatchFees();
+
+        // Now charge fees
+        vm.startPrank(users.relayer);
+        batchId = vault.getBatchId();
+        vault.closeBatch(batchId, true);
+
+        proposalId = assetRouter.proposeSettleBatch(
+            tokens.usdc,
+            address(vault),
+            batchId,
+            vault.totalAssets() - accruedFees,
+            uint64(nextFeeTimestamp),
+            uint64(nextFeeTimestamp)
+        );
+        vm.stopPrank();
+
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(proposalId);
+        // new watermark should be 1.2(800k to 960k)
+        assertEq(vault.sharePriceWatermark(), 1_200_000 - 1);
+    }
+
     function test_SharePriceWatermark_NoUpdateAfterLoss() public {
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 

@@ -44,7 +44,6 @@ import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
-import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 /// @title kStakingVault
 /// @notice Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
@@ -564,21 +563,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         uint256 _totalSupplyVal = totalSupply();
         uint8 _decimals = _getDecimals($);
 
-        (,, uint256 totalFees) = VaultMathLib.computeFees(
-            _totalAssetsVal,
-            _totalSupplyVal,
-            $.sharePriceWatermark,
-            10 ** _decimals,
-            _getManagementFee($),
-            _getHurdleRate($),
-            _getPerformanceFee($),
-            _getIsHardHurdleRate($),
-            _getLastFeesChargedManagement($),
-            _getLastFeesChargedPerformance($),
-            _timestamp
-        );
-
-        uint256 _sp = _convertToAssetsWithTotals(10 ** _decimals, _totalAssetsVal - totalFees, _totalSupplyVal);
+        uint256 _sp = _convertToAssetsWithTotals(10 ** _decimals, _totalAssetsVal, _totalSupplyVal);
         if (_sp > $.sharePriceWatermark) {
             $.sharePriceWatermark = _sp.toUint128();
             emit SharePriceWatermarkUpdated(_sp);
