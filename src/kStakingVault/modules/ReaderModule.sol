@@ -26,6 +26,8 @@ contract ReaderModule is BaseVault, Extsload, IModule {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Calculates accumulated fees for the current period
+    /// @dev Returns the sum of already-accrued fees (from settlement) plus any newly
+    ///      accrued fees since the last settlement. This gives the complete fee picture.
     /// @return managementFees Accrued management fees in underlying asset terms
     /// @return performanceFees Accrued performance fees in underlying asset terms
     /// @return totalFees Combined management and performance fees
@@ -35,7 +37,13 @@ contract ReaderModule is BaseVault, Extsload, IModule {
         returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return VaultMathLib.computeFees(
+
+        // Start with already-accrued fees from settlements
+        managementFees = $.accruedManagementFees;
+        performanceFees = $.accruedPerformanceFees;
+
+        // Add any newly accrued fees since last settlement
+        (uint256 newMgmt, uint256 newPerf,) = VaultMathLib.computeFees(
             _totalAssets(),
             totalSupply(),
             $.sharePriceWatermark,
@@ -48,6 +56,10 @@ contract ReaderModule is BaseVault, Extsload, IModule {
             _getLastFeesChargedPerformance($),
             block.timestamp
         );
+
+        managementFees += newMgmt;
+        performanceFees += newPerf;
+        totalFees = managementFees + performanceFees;
     }
 
     /// @notice Returns the timestamp when management fees were last processed

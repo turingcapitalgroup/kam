@@ -59,4 +59,22 @@ interface IVaultFees {
     /// @param _timestamp The timestamp when performance fees were processed (must be >= last timestamp, <= current
     /// time)
     function notifyPerformanceFeesCharged(uint64 _timestamp) external;
+
+    /// @notice Claims accrued management fees for the treasury
+    /// @dev Records that management fees have been extracted. Actual extraction happens via
+    ///      underlying adapters when converting yield. Resets the accrued management fee counter.
+    function claimAccruedManagementFees() external;
+
+    /// @notice Claims accrued performance fees for the treasury
+    /// @dev Records that performance fees have been extracted. Actual extraction happens via
+    ///      underlying adapters when converting yield. Resets the accrued performance fee counter.
+    function claimAccruedPerformanceFees() external;
+
+    /// @notice Returns the accrued management fees
+    /// @return Accrued management fees in asset terms
+    function accruedManagementFees() external view returns (uint256);
+
+    /// @notice Returns the accrued performance fees
+    /// @return Accrued performance fees in asset terms
+    function accruedPerformanceFees() external view returns (uint256);
 }

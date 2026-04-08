@@ -61,7 +61,6 @@ library VaultMathLib {
         uint256 durationManagement = _endOfPeriod - _lastFeesChargedManagement;
         uint256 durationPerformance = _endOfPeriod - _lastFeesChargedPerformance;
         uint256 currentTotalAssets = _totalAssets;
-        uint256 lastTotalAssets = _totalSupply.fullMulDiv(_sharePriceWatermark, _vaultDecimals);
 
         // Calculate time-based fees (management)
         // These are charged on total assets, prorated for the time period
@@ -69,43 +68,50 @@ library VaultMathLib {
         currentTotalAssets -= managementFees;
         totalFees = managementFees;
 
-        // Calculate the asset's value change since entry
-        // This gives us the raw profit/loss in asset terms after management fees
-        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
-        // forge-lint: disable-next-line(unsafe-typecast)
-        int256 assetsDelta = int256(currentTotalAssets) - int256(lastTotalAssets);
+        // Performance fees only apply when there's existing supply to charge against.
+        // If totalSupply is zero, lastTotalAssets is zero and the entire current balance
+        // would falsely appear as profit (it's actually just new deposits).
+        if (_totalSupply > 0) {
+            uint256 lastTotalAssets = _totalSupply.fullMulDiv(_sharePriceWatermark, _vaultDecimals);
 
-        // Only calculate fees if there's a profit
-        if (assetsDelta > 0) {
-            uint256 excessReturn;
-
-            // Calculate returns relative to hurdle rate
-            uint256 hurdleReturn =
-                (lastTotalAssets * _hurdleRate).fullMulDiv(durationPerformance, SECS_PER_YEAR) / MAX_BPS;
-
-            // Calculate returns relative to hurdle rate
-            // casting to 'uint256' is safe because assetsDelta is positive in this branch
+            // Calculate the asset's value change since entry
+            // This gives us the raw profit/loss in asset terms after management fees
+            // casting to 'int256' is safe because we're doing arithmetic on uint256 values
             // forge-lint: disable-next-line(unsafe-typecast)
-            uint256 totalReturn = uint256(assetsDelta);
+            int256 assetsDelta = int256(currentTotalAssets) - int256(lastTotalAssets);
 
-            // Only charge performance fees if:
-            // 1. Current share price is not below
-            // 2. Returns exceed hurdle rate
-            if (totalReturn > hurdleReturn) {
-                // Only charge performance fees on returns above hurdle rate
-                excessReturn = totalReturn - hurdleReturn;
+            // Only calculate fees if there's a profit
+            if (assetsDelta > 0) {
+                uint256 excessReturn;
 
-                // If its a hard hurdle rate, only charge fees above the hurdle performance
-                // Otherwise, charge fees to all return if its above hurdle return
-                if (_isHardHurdleRate) {
-                    performanceFees = (excessReturn * _performanceFee) / MAX_BPS;
-                } else {
-                    performanceFees = (totalReturn * _performanceFee) / MAX_BPS;
+                // Calculate returns relative to hurdle rate
+                uint256 hurdleReturn =
+                    (lastTotalAssets * _hurdleRate).fullMulDiv(durationPerformance, SECS_PER_YEAR) / MAX_BPS;
+
+                // Calculate returns relative to hurdle rate
+                // casting to 'uint256' is safe because assetsDelta is positive in this branch
+                // forge-lint: disable-next-line(unsafe-typecast)
+                uint256 totalReturn = uint256(assetsDelta);
+
+                // Only charge performance fees if:
+                // 1. Current share price is not below
+                // 2. Returns exceed hurdle rate
+                if (totalReturn > hurdleReturn) {
+                    // Only charge performance fees on returns above hurdle rate
+                    excessReturn = totalReturn - hurdleReturn;
+
+                    // If its a hard hurdle rate, only charge fees above the hurdle performance
+                    // Otherwise, charge fees to all return if its above hurdle return
+                    if (_isHardHurdleRate) {
+                        performanceFees = (excessReturn * _performanceFee) / MAX_BPS;
+                    } else {
+                        performanceFees = (totalReturn * _performanceFee) / MAX_BPS;
+                    }
                 }
-            }
 
-            // Calculate total fees
-            totalFees += performanceFees;
+                // Calculate total fees
+                totalFees += performanceFees;
+            }
         }
 
         return (managementFees, performanceFees, totalFees);

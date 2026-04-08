@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import { ERC20 } from "solady/tokens/ERC20.sol";
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
+import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentrancyGuardTransient.sol";
@@ -37,6 +38,7 @@ import {
 /// while reducing code duplication and ensuring consistent behavior across the vault network.
 abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771Context {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
+    using OptimizedSafeCastLib for uint256;
     using SafeTransferLib for address;
 
     /* //////////////////////////////////////////////////////////////
@@ -109,6 +111,9 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;
         mapping(bytes32 => BaseVaultTypes.UnstakeRequest) unstakeRequests;
         mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set) userRequests;
+        //12 - accrued fees (virtual, deducted from share price but capital stays deployed)
+        uint128 accruedManagementFees;
+        uint128 accruedPerformanceFees;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.BaseVault")) - 1)) & ~bytes32(uint256(0xff))
@@ -414,14 +419,14 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
 
     /// @notice Calculates net assets available to users after deducting accumulated fees
     /// @dev This function provides the user-facing asset value by removing management and performance fee obligations.
-    /// The calculation: (1) Takes total gross assets as the starting point, (2) Subtracts accumulated fees calculated
-    /// by the fee computation module, (3) Results in the net value attributable to stkToken holders. This net asset
-    /// calculation is critical for fair share pricing, ensuring new entrants pay appropriate prices and existing
-    /// holders receive accurate valuations. The fee deduction prevents users from claiming value that belongs to
-    /// vault operators through fee mechanisms.
+    /// Fees include both already-accrued amounts from settlements and newly computed fees since last settlement.
+    /// When fees equal or exceed total assets (e.g., after all users unstake), returns zero.
     /// @return Net asset value available to users after all fee deductions
     function _totalNetAssets() internal view returns (uint256) {
-        return _totalAssets() - _accumulatedFees();
+        uint256 totalAssets = _totalAssets();
+        uint256 accumulated = _accumulatedFees();
+        if (totalAssets <= accumulated) return 0;
+        return totalAssets - accumulated;
     }
 
     /// @notice Delegates fee calculation to the vault reader module for comprehensive fee computation
@@ -436,6 +441,17 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     function _accumulatedFees() internal view returns (uint256) {
         (,, uint256 totalFees) = IVaultReader(address(this)).computeLastBatchFees();
         return totalFees;
+    }
+
+    /// @notice Accrues fees into storage at settlement time
+    /// @dev Called during batch settlement to lock in fee obligations. The actual kTokens remain
+    ///      deployed earning yield until the treasury claims them.
+    /// @param managementFees Accrued management fees in asset terms
+    /// @param performanceFees Accrued performance fees in asset terms
+    function _accrueFees(uint256 managementFees, uint256 performanceFees) internal {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        $.accruedManagementFees += managementFees.toUint128();
+        $.accruedPerformanceFees += performanceFees.toUint128();
     }
 
     /* //////////////////////////////////////////////////////////////

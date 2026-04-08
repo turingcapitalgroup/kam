@@ -576,6 +576,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
             }
 
+            // Claim accrued fees after settlement
+            IkStakingVault(_vault).claimAccruedManagementFees();
+            IkStakingVault(_vault).claimAccruedPerformanceFees();
+
             // Mark batch as settled in the vault (also burns unstake shares and tracks claimable kTokens)
             ISettleBatch(_vault).settleBatch(_batchId);
             _adapter.setTotalAssets(_totalAssets);
