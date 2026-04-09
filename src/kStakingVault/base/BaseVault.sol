@@ -429,17 +429,14 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return totalAssets - accumulated;
     }
 
-    /// @notice Delegates fee calculation to the vault reader module for comprehensive fee computation
-    /// @dev This function serves as a gateway to the modular fee calculation system implemented in the vault reader.
-    /// The delegation pattern: (1) Calls the reader module which implements detailed fee calculation logic including
-    /// management fee accrual and performance fee assessment, (2) Returns total accumulated fees for asset
-    /// calculations,
-    /// (3) Maintains separation of concerns by isolating complex fee logic in dedicated modules. The reader module
-    /// handles time-based management fees, watermark-based performance fees, and hurdle rate calculations.
-    /// This modular approach enables upgradeable fee calculation logic while maintaining consistent interfaces.
+    /// @notice Calculates total accumulated fees combining settled (accrued) and pending fee obligations
+    /// @dev Delegates to the reader module's `computeAccumulatedFees` which combines:
+    /// (1) Fees already accrued in storage from previous batch settlements (`accruedManagementFees` +
+    /// `accruedPerformanceFees`), and (2) Newly computed fees since the last fee checkpoint.
+    /// This ensures `_totalNetAssets` accurately reflects both historical and ongoing fee obligations.
     /// @return Total accumulated fees (management + performance) in underlying asset terms
     function _accumulatedFees() internal view returns (uint256) {
-        (,, uint256 totalFees) = IVaultReader(address(this)).computeLastBatchFees();
+        (,, uint256 totalFees) = IVaultReader(address(this)).computeAccumulatedFees();
         return totalFees;
     }
 

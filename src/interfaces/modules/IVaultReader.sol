@@ -9,11 +9,20 @@ import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 /// Essential vault getters (totalAssets, sharePrice, conversions, batch info, etc.) are declared in IVault
 /// and implemented directly on kStakingVault.
 interface IVaultReader {
-    /// @notice Calculates accumulated fees for the current period
-    /// @return managementFees Accrued management fees in underlying asset terms
-    /// @return performanceFees Accrued performance fees in underlying asset terms
-    /// @return totalFees Combined management and performance fees
+    /// @notice Calculates only the newly accrued fees since the last fee checkpoint
+    /// @return managementFees Newly accrued management fees in underlying asset terms
+    /// @return performanceFees Newly accrued performance fees in underlying asset terms
+    /// @return totalFees Combined newly accrued management and performance fees
     function computeLastBatchFees()
+        external
+        view
+        returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees);
+
+    /// @notice Calculates total accumulated fees combining previously accrued and newly accrued fees
+    /// @return managementFees Total management fees (accrued + new) in underlying asset terms
+    /// @return performanceFees Total performance fees (accrued + new) in underlying asset terms
+    /// @return totalFees Combined total of all fees
+    function computeAccumulatedFees()
         external
         view
         returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees);

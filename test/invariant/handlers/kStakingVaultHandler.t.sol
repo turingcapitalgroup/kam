@@ -287,8 +287,7 @@ contract kStakingVaultHandler is BaseHandler {
             vm.stopPrank();
             return;
         }
-        uint256 sharesToTransfer =
-            VaultMathLib.convertToSharesWithAssetsAndSupply(stakeRequest.kTokenAmount, totalNetAssets, totalSupply);
+        uint256 sharesToTransfer = VaultMathLib.convertToShares(stakeRequest.kTokenAmount, totalNetAssets, totalSupply);
         if (sharesToTransfer == 0) {
             vm.expectRevert(bytes("SV9"));
             kStakingVault_vault.claimStakedShares(requestId);
@@ -366,9 +365,8 @@ contract kStakingVaultHandler is BaseHandler {
             vm.stopPrank();
             return;
         }
-        uint256 totalKTokensNet = VaultMathLib.convertToAssetsWithAssetsAndSupply(
-            unstakeRequest.stkTokenAmount, totalNetAssets, totalSupply
-        );
+        uint256 totalKTokensNet =
+            VaultMathLib.convertToAssets(unstakeRequest.stkTokenAmount, totalNetAssets, totalSupply);
         if (totalKTokensNet == 0) {
             vm.expectRevert(bytes("SV9"));
             kStakingVault_vault.claimUnstakedAssets(requestId);
@@ -422,9 +420,7 @@ contract kStakingVaultHandler is BaseHandler {
         uint256 newTotalAssets = uint256(newTotalAssetsInt);
 
         // Convert requested shares to assets
-        requested = VaultMathLib.convertToAssetsWithAssetsAndSupply(
-            requested, newTotalAssets, kStakingVault_vault.totalSupply()
-        );
+        requested = VaultMathLib.convertToAssets(requested, newTotalAssets, kStakingVault_vault.totalSupply());
         int256 netted = int256(deposited) - int256(requested);
 
         if (netted < 0 && netted.abs() > kStakingVault_expectedAdapterTotalAssets) {
@@ -585,7 +581,7 @@ contract kStakingVaultHandler is BaseHandler {
             // Discount protocol fees
             uint256 netRequestedShares = totalRequestedShares.fullMulDiv(totalNetAssets, totalAssets);
             expectedSharesToBurn = totalRequestedShares - netRequestedShares;
-            uint256 feeAssets = VaultMathLib.convertToAssetsWithAssetsAndSupply(
+            uint256 feeAssets = VaultMathLib.convertToAssets(
                 expectedSharesToBurn, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply
             );
 
@@ -631,9 +627,8 @@ contract kStakingVaultHandler is BaseHandler {
         if (depositedInBatch > 0 && totalNetAssets > 0) {
             (,,,,,, uint256 batchTotalNetAssets, uint256 batchTotalSupply,,) =
                 kStakingVault_vault.getBatchIdInfo(proposal.batchId);
-            uint256 sharesMintedToVault = VaultMathLib.convertToSharesWithAssetsAndSupply(
-                depositedInBatch, batchTotalNetAssets, batchTotalSupply
-            );
+            uint256 sharesMintedToVault =
+                VaultMathLib.convertToShares(depositedInBatch, batchTotalNetAssets, batchTotalSupply);
             kStakingVault_expectedVaultSelfBalance += sharesMintedToVault;
         }
     }

@@ -36,39 +36,22 @@ interface IVaultFees {
     /// @param _performanceFee Performance fee rate in basis points charged on excess returns (max 10000 bp)
     function setPerformanceFee(uint16 _performanceFee) external;
 
-    /// @notice Updates the timestamp tracking for management fee calculations after backend fee processing
-    /// @dev This function maintains accurate management fee accrual by recording when fees were last processed.
-    /// Backend Coordination: (1) Off-chain systems calculate and process management fees based on time elapsed and
-    /// assets under management, (2) Fees are deducted from vault assets through settlement mechanisms, (3) This
-    /// function
-    /// updates the tracking timestamp to prevent double-charging in future calculations. The timestamp validation
-    /// ensures logical progression and prevents manipulation. Management fees accrue continuously, and proper timestamp
-    /// tracking is essential for accurate pro-rata fee calculations across all vault participants.
-    /// @param _timestamp The timestamp when management fees were processed (must be >= last timestamp, <= current time)
+    /// @notice Records that accrued management fees have been claimed by the treasury and resets the fee checkpoint
+    /// @dev Called by the kAssetRouter during settlement after fees have been extracted. This function:
+    /// (1) Updates the management fee tracking timestamp to the given value, preventing double-charging
+    /// in future calculations, (2) Resets the accrued management fee counter to zero, marking the fees as claimed.
+    /// The timestamp validation ensures logical progression and prevents manipulation.
+    /// @param _timestamp The timestamp to set as the new management fee checkpoint (must be >= last timestamp, <= current time)
     function notifyManagementFeesCharged(uint64 _timestamp) external;
 
-    /// @notice Updates the timestamp tracking for performance fee calculations after backend fee processing
-    /// @dev This function maintains accurate performance fee tracking by recording when performance fees were last
-    /// calculated and charged. Backend Processing: (1) Off-chain systems evaluate vault performance against watermarks
-    /// and hurdle rates, (2) Performance fees are calculated on excess returns and deducted during settlement,
-    /// (3) This notification updates tracking timestamp and potentially adjusts watermark levels. The timestamp ensures
-    /// proper sequencing of performance evaluations and prevents fee calculation errors. Performance fees are
-    /// event-driven
-    /// based on new high watermarks, making accurate timestamp tracking crucial for fair fee assessment across all
-    /// users.
-    /// @param _timestamp The timestamp when performance fees were processed (must be >= last timestamp, <= current
-    /// time)
+    /// @notice Records that accrued performance fees have been claimed by the treasury and resets the fee checkpoint
+    /// @dev Called by the kAssetRouter during settlement after fees have been extracted. This function:
+    /// (1) Updates the performance fee tracking timestamp to the given value, (2) Resets the accrued performance
+    /// fee counter to zero, marking the fees as claimed, (3) Updates the share price watermark if current price
+    /// exceeds the previous high-water mark. The timestamp validation ensures proper sequencing of performance
+    /// evaluations and prevents fee calculation errors.
+    /// @param _timestamp The timestamp to set as the new performance fee checkpoint (must be >= last timestamp, <= current time)
     function notifyPerformanceFeesCharged(uint64 _timestamp) external;
-
-    /// @notice Claims accrued management fees for the treasury
-    /// @dev Records that management fees have been extracted. Actual extraction happens via
-    ///      underlying adapters when converting yield. Resets the accrued management fee counter.
-    function claimAccruedManagementFees() external;
-
-    /// @notice Claims accrued performance fees for the treasury
-    /// @dev Records that performance fees have been extracted. Actual extraction happens via
-    ///      underlying adapters when converting yield. Resets the accrued performance fee counter.
-    function claimAccruedPerformanceFees() external;
 
     /// @notice Returns the accrued management fees
     /// @return Accrued management fees in asset terms

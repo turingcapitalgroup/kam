@@ -72,7 +72,8 @@ library VaultMathLib {
         // If totalSupply is zero, lastTotalAssets is zero and the entire current balance
         // would falsely appear as profit (it's actually just new deposits).
         if (_totalSupply > 0) {
-            uint256 lastTotalAssets = _totalSupply.fullMulDiv(_sharePriceWatermark, _vaultDecimals);
+            uint256 lastTotalAssets =
+                convertToAssets(_totalSupply, _totalSupply * _sharePriceWatermark / _vaultDecimals, _totalSupply);
 
             // Calculate the asset's value change since entry
             // This gives us the raw profit/loss in asset terms after management fees
@@ -186,41 +187,5 @@ library VaultMathLib {
         returns (uint256)
     {
         return _assets.fullMulDiv(_totalSupply + VIRTUAL_SHARES, _totalAssets + VIRTUAL_ASSETS);
-    }
-
-    /// @notice Converts shares to assets given explicit totals (no virtual offset)
-    /// @param _shares Amount of shares to convert
-    /// @param _totalAssets Total assets in the vault
-    /// @param _totalSupply Total supply of shares
-    /// @return Equivalent asset amount
-    function convertToAssetsWithAssetsAndSupply(
-        uint256 _shares,
-        uint256 _totalAssets,
-        uint256 _totalSupply
-    )
-        internal
-        pure
-        returns (uint256)
-    {
-        if (_totalSupply == 0) return _shares;
-        return _shares.fullMulDiv(_totalAssets, _totalSupply);
-    }
-
-    /// @notice Converts assets to shares given explicit totals (no virtual offset)
-    /// @param _assets Amount of assets to convert
-    /// @param _totalAssets Total assets in the vault
-    /// @param _totalSupply Total supply of shares
-    /// @return Equivalent share amount
-    function convertToSharesWithAssetsAndSupply(
-        uint256 _assets,
-        uint256 _totalAssets,
-        uint256 _totalSupply
-    )
-        internal
-        pure
-        returns (uint256)
-    {
-        if (_totalSupply == 0) return _assets;
-        return _assets.fullMulDiv(_totalSupply, _totalAssets);
     }
 }

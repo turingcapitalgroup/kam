@@ -16,6 +16,7 @@ import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces/IVault.sol";
+import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 
 import {
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
@@ -44,7 +45,6 @@ import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
-import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 /// @title kStakingVault
 /// @notice Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
@@ -363,22 +363,14 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         uint8 _decimals = _getDecimals($);
         uint256 _decimalsScaled = 10 ** _decimals;
 
-        (uint256 mgmtFees, uint256 perfFees,) = VaultMathLib.computeFees(
-            _totalAssetsBefore,
-            _totalSupplyBefore,
-            $.sharePriceWatermark,
-            _decimalsScaled,
-            _getManagementFee($),
-            _getHurdleRate($),
-            _getPerformanceFee($),
-            _getIsHardHurdleRate($),
-            _getLastFeesChargedManagement($),
-            _getLastFeesChargedPerformance($),
-            block.timestamp
-        );
+        (uint256 mgmtFees, uint256 perfFees,) = IVaultReader(address(this)).computeLastBatchFees();
 
         if (mgmtFees != 0 || perfFees != 0) {
+            // Accrue fees from last checkpoint
             _accrueFees(mgmtFees, perfFees);
+
+            mgmtFees = $.accruedManagementFees;
+            perfFees = $.accruedPerformanceFees;
 
             // Update watermark to current net share price if it increased
             uint256 _netSharePrice = _convertToAssetsWithTotals(
@@ -563,44 +555,29 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     }
 
     /// @inheritdoc IVaultFees
+    /// @dev Additionally resets `accruedManagementFees` to zero, marking previously accrued fees as claimed.
+    ///      This consolidates the old separate `claimAccruedManagementFees` step into the notify call.
     function notifyManagementFeesCharged(uint64 _timestamp) external {
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedManagement($));
+        $.accruedManagementFees = 0;
         _setLastFeesChargedManagement($, _timestamp);
         emit ManagementFeesCharged(_timestamp);
     }
 
     /// @inheritdoc IVaultFees
+    /// @dev Additionally resets `accruedPerformanceFees` to zero, marking previously accrued fees as claimed,
+    ///      and updates the share price watermark if the current price exceeds the previous high-water mark.
+    ///      This consolidates the old separate `claimAccruedPerformanceFees` step into the notify call.
     function notifyPerformanceFeesCharged(uint64 _timestamp) external {
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedPerformance($));
-        _updateGlobalWatermark(_timestamp);
+        $.accruedPerformanceFees = 0;
+        _updateGlobalWatermark();
         _setLastFeesChargedPerformance($, _timestamp);
         emit PerformanceFeesCharged(_timestamp);
-    }
-
-    /// @inheritdoc IVaultFees
-    function claimAccruedManagementFees() external {
-        _checkRouter(_msgSender());
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        require($.accruedManagementFees > 0, KSTAKINGVAULT_ZERO_AMOUNT);
-
-        $.accruedManagementFees = 0;
-
-        emit ManagementFeesCharged(block.timestamp);
-    }
-
-    /// @inheritdoc IVaultFees
-    function claimAccruedPerformanceFees() external {
-        _checkRouter(_msgSender());
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        require($.accruedPerformanceFees > 0, KSTAKINGVAULT_ZERO_AMOUNT);
-
-        $.accruedPerformanceFees = 0;
-
-        emit PerformanceFeesCharged(block.timestamp);
     }
 
     /// @inheritdoc IVaultFees
@@ -616,28 +593,13 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     /// @notice Updates the share price watermark using the share price at a specific timestamp
     /// @dev Updates the high water mark if the share price at _timestamp exceeds the previous mark.
     ///      Uses VaultMathLib to compute fees at the given timestamp for accurate historical pricing.
-    /// @param _timestamp The timestamp at which to evaluate the share price for watermark comparison
-    function _updateGlobalWatermark(uint64 _timestamp) private {
+    function _updateGlobalWatermark() private {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint256 _totalAssetsVal = _totalAssets();
         uint256 _totalSupplyVal = totalSupply();
         uint8 _decimals = _getDecimals($);
 
-        (,, uint256 totalFees) = VaultMathLib.computeFees(
-            _totalAssetsVal,
-            _totalSupplyVal,
-            $.sharePriceWatermark,
-            10 ** _decimals,
-            _getManagementFee($),
-            _getHurdleRate($),
-            _getPerformanceFee($),
-            _getIsHardHurdleRate($),
-            _getLastFeesChargedManagement($),
-            _getLastFeesChargedPerformance($),
-            _timestamp
-        );
-
-        uint256 _sp = _convertToAssetsWithTotals(10 ** _decimals, _totalAssetsVal - totalFees, _totalSupplyVal);
+        uint256 _sp = _convertToAssetsWithTotals(10 ** _decimals, _totalAssetsVal, _totalSupplyVal);
         if (_sp > $.sharePriceWatermark) {
             $.sharePriceWatermark = _sp.toUint128();
             emit SharePriceWatermarkUpdated(_sp);

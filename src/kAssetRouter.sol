@@ -568,17 +568,15 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
             emit TotalAssetsSet(address(_kMinterAdapter), uint256(_kMinterTotalAssets));
 
-            // If new fees were scharged discount from current share price
+            // Notify fee charges: updates checkpoints and resets accrued fee counters to zero.
+            // This replaces the old separate claimAccrued* functions — the reset is now embedded
+            // in the notify calls to consolidate the fee lifecycle into a single step per fee type.
             if (_proposal.lastFeesChargedManagement != 0) {
                 IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
             }
             if (_proposal.lastFeesChargedPerformance != 0) {
                 IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
             }
-
-            // Claim accrued fees after settlement
-            IkStakingVault(_vault).claimAccruedManagementFees();
-            IkStakingVault(_vault).claimAccruedPerformanceFees();
 
             // Mark batch as settled in the vault (also burns unstake shares and tracks claimable kTokens)
             ISettleBatch(_vault).settleBatch(_batchId);

@@ -25,12 +25,13 @@ contract ReaderModule is BaseVault, Extsload, IModule {
                             FEE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Calculates accumulated fees for the current period
-    /// @dev Returns the sum of already-accrued fees (from settlement) plus any newly
-    ///      accrued fees since the last settlement. This gives the complete fee picture.
-    /// @return managementFees Accrued management fees in underlying asset terms
-    /// @return performanceFees Accrued performance fees in underlying asset terms
-    /// @return totalFees Combined management and performance fees
+    /// @notice Calculates only the newly accrued fees since the last fee checkpoint
+    /// @dev Returns fees computed from the time elapsed since the last management/performance
+    ///      fee charge, without including already-accrued fees from previous settlements.
+    ///      Used during batch settlement to determine the incremental fees to accrue.
+    /// @return managementFees Newly accrued management fees in underlying asset terms
+    /// @return performanceFees Newly accrued performance fees in underlying asset terms
+    /// @return totalFees Combined newly accrued management and performance fees
     function computeLastBatchFees()
         external
         view
@@ -38,13 +39,43 @@ contract ReaderModule is BaseVault, Extsload, IModule {
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
 
-        // Start with already-accrued fees from settlements
+        (managementFees, performanceFees,) = VaultMathLib.computeFees(
+            _totalAssets() - $.accruedManagementFees - $.accruedPerformanceFees, // Discount already accrued fees
+            totalSupply(),
+            $.sharePriceWatermark,
+            10 ** _getDecimals($),
+            _getManagementFee($),
+            _getHurdleRate($),
+            _getPerformanceFee($),
+            _getIsHardHurdleRate($),
+            _getLastFeesChargedManagement($),
+            _getLastFeesChargedPerformance($),
+            block.timestamp
+        );
+
+        totalFees = managementFees + performanceFees;
+    }
+
+    /// @notice Calculates total accumulated fees combining previously accrued and newly accrued fees
+    /// @dev Returns the sum of: (1) Fees already accrued in storage from previous batch settlements
+    ///      (`accruedManagementFees` + `accruedPerformanceFees`), and (2) Newly computed fees since
+    ///      the last fee checkpoint via VaultMathLib. This gives the complete fee picture used by
+    ///      `_accumulatedFees` to compute `_totalNetAssets`.
+    /// @return managementFees Total management fees (accrued + new) in underlying asset terms
+    /// @return performanceFees Total performance fees (accrued + new) in underlying asset terms
+    /// @return totalFees Combined total of all fees
+    function computeAccumulatedFees()
+        external
+        view
+        returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
+    {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+
         managementFees = $.accruedManagementFees;
         performanceFees = $.accruedPerformanceFees;
 
-        // Add any newly accrued fees since last settlement
         (uint256 newMgmt, uint256 newPerf,) = VaultMathLib.computeFees(
-            _totalAssets(),
+            _totalAssets() - managementFees - performanceFees, // Discount already accrued fees
             totalSupply(),
             $.sharePriceWatermark,
             10 ** _getDecimals($),
@@ -214,22 +245,23 @@ contract ReaderModule is BaseVault, Extsload, IModule {
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](15);
+        bytes4[] memory moduleSelectors = new bytes4[](16);
         moduleSelectors[0] = this.computeLastBatchFees.selector;
-        moduleSelectors[1] = this.lastFeesChargedManagement.selector;
-        moduleSelectors[2] = this.lastFeesChargedPerformance.selector;
-        moduleSelectors[3] = this.hurdleRate.selector;
-        moduleSelectors[4] = this.isHardHurdleRate.selector;
-        moduleSelectors[5] = this.performanceFee.selector;
-        moduleSelectors[6] = this.nextPerformanceFeeTimestamp.selector;
-        moduleSelectors[7] = this.nextManagementFeeTimestamp.selector;
-        moduleSelectors[8] = this.managementFee.selector;
-        moduleSelectors[9] = this.sharePriceWatermark.selector;
-        moduleSelectors[10] = this.getBatchReceiver.selector;
-        moduleSelectors[11] = this.getSafeBatchReceiver.selector;
-        moduleSelectors[12] = this.getUserRequests.selector;
-        moduleSelectors[13] = this.getStakeRequest.selector;
-        moduleSelectors[14] = this.getUnstakeRequest.selector;
+        moduleSelectors[1] = this.computeAccumulatedFees.selector;
+        moduleSelectors[2] = this.lastFeesChargedManagement.selector;
+        moduleSelectors[3] = this.lastFeesChargedPerformance.selector;
+        moduleSelectors[4] = this.hurdleRate.selector;
+        moduleSelectors[5] = this.isHardHurdleRate.selector;
+        moduleSelectors[6] = this.performanceFee.selector;
+        moduleSelectors[7] = this.nextPerformanceFeeTimestamp.selector;
+        moduleSelectors[8] = this.nextManagementFeeTimestamp.selector;
+        moduleSelectors[9] = this.managementFee.selector;
+        moduleSelectors[10] = this.sharePriceWatermark.selector;
+        moduleSelectors[11] = this.getBatchReceiver.selector;
+        moduleSelectors[12] = this.getSafeBatchReceiver.selector;
+        moduleSelectors[13] = this.getUserRequests.selector;
+        moduleSelectors[14] = this.getStakeRequest.selector;
+        moduleSelectors[15] = this.getUnstakeRequest.selector;
         return moduleSelectors;
     }
 }

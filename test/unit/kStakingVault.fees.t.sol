@@ -9,13 +9,13 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { OptimizedDateTimeLib } from "solady/utils/OptimizedDateTimeLib.sol";
 
-import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
-
+import { console } from "forge-std/console.sol";
 import {
     KSTAKINGVAULT_WRONG_ROLE,
     VAULTFEES_FEE_EXCEEDS_MAXIMUM,
     VAULTFEES_INVALID_TIMESTAMP
 } from "kam/src/errors/Errors.sol";
+import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 
 contract kStakingVaultFeesTest is BaseVaultTest {
     using OptimizedFixedPointMathLib for uint256;
@@ -318,6 +318,88 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         // Watermark should have increased
         assertGt(newWatermark, initialWatermark);
         assertEq(newWatermark, vault.netSharePrice());
+    }
+
+    function test_WatermarkAccuracy() public {
+        vm.startPrank(users.admin);
+        // 0 management fee for clarity
+        vault.setManagementFee(0);
+        vault.setPerformanceFee(2000);
+        vm.stopPrank();
+        _performStakeAndSettle(users.alice, 800_000 * _1_USDC, 0);
+
+        uint256 initialWatermark = vault.sharePriceWatermark();
+        assertEq(vault.sharePriceWatermark(), _1_USDC, "1");
+        assertEq(vault.sharePrice(), _1_USDC, "2");
+        assertEq(vault.netSharePrice(), _1_USDC, "2");
+        assertEq(vault.totalAssets(), 800_000 * _1_USDC, "3");
+        assertEq(vault.totalNetAssets(), 800_000 * _1_USDC, "4");
+
+        vm.warp(block.timestamp + 2);
+
+        // Add yield to increase share price
+        uint256 yieldAmount = 200_000 * _1_USDC;
+
+        vm.startPrank(users.relayer);
+        bytes32 batchId = vault.getBatchId();
+        vault.closeBatch(batchId, true);
+
+        bytes32 proposalId = assetRouter.proposeSettleBatch(
+            tokens.usdc, address(vault), batchId, vault.totalAssets() + yieldAmount, 0, 0
+        );
+        vm.stopPrank();
+
+        // Accept proposal (high delta requires guardian approval)
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(proposalId);
+
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(proposalId);
+
+        assertEq(vault.sharePriceWatermark(), 1_200_000 - 1, "1");
+        assertEq(vault.sharePrice(), 1_250_000 - 1, "2");
+        assertEq(vault.netSharePrice(), 1_200_000 - 1, "2");
+        assertEq(vault.totalAssets(), 1_000_000 * _1_USDC, "3");
+        assertApproxEqRel(vault.totalNetAssets(), 960_000 * _1_USDC, 0.01 ether);
+        uint256 newWatermark = vault.sharePriceWatermark();
+
+        // Watermark should be updated on every batch
+        assertGt(newWatermark, initialWatermark);
+
+        // Go to 3 months forward for charging performance fees
+        uint256 nextFeeTimestamp = vault.nextPerformanceFeeTimestamp();
+        vm.warp(nextFeeTimestamp);
+
+        vm.warp(nextFeeTimestamp + 30 days);
+
+        // Compute fees at the time of settlement (includes the extra 30 days)
+        (,, uint256 accruedFees) = vault.computeAccumulatedFees();
+
+        // Now charge fees
+        vm.startPrank(users.relayer);
+        batchId = vault.getBatchId();
+        vault.closeBatch(batchId, true);
+
+        proposalId = assetRouter.proposeSettleBatch(
+            tokens.usdc,
+            address(vault),
+            batchId,
+            vault.totalAssets() - accruedFees,
+            uint64(nextFeeTimestamp),
+            uint64(nextFeeTimestamp)
+        );
+        vm.stopPrank();
+
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(proposalId);
+
+        // new watermark should reflect the net share price after accrued performance fees
+        // (settleBatch now accrues fees and sets watermark to net price)
+        assertEq(vault.sharePriceWatermark(), 1_200_000 - 1, "1");
+        assertEq(vault.sharePrice(), 1_200_000 - 1, "2");
+        assertEq(vault.netSharePrice(), 1_200_000 - 1, "2");
+        assertEq(vault.totalAssets(), 960_000 * _1_USDC, "3");
+        assertEq(vault.totalNetAssets(), 960_000 * _1_USDC, "4");
     }
 
     function test_SharePriceWatermark_NoUpdateAfterLoss() public {
