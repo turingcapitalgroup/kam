@@ -365,10 +365,12 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             uint256 _totalSupplyBefore = totalSupply();
 
             _accrueFees(mgmtFees, perfFees);
+            mgmtFees = $.accruedManagementFees;
+            perfFees = $.accruedPerformanceFees;
 
             // Update watermark to net share price (after all accrued fees) if it increased
             _updateWatermark(
-                _totalAssetsBefore - $.accruedManagementFees - $.accruedPerformanceFees, _totalSupplyBefore
+                _totalAssetsBefore - mgmtFees - perfFees, _totalSupplyBefore
             );
 
             // Reset fee tracking timestamps
@@ -399,7 +401,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             // Calculate total kTokens corresponding to all requested shares at net price
             // (fees are already accrued, so net price is the correct payout)
             uint256 _claimableKTokens =
-                _convertToAssetsWithTotals(requestedShares, _batchTotalNetAssets, _batchTotalSupply);
+                _convertToAssetsWithTotals(requestedShares, _batchTotalAssets, _batchTotalSupply) - mgmtFees - perfFees;
 
             // Burn all requested shares
             _burn(address(this), requestedShares);

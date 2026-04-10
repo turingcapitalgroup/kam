@@ -72,8 +72,7 @@ library VaultMathLib {
         // If totalSupply is zero, lastTotalAssets is zero and the entire current balance
         // would falsely appear as profit (it's actually just new deposits).
         if (_totalSupply > 0) {
-            uint256 lastTotalAssets =
-                convertToAssets(_totalSupply, _totalSupply * _sharePriceWatermark / _vaultDecimals, _totalSupply);
+            uint256 lastTotalAssets = _totalSupply.fullMulDiv(_sharePriceWatermark, _vaultDecimals);
 
             // Calculate the asset's value change since entry
             // This gives us the raw profit/loss in asset terms after management fees
