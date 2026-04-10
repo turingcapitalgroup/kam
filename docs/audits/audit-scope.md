@@ -217,9 +217,9 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
    - User calls `claimUnstakedAssets(requestId)`
    - Retrieves settlement-time values from batch storage
    - Calculates net payout: `kTokensNet = stkTokensUnstaked * totalNetAssets / totalSupply`
-   - Calculates net shares to burn (accounting for fees): `netSharesToBurn = stkTokens * totalNetAssets / totalAssets`
-   - Burns net stkTokens and transfers kTokens to recipient
-   - Fees captured by vault through share/asset difference
+   - Burns all requested stkTokens and transfers net kTokens to recipient
+   - Fees already accrued during settlement via `settleBatch` (capital stays deployed, not transferred to treasury)
+   - Treasury claims accrued fees later via `notifyManagementFeesCharged`/`notifyPerformanceFeesCharged`
 
 **Architecture Features**:
 

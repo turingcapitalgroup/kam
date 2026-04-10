@@ -37,15 +37,19 @@ interface IVaultBatch {
     /// @param _create Whether to immediately create a new batch after closing for continued operations
     function closeBatch(bytes32 _batchId, bool _create) external;
 
-    /// @notice Marks a batch as settled after yield distribution, mints shares for pending stakers, and enables claiming
-    /// @dev This function finalizes batch settlement by recording final asset values, minting shares, and enabling claims.
-    /// Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Snapshots both
-    /// gross and net share prices at settlement time for accurate reward calculations, (3) Mints stkTokens for all pending
-    /// stakers in this batch to the vault itself at the settlement share price (clearing totalPendingStake for this batch),
-    /// (4) Marks batch as settled enabling users to claim their staked shares or unstaked assets, (5) Completes the batch
-    /// lifecycle allowing reward distribution through the claiming mechanism. Only kAssetRouter can settle batches as it
-    /// coordinates yield calculations across DN vaults and manages cross-vault asset flows. The pre-minting approach ensures
-    /// share prices are locked at settlement and users receive shares via transfer (not mint) when they claim.
+    /// @notice Marks a batch as settled after yield distribution, accrues fees, mints shares for pending stakers, and enables claiming
+    /// @dev This function finalizes batch settlement by computing and accruing fees, recording final asset values, minting shares, and enabling claims.
+    /// Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Computes
+    /// incremental fees since last checkpoint via `computeLastBatchFees` and accrues them in storage (capital remains
+    /// deployed earning yield, not transferred to treasury), (3) Updates share price watermark if net price exceeds
+    /// previous high-water mark, (4) Snapshots both gross and net share prices at settlement time for accurate reward
+    /// calculations, (5) Mints stkTokens for all pending stakers in this batch to the vault itself at the settlement
+    /// net share price, (6) Burns all requested unstake stkTokens and calculates claimable kTokens at net price,
+    /// decreasing internal balance accordingly, (7) Marks batch as settled enabling users to claim their staked shares
+    /// or unstaked assets. Only kAssetRouter can settle batches as it coordinates yield calculations across DN vaults
+    /// and manages cross-vault asset flows. The pre-minting approach ensures share prices are locked at settlement
+    /// and users receive shares via transfer (not mint) when they claim. Accrued fees are claimed by the treasury
+    /// via `notifyManagementFeesCharged`/`notifyPerformanceFeesCharged` called by kAssetRouter after settlement.
     /// @param _batchId The batch identifier to mark as settled (must be closed, not previously settled)
     function settleBatch(bytes32 _batchId) external;
 }

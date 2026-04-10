@@ -255,7 +255,8 @@ Read-only interface for querying vault state, calculations, and metrics without 
 - `netSharePrice()` - Current net share price after fee deductions
 - `totalAssets()` - Total assets under management
 - `totalNetAssets()` - Net assets after fee deductions
-- `computeLastBatchFees()` - Calculates accumulated fees (management, performance, total)
+- `computeLastBatchFees()` - Calculates only newly accrued fees since last checkpoint (used during settlement)
+- `computeAccumulatedFees()` - Calculates total accumulated fees (accrued from settlements + newly accrued)
 - `convertToShares(uint256 shares)` - Converts shares to equivalent asset amount
 - `convertToAssets(uint256 assets)` - Converts assets to equivalent share amount
 - `convertToAssetsWithTotals(uint256 shares, uint256 totalAssets, uint256 totalSupply)` - Converts shares to assets with specified totals

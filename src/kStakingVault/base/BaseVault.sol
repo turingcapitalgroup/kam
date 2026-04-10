@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import { ERC20 } from "solady/tokens/ERC20.sol";
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
+import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
@@ -38,6 +39,7 @@ import {
 /// while reducing code duplication and ensuring consistent behavior across the vault network.
 abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771Context {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
+    using OptimizedFixedPointMathLib for uint256;
     using OptimizedSafeCastLib for uint256;
     using SafeTransferLib for address;
 
@@ -420,24 +422,11 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @notice Calculates net assets available to users after deducting accumulated fees
     /// @dev This function provides the user-facing asset value by removing management and performance fee obligations.
     /// Fees include both already-accrued amounts from settlements and newly computed fees since last settlement.
-    /// When fees equal or exceed total assets (e.g., after all users unstake), returns zero.
+    /// When fees equal or exceed total assets (e.g., after all users unstake), returns zero via zeroFloorSub.
     /// @return Net asset value available to users after all fee deductions
     function _totalNetAssets() internal view returns (uint256) {
-        uint256 totalAssets = _totalAssets();
-        uint256 accumulated = _accumulatedFees();
-        if (totalAssets <= accumulated) return 0;
-        return totalAssets - accumulated;
-    }
-
-    /// @notice Calculates total accumulated fees combining settled (accrued) and pending fee obligations
-    /// @dev Delegates to the reader module's `computeAccumulatedFees` which combines:
-    /// (1) Fees already accrued in storage from previous batch settlements (`accruedManagementFees` +
-    /// `accruedPerformanceFees`), and (2) Newly computed fees since the last fee checkpoint.
-    /// This ensures `_totalNetAssets` accurately reflects both historical and ongoing fee obligations.
-    /// @return Total accumulated fees (management + performance) in underlying asset terms
-    function _accumulatedFees() internal view returns (uint256) {
         (,, uint256 totalFees) = IVaultReader(address(this)).computeAccumulatedFees();
-        return totalFees;
+        return _totalAssets().zeroFloorSub(totalFees);
     }
 
     /// @notice Accrues fees into storage at settlement time

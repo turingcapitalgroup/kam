@@ -37,22 +37,7 @@ contract ReaderModule is BaseVault, Extsload, IModule {
         view
         returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
     {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-
-        (managementFees, performanceFees,) = VaultMathLib.computeFees(
-            _totalAssets() - $.accruedManagementFees - $.accruedPerformanceFees, // Discount already accrued fees
-            totalSupply(),
-            $.sharePriceWatermark,
-            10 ** _getDecimals($),
-            _getManagementFee($),
-            _getHurdleRate($),
-            _getPerformanceFee($),
-            _getIsHardHurdleRate($),
-            _getLastFeesChargedManagement($),
-            _getLastFeesChargedPerformance($),
-            block.timestamp
-        );
-
+        (managementFees, performanceFees) = _computeIncrementalFees();
         totalFees = managementFees + performanceFees;
     }
 
@@ -60,7 +45,7 @@ contract ReaderModule is BaseVault, Extsload, IModule {
     /// @dev Returns the sum of: (1) Fees already accrued in storage from previous batch settlements
     ///      (`accruedManagementFees` + `accruedPerformanceFees`), and (2) Newly computed fees since
     ///      the last fee checkpoint via VaultMathLib. This gives the complete fee picture used by
-    ///      `_accumulatedFees` to compute `_totalNetAssets`.
+    ///      `_totalNetAssets` to compute the net asset value.
     /// @return managementFees Total management fees (accrued + new) in underlying asset terms
     /// @return performanceFees Total performance fees (accrued + new) in underlying asset terms
     /// @return totalFees Combined total of all fees
@@ -70,12 +55,22 @@ contract ReaderModule is BaseVault, Extsload, IModule {
         returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-
         managementFees = $.accruedManagementFees;
         performanceFees = $.accruedPerformanceFees;
 
-        (uint256 newMgmt, uint256 newPerf,) = VaultMathLib.computeFees(
-            _totalAssets() - managementFees - performanceFees, // Discount already accrued fees
+        (uint256 newMgmt, uint256 newPerf) = _computeIncrementalFees();
+
+        managementFees += newMgmt;
+        performanceFees += newPerf;
+        totalFees = managementFees + performanceFees;
+    }
+
+    /// @dev Computes only the incremental fees since the last checkpoint, discounting already-accrued fees
+    ///      from the base assets. Shared by both `computeLastBatchFees` and `computeAccumulatedFees`.
+    function _computeIncrementalFees() private view returns (uint256 managementFees, uint256 performanceFees) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        (managementFees, performanceFees,) = VaultMathLib.computeFees(
+            _totalAssets() - $.accruedManagementFees - $.accruedPerformanceFees,
             totalSupply(),
             $.sharePriceWatermark,
             10 ** _getDecimals($),
@@ -87,10 +82,6 @@ contract ReaderModule is BaseVault, Extsload, IModule {
             _getLastFeesChargedPerformance($),
             block.timestamp
         );
-
-        managementFees += newMgmt;
-        performanceFees += newPerf;
-        totalFees = managementFees + performanceFees;
     }
 
     /// @notice Returns the timestamp when management fees were last processed

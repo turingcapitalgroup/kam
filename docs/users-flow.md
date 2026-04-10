@@ -244,14 +244,7 @@
 ┌─────────────────┐
 │Calculate kTokens│
 │Net Amount       │ ── netKTokens = stkTokens * netSharePrice / (10^decimals)
-│                 │ 
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│Calculate Fees   │
-│                 │ ── grossKTokens = stkTokens * sharePrice / (10^decimals)
-│                 │ ── fees = grossKTokens - netKTokens
+│                 │ ── Fees already accrued during settlement (no transfer here)
 └────────┬────────┘
          │
          ▼
@@ -262,8 +255,7 @@
          │
          ▼
 ┌─────────────────┐
-│Transfer Fees to │
-│Treasury         │ ── $.kToken.safeTransfer(getTreasury(), fees)
+│Decrease Balance │ ── _decreaseBalance(netKTokens) - capital leaves active management
 └────────┬────────┘
          │
          ▼

@@ -357,29 +357,19 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         $.batches[_batchId].isSettled = true;
 
         // Compute and accrue fees at settlement time
-        // This replaces the old periodic fee charging model with batch-local attribution
-        uint256 _totalAssetsBefore = _totalAssets();
-        uint256 _totalSupplyBefore = totalSupply();
-        uint8 _decimals = _getDecimals($);
-        uint256 _decimalsScaled = 10 ** _decimals;
-
         (uint256 mgmtFees, uint256 perfFees,) = IVaultReader(address(this)).computeLastBatchFees();
 
         if (mgmtFees != 0 || perfFees != 0) {
-            // Accrue fees from last checkpoint
+            // Snapshot totals before accrual
+            uint256 _totalAssetsBefore = _totalAssets();
+            uint256 _totalSupplyBefore = totalSupply();
+
             _accrueFees(mgmtFees, perfFees);
 
-            mgmtFees = $.accruedManagementFees;
-            perfFees = $.accruedPerformanceFees;
-
-            // Update watermark to current net share price if it increased
-            uint256 _netSharePrice = _convertToAssetsWithTotals(
-                _decimalsScaled, _totalAssetsBefore - mgmtFees - perfFees, _totalSupplyBefore
+            // Update watermark to net share price (after all accrued fees) if it increased
+            _updateWatermark(
+                _totalAssetsBefore - $.accruedManagementFees - $.accruedPerformanceFees, _totalSupplyBefore
             );
-            if (_netSharePrice > $.sharePriceWatermark) {
-                $.sharePriceWatermark = _netSharePrice.toUint128();
-                emit SharePriceWatermarkUpdated(_netSharePrice);
-            }
 
             // Reset fee tracking timestamps
             _setLastFeesChargedManagement($, uint64(block.timestamp));
@@ -575,7 +565,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _validateTimestamp(_timestamp, _getLastFeesChargedPerformance($));
         $.accruedPerformanceFees = 0;
-        _updateGlobalWatermark();
+        _updateWatermark(_totalAssets(), totalSupply());
         _setLastFeesChargedPerformance($, _timestamp);
         emit PerformanceFeesCharged(_timestamp);
     }
@@ -590,16 +580,12 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         return _getBaseVaultStorage().accruedPerformanceFees;
     }
 
-    /// @notice Updates the share price watermark using the share price at a specific timestamp
-    /// @dev Updates the high water mark if the share price at _timestamp exceeds the previous mark.
-    ///      Uses VaultMathLib to compute fees at the given timestamp for accurate historical pricing.
-    function _updateGlobalWatermark() private {
+    /// @notice Updates the share price watermark if the given share price exceeds it
+    /// @param _assets The total assets to use for the share price calculation
+    /// @param _supply The total supply to use for the share price calculation
+    function _updateWatermark(uint256 _assets, uint256 _supply) private {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        uint256 _totalAssetsVal = _totalAssets();
-        uint256 _totalSupplyVal = totalSupply();
-        uint8 _decimals = _getDecimals($);
-
-        uint256 _sp = _convertToAssetsWithTotals(10 ** _decimals, _totalAssetsVal, _totalSupplyVal);
+        uint256 _sp = _convertToAssetsWithTotals(10 ** _getDecimals($), _assets, _supply);
         if (_sp > $.sharePriceWatermark) {
             $.sharePriceWatermark = _sp.toUint128();
             emit SharePriceWatermarkUpdated(_sp);
