@@ -134,11 +134,10 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Settlement Workflow**:
 
-1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, lastFeesChargedManagement, lastFeesChargedPerformance)`
+1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets)`
    - Contract automatically calculates: `netted = deposited - requested`, then `yield = totalAssets - lastTotalAssets`
    - Validates yield against configurable tolerance limits
    - Creates proposal with mandatory cooldown period (default 1 hour, max 1 day)
-   - Records fee timestamps for vault fee tracking synchronization
 2. **Cooldown Phase**: Guardian oversight period
    - GUARDIAN_ROLE can call `cancelProposal()` if irregularities detected
    - Proposal remains pending until cooldown expires
@@ -200,10 +199,10 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 2. **Batch Settlement**: When batch closes and settles via kAssetRouter:
    - Yield distributed automatically through kToken minting/burning to vault
    - Virtual balances updated to reflect new asset positions
-   - Batch share prices captured at settlement time (totalAssets, totalNetAssets, totalSupply)
+   - Batch share prices captured at settlement time (totalAssets, totalSupply)
 3. **Claim Phase**: User calls `claimStakedShares(requestId)`
    - Retrieves settlement-time values from batch storage
-   - Calculates stkTokens owed: `stkTokens = kTokensStaked * totalSupply / totalNetAssets`
+   - Calculates stkTokens owed: `stkTokens = kTokensStaked * totalSupply / totalAssets`
    - Mints stkTokens directly to recipient address
    - Updates vault accounting and removes request from user tracking
 
@@ -216,17 +215,16 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 2. **Settlement & Claim**: After batch processing:
    - User calls `claimUnstakedAssets(requestId)`
    - Retrieves settlement-time values from batch storage
-   - Calculates net payout: `kTokensNet = stkTokensUnstaked * totalNetAssets / totalSupply`
+   - Calculates net payout: `kTokensNet = stkTokensUnstaked * totalAssets / totalSupply`
    - Burns all requested stkTokens and transfers net kTokens to recipient
-   - Fees already accrued during settlement via `settleBatch` (capital stays deployed, not transferred to treasury)
-   - Treasury claims accrued fees later via `notifyManagementFeesCharged`/`notifyPerformanceFeesCharged`
+   - Fees already collected via `_accrueFees()` share dilution (shares minted to treasury on every interaction)
 
 **Architecture Features**:
 
 - **MultiFacetProxy Pattern**: Core staking logic in main contract, state queries routed to ReaderModule
 - **Internal Batch System**: No separate BatchReceiver contracts needed, simplified claim process
 - **Share Price Appreciation**: Yield distributed through increasing token value rather than token quantity
-- **Fee Structure**: Management fees (time-based) and performance fees (yield-based) with high-watermark protection
+- **Fee Structure**: Management fees (time-based) and performance fees (yield-based) with high-watermark protection, collected via `_accrueFees()` share dilution to treasury on every interaction
 
 **Yield Distribution**: Automatic compounding through share price increases, proportional yield distribution to all stkToken holders.
 
@@ -392,4 +390,4 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 - **Economic Security**: Attack costs must exceed potential profits under all market conditions
 - **Adapter Isolation**: Physical assets must ONLY move through kMinter Adapter (central hub validation)
 - **Share/Asset Accounting Integrity**: Share transfers between kMinter↔DN must maintain correct ownership proportions; asset movements for Alpha/Beta must properly reconcile with kMinter Adapter
-- **Virtual Balance Consistency**: Sum of all adapter virtual balances must equal total kToken supply minus fees
+- **Virtual Balance Consistency**: Sum of all adapter virtual balances must equal total kToken supply

@@ -53,7 +53,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 
 **Settlement Operations**
 
-- `proposeSettleBatch(address asset, address vault, bytes32 batchId, uint256 totalAssets, uint64 lastFeesChargedManagement, uint64 lastFeesChargedPerformance)` - Creates timelock settlement proposal with automatic yield calculations (RELAYER_ROLE required)
+- `proposeSettleBatch(address asset, address vault, bytes32 batchId, uint256 totalAssets)` - Creates timelock settlement proposal with automatic yield calculations (RELAYER_ROLE required)
 - `executeSettleBatch(bytes32 proposalId)` - Executes approved settlement after cooldown using proposal ID (anyone can call after cooldown)
 - `cancelProposal(bytes32 proposalId)` - Cancels settlement proposals during cooldown period (GUARDIAN_ROLE required)
 - `acceptProposal(bytes32 proposalId)` - Approves high-yield-delta proposals that exceed the yield tolerance threshold (GUARDIAN_ROLE required)
@@ -234,10 +234,12 @@ Interface for vault fee management including performance and management fees.
 
 **Fee Management**
 
-- `setManagementFee(uint16 fee)` - Sets management fee in basis points (ADMIN_ROLE required, max 10000 bp)
-- `setPerformanceFee(uint16 fee)` - Sets performance fee in basis points (ADMIN_ROLE required, max 10000 bp)
-- `notifyManagementFeesCharged(uint64 timestamp)` - Updates management fee timestamp (kAssetRouter only)
-- `notifyPerformanceFeesCharged(uint64 timestamp)` - Updates performance fee timestamp (kAssetRouter only)
+- `setManagementFee(uint16 fee)` - Sets management fee in basis points (ADMIN_ROLE required, max 10000 bp). Accrues pending fees before updating the rate.
+- `setPerformanceFee(uint16 fee)` - Sets performance fee in basis points (ADMIN_ROLE required, max 10000 bp). Accrues pending fees before updating the rate.
+
+**Internal Fee Accrual**
+
+- `_accrueFees()` - Internal function that computes pending management and performance fees based on time elapsed since `lastFeeTimestamp`, then mints shares to the treasury address (from registry via `getTreasury()`). Called at the start of every user interaction: `requestStake`, `requestUnstake`, `claimStakedShares`, `claimUnstakedAssets`, and `settleBatch`. Also called before fee-rate changes. Updates the watermark when share price has increased.
 
 ### IVaultReader
 
@@ -251,12 +253,10 @@ Read-only interface for querying vault state, calculations, and metrics without 
 
 **Financial Metrics**
 
-- `sharePrice()` - Current gross share price in underlying asset terms (before fee deductions)
-- `netSharePrice()` - Current net share price after fee deductions
+- `sharePrice()` - Current share price in underlying asset terms
+- `netSharePrice()` - Alias for `sharePrice()` (backward compatibility; fees are already collected via share dilution)
 - `totalAssets()` - Total assets under management
-- `totalNetAssets()` - Net assets after fee deductions
-- `computeLastBatchFees()` - Calculates only newly accrued fees since last checkpoint (used during settlement)
-- `computeAccumulatedFees()` - Calculates total accumulated fees (accrued from settlements + newly accrued)
+- `totalNetAssets()` - Alias for `totalAssets()` (backward compatibility; fees are already collected via share dilution)
 - `convertToShares(uint256 shares)` - Converts shares to equivalent asset amount
 - `convertToAssets(uint256 assets)` - Converts assets to equivalent share amount
 - `convertToAssetsWithTotals(uint256 shares, uint256 totalAssets, uint256 totalSupply)` - Converts shares to assets with specified totals
@@ -289,10 +289,7 @@ Read-only interface for querying vault state, calculations, and metrics without 
 - `hurdleRate()` - Hurdle rate threshold
 - `isHardHurdleRate()` - Whether the current hurdle rate is a hard hurdle rate
 - `sharePriceWatermark()` - High watermark for performance fees
-- `lastFeesChargedManagement()` - Last management fee timestamp
-- `lastFeesChargedPerformance()` - Last performance fee timestamp
-- `nextManagementFeeTimestamp()` - Projected timestamp for next management fee evaluation
-- `nextPerformanceFeeTimestamp()` - Projected timestamp for next performance fee evaluation
+- `lastFeeTimestamp()` - Last timestamp when fees were accrued
 
 **Capacity**
 

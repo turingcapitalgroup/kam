@@ -69,18 +69,6 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /// @param newFee New performance fee in basis points
     event PerformanceFeeSet(uint16 oldFee, uint16 newFee);
 
-    /// @notice Emitted when management fees are charged
-    /// @param timestamp Timestamp of the fee charge
-    event ManagementFeesCharged(uint256 timestamp);
-
-    /// @notice Emitted when performance fees are charged
-    /// @param timestamp Timestamp of the fee charge
-    event PerformanceFeesCharged(uint256 timestamp);
-
-    /// @notice Emitted when share price watermark is updated
-    /// @param newWatermark The new share price watermark value
-    event SharePriceWatermarkUpdated(uint256 newWatermark);
-
     /// @notice Emitted when max total assets is updated
     /// @param oldMaxTotalAssets The previous max total assets value
     /// @param newMaxTotalAssets The new max total assets value

@@ -129,7 +129,7 @@
 ┌─────────────────-┐
 │Relayer calls     │
 │proposeSettleBatch│ ── Provides totalAssets + identifying params
-│with totalAssets  │    (asset, vault, batchId, fee timestamps)
+│with totalAssets  │    (asset, vault, batchId)
 └────────┬────────-┘
          │
          ▼

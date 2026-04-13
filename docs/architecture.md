@@ -112,7 +112,7 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
 
 **Settlement Proposal Mechanism**: The kAssetRouter implements a secure multi-phase settlement:
 
-1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, lastFeesChargedManagement, lastFeesChargedPerformance)` providing the current total assets from external strategies and fee charge timestamps (`uint64`, 0 = no fees to charge). The kAssetRouter contract automatically calculates:
+1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets)` providing the current total assets from external strategies. The kAssetRouter contract automatically calculates:
    - `netted` = deposited - requested amounts from batch balances
    - `lastTotalAssets` = current virtual balance via `adapter.totalAssets()`
    - `yield` = totalAssets_ - lastTotalAssets
@@ -359,11 +359,11 @@ The kStakingVault is implemented as a unified contract that inherits from multip
 
 **Batch Processing**: The vault manages the complete batch lifecycle for efficient gas usage. Batches are created by the relayer via `createNewBatch()`, handles batch closure and settlement coordination with kAssetRouter, and processes direct asset transfers without requiring external BatchReceiver contracts.
 
-**Fee Management**: Implements comprehensive fee collection including management fees that accrue continuously based on time and assets under management, and performance fees charged only on positive yields. Fee calculations use precise mathematical operations to avoid rounding errors.
+**Fee Management**: Fees are accrued and collected automatically via share dilution. The `_accrueFees()` internal function computes pending management and performance fees based on time elapsed since `lastFeeTimestamp`, then mints shares directly to the treasury address (from registry via `getTreasury()`). This is called at the start of every user interaction (`requestStake`, `requestUnstake`, `claimStakedShares`, `claimUnstakedAssets`, `settleBatch`) and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). A single `lastFeeTimestamp` replaces the previous dual-timestamp system. Management fees accrue continuously based on time and total assets, while performance fees are charged only on gains above the watermark (with optional hurdle rate).
 
 **Claims Processing**: Handles user claims for completed requests by converting stake requests into stkToken balances, processing unstaking requests with underlying token plus yield distribution, and ensuring claims are only processed for settled batches.
 
-**Module Integration**: The vault includes a ReaderModule for external state queries and fee calculations, providing a clean interface for off-chain monitoring and integration while keeping core logic within the main contract.
+**Module Integration**: The vault includes a ReaderModule for external state queries and vault metrics, providing a clean interface for off-chain monitoring and integration while keeping core logic within the main contract.
 
 #### kBatchReceiver
 
@@ -578,32 +578,36 @@ The protocol implements a multi-layered emergency response system with global pa
 
 ## Fee Structure
 
+Fees are accrued and collected automatically via share dilution through the `_accrueFees()` internal function, which is called at the start of every user interaction (`requestStake`, `requestUnstake`, `claimStakedShares`, `claimUnstakedAssets`, `settleBatch`) and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). This replaces the previous system where fees accumulated in storage and were collected only during settlement via notify functions.
+
+A single `lastFeeTimestamp` tracks when fees were last accrued, replacing the previous dual-timestamp system (`lastFeesChargedManagement` / `lastFeesChargedPerformance`). The watermark (high-water mark share price) is updated on every `_accrueFees()` call when the share price has increased.
+
 ### Management Fees
 
-Management fees accrue continuously on assets under management, calculated on a per-second basis, collected during settlement operations, and are configurable per vault to accommodate different strategy types.
+Management fees accrue continuously on total assets under management, calculated on a per-second basis, and are collected immediately by minting shares to the treasury address. They are configurable per vault to accommodate different strategy types.
 
 **Configuration:**
 
 - **Rate**: Configurable per vault in basis points (initialized to 0, set operationally e.g. 200 bp = 2%)
 - **Calculation**: Continuous accrual based on `(totalAssets * managementFee * timeElapsed) / (SECS_PER_YEAR * 10000)` where `SECS_PER_YEAR = 31_556_952` (365.2425 days / Gregorian year)
-- **Collection**: During batch settlement via fee deduction from gross yield
+- **Collection**: Shares are minted directly to the treasury (from `registry.getTreasury()`) at the time of accrual — no deferred accumulation or separate collection step
 
 ### Performance Fees
 
-Performance fees are charged only on positive yield generation, calculated as a percentage of profits, distributed to the designated fee collector, with no fees charged on losses to align incentives properly.
+Performance fees are charged only on gains above the watermark share price, minted as shares to the treasury, with no fees charged on losses to align incentives properly.
 
 **Configuration:**
 
 - **Rate**: Configurable per vault in basis points (initialized to 0, set operationally e.g. 1000 bp = 10%)
 - **Hurdle Rate**: Configurable threshold per vault in registry (default 0%) - fees only charged above this minimum return
-- **Watermark**: High watermark system ensures fees only charged on net new profits
+- **Watermark**: High watermark system ensures fees only charged on net new profits; updated on every `_accrueFees()` call when share price increases
 - **Hard Hurdle** (default): `(positiveYield - hurdleAmount) * performanceFee / 10000` — fees only on excess above hurdle
 - **Soft Hurdle**: `positiveYield * performanceFee / 10000` when yield exceeds hurdle — fees on all profits once hurdle is met
 - **Mode**: Configurable via `registry.setIsHardHurdleRate(vault, bool)` per vault
 
 ### Fee Calculation
 
-The system uses precise mathematical calculations to determine fees based on time passed and total assets, avoiding rounding errors through careful implementation, and ensuring fairness across all participants.
+The system uses `_accrueFees()` to compute and immediately collect fees via share minting. Fees are calculated based on time elapsed since `lastFeeTimestamp` and current total assets, using precise mathematical operations to avoid rounding errors. Because fees are collected via share dilution (minting treasury shares), `totalNetAssets()` equals `totalAssets()` and `netSharePrice()` equals `sharePrice()` for backward compatibility.
 
 ## VaultAdapter Integration Pattern
 

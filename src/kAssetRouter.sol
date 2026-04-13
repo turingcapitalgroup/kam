@@ -247,9 +247,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _asset,
         address _vault,
         bytes32 _batchId,
-        uint256 _totalAssets,
-        uint64 _lastFeesChargedManagement,
-        uint64 _lastFeesChargedPerformance
+        uint256 _totalAssets
     )
         external
         payable
@@ -380,22 +378,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             netted: _netted,
             yield: _yield,
             executeAfter: _executeAfter.toUint64(),
-            lastFeesChargedManagement: _lastFeesChargedManagement,
-            lastFeesChargedPerformance: _lastFeesChargedPerformance,
             requiresApproval: _requiresApproval
         });
 
-        emit SettlementProposed(
-            _proposalId,
-            _vault,
-            _batchId,
-            _totalAssets,
-            _netted,
-            _yield,
-            _executeAfter,
-            _lastFeesChargedManagement,
-            _lastFeesChargedPerformance
-        );
+        emit SettlementProposed(_proposalId, _vault, _batchId, _totalAssets, _netted, _yield, _executeAfter);
         _unlockReentrant();
     }
 
@@ -567,17 +553,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             // forge-lint: disable-next-line(unsafe-typecast)
             _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
             emit TotalAssetsSet(address(_kMinterAdapter), uint256(_kMinterTotalAssets));
-
-            // Notify fee charges: updates checkpoints and resets accrued fee counters to zero.
-            // These calls serve dual purpose: (1) update the fee checkpoint timestamp to prevent
-            // double-charging, and (2) reset the accrued fee counters to zero, marking previously
-            // accrued fees as claimed by the treasury.
-            if (_proposal.lastFeesChargedManagement != 0) {
-                IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
-            }
-            if (_proposal.lastFeesChargedPerformance != 0) {
-                IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
-            }
 
             // Mark batch as settled in the vault (accrues fees, mints/burns shares, snapshots prices)
             ISettleBatch(_vault).settleBatch(_batchId);

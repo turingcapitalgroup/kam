@@ -49,10 +49,6 @@ contract kStakingVaultInvariants is SetUp {
         vaultHandlerAlpha.INVARIANT_J_UNSTAKE_CLAIM_ACCURACY();
     }
 
-    function invariant_kStakingVaultFeeBounds() public view {
-        vaultHandlerAlpha.INVARIANT_K_FEE_BOUNDS();
-    }
-
     function invariant_kStakingVaultSelfBalance() public view {
         vaultHandlerAlpha.INVARIANT_L_VAULT_SELF_BALANCE();
     }

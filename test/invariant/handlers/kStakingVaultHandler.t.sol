@@ -31,17 +31,12 @@ contract kStakingVaultHandler is BaseHandler {
     address kStakingVault_token;
     address kStakingVault_kToken;
     address kStakingVault_relayer;
-    uint256 kStakingVault_lastFeesChargedManagement;
-    uint256 kStakingVault_lastFeesChargedPerformance;
     mapping(address actor => Bytes32Set pendingRequestIds) kStakingVault_actorStakeRequests;
     mapping(address actor => Bytes32Set pendingRequestIds) kStakingVault_actorUnstakeRequests;
     mapping(bytes32 batchId => uint256) kStakingVault_depositedInBatch;
     mapping(bytes32 batchId => uint256) kStakingVault_requestedInBatch;
     mapping(bytes32 batchId => int256 yieldInBatch) kStakingVault_totalYieldInBatch;
-    mapping(bytes32 batchId => uint256 chargedManagement) kStakingVault_chargedManagementInBatch;
-    mapping(bytes32 batchId => uint256 chargedPerformance) kStakingVault_chargedPerformanceInBatch;
     mapping(bytes32 batchId => uint256 pendingStake) kStakingVault_pendingStakeInBatch;
-    mapping(bytes32 batchId => uint256 lastComputedFees) kStakingVault_lastComputedFeesInBatch;
     Bytes32Set kStakingVault_pendingUnsettledBatches;
     Bytes32Set kStakingVault_pendingSettlementProposals;
 
@@ -112,8 +107,6 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_token = _token;
         kStakingVault_kToken = _kToken;
         kStakingVault_relayer = _relayer;
-        kStakingVault_lastFeesChargedManagement = 1; // initial timestamp
-        kStakingVault_lastFeesChargedPerformance = 1;
     }
 
     // //////////////////////////////////////////////////////////////
@@ -121,7 +114,7 @@ contract kStakingVaultHandler is BaseHandler {
     // //////////////////////////////////////////////////////////////
 
     function getEntryPoints() public pure override returns (bytes4[] memory) {
-        bytes4[] memory _entryPoints = new bytes4[](10);
+        bytes4[] memory _entryPoints = new bytes4[](9);
         _entryPoints[0] = this.kStakingVault_claimStakedShares.selector;
         _entryPoints[1] = this.kStakingVault_requestStake.selector;
         _entryPoints[2] = this.kStakingVault_claimUnstakedAssets.selector;
@@ -131,7 +124,6 @@ contract kStakingVaultHandler is BaseHandler {
         _entryPoints[6] = this.kStakingVault_gain.selector;
         _entryPoints[7] = this.kStakingVault_lose.selector;
         _entryPoints[8] = this.kStakingVault_advanceTime.selector;
-        _entryPoints[9] = this.kStakingVault_chargeFees.selector;
         return _entryPoints;
     }
 
@@ -213,35 +205,14 @@ contract kStakingVaultHandler is BaseHandler {
     function kStakingVault_advanceTime(uint256 amount) public {
         amount = bound(amount, 0, 30 days);
         vm.warp(block.timestamp + amount);
-        (,, uint256 totalFees) = kStakingVault_vault.computeLastBatchFees();
-        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - totalFees;
+        // Fees are now minted as shares, so totalNetAssets == totalAssets
+        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
-    }
-
-    function kStakingVault_chargeFees(bool management, bool performance) public {
-        (uint256 managementFee, uint256 performanceFee,) = kStakingVault_vault.computeLastBatchFees();
-        if (management && managementFee > 0) {
-            kStakingVault_chargedManagementInBatch[kStakingVault_vault.getBatchId()] += managementFee;
-            kStakingVault_lastFeesChargedManagement = block.timestamp;
-            vm.prank(address(kStakingVault_vaultAdapter));
-            kStakingVault_token.safeTransfer(makeAddr("treasury"), managementFee);
-            kStakingVault_expectedAdapterBalance -= managementFee;
-        }
-        if (performance && performanceFee > 0) {
-            kStakingVault_chargedPerformanceInBatch[kStakingVault_vault.getBatchId()] += performanceFee;
-            kStakingVault_lastFeesChargedPerformance = block.timestamp;
-            vm.prank(address(kStakingVault_vaultAdapter));
-            kStakingVault_token.safeTransfer(makeAddr("treasury"), performanceFee);
-            kStakingVault_expectedAdapterBalance -= performanceFee;
-        }
-        kStakingVault_actualAdapterBalance = kStakingVault_token.balanceOf(address(kStakingVault_vaultAdapter));
     }
 
     function kStakingVault_lose(uint256 amount) public {
         int256 maxLoss = int256(kStakingVault_expectedAdapterTotalAssets)
-            + kStakingVault_totalYieldInBatch[kStakingVault_vault.getBatchId()]
-            - int256(kStakingVault_chargedPerformanceInBatch[kStakingVault_vault.getBatchId()])
-            - int256(kStakingVault_chargedManagementInBatch[kStakingVault_vault.getBatchId()]);
+            + kStakingVault_totalYieldInBatch[kStakingVault_vault.getBatchId()];
 
         if (maxLoss <= 0) return;
 
@@ -309,10 +280,8 @@ contract kStakingVaultHandler is BaseHandler {
 
         kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
         kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
-        (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
-            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply, block.timestamp
-        );
-        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
+        // Fees are now minted as shares, so totalNetAssets == totalAssets
+        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
 
         uint256 sharePriceAfter = kStakingVault_vault.sharePrice();
@@ -393,10 +362,8 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_actualSupply = kStakingVault_vault.totalSupply();
         kStakingVault_expectedTotalAssets -= totalKTokensNet;
         kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
-        (,, uint256 expectedNewFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
-            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply, block.timestamp
-        );
-        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedNewFees;
+        // Fees are now minted as shares, so totalNetAssets == totalAssets
+        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
         uint256 sharePriceAfter = kStakingVault_vault.sharePrice();
         kStakingVault_sharePriceDelta = int256(sharePriceAfter) - int256(sharePriceBefore);
@@ -408,10 +375,7 @@ contract kStakingVaultHandler is BaseHandler {
         bytes32 batchId = kStakingVault_vault.getBatchId();
         uint256 deposited = kStakingVault_depositedInBatch[batchId];
         uint256 requested = kStakingVault_requestedInBatch[batchId];
-        uint256 chargedManagement = kStakingVault_chargedManagementInBatch[batchId];
-        uint256 chargedPerformance = kStakingVault_chargedPerformanceInBatch[batchId];
-        int256 yieldAmount =
-            kStakingVault_totalYieldInBatch[batchId] - int256(chargedPerformance) - int256(chargedManagement);
+        int256 yieldAmount = kStakingVault_totalYieldInBatch[batchId];
 
         // skip proposal if losses would make total assets negative or too small
         int256 newTotalAssetsInt = int256(kStakingVault_expectedAdapterTotalAssets) + yieldAmount;
@@ -431,27 +395,6 @@ contract kStakingVaultHandler is BaseHandler {
         if (newTotalAssetsAdjustedInt <= 0) return;
 
         uint256 newTotalAssetsAdjusted = uint256(newTotalAssetsAdjustedInt);
-
-        // // total yield in batch cannot underflow total assets
-        // if (kStakingVault_totalYieldInBatch[batchId] < -(int256(kStakingVault_expectedAdapterTotalAssets) + netted))
-        // {
-        //     kStakingVault_totalYieldInBatch[batchId] = -(int256(kStakingVault_expectedAdapterTotalAssets) + netted);
-        // }
-
-        uint256 lastFeesChargedPerformance_ = kStakingVault_vault.lastFeesChargedPerformance();
-        uint256 lastFeesChargedManagement_ = kStakingVault_vault.lastFeesChargedManagement();
-
-        if (lastFeesChargedPerformance_ == kStakingVault_lastFeesChargedPerformance) {
-            lastFeesChargedPerformance_ = 0;
-        } else {
-            lastFeesChargedPerformance_ = kStakingVault_lastFeesChargedPerformance;
-        }
-
-        if (lastFeesChargedManagement_ == kStakingVault_lastFeesChargedManagement) {
-            lastFeesChargedManagement_ = 0;
-        } else {
-            lastFeesChargedManagement_ = kStakingVault_lastFeesChargedManagement;
-        }
 
         vm.startPrank(kStakingVault_relayer);
         if (kStakingVault_pendingUnsettledBatches.count() != 0) {
@@ -512,18 +455,11 @@ contract kStakingVaultHandler is BaseHandler {
             newTotalAssets,
             netted,
             yieldAmount,
-            block.timestamp + kStakingVault_assetRouter.getSettlementCooldown(),
-            uint64(lastFeesChargedManagement_),
-            uint64(lastFeesChargedPerformance_)
+            block.timestamp + kStakingVault_assetRouter.getSettlementCooldown()
         );
 
         bytes32 proposalId = kStakingVault_assetRouter.proposeSettleBatch(
-            kStakingVault_token,
-            address(kStakingVault_vault),
-            batchId,
-            newTotalAssets,
-            uint64(lastFeesChargedManagement_),
-            uint64(lastFeesChargedPerformance_)
+            kStakingVault_token, address(kStakingVault_vault), batchId, newTotalAssets
         );
         vm.stopPrank();
         kStakingVault_pendingSettlementProposals.add(proposalId);
@@ -592,11 +528,9 @@ contract kStakingVaultHandler is BaseHandler {
         }
 
         kStakingVault_expectedSupply -= expectedSharesToBurn;
-        (,, uint256 expectedFees) = VaultMathLib.computeLastBatchFeesWithAssetsAndSupply(
-            kStakingVault_vault, kStakingVault_expectedTotalAssets, kStakingVault_expectedSupply, block.timestamp
-        );
+        // Fees are now minted as shares, so totalNetAssets == totalAssets
         kStakingVault_actualTotalAssets = kStakingVault_vault.totalAssets();
-        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets - expectedFees;
+        kStakingVault_expectedNetTotalAssets = kStakingVault_expectedTotalAssets;
         kStakingVault_actualNetTotalAssets = kStakingVault_vault.totalNetAssets();
 
         uint256 shares = 10 ** kStakingVault_vault.decimals();
@@ -667,15 +601,6 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_relayer = _relayer;
     }
 
-    // Value setters
-    function set_kStakingVault_lastFeesChargedManagement(uint256 _value) public {
-        kStakingVault_lastFeesChargedManagement = _value;
-    }
-
-    function set_kStakingVault_lastFeesChargedPerformance(uint256 _value) public {
-        kStakingVault_lastFeesChargedPerformance = _value;
-    }
-
     // Mapping setters
     function set_kStakingVault_depositedInBatch(bytes32 _batchId, uint256 _value) public {
         kStakingVault_depositedInBatch[_batchId] = _value;
@@ -689,20 +614,8 @@ contract kStakingVaultHandler is BaseHandler {
         kStakingVault_totalYieldInBatch[_batchId] = _value;
     }
 
-    function set_kStakingVault_chargedManagementInBatch(bytes32 _batchId, uint256 _value) public {
-        kStakingVault_chargedManagementInBatch[_batchId] = _value;
-    }
-
-    function set_kStakingVault_chargedPerformanceInBatch(bytes32 _batchId, uint256 _value) public {
-        kStakingVault_chargedPerformanceInBatch[_batchId] = _value;
-    }
-
     function set_kStakingVault_pendingStakeInBatch(bytes32 _batchId, uint256 _value) public {
         kStakingVault_pendingStakeInBatch[_batchId] = _value;
-    }
-
-    function set_kStakingVault_lastComputedFeesInBatch(bytes32 _batchId, uint256 _value) public {
-        kStakingVault_lastComputedFeesInBatch[_batchId] = _value;
     }
 
     // Ghost var setters
@@ -866,16 +779,6 @@ contract kStakingVaultHandler is BaseHandler {
                 "KSTAKING_VAULT: INVARIANT_J - Unstake claim returned incorrect kToken amount"
             );
         }
-    }
-
-    /// @notice Invariant: Accumulated fees can never exceed total assets
-    /// @dev Prevents fee extraction overflow that could drain vault
-    function INVARIANT_K_FEE_BOUNDS() public view {
-        uint256 totalAssets = kStakingVault_vault.totalAssets();
-        (uint256 mgmtFees, uint256 perfFees,) = kStakingVault_vault.computeLastBatchFees();
-        uint256 totalFees = mgmtFees + perfFees;
-
-        assertLe(totalFees, totalAssets, "KSTAKING_VAULT: INVARIANT_K - Fees exceed total assets");
     }
 
     /// @notice Invariant: Vault's self-balance equals sum of unclaimed settled stake shares

@@ -4,7 +4,6 @@ pragma solidity 0.8.30;
 import { ERC20 } from "solady/tokens/ERC20.sol";
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
-import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
@@ -13,7 +12,6 @@ import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentra
 import { ERC2771Context } from "kam/src/base/ERC2771Context.sol";
 import { K_ASSET_ROUTER, K_MINTER } from "kam/src/constants/Constants.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
-import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
@@ -39,7 +37,6 @@ import {
 /// while reducing code duplication and ensuring consistent behavior across the vault network.
 abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771Context {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
-    using OptimizedFixedPointMathLib for uint256;
     using OptimizedSafeCastLib for uint256;
     using SafeTransferLib for address;
 
@@ -59,6 +56,20 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @param amount The amount the balance was decreased by
     event BalanceDecreased(uint128 amount);
 
+    /// @notice Emitted when management fees are accrued and shares minted to treasury
+    /// @param managementFeeShares Number of shares minted for management fees
+    event ManagementFeesAccrued(uint256 managementFeeShares);
+
+    /// @notice Emitted when performance fees are charged and shares minted to treasury
+    /// @param performanceFeeShares Number of shares minted for performance fees
+    event PerformanceFeesCharged(uint256 performanceFeeShares);
+
+    /// @notice Emitted when profit vesting is updated
+    /// @param vestingProfit Total profit being vested
+    /// @param vestingStart Start of vesting period
+    /// @param vestingDuration Duration of vesting period
+    event ProfitVestingUpdated(uint256 vestingProfit, uint256 vestingStart, uint256 vestingDuration);
+
     /* //////////////////////////////////////////////////////////////
                               CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -74,10 +85,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     uint256 internal constant INITIALIZED_SHIFT = 40;
     uint256 internal constant PAUSED_MASK = 0x1;
     uint256 internal constant PAUSED_SHIFT = 41;
-    uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_MASK = 0xFFFFFFFFFFFFFFFF;
-    uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_SHIFT = 42;
-    uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_MASK = 0xFFFFFFFFFFFFFFFF;
-    uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 106;
+    uint256 internal constant LAST_FEE_TIMESTAMP_MASK = 0xFFFFFFFFFFFFFFFF;
+    uint256 internal constant LAST_FEE_TIMESTAMP_SHIFT = 42;
 
     /* //////////////////////////////////////////////////////////////
                               STORAGE
@@ -86,13 +95,14 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @custom:storage-location erc7201.kam.storage.BaseVault
     struct BaseVaultStorage {
         //1
-        uint256 config; // decimals, performance fee, management fee, initialized, paused,
-        // lastFeesChargedManagement, lastFeesChargedPerformance
+        uint256 config; // decimals, performance fee, management fee, initialized, paused, lastFeeTimestamp
         //2 - asset tracking (both read in _totalAssets hot path)
         uint128 totalBalance;
         uint128 maxTotalAssets;
-        //3
-        uint128 sharePriceWatermark;
+        //3 - profit vesting (replaces sharePriceWatermark)
+        uint128 vestingProfit;
+        uint64 vestingStart;
+        uint24 vestingDuration; // 8h = 28800s fits in uint24
         //4
         uint256 currentBatch;
         //5
@@ -113,9 +123,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;
         mapping(bytes32 => BaseVaultTypes.UnstakeRequest) unstakeRequests;
         mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set) userRequests;
-        //12 - accrued fees (virtual, deducted from share price but capital stays deployed)
-        uint128 accruedManagementFees;
-        uint128 accruedPerformanceFees;
+        //12 - last settlement balance for performance fee calculation
+        uint128 lastSettlementBalance;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.BaseVault")) - 1)) & ~bytes32(uint256(0xff))
@@ -192,26 +201,15 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return _registry().getIsHardHurdleRate(address(this));
     }
 
-    function _getLastFeesChargedManagement(BaseVaultStorage storage $) internal view returns (uint64) {
-        // casting to 'uint64' is safe because LAST_FEES_CHARGED_MANAGEMENT_MASK ensures value fits in uint64
+    function _getLastFeeTimestamp(BaseVaultStorage storage $) internal view returns (uint64) {
+        // casting to 'uint64' is safe because LAST_FEE_TIMESTAMP_MASK ensures value fits in uint64
         // forge-lint: disable-next-line(unsafe-typecast)
-        return uint64(($.config >> LAST_FEES_CHARGED_MANAGEMENT_SHIFT) & LAST_FEES_CHARGED_MANAGEMENT_MASK);
+        return uint64(($.config >> LAST_FEE_TIMESTAMP_SHIFT) & LAST_FEE_TIMESTAMP_MASK);
     }
 
-    function _setLastFeesChargedManagement(BaseVaultStorage storage $, uint64 _value) internal {
-        $.config = ($.config & ~(LAST_FEES_CHARGED_MANAGEMENT_MASK << LAST_FEES_CHARGED_MANAGEMENT_SHIFT))
-            | (uint256(_value) << LAST_FEES_CHARGED_MANAGEMENT_SHIFT);
-    }
-
-    function _getLastFeesChargedPerformance(BaseVaultStorage storage $) internal view returns (uint64) {
-        // casting to 'uint64' is safe because LAST_FEES_CHARGED_PERFORMANCE_MASK ensures value fits in uint64
-        // forge-lint: disable-next-line(unsafe-typecast)
-        return uint64(($.config >> LAST_FEES_CHARGED_PERFORMANCE_SHIFT) & LAST_FEES_CHARGED_PERFORMANCE_MASK);
-    }
-
-    function _setLastFeesChargedPerformance(BaseVaultStorage storage $, uint64 _value) internal {
-        $.config = ($.config & ~(LAST_FEES_CHARGED_PERFORMANCE_MASK << LAST_FEES_CHARGED_PERFORMANCE_SHIFT))
-            | (uint256(_value) << LAST_FEES_CHARGED_PERFORMANCE_SHIFT);
+    function _setLastFeeTimestamp(BaseVaultStorage storage $, uint64 _value) internal {
+        $.config = ($.config & ~(LAST_FEE_TIMESTAMP_MASK << LAST_FEE_TIMESTAMP_SHIFT))
+            | (uint256(_value) << LAST_FEE_TIMESTAMP_SHIFT);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -237,8 +235,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         $.registry = _registryAddress;
         _setPaused($, _paused);
         _setInitialized($, true);
-        _setLastFeesChargedManagement($, uint64(block.timestamp));
-        _setLastFeesChargedPerformance($, uint64(block.timestamp));
+        _setLastFeeTimestamp($, uint64(block.timestamp));
+        $.vestingDuration = 8 hours;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -363,17 +361,11 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return VaultMathLib.convertToShares(_assets, _totalAssetsValue, _totalSupply);
     }
 
-    /// @notice Calculates net share price per stkToken after deducting accumulated fees
-    /// @dev This function provides the user-facing share price that reflects actual value after management and
-    /// performance fee deductions. The calculation: (1) Uses vault decimals for proper scaling to match token
-    /// precision, (2) Calls _convertToAssets with unit share amount to determine per-token value, (3) Reflects
-    /// total net assets which exclude accrued but unpaid fees. This net pricing ensures users see accurate
-    /// value after all fee obligations, providing transparent visibility into their true vault position value.
-    /// Used primarily for user-facing calculations and accurate balance reporting.
-    /// @return Net price per stkToken in underlying asset terms (scaled to vault decimals)
+    /// @notice Calculates net share price per stkToken
+    /// @dev With continuous fee accrual via share minting, net and gross share price are equivalent.
+    /// @return Price per stkToken in underlying asset terms (scaled to vault decimals)
     function _netSharePrice() internal view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalNetAssets(), totalSupply());
+        return _sharePrice();
     }
 
     /// @notice Calculates gross share price per stkToken including accumulated fees
@@ -390,13 +382,32 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalAssets(), totalSupply());
     }
 
-    /// @notice Returns the internally tracked total assets under management
-    /// @dev Uses internal accounting (`totalBalance`) instead of relying on `kToken.balanceOf`.
-    /// The balance is updated via `increaseBalance`/`decreaseBalance` (authorized by router) and
-    /// internally during settlement. This approach is immune to balance manipulation attacks.
-    /// @return Total asset value managed by the vault
+    /// @notice Returns total assets under management, accounting for profit vesting
+    /// @dev totalBalance includes all assets (including unvested profit). We subtract
+    ///      unreleased (still-vesting) profit so share price grows linearly over the vesting period.
+    ///      If totalBalance < unreleasedProfit (edge case when all shares burned with active vesting),
+    ///      returns 0 to prevent underflow.
+    /// @return Total vested asset value
     function _totalAssets() internal view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        uint256 unreleased = _unreleasedProfit($);
+        return unreleased >= $.totalBalance ? 0 : $.totalBalance - unreleased;
+    }
+
+    /// @notice Returns the raw totalBalance without vesting adjustment
+    /// @return Raw balance including unvested profit
+    function _totalBalance() internal view returns (uint256) {
         return _getBaseVaultStorage().totalBalance;
+    }
+
+    /// @notice Computes the unreleased (still-vesting) portion of profit
+    function _unreleasedProfit(BaseVaultStorage storage $) internal view returns (uint256) {
+        uint256 profit = $.vestingProfit;
+        if (profit == 0) return 0;
+        uint256 elapsed = block.timestamp - $.vestingStart;
+        uint256 duration = $.vestingDuration;
+        if (elapsed >= duration) return 0;
+        return profit - (profit * elapsed / duration);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -419,25 +430,58 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         emit BalanceDecreased(_amount);
     }
 
-    /// @notice Calculates net assets available to users after deducting accumulated fees
-    /// @dev This function provides the user-facing asset value by removing management and performance fee obligations.
-    /// Fees include both already-accrued amounts from settlements and newly computed fees since last settlement.
-    /// When fees equal or exceed total assets (e.g., after all users unstake), returns zero via zeroFloorSub.
-    /// @return Net asset value available to users after all fee deductions
-    function _totalNetAssets() internal view returns (uint256) {
-        (,, uint256 totalFees) = IVaultReader(address(this)).computeAccumulatedFees();
-        return _totalAssets().zeroFloorSub(totalFees);
+    /// @notice Accrues management fees by computing pending fees and minting shares to the treasury
+    /// @dev Called at the start of every user interaction (requestStake, requestUnstake,
+    ///      claimStakedShares, claimUnstakedAssets, settleBatch) and before fee rate changes.
+    ///      Only charges time-based management fees. Performance fees are charged at settlement.
+    function _accrueFees() internal {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        uint256 totalAssets_ = _totalAssets();
+        uint256 _totalSupply = totalSupply();
+
+        if (_totalSupply == 0) {
+            _setLastFeeTimestamp($, uint64(block.timestamp));
+            return;
+        }
+
+        uint256 managementFeeAssets = VaultMathLib.computeManagementFee(
+            totalAssets_, _getManagementFee($), _getLastFeeTimestamp($), block.timestamp
+        );
+
+        _setLastFeeTimestamp($, uint64(block.timestamp));
+
+        if (managementFeeAssets > 0) {
+            address treasury = _registry().getTreasury();
+            uint256 managementFeeShares =
+                _convertToSharesWithTotals(managementFeeAssets, totalAssets_, _totalSupply);
+            if (managementFeeShares > 0) {
+                _mint(treasury, managementFeeShares);
+            }
+            emit ManagementFeesAccrued(managementFeeShares);
+        }
     }
 
-    /// @notice Accrues fees into storage at settlement time
-    /// @dev Called during batch settlement to lock in fee obligations. The actual kTokens remain
-    ///      deployed earning yield until the treasury claims them.
-    /// @param managementFees Accrued management fees in asset terms
-    /// @param performanceFees Accrued performance fees in asset terms
-    function _accrueFees(uint256 managementFees, uint256 performanceFees) internal {
+    /// @notice Starts vesting profit over the configured duration
+    /// @dev Any previously unreleased profit is carried forward into the new vesting period.
+    ///      Called at settlement after performance fees are deducted from the interest.
+    /// @param _profit Net profit to vest (after performance fees)
+    function _startVesting(uint256 _profit) internal {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        $.accruedManagementFees += managementFees.toUint128();
-        $.accruedPerformanceFees += performanceFees.toUint128();
+        // Carry forward any unreleased profit from previous vesting
+        uint256 unreleased = _unreleasedProfit($);
+        $.vestingProfit = (unreleased + _profit).toUint128();
+        $.vestingStart = uint64(block.timestamp);
+        emit ProfitVestingUpdated($.vestingProfit, $.vestingStart, $.vestingDuration);
+    }
+
+    /// @notice Returns the last settlement balance for interest calculation
+    function _getLastSettlementBalance() internal view returns (uint256) {
+        return _getBaseVaultStorage().lastSettlementBalance;
+    }
+
+    /// @notice Sets the last settlement balance snapshot
+    function _setLastSettlementBalance(uint128 _balance) internal {
+        _getBaseVaultStorage().lastSettlementBalance = _balance;
     }
 
     /* //////////////////////////////////////////////////////////////

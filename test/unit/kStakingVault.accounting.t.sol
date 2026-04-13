@@ -91,7 +91,10 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         _executeBatchSettlement(address(vault), batchId, lastTotalAssets + yield);
 
-        // Total assets should now be 1.1M USDC
+        // Profit is vested over 8 hours - advance past vesting duration
+        vm.warp(block.timestamp + 8 hours);
+
+        // Total assets should now be 1.1M USDC (after vesting completes)
         assertEq(vault.totalAssets(), INITIAL_DEPOSIT + yield);
 
         // Total supply remains 1M stkTokens
@@ -148,7 +151,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         vm.prank(users.relayer);
-        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, INITIAL_DEPOSIT, 0, 0);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, INITIAL_DEPOSIT);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
@@ -182,6 +185,9 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         _executeBatchSettlement(address(vault), batchId, lastTotalAssets + yield);
+
+        // Profit is vested over 8 hours - advance past vesting duration
+        vm.warp(block.timestamp + 8 hours);
 
         // Share price is now 1.2 USDC per stkToken (with small rounding tolerance due to virtual offset)
         assertApproxEqAbs(vault.netSharePrice(), 1.2e6, 1);
@@ -363,16 +369,9 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         // Fast forward time to accrue management fees
         vm.warp(block.timestamp + 365 days);
 
-        // Net assets should be less than total assets due to accrued fees
-        uint256 totalAssets = vault.totalAssets();
-        uint256 netAssets = vault.totalNetAssets();
-
-        assertLt(netAssets, totalAssets);
-
-        // Difference should be approximately 1% (management fee)
-        uint256 feeAmount = totalAssets - netAssets;
-        uint256 expectedFeeAmount = totalAssets / 100; //1%
-        assertApproxEqRel(feeAmount, expectedFeeAmount, 0.1e18); // 10% tolerance
+        // With continuous fee accrual, totalNetAssets equals totalAssets
+        // (fees are collected as shares, not subtracted from assets)
+        assertEq(vault.totalNetAssets(), vault.totalAssets());
     }
 
     /* //////////////////////////////////////////////////////////////
