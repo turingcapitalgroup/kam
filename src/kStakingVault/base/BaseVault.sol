@@ -405,12 +405,13 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         uint256 totalAssets_ = _totalAssets();
         uint256 _totalSupply = totalSupply();
 
+        uint64 _lastFeeTimestamp = _getLastFeeTimestamp($);
         _setLastFeeTimestamp($, uint64(block.timestamp));
 
         if (_totalSupply == 0) return 0;
 
         managementFeeAssets = VaultMathLib.computeManagementFee(
-            totalAssets_, _getManagementFee($), _getLastFeeTimestamp($), block.timestamp
+            totalAssets_, _getManagementFee($), _lastFeeTimestamp, block.timestamp
         );
     }
 

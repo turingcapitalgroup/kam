@@ -356,6 +356,9 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(!$.batches[_batchId].isSettled, VAULTBATCHES_VAULT_SETTLED);
         $.batches[_batchId].isSettled = true;
 
+        // Capture elapsed time before _accrueFees() updates the timestamp
+        uint256 _settlementElapsed = block.timestamp - _getLastFeeTimestamp($);
+
         // 1. Accrue management fees
         uint256 _mgmtFeeAssets = _accrueFees();
 
@@ -381,7 +384,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
                 _getPerformanceFee($),
                 _getHurdleRate($),
                 _getIsHardHurdleRate($),
-                block.timestamp - _getLastFeeTimestamp($)
+                _settlementElapsed
             );
 
             if (_perfFeeAssets > 0) {

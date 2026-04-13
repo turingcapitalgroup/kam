@@ -18,6 +18,7 @@ broadcast/
 .cursorrules
 CLAUDE.md
 .claude/
+.letta/
 
 # Soldeer
 /dependencies
