@@ -59,8 +59,7 @@ contract BaseVaultTest is DeploymentBaseTest {
             profit > 0 ? lastTotalAssets + uint256(profit) : lastTotalAssets - uint256(profit)
         );
 
-        vm.prank(users.relayer);
-        assetRouter.executeSettleBatch(proposalId);
+        _acceptAndExecuteSettlement(proposalId);
 
         vm.prank(user);
         vault.claimStakedShares(stakeRequestId);
@@ -115,16 +114,6 @@ contract BaseVaultTest is DeploymentBaseTest {
     function _executeBatchSettlement(address vaultAddress, bytes32 batchId, uint256 totalAssets) internal {
         vm.prank(users.relayer);
         bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, vaultAddress, batchId, totalAssets);
-
-        // Accept proposal if it requires guardian approval (high delta)
-        (bool canExecute,) = assetRouter.canExecuteProposal(proposalId);
-        if (!canExecute) {
-            vm.prank(users.guardian);
-            assetRouter.acceptProposal(proposalId);
-        }
-
-        // Wait for cooldown period(0 for testing)
-        vm.prank(users.relayer);
-        assetRouter.executeSettleBatch(proposalId);
+        _acceptAndExecuteSettlement(proposalId);
     }
 }

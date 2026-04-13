@@ -788,6 +788,9 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(users.relayer);
         testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS);
+        // First settlement requires guardian approval (ToB-24 fix)
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(testProposalId);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(testProposalId);
 
@@ -960,6 +963,10 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.warp(block.timestamp + 2);
 
+        // First settlement requires guardian approval (ToB-24 fix)
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(testProposalId);
+
         vm.prank(users.relayer);
         vm.expectEmit(true, true, true, true);
         emit IkAssetRouter.SettlementExecuted(testProposalId, address(dnVault), batchId, users.relayer);
@@ -1043,6 +1050,14 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.warp(block.timestamp + 2);
 
+        // First settlement requires guardian approval before it is executable (ToB-24 fix)
+        (canExecute, status) = assetRouter.canExecuteProposal(testProposalId);
+        assertFalse(canExecute);
+        assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.REQUIRES_APPROVAL));
+
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(testProposalId);
+
         (canExecute, status) = assetRouter.canExecuteProposal(testProposalId);
         assertTrue(canExecute);
         assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.EXECUTABLE));
@@ -1059,9 +1074,10 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Warp past cooldown
         vm.warp(block.timestamp + 2);
 
-        // Verify can execute before cancellation
+        // First settlement requires approval — not yet executable (ToB-24 fix)
         (bool canExecute, IkAssetRouter.ProposalStatus status) = assetRouter.canExecuteProposal(proposalId);
-        assertTrue(canExecute);
+        assertFalse(canExecute);
+        assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.REQUIRES_APPROVAL));
 
         // Cancel the proposal
         vm.prank(users.guardian);
@@ -1081,8 +1097,10 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS);
 
-        // Warp past cooldown and execute
+        // Warp past cooldown, approve, then execute (ToB-24: first settlement requires approval)
         vm.warp(block.timestamp + 2);
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(proposalId);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
@@ -1127,8 +1145,10 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Pending before execution
         assertTrue(assetRouter.isProposalPending(proposalId));
 
-        // Execute
+        // Execute (ToB-24: first settlement requires guardian approval)
         vm.warp(block.timestamp + 2);
+        vm.prank(users.guardian);
+        assetRouter.acceptProposal(proposalId);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 

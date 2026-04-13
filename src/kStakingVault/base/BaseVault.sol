@@ -410,9 +410,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
 
         if (_totalSupply == 0) return 0;
 
-        managementFeeAssets = VaultMathLib.computeManagementFee(
-            totalAssets_, _getManagementFee($), _lastFeeTimestamp, block.timestamp
-        );
+        managementFeeAssets =
+            VaultMathLib.computeManagementFee(totalAssets_, _getManagementFee($), _lastFeeTimestamp, block.timestamp);
     }
 
     /// @notice Mints management fee shares to the treasury

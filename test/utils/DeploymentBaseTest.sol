@@ -425,6 +425,17 @@ contract DeploymentBaseTest is BaseTest {
         );
     }
 
+    /// @dev Accepts (if guardian approval required) and executes a settlement proposal.
+    function _acceptAndExecuteSettlement(bytes32 _proposalId) internal {
+        (bool canExecute,) = assetRouter.canExecuteProposal(_proposalId);
+        if (!canExecute) {
+            vm.prank(users.guardian);
+            assetRouter.acceptProposal(_proposalId);
+        }
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(_proposalId);
+    }
+
     function getVaultByType(IRegistry.VaultType vaultType) internal view returns (IkStakingVault) {
         if (vaultType == IRegistry.VaultType.DN) return dnVault;
         if (vaultType == IRegistry.VaultType.ALPHA) return alphaVault;

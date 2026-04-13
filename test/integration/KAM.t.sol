@@ -336,8 +336,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
     function _proposeAndExecuteSettle(address _asset, address _vault, bytes32 _batchId, uint256 _totalAssets) internal {
         vm.prank(users.relayer);
         bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _vault, _batchId, _totalAssets);
-        vm.prank(users.relayer);
-        assetRouter.executeSettleBatch(_proposalId);
+        _acceptAndExecuteSettlement(_proposalId);
     }
 
     function _approveAndDeposit(address _adapter, uint256 _amount) internal {
