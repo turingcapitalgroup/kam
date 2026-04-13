@@ -330,8 +330,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         uint256 _totalAssetsAdjusted = uint256(int256(_totalAssets) + _netted);
 
         // Check if yield exceeds tolerance threshold to prevent excessive yield deviations
-        // If exceeded, require guardian approval before execution
-        bool _requiresApproval = false;
+        // If exceeded, require guardian approval before execution.
+        // On the first settlement (_lastTotalAssets == 0), any reported assets bypass the tolerance
+        // formula entirely — require approval unconditionally to prevent unguarded bootstrapping.
+        bool _requiresApproval = _lastTotalAssets == 0 && _totalAssets > 0;
         if (_lastTotalAssets > 0) {
             uint256 _maxAllowedYield = _lastTotalAssets * $.maxAllowedDelta[_vault] / MAX_BPS;
             if (_yield.abs() > _maxAllowedYield) {
