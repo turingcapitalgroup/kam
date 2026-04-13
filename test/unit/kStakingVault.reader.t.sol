@@ -296,27 +296,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         assertGt(total, 0);
     }
 
-    function test_totalNetAssets_ReturnsNetAssets() public {
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        uint256 total = vault.totalNetAssets();
-        assertGt(total, 0);
-    }
-
-    function test_totalNetAssets_EqualsTotalAssets_AfterFees() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Fast forward to accrue fees
-        vm.warp(block.timestamp + 365 days);
-
-        uint256 totalGross = vault.totalAssets();
-        uint256 totalNet = vault.totalNetAssets();
-
-        // Fees are minted as shares, so totalNetAssets == totalAssets
-        assertEq(totalNet, totalGross);
-    }
-
     function test_convertToShares_ConvertsCorrectly() public {
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 

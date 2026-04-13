@@ -342,9 +342,10 @@
 │  │PendingStakes    │                                                │
 │  └────────┬────────┘                                                │
 │           │                                                         │
-│           │ Fees already collected via share dilution               │
-│           │ (_accrueFees() mints treasury shares on every           │
-│           │  interaction — no fee deduction needed here)            │
+│           │ Fees collected via share dilution                        │
+│           │ (_accrueFees() computes mgmt fee on every interaction;  │
+│           │  shares minted by _mintManagementFees() / settleBatch() │
+│           │  — no fee deduction needed in share price formula)      │
 │           ▼                                                         │
 │  ┌─────────────────────────────────┐                                │
 │  │Formulas:                        │                                │
@@ -365,7 +366,7 @@
 
 ## Fee Distribution
 
-Fees are accrued and collected automatically via share dilution. On every user interaction (`requestStake`, `requestUnstake`, `claimStakedShares`, `claimUnstakedAssets`, `settleBatch`), the internal `_accrueFees()` function computes pending management and performance fees based on time elapsed since `lastFeeTimestamp`, then mints shares directly to the treasury address. This means fees are collected continuously and proactively — no deferred accumulation or separate collection step is needed.
+Fees are collected via share dilution in two distinct steps. On every user interaction (`requestStake`, `requestUnstake`, `claimStakedShares`, `claimUnstakedAssets`, `settleBatch`), `_accrueFees()` computes the management fee for the elapsed period and updates `lastFeeTimestamp`; `_mintManagementFees()` then mints the corresponding shares to the treasury. Performance fees are computed and minted only inside `settleBatch()`, on net interest (`currentBalance − lastSettlementBalance − managementFeeAssets`) above the time-weighted hurdle threshold.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -375,25 +376,36 @@ Fees are accrued and collected automatically via share dilution. On every user i
 │  On Every User Interaction:                                    │
 │                         ┌─────────────┐                        │
 │                         │_accrueFees()│                        │
-│                         │called       │                        │
+│                         │+ _mintMgmt  │                        │
+│                         │  Fees()     │                        │
 │                         └──────┬──────┘                        │
 │                                │                               │
-│               ┌────────────────────────────────┐               │
-│               │                                │               │
-│               ▼                                ▼               │
-│      ┌────────────────┐               ┌────────────────┐       │
-│      │Management Fee  │               │Performance Fee │       │
-│      │(time-based on  │               │(above watermark│       │
-│      │ total assets)  │               │ with hurdle)   │       │
-│      └────────┬───────┘               └────────┬───────┘       │
-│               │                                │               │
-│               │  Shares minted directly to      │              │
-│               └────────────────────────────────▶│              │
-│                                         ┌───────▼──────┐       │
-│                                         │Treasury      │       │
-│                                         │(via registry │       │
-│                                         │getTreasury())│       │
-│                                         └──────────────┘       │
+│                                ▼                               │
+│                       ┌────────────────┐                       │
+│                       │Management Fee  │                       │
+│                       │(time-based on  │                       │
+│                       │ total assets)  │                       │
+│                       └────────┬───────┘                       │
+│                                │  Shares minted to treasury    │
+│                                ▼                               │
+│                         ┌──────────────┐                       │
+│                         │Treasury      │                       │
+│                         │(via registry │                       │
+│                         │getTreasury())│                       │
+│                         └──────────────┘                       │
+│                                                                │
+│  At Settlement Only (settleBatch()):                           │
+│                       ┌────────────────┐                       │
+│                       │Performance Fee │                       │
+│                       │(net interest   │                       │
+│                       │ above hurdle   │                       │
+│                       │ rate threshold)│                       │
+│                       └────────┬───────┘                       │
+│                                │  Shares minted to treasury    │
+│                                ▼                               │
+│                         ┌──────────────┐                       │
+│                         │Treasury      │                       │
+│                         └──────────────┘                       │
 │                                                                │
 │  Result: Share price already reflects collected fees.          │
 │  No separate fee deduction step needed.                        │
@@ -453,10 +465,11 @@ Request Status Flow:
 │  │  Balance - pending stakes │      └───────────────────────────┘   │
 │  │                           │                                      │
 │  │• _accrueFees()            │      Fee Functions:                  │
-│  │  Accrue fees & mint       │      ┌───────────────────────────┐   │
-│  │  treasury shares          │      │• setManagementFee()       │   │
+│  │  Compute mgmt fee &       │      ┌───────────────────────────┐   │
+│  │  update lastFeeTimestamp  │      │• setManagementFee()       │   │
 │  │  (called on every         │      │• setPerformanceFee()      │   │
-│  │   interaction)            │      │  (accrue fees first, then │   │
+│  │   interaction; perf fee   │      │  (accrue fees first, then │   │
+│  │   minted in settleBatch)  │      │   update rate; hurdle     │   │
 │  └───────────────────────────┘      │   update rate; hurdle     │   │
 │                                     │   rates in registry)      │   │
 │                                     └───────────────────────────┘   │
