@@ -425,9 +425,11 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Snapshot for next settlement's interest calculation
         _setLastSettlementBalance(uint128(_totalBalance()));
 
-        // Snapshot total assets and supply at the time of settlement
-        $.batches[_batchId].totalAssets = _totalAssets();
-        $.batches[_batchId].totalSupply = totalSupply();
+        // Snapshot the pre-operation totals used for settlement calculations.
+        // Individual claims must use the same conversion rate as the bulk settlement
+        // to guarantee sum(individual claims) <= total reserved amount.
+        $.batches[_batchId].totalAssets = _batchTotalAssets;
+        $.batches[_batchId].totalSupply = _batchTotalSupply;
 
         emit BatchSettled(_batchId);
     }
