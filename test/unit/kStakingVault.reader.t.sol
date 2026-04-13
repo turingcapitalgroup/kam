@@ -84,22 +84,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         assertTrue(isHard);
     }
 
-    function test_vestingDuration_ReturnsInitialValue() public view {
-        uint256 duration = vault.vestingDuration();
-        // Default vesting duration is 8 hours
-        assertEq(duration, 8 hours);
-    }
-
-    function test_vestingProfit_ReturnsZero_Initially() public view {
-        uint256 profit = vault.vestingProfit();
-        assertEq(profit, 0);
-    }
-
-    function test_vestingStart_ReturnsZero_Initially() public view {
-        uint256 start = vault.vestingStart();
-        assertEq(start, 0);
-    }
-
     function test_lastFeeTimestamp_ReturnsTimestamp() public view {
         uint256 lastCharged = vault.lastFeeTimestamp();
         // Should be set to deployment time
@@ -298,12 +282,10 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         int256 profit = int256(INITIAL_DEPOSIT / 10); // 10% profit
         _performStakeAndSettle(users.bob, SMALL_DEPOSIT, profit);
 
-        // Profit is vested over 8 hours - advance past vesting duration
-        vm.warp(block.timestamp + 8 hours);
-
+        // No vesting - share price reflects profit immediately
         uint256 priceAfter = vault.sharePrice();
 
-        // Share price should increase after profit (once vesting completes)
+        // Share price should increase after profit
         assertGt(priceAfter, priceBefore);
     }
 
@@ -502,9 +484,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         vault.hurdleRate();
         vault.isHardHurdleRate();
         vault.lastFeeTimestamp();
-        vault.vestingDuration();
-        vault.vestingProfit();
-        vault.vestingStart();
 
         // Batch info
         vault.getBatchId();

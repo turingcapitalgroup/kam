@@ -29,18 +29,6 @@ interface IVaultReader {
     /// @return Management fee in basis points
     function managementFee() external view returns (uint16);
 
-    /// @notice Returns the vesting duration in seconds
-    /// @return Vesting duration
-    function vestingDuration() external view returns (uint256);
-
-    /// @notice Returns the current vesting profit amount
-    /// @return Vested profit being released
-    function vestingProfit() external view returns (uint256);
-
-    /// @notice Returns the start time of current vesting period
-    /// @return Timestamp when current vesting started
-    function vestingStart() external view returns (uint256);
-
     /// @notice Returns the batch receiver address for a specific batch ID
     /// @param batchId The batch identifier to query
     /// @return Address of the batch receiver

@@ -91,10 +91,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         _executeBatchSettlement(address(vault), batchId, lastTotalAssets + yield);
 
-        // Profit is vested over 8 hours - advance past vesting duration
-        vm.warp(block.timestamp + 8 hours);
-
-        // Total assets should now be 1.1M USDC (after vesting completes)
+        // Total assets should now be 1.1M USDC
         assertEq(vault.totalAssets(), INITIAL_DEPOSIT + yield);
 
         // Total supply remains 1M stkTokens
@@ -185,9 +182,6 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         _executeBatchSettlement(address(vault), batchId, lastTotalAssets + yield);
-
-        // Profit is vested over 8 hours - advance past vesting duration
-        vm.warp(block.timestamp + 8 hours);
 
         // Share price is now 1.2 USDC per stkToken (with small rounding tolerance due to virtual offset)
         assertApproxEqAbs(vault.netSharePrice(), 1.2e6, 1);

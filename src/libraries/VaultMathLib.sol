@@ -70,8 +70,7 @@ library VaultMathLib {
         if (_interest == 0 || _performanceFee == 0 || _previousTotalAssets == 0) return 0;
 
         // Calculate hurdle return: minimum return threshold for the period
-        uint256 hurdleReturn =
-            (_previousTotalAssets * _hurdleRate).fullMulDiv(_elapsed, SECS_PER_YEAR) / MAX_BPS;
+        uint256 hurdleReturn = (_previousTotalAssets * _hurdleRate).fullMulDiv(_elapsed, SECS_PER_YEAR) / MAX_BPS;
 
         if (_interest <= hurdleReturn) return 0;
 

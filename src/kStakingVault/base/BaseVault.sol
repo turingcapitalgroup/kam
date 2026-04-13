@@ -4,7 +4,6 @@ pragma solidity 0.8.30;
 import { ERC20 } from "solady/tokens/ERC20.sol";
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
-import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentrancyGuardTransient.sol";
@@ -37,7 +36,6 @@ import {
 /// while reducing code duplication and ensuring consistent behavior across the vault network.
 abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771Context {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
-    using OptimizedSafeCastLib for uint256;
     using SafeTransferLib for address;
 
     /* //////////////////////////////////////////////////////////////
@@ -63,12 +61,6 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @notice Emitted when performance fees are charged and shares minted to treasury
     /// @param performanceFeeShares Number of shares minted for performance fees
     event PerformanceFeesCharged(uint256 performanceFeeShares);
-
-    /// @notice Emitted when profit vesting is updated
-    /// @param vestingProfit Total profit being vested
-    /// @param vestingStart Start of vesting period
-    /// @param vestingDuration Duration of vesting period
-    event ProfitVestingUpdated(uint256 vestingProfit, uint256 vestingStart, uint256 vestingDuration);
 
     /* //////////////////////////////////////////////////////////////
                               CONSTANTS
@@ -99,10 +91,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         //2 - asset tracking (both read in _totalAssets hot path)
         uint128 totalBalance;
         uint128 maxTotalAssets;
-        //3 - profit vesting (replaces sharePriceWatermark)
-        uint128 vestingProfit;
-        uint64 vestingStart;
-        uint24 vestingDuration; // 8h = 28800s fits in uint24
+        //3 - reserved (previously vesting fields)
+        uint256 _reserved3;
         //4
         uint256 currentBatch;
         //5
@@ -236,7 +226,6 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         _setPaused($, _paused);
         _setInitialized($, true);
         _setLastFeeTimestamp($, uint64(block.timestamp));
-        $.vestingDuration = 8 hours;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -361,14 +350,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return VaultMathLib.convertToShares(_assets, _totalAssetsValue, _totalSupply);
     }
 
-    /// @notice Calculates net share price per stkToken
-    /// @dev With continuous fee accrual via share minting, net and gross share price are equivalent.
-    /// @return Price per stkToken in underlying asset terms (scaled to vault decimals)
-    function _netSharePrice() internal view returns (uint256) {
-        return _sharePrice();
-    }
-
-    /// @notice Calculates gross share price per stkToken including accumulated fees
+    /// @notice Calculates share price per stkToken
     /// @dev This function provides the total vault performance-based share price before fee deductions. The
     /// calculation:
     /// (1) Handles zero total supply edge case with 1:1 initial pricing, (2) Uses total gross assets including accrued
@@ -382,32 +364,16 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalAssets(), totalSupply());
     }
 
-    /// @notice Returns total assets under management, accounting for profit vesting
-    /// @dev totalBalance includes all assets (including unvested profit). We subtract
-    ///      unreleased (still-vesting) profit so share price grows linearly over the vesting period.
-    ///      If totalBalance < unreleasedProfit (edge case when all shares burned with active vesting),
-    ///      returns 0 to prevent underflow.
-    /// @return Total vested asset value
+    /// @notice Returns total assets under management
+    /// @return Total asset value
     function _totalAssets() internal view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        uint256 unreleased = _unreleasedProfit($);
-        return unreleased >= $.totalBalance ? 0 : $.totalBalance - unreleased;
-    }
-
-    /// @notice Returns the raw totalBalance without vesting adjustment
-    /// @return Raw balance including unvested profit
-    function _totalBalance() internal view returns (uint256) {
         return _getBaseVaultStorage().totalBalance;
     }
 
-    /// @notice Computes the unreleased (still-vesting) portion of profit
-    function _unreleasedProfit(BaseVaultStorage storage $) internal view returns (uint256) {
-        uint256 profit = $.vestingProfit;
-        if (profit == 0) return 0;
-        uint256 elapsed = block.timestamp - $.vestingStart;
-        uint256 duration = $.vestingDuration;
-        if (elapsed >= duration) return 0;
-        return profit - (profit * elapsed / duration);
+    /// @notice Returns the raw totalBalance
+    /// @return Raw balance
+    function _totalBalance() internal view returns (uint256) {
+        return _getBaseVaultStorage().totalBalance;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -430,48 +396,38 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         emit BalanceDecreased(_amount);
     }
 
-    /// @notice Accrues management fees by computing pending fees and minting shares to the treasury
-    /// @dev Called at the start of every user interaction (requestStake, requestUnstake,
-    ///      claimStakedShares, claimUnstakedAssets, settleBatch) and before fee rate changes.
-    ///      Only charges time-based management fees. Performance fees are charged at settlement.
-    function _accrueFees() internal {
+    /// @notice Computes pending management fee assets and updates the last fee timestamp
+    /// @dev Called at settlement and before fee rate changes. Does NOT mint shares — the caller
+    ///      is responsible for converting and minting. Returns 0 if no supply or no fees due.
+    /// @return managementFeeAssets Management fee in asset terms
+    function _accrueFees() internal returns (uint256 managementFeeAssets) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint256 totalAssets_ = _totalAssets();
         uint256 _totalSupply = totalSupply();
 
-        if (_totalSupply == 0) {
-            _setLastFeeTimestamp($, uint64(block.timestamp));
-            return;
-        }
-
-        uint256 managementFeeAssets = VaultMathLib.computeManagementFee(
-            totalAssets_, _getManagementFee($), _getLastFeeTimestamp($), block.timestamp
-        );
-
         _setLastFeeTimestamp($, uint64(block.timestamp));
 
-        if (managementFeeAssets > 0) {
-            address treasury = _registry().getTreasury();
-            uint256 managementFeeShares =
-                _convertToSharesWithTotals(managementFeeAssets, totalAssets_, _totalSupply);
-            if (managementFeeShares > 0) {
-                _mint(treasury, managementFeeShares);
-            }
-            emit ManagementFeesAccrued(managementFeeShares);
-        }
+        if (_totalSupply == 0) return 0;
+
+        managementFeeAssets = VaultMathLib.computeManagementFee(
+            totalAssets_, _getManagementFee($), _getLastFeeTimestamp($), block.timestamp
+        );
     }
 
-    /// @notice Starts vesting profit over the configured duration
-    /// @dev Any previously unreleased profit is carried forward into the new vesting period.
-    ///      Called at settlement after performance fees are deducted from the interest.
-    /// @param _profit Net profit to vest (after performance fees)
-    function _startVesting(uint256 _profit) internal {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        // Carry forward any unreleased profit from previous vesting
-        uint256 unreleased = _unreleasedProfit($);
-        $.vestingProfit = (unreleased + _profit).toUint128();
-        $.vestingStart = uint64(block.timestamp);
-        emit ProfitVestingUpdated($.vestingProfit, $.vestingStart, $.vestingDuration);
+    /// @notice Mints management fee shares to the treasury
+    /// @dev Called by settlement and fee config setters to mint accrued management fees
+    /// @param _managementFeeAssets Management fee amount in asset terms
+    function _mintManagementFees(uint256 _managementFeeAssets) internal {
+        if (_managementFeeAssets == 0) return;
+        uint256 _totalSupply = totalSupply();
+        if (_totalSupply == 0) return;
+
+        address treasury = _registry().getTreasury();
+        uint256 managementFeeShares = _convertToSharesWithTotals(_managementFeeAssets, _totalAssets(), _totalSupply);
+        if (managementFeeShares > 0) {
+            _mint(treasury, managementFeeShares);
+            emit ManagementFeesAccrued(managementFeeShares);
+        }
     }
 
     /// @notice Returns the last settlement balance for interest calculation

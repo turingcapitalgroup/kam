@@ -55,24 +55,6 @@ contract ReaderModule is BaseVault, Extsload, IModule {
         return _getManagementFee($);
     }
 
-    /// @notice Returns the vesting duration in seconds
-    /// @return Vesting duration
-    function vestingDuration() external view returns (uint256) {
-        return _getBaseVaultStorage().vestingDuration;
-    }
-
-    /// @notice Returns the current vesting profit amount
-    /// @return Vested profit being released
-    function vestingProfit() external view returns (uint256) {
-        return _getBaseVaultStorage().vestingProfit;
-    }
-
-    /// @notice Returns the start time of current vesting period
-    /// @return Timestamp when current vesting started
-    function vestingStart() external view returns (uint256) {
-        return _getBaseVaultStorage().vestingStart;
-    }
-
     /* //////////////////////////////////////////////////////////////
                         BATCH RECEIVER GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -135,20 +117,17 @@ contract ReaderModule is BaseVault, Extsload, IModule {
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](13);
+        bytes4[] memory moduleSelectors = new bytes4[](10);
         moduleSelectors[0] = this.lastFeeTimestamp.selector;
         moduleSelectors[1] = this.hurdleRate.selector;
         moduleSelectors[2] = this.isHardHurdleRate.selector;
         moduleSelectors[3] = this.performanceFee.selector;
         moduleSelectors[4] = this.managementFee.selector;
-        moduleSelectors[5] = this.vestingDuration.selector;
-        moduleSelectors[6] = this.vestingProfit.selector;
-        moduleSelectors[7] = this.vestingStart.selector;
-        moduleSelectors[8] = this.getBatchReceiver.selector;
-        moduleSelectors[9] = this.getSafeBatchReceiver.selector;
-        moduleSelectors[10] = this.getUserRequests.selector;
-        moduleSelectors[11] = this.getStakeRequest.selector;
-        moduleSelectors[12] = this.getUnstakeRequest.selector;
+        moduleSelectors[5] = this.getBatchReceiver.selector;
+        moduleSelectors[6] = this.getSafeBatchReceiver.selector;
+        moduleSelectors[7] = this.getUserRequests.selector;
+        moduleSelectors[8] = this.getStakeRequest.selector;
+        moduleSelectors[9] = this.getUnstakeRequest.selector;
         return moduleSelectors;
     }
 }

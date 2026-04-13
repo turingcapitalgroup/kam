@@ -157,5 +157,4 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vm.prank(users.admin);
         registry.setIsHardHurdleRate(address(vault), true);
     }
-
 }
