@@ -174,7 +174,7 @@
 ┌─────────────────┐
 │Mint stkTokens   │
 │to Vault         │ ── Pre-mint shares for all pending stakers
-└────────┬────────┘    at settlement price, clear totalPendingStake
+└────────┬────────┘    at settlement price
          │
          ▼
 ┌─────────────────┐
@@ -199,8 +199,8 @@
          ▼
 ┌─────────────────┐
 │Calculate        │
-│stkTokens Based  │ ── stkTokens = kTokens * (10^decimals) / sharePrice
-│on Share         │    (using batch settlement snapshot values)
+│stkTokens Based  │ ── stkTokens = kTokens * (totalSupply + 1e6) / (totalAssets + 1e6)
+│on Share         │    (ERC4626 virtual offset; using batch snapshot values)
 │Price            │
 └────────┬────────┘
          │
@@ -243,19 +243,14 @@
          ▼
 ┌─────────────────┐
 │Calculate kTokens│
-│Net Amount       │ ── netKTokens = stkTokens * sharePrice / (10^decimals)
-│                 │ ── Fees already collected via _accrueFees() share dilution
+│Net Amount       │ ── kTokens = stkTokens * (totalAssets + 1e6) / (totalSupply + 1e6)
+│                 │ ── Uses batch snapshot values; fees already collected via dilution
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│Burn stkTokens   │
-│from Vault       │ ── Burns from address(this) - already transferred
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│Decrease Balance │ ── _decreaseBalance(netKTokens) - capital leaves active management
+│stkTokens already│
+│burned at settle │ ── Burn + _decreaseBalance happened in settleBatch()
 └────────┬────────┘
          │
          ▼
@@ -334,17 +329,16 @@
 │  │balanceOf(this)  │                                                │
 │  └────────┬────────┘                                                │
 │           │                                                         │
-│           │ Subtract pending stakes                                 │
+│           │ totalBalance tracks active capital                      │
 │           ▼                                                         │
 │  ┌─────────────────┐                                                │
 │  │Total Assets =   │                                                │
-│  │Balance -        │                                                │
-│  │PendingStakes    │                                                │
+│  │totalBalance     │                                                │
 │  └────────┬────────┘                                                │
 │           │                                                         │
 │           │ Fees collected via share dilution                        │
-│           │ (_accrueFees() computes mgmt fee on every interaction;  │
-│           │  shares minted by _mintManagementFees() / settleBatch() │
+│           │ (_accrueFees() runs only at settleBatch;                │
+│           │  shares minted by _mintManagementFees()                 │
 │           │  — no fee deduction needed in share price formula)      │
 │           ▼                                                         │
 │  ┌─────────────────────────────────┐                                │
@@ -366,14 +360,14 @@
 
 ## Fee Distribution
 
-Fees are collected via share dilution in two distinct steps. On every user interaction (`requestStake`, `requestUnstake`, `claimStakedShares`, `claimUnstakedAssets`, `settleBatch`), `_accrueFees()` computes the management fee for the elapsed period and updates `lastFeeTimestamp`; `_mintManagementFees()` then mints the corresponding shares to the treasury. Performance fees are computed and minted only inside `settleBatch()`, on net interest (`currentBalance − lastSettlementBalance − managementFeeAssets`) above the time-weighted hurdle threshold.
+Fees are collected via share dilution at settlement time only. During `settleBatch()`, `_accrueFees()` computes the management fee for the elapsed period and updates `lastFeeTimestamp`; `_mintManagementFees()` then mints the corresponding shares to the treasury. Performance fees are computed on net interest (`currentBalance − lastSettlementBalance − managementFeeAssets`) above the time-weighted hurdle threshold and minted to treasury in the same call.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │                        Fee Distribution Flow                   │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  On Every User Interaction:                                    │
+│  At Settlement Only (settleBatch()):                           │
 │                         ┌─────────────┐                        │
 │                         │_accrueFees()│                        │
 │                         │+ _mintMgmt  │                        │
@@ -394,7 +388,7 @@ Fees are collected via share dilution in two distinct steps. On every user inter
 │                         │getTreasury())│                       │
 │                         └──────────────┘                       │
 │                                                                │
-│  At Settlement Only (settleBatch()):                           │
+│  Also at Settlement (settleBatch()):                           │
 │                       ┌────────────────┐                       │
 │                       │Performance Fee │                       │
 │                       │(net interest   │                       │
@@ -462,13 +456,13 @@ Request Status Flow:
 │  │  Share price calculation  │      │                           │   │
 │  │                           │      │• kAssetTransfer()         │   │
 │  │• _totalAssets()           │      │  Virtual balance updates  │   │
-│  │  Balance - pending stakes │      └───────────────────────────┘   │
+│  │  Returns totalBalance      │      └───────────────────────────┘   │
 │  │                           │                                      │
 │  │• _accrueFees()            │      Fee Functions:                  │
 │  │  Compute mgmt fee &       │      ┌───────────────────────────┐   │
 │  │  update lastFeeTimestamp  │      │• setManagementFee()       │   │
-│  │  (called on every         │      │• setPerformanceFee()      │   │
-│  │   interaction; perf fee   │      │  (accrue fees first, then │   │
+│  │  (called at settlement    │      │• setPerformanceFee()      │   │
+│  │   only; perf fee also     │      │  (accrue fees first, then │   │
 │  │   minted in settleBatch)  │      │   update rate; hurdle     │   │
 │  └───────────────────────────┘      │   update rate; hurdle     │   │
 │                                     │   rates in registry)      │   │
@@ -596,7 +590,7 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │  ┌─────────────────┐                                                                            │
 │  │Increases Share  │                                                                            │
 │  │Price            │                                                                            │
-│  │                 │ ── sharePrice = totalAssets * 1e18 / totalSupply                           │
+│  │                 │ ── sharePrice = (totalAssets + 1e6) * 10^decimals / (totalSupply + 1e6)    │
 │  └─────────┬───────┘                                                                            │
 │            │                                                                                    │
 │            ▼                                                                                    │

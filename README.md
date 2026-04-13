@@ -110,8 +110,7 @@ Institutions can mint kTokens 1:1 with underlying assets and request redemptions
 
 - `kMinter.mint()` - Creates new kTokens by accepting underlying asset deposits
 - `kMinter.requestBurn()` - Requests the burn of X shares for Y kTokens
-- `kMinter.burn()` - Burns the requested shares amount and transfer the kTokens
-- `kMinter.cancelBurnRequest()` - Cancels pending burn requests before batch settlement
+- `kMinter.burn()` - Claims underlying assets from the batch receiver after settlement
 
 ### Retail Operations
 
@@ -119,7 +118,8 @@ Retail users can stake kTokens to earn yield from external strategies:
 
 - `kStakingVault.requestStake()` - Request to stake kTokens for yield-bearing stkTokens
 - `kStakingVault.requestUnstake()` - Request to unstake stkTokens back to kTokens
-- Claims processed through vault's VaultClaims after batch settlement
+- `kStakingVault.claimStakedShares()` - Claim stkTokens after batch settlement
+- `kStakingVault.claimUnstakedAssets()` - Claim kTokens after batch settlement
 
 ### Virtual Balance System
 

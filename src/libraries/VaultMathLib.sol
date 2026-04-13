@@ -22,7 +22,7 @@ library VaultMathLib {
     uint256 constant VIRTUAL_ASSETS = 1e6;
 
     /// @notice Computes the management fee in asset terms based on time elapsed
-    /// @dev Time-prorated annual fee on total assets. Called by _accrueFees on every interaction.
+    /// @dev Time-prorated annual fee on total assets. Called by _accrueFees at settlement.
     /// @param _totalAssets Current total assets in the vault
     /// @param _managementFee Annual management fee in basis points
     /// @param _lastFeeTimestamp Timestamp of last fee accrual

@@ -20,6 +20,7 @@ CLAUDE.md
 .claude/
 .letta/
 .trigrep/
+.planning/
 
 # Soldeer
 /dependencies

@@ -76,7 +76,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `isProposalPending(bytes32 proposalId)` - Simple boolean check if proposal is still pending (not cancelled or executed)
 - `isProposalAccepted(bytes32 proposalId)` - Checks if a high-yield-delta proposal has been approved by a guardian
 - `getSettlementCooldown()` - Gets current cooldown period in seconds before proposals can be executed
-- `getMaxAllowedDelta()` - Gets current yield tolerance threshold in basis points (exceeding emits warning event)
+- `getMaxAllowedDelta(address vault_)` - Gets yield tolerance threshold for a vault in basis points
 - `virtualBalance(address vault, address asset)` - Returns virtual asset balance from vault's adapter
 - `isProposalExecuted(bytes32 proposalId)` - Checks if a settlement proposal has been executed
 - `isBatchIdRegistered(bytes32 batchId)` - Checks if a batch ID has been registered in the router
@@ -86,7 +86,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 **Admin Functions**
 
 - `setSettlementCooldown(uint256 cooldown)` - Sets the security cooldown period in seconds for settlement proposals (ADMIN_ROLE required)
-- `setMaxAllowedDelta(uint256 tolerance_)` - Updates yield tolerance threshold in basis points (ADMIN_ROLE required)
+- `setMaxAllowedDelta(address vault_, uint256 tolerance_)` - Updates yield tolerance threshold for a vault in basis points (ADMIN_ROLE required)
 
 ### IkRegistry
 
@@ -239,61 +239,22 @@ Interface for vault fee management including performance and management fees.
 
 **Internal Fee Accrual**
 
-- `_accrueFees()` - Internal function that computes pending management and performance fees based on time elapsed since `lastFeeTimestamp`, then mints shares to the treasury address (from registry via `getTreasury()`). Called at the start of every user interaction: `requestStake`, `requestUnstake`, `claimStakedShares`, `claimUnstakedAssets`, and `settleBatch`. Also called before fee-rate changes. Updates the watermark when share price has increased.
+- `_accrueFees()` - Internal function that computes pending management fees based on time elapsed since `lastFeeTimestamp` and returns the fee amount. Called in `settleBatch()` and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). Performance fees are computed separately in `settleBatch()` on net interest above the hurdle threshold.
 
 ### IVaultReader
 
-Read-only interface for querying vault state, calculations, and metrics without modifying contract state.
+Read-only interface for querying vault state and fee parameters. Note: most vault getters (`registry()`, `asset()`, `sharePrice()`, `totalAssets()`, `convertToShares()`, `convertToAssets()`, batch queries, `maxTotalAssets()`) are defined on `IVault`, not `IVaultReader`. `IVaultReader` exposes fee/config internals via the ReaderModule:
 
-**Configuration Queries**
-
-- `registry()` - Returns protocol registry address
-- `asset()` - Returns vault's share token (stkToken) address
-- `underlyingAsset()` - Returns underlying asset address
-
-**Financial Metrics**
-
-- `sharePrice()` - Current share price in underlying asset terms
-- `netSharePrice()` - Alias for `sharePrice()` (backward compatibility; fees are already collected via share dilution)
-- `totalAssets()` - Total assets under management
-- `totalNetAssets()` - Alias for `totalAssets()` (backward compatibility; fees are already collected via share dilution)
-- `convertToShares(uint256 shares)` - Converts shares to equivalent asset amount
-- `convertToAssets(uint256 assets)` - Converts assets to equivalent share amount
-- `convertToAssetsWithTotals(uint256 shares, uint256 totalAssets, uint256 totalSupply)` - Converts shares to assets with specified totals
-- `convertToSharesWithTotals(uint256 assets, uint256 totalAssets, uint256 totalSupply)` - Converts assets to shares with specified totals
-
-**Batch Information**
-
-- `getBatchId()` - Current active batch identifier
-- `getSafeBatchId()` - Batch ID with safety validation
-- `getCurrentBatchInfo()` - Comprehensive batch information (batchId, batchReceiver, isClosed, isSettled)
-- `getBatchIdInfo(bytes32 batchId)` - Detailed batch information including share prices, total assets, supply, and deposit/request amounts
-- `getBatchReceiver(bytes32 batchId)` - Batch receiver address
-- `getSafeBatchReceiver(bytes32 batchId)` - Batch receiver address with validation (guaranteed non-zero)
-- `isBatchClosed()` - Check if current batch is closed
-- `isBatchSettled()` - Check if current batch is settled
-- `isClosed(bytes32 batchId_)` - Check if a specific batch is closed
-
-**Request Information**
-
-- `getUserRequests(address user)` - Returns all request IDs (both stake and unstake) for a user
-- `getStakeRequest(bytes32 requestId)` - Returns the full StakeRequest struct for a specific request
-- `getUnstakeRequest(bytes32 requestId)` - Returns the full UnstakeRequest struct for a specific request
-- `getTotalPendingStake()` - Returns total pending stake amount
-- `getTotalPendingUnstake()` - Returns total pending unstake amount (claimable kTokens for settled requests)
-
-**Fee Information**
-
-- `managementFee()` - Current management fee rate
-- `performanceFee()` - Current performance fee rate
+- `lastFeeTimestamp()` - Last timestamp when fees were accrued
 - `hurdleRate()` - Hurdle rate threshold
 - `isHardHurdleRate()` - Whether the current hurdle rate is a hard hurdle rate
-- `sharePriceWatermark()` - High watermark for performance fees
-- `lastFeeTimestamp()` - Last timestamp when fees were accrued
-
-**Capacity**
-
-- `maxTotalAssets()` - Returns the maximum total assets (TVL cap) allowed in the vault
+- `performanceFee()` - Current performance fee rate
+- `managementFee()` - Current management fee rate
+- `getBatchReceiver(bytes32 batchId)` - Batch receiver address
+- `getSafeBatchReceiver(bytes32 batchId)` - Batch receiver with non-zero validation
+- `getUserRequests(address user)` - Returns all request IDs for a user
+- `getStakeRequest(bytes32 requestId)` - Returns the full StakeRequest struct
+- `getUnstakeRequest(bytes32 requestId)` - Returns the full UnstakeRequest struct
 
 ### IkBatchReceiver
 

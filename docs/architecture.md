@@ -120,11 +120,11 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
    - `profit` = whether yield is positive or negative
    - Emits `YieldExceedsMaxDeltaWarning` if yield exceeds configured threshold (warning only, does not revert)
 
-2. **Cooldown Phase**: Mandatory waiting period (configurable, up to 24 hours) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds the configured threshold, a warning event is emitted and the proposal is flagged as requiring approval (`requiresApproval = true`). Guardians must monitor for these warnings and either cancel suspicious proposals or approve legitimate high-yield proposals via `acceptProposal()`.
+2. **Cooldown Phase**: Mandatory waiting period (configurable, up to 24 hours) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds the configured threshold, a warning event is emitted and the proposal is flagged as requiring approval (`requiresApproval = true`). On a vault's first settlement (`_lastTotalAssets == 0`), `requiresApproval` is set unconditionally. Guardians must monitor for these warnings and either cancel suspicious proposals or approve legitimate proposals via `acceptProposal()`.
 
 3. **Approval Phase** (conditional): Guardian calls `acceptProposal()` if required by high yield delta.
 
-4. **Execution Phase**: After cooldown (and approval if required), anyone calls `executeSettleBatch()` to complete settlement
+4. **Execution Phase**: After cooldown (and approval if required), the relayer calls `executeSettleBatch()` to complete settlement
 
 **Yield Distribution**: During settlement execution:
 
@@ -359,7 +359,7 @@ The kStakingVault is implemented as a unified contract that inherits from multip
 
 **Batch Processing**: The vault manages the complete batch lifecycle for efficient gas usage. Batches are created by the relayer via `createNewBatch()`, handles batch closure and settlement coordination with kAssetRouter, and processes direct asset transfers without requiring external BatchReceiver contracts.
 
-**Fee Management**: Fees are collected via share dilution. `_accrueFees()` computes the management fee for the elapsed period and updates `lastFeeTimestamp`; the actual share minting is done by `_mintManagementFees()` (management) and inline in `settleBatch()` (performance). `_accrueFees()` is called at the start of every user interaction (`requestStake`, `requestUnstake`, `claimStakedShares`, `claimUnstakedAssets`, `settleBatch`) and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). A single `lastFeeTimestamp` replaces the previous dual-timestamp system. Management fees accrue continuously on time and total assets; performance fees are computed once per settlement on net interest above the time-weighted hurdle threshold.
+**Fee Management**: Fees are collected via share dilution at settlement time. `_accrueFees()` computes the management fee for the elapsed period and updates `lastFeeTimestamp`; the actual share minting is done by `_mintManagementFees()` (management) and inline in `settleBatch()` (performance). `_accrueFees()` is called in `settleBatch()` and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). A single `lastFeeTimestamp` replaces the previous dual-timestamp system. Management fees accrue on time and total assets; performance fees are computed once per settlement on net interest above the time-weighted hurdle threshold.
 
 **Claims Processing**: Handles user claims for completed requests by converting stake requests into stkToken balances, processing unstaking requests with underlying token plus yield distribution, and ensuring claims are only processed for settled batches.
 
@@ -538,7 +538,7 @@ The multi-phase commit system provides multiple safeguards:
 ### Timelock Protection ###
 
 - Mandatory cooldown period (1hr default, max 1 day)
-- Guardian-only proposal cancellation during cooldown
+- Guardian or emergency admin proposal cancellation during cooldown
 - High-yield-delta approval system: Proposals exceeding yield tolerance require explicit guardian approval via `acceptProposal()` before execution
 - `canExecuteProposal()` returns specific reasons for blocked proposals (cooldown pending, requires approval, cancelled, already executed)
 - On-chain validation of all settlement parameters
@@ -578,7 +578,7 @@ The protocol implements a multi-layered emergency response system with global pa
 
 ## Fee Structure
 
-Fees are accrued and collected automatically via share dilution through the `_accrueFees()` internal function, which is called at the start of every user interaction (`requestStake`, `requestUnstake`, `claimStakedShares`, `claimUnstakedAssets`, `settleBatch`) and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). This replaces the previous system where fees accumulated in storage and were collected only during settlement via notify functions.
+Fees are accrued and collected automatically via share dilution through the `_accrueFees()` internal function, which is called during `settleBatch()` and before fee-rate changes (`setManagementFee`, `setPerformanceFee`).
 
 A single `lastFeeTimestamp` tracks when management fees were last accrued, replacing the previous dual-timestamp system (`lastFeesChargedManagement` / `lastFeesChargedPerformance`). `lastSettlementBalance` records the vault balance at the last settlement and serves as the interest baseline for the next batch's performance fee calculation.
 
@@ -607,7 +607,7 @@ Performance fees are charged on net interest per settlement batch — only when 
 
 ### Fee Calculation
 
-**Management fee**: `_accrueFees()` computes `totalAssets * managementFee * elapsed / (SECS_PER_YEAR * 10000)` and updates `lastFeeTimestamp`. `_mintManagementFees()` converts that asset amount to shares and mints them to the treasury. Called on every user interaction and before fee-rate changes.
+**Management fee**: `_accrueFees()` computes `totalAssets * managementFee * elapsed / (SECS_PER_YEAR * 10000)` and updates `lastFeeTimestamp`. `_mintManagementFees()` converts that asset amount to shares and mints them to the treasury. Called at settlement and before fee-rate changes.
 
 **Performance fee**: computed once per settlement inside `settleBatch()`. Interest is `currentBalance − lastSettlementBalance − managementFeeAssets`. If interest exceeds the time-weighted hurdle (`previousBalance * hurdleRate * elapsed / SECS_PER_YEAR / 10000`), performance fee shares are minted directly to the treasury. `lastSettlementBalance` is then updated to the post-settlement balance.
 

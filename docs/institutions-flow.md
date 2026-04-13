@@ -149,8 +149,8 @@
          │
          ▼
 ┌─────────────────-┐
-│Anyone calls      │
-│executeSettleBatch│ ── After cooldown expires
+│Relayer calls     │
+│executeSettleBatch│ ── After cooldown expires (RELAYER_ROLE required)
 └────────┬────────-┘
          │
          ▼
@@ -189,14 +189,7 @@
          ▼
 ┌─────────────────┐
 │Mark request as  │
-│REDEEMED         │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│Burn escrowed    │
-│kTokens          │ ── IkToken(kToken).burn(address(this), amount)
-│permanently      │
+│REDEEMED         │ ── kTokens already burned in bulk during settleBatch()
 └────────┬────────┘
          │
          ▼
@@ -279,7 +272,7 @@ Day N+3:                                 Day N+3:                   │
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐             │
 │Redeem Assets│◀────│Settlement   │◀────│Cooldown     │◀────────────┘
 │(institution)│     │Executed     │     │Period (1hr) │
-│             │     │(anyone)     │     │             │
+│             │     │(relayer)    │     │             │
 └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
@@ -347,7 +340,7 @@ Day N+3:                                 Day N+3:                   │
 │                                                                 │
 │  Two tracking layers in kAssetRouter:                           │
 │                                                                 │
-│  1. Per-Batch Balances (vaultBatchBalances[vault][batchId]):    │
+│  1. Per-Batch Balances (batches[batchId] in kMinter storage):   │
 │     ┌─────────────┐    ┌─────────────┐                          │
 │     │Deposited    │    │Requested    │                          │
 │     │(per batch)  │    │(per batch)  │                          │
