@@ -10,6 +10,7 @@ import { kBase } from "kam/src/base/kBase.sol";
 import {
     KASSETROUTER_BATCH_ID_PROPOSED,
     KASSETROUTER_COOLDOWN_IS_UP,
+    KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD,
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_IS_PAUSED,
     KASSETROUTER_NOT_BATCH_CLOSED,
@@ -61,6 +62,8 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(users.admin);
         assetRouter.setSettlementCooldown(1);
+
+        _setDNVaultAdapterAssets(TEST_TOTAL_ASSETS - TEST_PROFIT);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -345,7 +348,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         vm.expectEmit(false, true, true, false);
         emit IkAssetRouter.SettlementProposed(
-            bytes32(0), address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, 0, block.timestamp + 1
+            bytes32(0), address(dnVault), _batchId, TEST_TOTAL_ASSETS, 0, int256(TEST_PROFIT), block.timestamp + 1
         );
 
         testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS);
@@ -356,7 +359,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assertEq(_proposal.batchId, _batchId);
         assertEq(_proposal.totalAssets, TEST_TOTAL_ASSETS);
         assertEq(_proposal.netted, 0);
-        assertEq(uint256(_proposal.yield), TEST_TOTAL_ASSETS);
+        assertEq(uint256(_proposal.yield), TEST_PROFIT);
         assertEq(_proposal.executeAfter, block.timestamp + 1);
 
         assertEq(assetRouter.getPendingProposals(address(dnVault))[0], testProposalId);
@@ -392,6 +395,29 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_NOT_BATCH_CLOSED));
         testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS);
+    }
+
+    function test_ProposeSettleBatch_FirstSettlement_NonZeroYield_Reverts() public {
+        bytes32 _batchId = dnVault.getBatchId();
+        _setDNVaultAdapterAssets(0);
+        _closeBatch(address(dnVault), _batchId);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD));
+        assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS);
+    }
+
+    function test_ProposeSettleBatch_FirstSettlement_ZeroYield_Succeeds() public {
+        bytes32 _batchId = dnVault.getBatchId();
+        _setDNVaultAdapterAssets(0);
+        _closeBatch(address(dnVault), _batchId);
+
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, 0);
+
+        IkAssetRouter.VaultSettlementProposal memory _proposal = assetRouter.getSettlementProposal(proposalId);
+        assertEq(uint256(_proposal.yield), 0);
+        assertEq(_proposal.totalAssets, 0);
     }
 
     function test_ProposeSettleBatch_Require_Only_One_Pending_Proposal() public {
@@ -788,9 +814,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(users.relayer);
         testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS);
-        // First settlement requires guardian approval (ToB-24 fix)
-        vm.prank(users.guardian);
-        assetRouter.acceptProposal(testProposalId);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(testProposalId);
 
@@ -963,10 +986,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.warp(block.timestamp + 2);
 
-        // First settlement requires guardian approval (ToB-24 fix)
-        vm.prank(users.guardian);
-        assetRouter.acceptProposal(testProposalId);
-
         vm.prank(users.relayer);
         vm.expectEmit(true, true, true, true);
         emit IkAssetRouter.SettlementExecuted(testProposalId, address(dnVault), batchId, users.relayer);
@@ -1038,11 +1057,13 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.NOT_FOUND));
 
         bytes32 _batchId = dnVault.getBatchId();
+        _setDNVaultAdapterAssets(TEST_TOTAL_ASSETS);
         vm.prank(users.relayer);
         dnVault.closeBatch(_batchId, true);
 
         vm.prank(users.relayer);
-        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS);
+        uint256 _highTotalAssets = TEST_TOTAL_ASSETS * 2;
+        testProposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, _highTotalAssets);
 
         (canExecute, status) = assetRouter.canExecuteProposal(testProposalId);
         assertFalse(canExecute);
@@ -1050,7 +1071,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.warp(block.timestamp + 2);
 
-        // First settlement requires guardian approval before it is executable (ToB-24 fix)
         (canExecute, status) = assetRouter.canExecuteProposal(testProposalId);
         assertFalse(canExecute);
         assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.REQUIRES_APPROVAL));
@@ -1065,16 +1085,16 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
     function test_CanExecuteProposal_Cancelled() public {
         bytes32 _batchId = dnVault.getBatchId();
+        _setDNVaultAdapterAssets(TEST_TOTAL_ASSETS);
         vm.prank(users.relayer);
         dnVault.closeBatch(_batchId, true);
 
         vm.prank(users.relayer);
-        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS * 2);
 
         // Warp past cooldown
         vm.warp(block.timestamp + 2);
 
-        // First settlement requires approval — not yet executable (ToB-24 fix)
         (bool canExecute, IkAssetRouter.ProposalStatus status) = assetRouter.canExecuteProposal(proposalId);
         assertFalse(canExecute);
         assertEq(uint8(status), uint8(IkAssetRouter.ProposalStatus.REQUIRES_APPROVAL));
@@ -1091,13 +1111,14 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
     function test_CanExecuteProposal_AlreadyExecuted() public {
         bytes32 _batchId = dnVault.getBatchId();
+        _setDNVaultAdapterAssets(TEST_TOTAL_ASSETS);
         vm.prank(users.relayer);
         dnVault.closeBatch(_batchId, true);
 
         vm.prank(users.relayer);
-        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(USDC, address(dnVault), _batchId, TEST_TOTAL_ASSETS * 2);
 
-        // Warp past cooldown, approve, then execute (ToB-24: first settlement requires approval)
+        // Warp past cooldown, approve high-delta proposal, then execute
         vm.warp(block.timestamp + 2);
         vm.prank(users.guardian);
         assetRouter.acceptProposal(proposalId);
@@ -1145,10 +1166,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         // Pending before execution
         assertTrue(assetRouter.isProposalPending(proposalId));
 
-        // Execute (ToB-24: first settlement requires guardian approval)
         vm.warp(block.timestamp + 2);
-        vm.prank(users.guardian);
-        assetRouter.acceptProposal(proposalId);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
@@ -1239,7 +1257,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assertEq(proposal.batchId, _batchId);
         assertEq(proposal.totalAssets, TEST_TOTAL_ASSETS);
         assertEq(proposal.netted, 0);
-        assertEq(uint256(proposal.yield), TEST_TOTAL_ASSETS);
+        assertEq(uint256(proposal.yield), TEST_PROFIT);
         assertGt(proposal.executeAfter, 0);
     }
 
@@ -1342,8 +1360,13 @@ contract kAssetRouterTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                            Internals
+                             Internals
     //////////////////////////////////////////////////////////////*/
+
+    function _setDNVaultAdapterAssets(uint256 amount) internal {
+        vm.prank(address(assetRouter));
+        DNVaultAdapterUSDC.setTotalAssets(amount);
+    }
 
     function _closeBatch(address _vault, bytes32 _batchId) internal {
         vm.prank(users.relayer);

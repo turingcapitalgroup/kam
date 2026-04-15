@@ -280,9 +280,9 @@ interface IkAssetRouter is IVersioned {
     /// redemptions, (3) creating a proposal with cooldown period for security verification, (4) preparing for
     /// kToken supply adjustment to maintain 1:1 backing. Positive yields result in kToken minting (distributing
     /// gains to all holders), while losses result in kToken burning (socializing losses). The cooldown period
-    /// allows guardians to verify calculations before execution, ensuring protocol integrity.
-    /// On a vault's first settlement (no prior virtual balance), any non-zero totalAssets automatically sets
-    /// requiresApproval=true — guardian sign-off is always required before the bootstrapping settlement executes.
+    /// allows guardians to verify calculations before execution, ensuring protocol integrity. On a vault's first
+    /// settlement (no prior virtual balance), non-zero yields revert with KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD
+    /// to prevent unverified bootstrapping.
     /// @param asset The underlying asset address being settled (USDC, WBTC, etc.)
     /// @param vault The DN vault address where yield was generated
     /// @param batchId The batch identifier for this settlement period

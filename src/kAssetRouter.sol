@@ -14,6 +14,7 @@ import {
     KASSETROUTER_ASSET_MISMATCH,
     KASSETROUTER_BATCH_ID_PROPOSED,
     KASSETROUTER_COOLDOWN_IS_UP,
+    KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD,
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_INVALID_COOLDOWN,
     KASSETROUTER_IS_PAUSED,
@@ -274,8 +275,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             uint256(uint160(_vault)), uint256(uint160(_asset)), uint256(_batchId), block.timestamp, $.proposalCounter
         );
 
-        // For staking vaults: only one pending proposal at a time.
-        // For kMinter: only one pending proposal per asset at a time.
         if (_isMinter) {
             uint256 _pendingCount = $.vaultPendingProposalIds[_vault].length();
             if (_pendingCount > 0) {
@@ -323,6 +322,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // forge-lint: disable-next-line(unsafe-typecast)
         _yield = int256(_totalAssets) - int256(_lastTotalAssets);
 
+        if (_lastTotalAssets == 0) {
+            require(_yield == 0, KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD);
+        }
+
         // To calculate the strategy yield we need to include the deposits and requests into the new total assets
         // First to match last total assets
         // casting to 'uint256' is safe because we're converting back from int256 arithmetic
@@ -330,10 +333,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         uint256 _totalAssetsAdjusted = uint256(int256(_totalAssets) + _netted);
 
         // Check if yield exceeds tolerance threshold to prevent excessive yield deviations
-        // If exceeded, require guardian approval before execution.
-        // On the first settlement (_lastTotalAssets == 0), any reported assets bypass the tolerance
-        // formula entirely — require approval unconditionally to prevent unguarded bootstrapping.
-        bool _requiresApproval = _lastTotalAssets == 0 && _totalAssets > 0;
+        // If exceeded, require guardian approval before execution
+        bool _requiresApproval = false;
         if (_lastTotalAssets > 0) {
             uint256 _maxAllowedYield = _lastTotalAssets * $.maxAllowedDelta[_vault] / MAX_BPS;
             if (_yield.abs() > _maxAllowedYield) {
