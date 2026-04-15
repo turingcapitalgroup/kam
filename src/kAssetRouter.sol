@@ -339,7 +339,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             }
         } else {
             require(_yield == 0, KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD);
-        }   
+        }
 
         // Cache the adapter address at proposal creation time to prevent registry modification
         // from breaking execution. This ensures settlement can proceed even if vault/adapter
