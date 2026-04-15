@@ -322,10 +322,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // forge-lint: disable-next-line(unsafe-typecast)
         _yield = int256(_totalAssets) - int256(_lastTotalAssets);
 
-        if (_lastTotalAssets == 0) {
-            require(_yield == 0, KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD);
-        }
-
         // To calculate the strategy yield we need to include the deposits and requests into the new total assets
         // First to match last total assets
         // casting to 'uint256' is safe because we're converting back from int256 arithmetic
@@ -341,7 +337,9 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 _requiresApproval = true;
                 emit YieldExceedsMaxDeltaWarning(_vault, _asset, _batchId, _yield, _maxAllowedYield);
             }
-        }
+        } else {
+            require(_yield == 0, KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD);
+        }   
 
         // Cache the adapter address at proposal creation time to prevent registry modification
         // from breaking execution. This ensures settlement can proceed even if vault/adapter
