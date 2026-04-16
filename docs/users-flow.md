@@ -167,14 +167,14 @@
          ▼
 ┌─────────────────┐
 │Share Prices     │
-│Locked           │ ── sharePrice and netSharePrice set
+│Locked           │ ── sharePrice set at settlement snapshot
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
 │Mint stkTokens   │
 │to Vault         │ ── Pre-mint shares for all pending stakers
-└────────┬────────┘    at settlement price, clear totalPendingStake
+└────────┬────────┘    at settlement price
          │
          ▼
 ┌─────────────────┐
@@ -199,8 +199,8 @@
          ▼
 ┌─────────────────┐
 │Calculate        │
-│stkTokens Based  │ ── stkTokens = kTokens * (10^decimals) / netSharePrice
-│on Net Share     │    (using batch settlement snapshot values)
+│stkTokens Based  │ ── stkTokens = kTokens * (totalSupply + 1e6) / (totalAssets + 1e6)
+│on Share         │    (ERC4626 virtual offset; using batch snapshot values)
 │Price            │
 └────────┬────────┘
          │
@@ -243,27 +243,14 @@
          ▼
 ┌─────────────────┐
 │Calculate kTokens│
-│Net Amount       │ ── netKTokens = stkTokens * netSharePrice / (10^decimals)
-│                 │ 
+│Net Amount       │ ── kTokens = stkTokens * (totalAssets + 1e6) / (totalSupply + 1e6)
+│                 │ ── Uses batch snapshot values; fees already collected via dilution
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│Calculate Fees   │
-│                 │ ── grossKTokens = stkTokens * sharePrice / (10^decimals)
-│                 │ ── fees = grossKTokens - netKTokens
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│Burn stkTokens   │
-│from Vault       │ ── Burns from address(this) - already transferred
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│Transfer Fees to │
-│Treasury         │ ── $.kToken.safeTransfer(getTreasury(), fees)
+│stkTokens already│
+│burned at settle │ ── Burn + _decreaseBalance happened in settleBatch()
 └────────┬────────┘
          │
          ▼
@@ -342,85 +329,80 @@
 │  │balanceOf(this)  │                                                │
 │  └────────┬────────┘                                                │
 │           │                                                         │
-│           │ Subtract pending stakes                                 │
+│           │ totalBalance tracks active capital                      │
 │           ▼                                                         │
 │  ┌─────────────────┐                                                │
 │  │Total Assets =   │                                                │
-│  │Balance -        │                                                │
-│  │PendingStakes    │                                                │
+│  │totalBalance     │                                                │
 │  └────────┬────────┘                                                │
 │           │                                                         │
-│  Components that reduce to Net Assets:                              │
-│  ┌─────────────────┐         ┌─────────────────┐                    │
-│  │Management Fees  │         │Performance Fees │                    │
-│  │(configurable)   │         │(configurable)   │                    │
-│  │Time-based       │         │Above watermark  │                    │
-│  └────────┬────────┘         └────────┬────────┘                    │
-│           │                           │                             │
-│           └───────────┬───────────────┘                             │
-│                       ▼                                             │
-│              ┌─────────────────┐                                    │
-│              │Total Net Assets │                                    │
-│              │= totalAssets -  │                                    │
-│              │accumulatedFees  │                                    │
-│              └────────┬────────┘                                    │
-│                       │                                             │
-│  ┌─────────────────┐  │                                             │
-│  │Total Supply     │  │                                             │
-│  │(stkTokens)      │  │                                             │
-│  └────────┬────────┘  │                                             │
-│           │           │                                             │
-│           └─────┬─────┘                                             │
-│                 ▼                                                   │
-│        ┌─────────────────────────────────┐                          │
-│        │Formulas:                        │                          │
-│        │                                 │                          │
-│        │grossSharePrice =                │                          │
-│        │  totalAssets * (10^decimals)    │                          │
-│        │  / totalSupply                  │                          │
-│        │                                 │                          │
-│        │netSharePrice =                  │                          │
-│        │  totalNetAssets * (10^decimals) │                          │
-│        │  / totalSupply                  │                          │
-│        └─────────────────────────────────┘                          │
+│           │ Fees collected via share dilution                        │
+│           │ (_accrueFees() runs only at settleBatch;                │
+│           │  shares minted by _mintManagementFees()                 │
+│           │  — no fee deduction needed in share price formula)      │
+│           ▼                                                         │
+│  ┌─────────────────────────────────┐                                │
+│  │Formulas:                        │                                │
+│  │                                 │                                │
+│  │sharePrice =                     │                                │
+│  │  totalAssets * (10^decimals)    │                                │
+│  │  / totalSupply                  │                                │
+│  │                                 │                                │
+│  │netSharePrice() = sharePrice()   │                                │
+│  │  (backward compatibility alias) │                                │
+│  │                                 │                                │
+│  │totalNetAssets() = totalAssets() │                                │
+│  │  (backward compatibility alias) │                                │
+│  └─────────────────────────────────┘                                │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Fee Distribution
 
+Fees are collected via share dilution at settlement time only. During `settleBatch()`, `_accrueFees()` computes the management fee for the elapsed period and updates `lastFeeTimestamp`; `_mintManagementFees()` then mints the corresponding shares to the treasury. Performance fees are computed on net interest (`currentBalance − lastSettlementBalance − managementFeeAssets`) above the time-weighted hurdle threshold and minted to treasury in the same call.
+
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │                        Fee Distribution Flow                   │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
+│  At Settlement Only (settleBatch()):                           │
 │                         ┌─────────────┐                        │
-│                         │Gross Yield  │                        │
+│                         │_accrueFees()│                        │
+│                         │+ _mintMgmt  │                        │
+│                         │  Fees()     │                        │
 │                         └──────┬──────┘                        │
 │                                │                               │
-│               ┌────────────────────────────────┐               │
-│               │                                │               │
-│               ▼                                ▼               │
-│      ┌────────────────┐               ┌────────────────┐       │
-│      │Management Fee  │               │Performance Fee │       │
-│      │(configurable)  │               │(configurable)  │       │
-│      └────────┬───────┘               └────────┬───────┘       │
-│               │                                │               │
-│               │                                ▼               │
-│               │                         ┌─────────────┐        │
-│               └────────────────────────▶│Treasury     │        │
-│                                         └─────────────┘        │
-│                                                │               |
-│                                                ▼               |     
-│                                         ┌─────────────┐        |
-│                                         │Net Yield    │        |
-│                                         └──────┬──────┘        |
-│                                                │               |
-│                                                ▼               |
-│                                         ┌─────────────┐        |
-│                                         │Users        │        |
-│                                         │(Stakers)    │        |
-│                                         └─────────────┘        |
+│                                ▼                               │
+│                       ┌────────────────┐                       │
+│                       │Management Fee  │                       │
+│                       │(time-based on  │                       │
+│                       │ total assets)  │                       │
+│                       └────────┬───────┘                       │
+│                                │  Shares minted to treasury    │
+│                                ▼                               │
+│                         ┌──────────────┐                       │
+│                         │Treasury      │                       │
+│                         │(via registry │                       │
+│                         │getTreasury())│                       │
+│                         └──────────────┘                       │
+│                                                                │
+│  Also at Settlement (settleBatch()):                           │
+│                       ┌────────────────┐                       │
+│                       │Performance Fee │                       │
+│                       │(net interest   │                       │
+│                       │ above hurdle   │                       │
+│                       │ rate threshold)│                       │
+│                       └────────┬───────┘                       │
+│                                │  Shares minted to treasury    │
+│                                ▼                               │
+│                         ┌──────────────┐                       │
+│                         │Treasury      │                       │
+│                         └──────────────┘                       │
+│                                                                │
+│  Result: Share price already reflects collected fees.          │
+│  No separate fee deduction step needed.                        │
 │                                                                │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -471,17 +453,20 @@ Request Status Flow:
 │  Price Functions:                   │                           │   │
 │  ┌───────────────────────────┐      │• cancelProposal()         │   │
 │  │• _sharePrice()            │      │  Guardian cancellation    │   │
-│  │  Gross price calculation  │      │                           │   │
+│  │  Share price calculation  │      │                           │   │
 │  │                           │      │• kAssetTransfer()         │   │
-│  │• _netSharePrice()         │      │  Virtual balance updates  │   │
-│  │  Net after fees           │      └───────────────────────────┘   │
+│  │• _totalAssets()           │      │  Virtual balance updates  │   │
+│  │  Returns totalBalance      │      └───────────────────────────┘   │
 │  │                           │                                      │
-│  │• _totalAssets()           │      Fee Functions:                  │
-│  │  Balance - pending stakes │      ┌───────────────────────────┐   │
-│  │                           │      │• setManagementFee()       │   │
-│  │• _totalNetAssets()        │      │• setPerformanceFee()      │   │
-│  │  Assets - fees            │      │  (hurdle rates in registry)│   │
-│  └───────────────────────────┘      └───────────────────────────┘   │
+│  │• _accrueFees()            │      Fee Functions:                  │
+│  │  Compute mgmt fee &       │      ┌───────────────────────────┐   │
+│  │  update lastFeeTimestamp  │      │• setManagementFee()       │   │
+│  │  (called at settlement    │      │• setPerformanceFee()      │   │
+│  │   only; perf fee also     │      │  (accrue fees first, then │   │
+│  │   minted in settleBatch)  │      │   update rate; hurdle     │   │
+│  └───────────────────────────┘      │   update rate; hurdle     │   │
+│                                     │   rates in registry)      │   │
+│                                     └───────────────────────────┘   │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -568,8 +553,9 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │           ▼                                                                                     │
 │  ┌─────────────────┐    ┌─────────────────────────────────┐    ┌─────────────────┐              │
 │  │User receives    │◀───│                                 │───▶│Treasury         │              │
-│  │kTokens + yield  │    │         Fees deducted           │    │(Fees)           │              │
-│  └─────────────────┘    └─────────────────────────────────┘    └─────────────────┘              │
+│  │kTokens + yield  │    │    Fees already collected via   │    │(Fees collected  │              │
+│  └─────────────────┘    │    _accrueFees() share dilution │    │ via share mint) │              │
+│                         └─────────────────────────────────┘    └─────────────────┘              │
 │                                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -604,7 +590,7 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │  ┌─────────────────┐                                                                            │
 │  │Increases Share  │                                                                            │
 │  │Price            │                                                                            │
-│  │                 │ ── sharePrice = totalAssets * 1e18 / totalSupply                           │
+│  │                 │ ── sharePrice = (totalAssets + 1e6) * 10^decimals / (totalSupply + 1e6)    │
 │  └─────────┬───────┘                                                                            │
 │            │                                                                                    │
 │            ▼                                                                                    │

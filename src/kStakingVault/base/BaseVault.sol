@@ -11,7 +11,6 @@ import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentra
 import { ERC2771Context } from "kam/src/base/ERC2771Context.sol";
 import { K_ASSET_ROUTER, K_MINTER } from "kam/src/constants/Constants.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
-import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
@@ -55,6 +54,14 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @param amount The amount the balance was decreased by
     event BalanceDecreased(uint128 amount);
 
+    /// @notice Emitted when management fees are accrued and shares minted to treasury
+    /// @param managementFeeShares Number of shares minted for management fees
+    event ManagementFeesAccrued(uint256 managementFeeShares);
+
+    /// @notice Emitted when performance fees are charged and shares minted to treasury
+    /// @param performanceFeeShares Number of shares minted for performance fees
+    event PerformanceFeesCharged(uint256 performanceFeeShares);
+
     /* //////////////////////////////////////////////////////////////
                               CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -70,10 +77,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     uint256 internal constant INITIALIZED_SHIFT = 40;
     uint256 internal constant PAUSED_MASK = 0x1;
     uint256 internal constant PAUSED_SHIFT = 41;
-    uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_MASK = 0xFFFFFFFFFFFFFFFF;
-    uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_SHIFT = 42;
-    uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_MASK = 0xFFFFFFFFFFFFFFFF;
-    uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 106;
+    uint256 internal constant LAST_FEE_TIMESTAMP_MASK = 0xFFFFFFFFFFFFFFFF;
+    uint256 internal constant LAST_FEE_TIMESTAMP_SHIFT = 42;
 
     /* //////////////////////////////////////////////////////////////
                               STORAGE
@@ -82,13 +87,12 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @custom:storage-location erc7201.kam.storage.BaseVault
     struct BaseVaultStorage {
         //1
-        uint256 config; // decimals, performance fee, management fee, initialized, paused,
-        // lastFeesChargedManagement, lastFeesChargedPerformance
+        uint256 config; // decimals, performance fee, management fee, initialized, paused, lastFeeTimestamp
         //2 - asset tracking (both read in _totalAssets hot path)
         uint128 totalBalance;
         uint128 maxTotalAssets;
-        //3
-        uint128 sharePriceWatermark;
+        //3 - reserved (previously vesting fields)
+        uint256 _reserved3;
         //4
         uint256 currentBatch;
         //5
@@ -109,6 +113,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;
         mapping(bytes32 => BaseVaultTypes.UnstakeRequest) unstakeRequests;
         mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set) userRequests;
+        //12 - last settlement balance for performance fee calculation
+        uint128 lastSettlementBalance;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.BaseVault")) - 1)) & ~bytes32(uint256(0xff))
@@ -185,26 +191,15 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return _registry().getIsHardHurdleRate(address(this));
     }
 
-    function _getLastFeesChargedManagement(BaseVaultStorage storage $) internal view returns (uint64) {
-        // casting to 'uint64' is safe because LAST_FEES_CHARGED_MANAGEMENT_MASK ensures value fits in uint64
+    function _getLastFeeTimestamp(BaseVaultStorage storage $) internal view returns (uint64) {
+        // casting to 'uint64' is safe because LAST_FEE_TIMESTAMP_MASK ensures value fits in uint64
         // forge-lint: disable-next-line(unsafe-typecast)
-        return uint64(($.config >> LAST_FEES_CHARGED_MANAGEMENT_SHIFT) & LAST_FEES_CHARGED_MANAGEMENT_MASK);
+        return uint64(($.config >> LAST_FEE_TIMESTAMP_SHIFT) & LAST_FEE_TIMESTAMP_MASK);
     }
 
-    function _setLastFeesChargedManagement(BaseVaultStorage storage $, uint64 _value) internal {
-        $.config = ($.config & ~(LAST_FEES_CHARGED_MANAGEMENT_MASK << LAST_FEES_CHARGED_MANAGEMENT_SHIFT))
-            | (uint256(_value) << LAST_FEES_CHARGED_MANAGEMENT_SHIFT);
-    }
-
-    function _getLastFeesChargedPerformance(BaseVaultStorage storage $) internal view returns (uint64) {
-        // casting to 'uint64' is safe because LAST_FEES_CHARGED_PERFORMANCE_MASK ensures value fits in uint64
-        // forge-lint: disable-next-line(unsafe-typecast)
-        return uint64(($.config >> LAST_FEES_CHARGED_PERFORMANCE_SHIFT) & LAST_FEES_CHARGED_PERFORMANCE_MASK);
-    }
-
-    function _setLastFeesChargedPerformance(BaseVaultStorage storage $, uint64 _value) internal {
-        $.config = ($.config & ~(LAST_FEES_CHARGED_PERFORMANCE_MASK << LAST_FEES_CHARGED_PERFORMANCE_SHIFT))
-            | (uint256(_value) << LAST_FEES_CHARGED_PERFORMANCE_SHIFT);
+    function _setLastFeeTimestamp(BaseVaultStorage storage $, uint64 _value) internal {
+        $.config = ($.config & ~(LAST_FEE_TIMESTAMP_MASK << LAST_FEE_TIMESTAMP_SHIFT))
+            | (uint256(_value) << LAST_FEE_TIMESTAMP_SHIFT);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -230,8 +225,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         $.registry = _registryAddress;
         _setPaused($, _paused);
         _setInitialized($, true);
-        _setLastFeesChargedManagement($, uint64(block.timestamp));
-        _setLastFeesChargedPerformance($, uint64(block.timestamp));
+        _setLastFeeTimestamp($, uint64(block.timestamp));
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -356,20 +350,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return VaultMathLib.convertToShares(_assets, _totalAssetsValue, _totalSupply);
     }
 
-    /// @notice Calculates net share price per stkToken after deducting accumulated fees
-    /// @dev This function provides the user-facing share price that reflects actual value after management and
-    /// performance fee deductions. The calculation: (1) Uses vault decimals for proper scaling to match token
-    /// precision, (2) Calls _convertToAssets with unit share amount to determine per-token value, (3) Reflects
-    /// total net assets which exclude accrued but unpaid fees. This net pricing ensures users see accurate
-    /// value after all fee obligations, providing transparent visibility into their true vault position value.
-    /// Used primarily for user-facing calculations and accurate balance reporting.
-    /// @return Net price per stkToken in underlying asset terms (scaled to vault decimals)
-    function _netSharePrice() internal view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalNetAssets(), totalSupply());
-    }
-
-    /// @notice Calculates gross share price per stkToken including accumulated fees
+    /// @notice Calculates share price per stkToken
     /// @dev This function provides the total vault performance-based share price before fee deductions. The
     /// calculation:
     /// (1) Handles zero total supply edge case with 1:1 initial pricing, (2) Uses total gross assets including accrued
@@ -383,12 +364,15 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalAssets(), totalSupply());
     }
 
-    /// @notice Returns the internally tracked total assets under management
-    /// @dev Uses internal accounting (`totalBalance`) instead of relying on `kToken.balanceOf`.
-    /// The balance is updated via `increaseBalance`/`decreaseBalance` (authorized by router) and
-    /// internally during settlement. This approach is immune to balance manipulation attacks.
-    /// @return Total asset value managed by the vault
+    /// @notice Returns total assets under management
+    /// @return Total asset value
     function _totalAssets() internal view returns (uint256) {
+        return _getBaseVaultStorage().totalBalance;
+    }
+
+    /// @notice Returns the raw totalBalance
+    /// @return Raw balance
+    function _totalBalance() internal view returns (uint256) {
         return _getBaseVaultStorage().totalBalance;
     }
 
@@ -412,30 +396,48 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         emit BalanceDecreased(_amount);
     }
 
-    /// @notice Calculates net assets available to users after deducting accumulated fees
-    /// @dev This function provides the user-facing asset value by removing management and performance fee obligations.
-    /// The calculation: (1) Takes total gross assets as the starting point, (2) Subtracts accumulated fees calculated
-    /// by the fee computation module, (3) Results in the net value attributable to stkToken holders. This net asset
-    /// calculation is critical for fair share pricing, ensuring new entrants pay appropriate prices and existing
-    /// holders receive accurate valuations. The fee deduction prevents users from claiming value that belongs to
-    /// vault operators through fee mechanisms.
-    /// @return Net asset value available to users after all fee deductions
-    function _totalNetAssets() internal view returns (uint256) {
-        return _totalAssets() - _accumulatedFees();
+    /// @notice Computes pending management fee assets and updates the last fee timestamp
+    /// @dev Called at settlement and before fee rate changes. Does NOT mint shares — the caller
+    ///      is responsible for converting and minting. Returns 0 if no supply or no fees due.
+    /// @return managementFeeAssets Management fee in asset terms
+    function _accrueFees() internal returns (uint256 managementFeeAssets) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        uint256 totalAssets_ = _totalAssets();
+        uint256 _totalSupply = totalSupply();
+
+        uint64 _lastFeeTimestamp = _getLastFeeTimestamp($);
+        _setLastFeeTimestamp($, uint64(block.timestamp));
+
+        if (_totalSupply == 0) return 0;
+
+        managementFeeAssets =
+            VaultMathLib.computeManagementFee(totalAssets_, _getManagementFee($), _lastFeeTimestamp, block.timestamp);
     }
 
-    /// @notice Delegates fee calculation to the vault reader module for comprehensive fee computation
-    /// @dev This function serves as a gateway to the modular fee calculation system implemented in the vault reader.
-    /// The delegation pattern: (1) Calls the reader module which implements detailed fee calculation logic including
-    /// management fee accrual and performance fee assessment, (2) Returns total accumulated fees for asset
-    /// calculations,
-    /// (3) Maintains separation of concerns by isolating complex fee logic in dedicated modules. The reader module
-    /// handles time-based management fees, watermark-based performance fees, and hurdle rate calculations.
-    /// This modular approach enables upgradeable fee calculation logic while maintaining consistent interfaces.
-    /// @return Total accumulated fees (management + performance) in underlying asset terms
-    function _accumulatedFees() internal view returns (uint256) {
-        (,, uint256 totalFees) = IVaultReader(address(this)).computeLastBatchFees();
-        return totalFees;
+    /// @notice Mints management fee shares to the treasury
+    /// @dev Called by settlement and fee config setters to mint accrued management fees
+    /// @param _managementFeeAssets Management fee amount in asset terms
+    function _mintManagementFees(uint256 _managementFeeAssets) internal {
+        if (_managementFeeAssets == 0) return;
+        uint256 _totalSupply = totalSupply();
+        if (_totalSupply == 0) return;
+
+        address treasury = _registry().getTreasury();
+        uint256 managementFeeShares = _convertToSharesWithTotals(_managementFeeAssets, _totalAssets(), _totalSupply);
+        if (managementFeeShares > 0) {
+            _mint(treasury, managementFeeShares);
+            emit ManagementFeesAccrued(managementFeeShares);
+        }
+    }
+
+    /// @notice Returns the last settlement balance for interest calculation
+    function _getLastSettlementBalance() internal view returns (uint256) {
+        return _getBaseVaultStorage().lastSettlementBalance;
+    }
+
+    /// @notice Sets the last settlement balance snapshot
+    function _setLastSettlementBalance(uint128 _balance) internal {
+        _getBaseVaultStorage().lastSettlementBalance = _balance;
     }
 
     /* //////////////////////////////////////////////////////////////

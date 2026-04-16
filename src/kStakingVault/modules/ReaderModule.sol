@@ -2,14 +2,12 @@
 pragma solidity 0.8.30;
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
-import { OptimizedDateTimeLib } from "solady/utils/OptimizedDateTimeLib.sol";
 import { Extsload } from "uniswap/Extsload.sol";
 
 import { KSTAKINGVAULT_VAULT_SETTLED } from "kam/src/errors/Errors.sol";
 import { IModule } from "kam/src/interfaces/modules/IModule.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
-import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 /// @title ReaderModule
 /// @notice Contains fee, request, and auxiliary getters for the Staking Vault
@@ -18,50 +16,15 @@ import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 contract ReaderModule is BaseVault, Extsload, IModule {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
 
-    /// @notice Number of months in a year
-    uint256 constant MONTHS_PER_YEAR = 12;
-
     /* //////////////////////////////////////////////////////////////
                             FEE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Calculates accumulated fees for the current period
-    /// @return managementFees Accrued management fees in underlying asset terms
-    /// @return performanceFees Accrued performance fees in underlying asset terms
-    /// @return totalFees Combined management and performance fees
-    function computeLastBatchFees()
-        external
-        view
-        returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
-    {
+    /// @notice Returns the timestamp when fees were last accrued
+    /// @return Timestamp of last fee accrual
+    function lastFeeTimestamp() public view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return VaultMathLib.computeFees(
-            _totalAssets(),
-            totalSupply(),
-            $.sharePriceWatermark,
-            10 ** _getDecimals($),
-            _getManagementFee($),
-            _getHurdleRate($),
-            _getPerformanceFee($),
-            _getIsHardHurdleRate($),
-            _getLastFeesChargedManagement($),
-            _getLastFeesChargedPerformance($),
-            block.timestamp
-        );
-    }
-
-    /// @notice Returns the timestamp when management fees were last processed
-    /// @return Timestamp of last management fee charge
-    function lastFeesChargedManagement() public view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return _getLastFeesChargedManagement($);
-    }
-
-    /// @notice Returns the timestamp when performance fees were last processed
-    /// @return Timestamp of last performance fee charge
-    function lastFeesChargedPerformance() public view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return _getLastFeesChargedPerformance($);
+        return _getLastFeeTimestamp($);
     }
 
     /// @notice Returns the hurdle rate threshold for performance fee calculations
@@ -85,59 +48,11 @@ contract ReaderModule is BaseVault, Extsload, IModule {
         return _getPerformanceFee($);
     }
 
-    /// @notice Calculates the next timestamp when performance fees can be charged
-    /// @return Projected timestamp for next performance fee evaluation
-    function nextPerformanceFeeTimestamp() external view returns (uint256) {
-        uint256 _lastCharged = _getLastFeesChargedPerformance(_getBaseVaultStorage());
-
-        (uint256 _year, uint256 _month, uint256 _day) = OptimizedDateTimeLib.timestampToDate(_lastCharged);
-        uint256 _lastDay = OptimizedDateTimeLib.daysInMonth(_year, _month);
-
-        uint256 _targetMonth = _day != _lastDay ? _month + 2 : _month + 3;
-        uint256 _targetYear = _year;
-
-        if (_targetMonth > MONTHS_PER_YEAR) {
-            _targetYear += (_targetMonth - 1) / MONTHS_PER_YEAR;
-            _targetMonth = ((_targetMonth - 1) % MONTHS_PER_YEAR) + 1;
-        }
-
-        _lastDay = OptimizedDateTimeLib.daysInMonth(_targetYear, _targetMonth);
-        return OptimizedDateTimeLib.dateTimeToTimestamp(_targetYear, _targetMonth, _lastDay, 23, 59, 59);
-    }
-
-    /// @notice Calculates the next timestamp when management fees can be charged
-    /// @return Projected timestamp for next management fee evaluation
-    function nextManagementFeeTimestamp() external view returns (uint256) {
-        uint256 _lastCharged = _getLastFeesChargedManagement(_getBaseVaultStorage());
-
-        (uint256 _year, uint256 _month, uint256 _day) = OptimizedDateTimeLib.timestampToDate(_lastCharged);
-        uint256 _lastDay = OptimizedDateTimeLib.daysInMonth(_year, _month);
-
-        if (_day != _lastDay) return OptimizedDateTimeLib.dateTimeToTimestamp(_year, _month, _lastDay, 23, 59, 59);
-
-        uint256 _targetMonth = _month + 1;
-        uint256 _targetYear = _year;
-
-        if (_targetMonth > MONTHS_PER_YEAR) {
-            _targetYear += 1;
-            _targetMonth = 1;
-        }
-
-        _lastDay = OptimizedDateTimeLib.daysInMonth(_targetYear, _targetMonth);
-        return OptimizedDateTimeLib.dateTimeToTimestamp(_targetYear, _targetMonth, _lastDay, 23, 59, 59);
-    }
-
     /// @notice Returns the current management fee rate
     /// @return Management fee in basis points
     function managementFee() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getManagementFee($);
-    }
-
-    /// @notice Returns the high watermark used for performance fee calculations
-    /// @return Current high watermark share price
-    function sharePriceWatermark() external view returns (uint256) {
-        return _getBaseVaultStorage().sharePriceWatermark;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -202,22 +117,17 @@ contract ReaderModule is BaseVault, Extsload, IModule {
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](15);
-        moduleSelectors[0] = this.computeLastBatchFees.selector;
-        moduleSelectors[1] = this.lastFeesChargedManagement.selector;
-        moduleSelectors[2] = this.lastFeesChargedPerformance.selector;
-        moduleSelectors[3] = this.hurdleRate.selector;
-        moduleSelectors[4] = this.isHardHurdleRate.selector;
-        moduleSelectors[5] = this.performanceFee.selector;
-        moduleSelectors[6] = this.nextPerformanceFeeTimestamp.selector;
-        moduleSelectors[7] = this.nextManagementFeeTimestamp.selector;
-        moduleSelectors[8] = this.managementFee.selector;
-        moduleSelectors[9] = this.sharePriceWatermark.selector;
-        moduleSelectors[10] = this.getBatchReceiver.selector;
-        moduleSelectors[11] = this.getSafeBatchReceiver.selector;
-        moduleSelectors[12] = this.getUserRequests.selector;
-        moduleSelectors[13] = this.getStakeRequest.selector;
-        moduleSelectors[14] = this.getUnstakeRequest.selector;
+        bytes4[] memory moduleSelectors = new bytes4[](10);
+        moduleSelectors[0] = this.lastFeeTimestamp.selector;
+        moduleSelectors[1] = this.hurdleRate.selector;
+        moduleSelectors[2] = this.isHardHurdleRate.selector;
+        moduleSelectors[3] = this.performanceFee.selector;
+        moduleSelectors[4] = this.managementFee.selector;
+        moduleSelectors[5] = this.getBatchReceiver.selector;
+        moduleSelectors[6] = this.getSafeBatchReceiver.selector;
+        moduleSelectors[7] = this.getUserRequests.selector;
+        moduleSelectors[8] = this.getStakeRequest.selector;
+        moduleSelectors[9] = this.getUnstakeRequest.selector;
         return moduleSelectors;
     }
 }

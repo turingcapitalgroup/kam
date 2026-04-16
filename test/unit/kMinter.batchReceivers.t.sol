@@ -102,7 +102,7 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         vm.prank(users.admin);
         assetRouter.setSettlementCooldown(0);
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_proposalId);
 

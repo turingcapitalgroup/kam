@@ -62,10 +62,6 @@ interface IkAssetRouter is IVersioned {
         int256 yield;
         /// @dev Timestamp after which this proposal can be executed (cooldown protection)
         uint64 executeAfter;
-        /// @dev Timestamp when management fees were last charged (0 means no fees to charge)
-        uint64 lastFeesChargedManagement;
-        /// @dev Timestamp when performance fees were last charged (0 means no fees to charge)
-        uint64 lastFeesChargedPerformance;
         /// @dev True if yield delta exceeded threshold, requires guardian approval before execution
         bool requiresApproval;
     }
@@ -152,8 +148,6 @@ interface IkAssetRouter is IVersioned {
     /// @param netted Net amount of new deposits/redemptions in this batch
     /// @param yield Absolute yield amount generated in this batch
     /// @param executeAfter Timestamp after which the proposal can be executed
-    /// @param lastFeesChargedManagement Timestamp when management fees were last charged (0 = no fees)
-    /// @param lastFeesChargedPerformance Timestamp when performance fees were last charged (0 = no fees)
     event SettlementProposed(
         bytes32 indexed proposalId,
         address indexed vault,
@@ -161,9 +155,7 @@ interface IkAssetRouter is IVersioned {
         uint256 totalAssets,
         int256 netted,
         int256 yield,
-        uint256 executeAfter,
-        uint64 lastFeesChargedManagement,
-        uint64 lastFeesChargedPerformance
+        uint256 executeAfter
     );
 
     /// @notice Emitted when a settlement proposal is successfully executed
@@ -288,20 +280,18 @@ interface IkAssetRouter is IVersioned {
     /// redemptions, (3) creating a proposal with cooldown period for security verification, (4) preparing for
     /// kToken supply adjustment to maintain 1:1 backing. Positive yields result in kToken minting (distributing
     /// gains to all holders), while losses result in kToken burning (socializing losses). The cooldown period
-    /// allows guardians to verify calculations before execution, ensuring protocol integrity.
+    /// allows guardians to verify calculations before execution, ensuring protocol integrity. On a vault's first
+    /// settlement (no prior virtual balance), non-zero yields revert with KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD
+    /// to prevent unverified bootstrapping.
     /// @param asset The underlying asset address being settled (USDC, WBTC, etc.)
     /// @param vault The DN vault address where yield was generated
     /// @param batchId The batch identifier for this settlement period
     /// @param totalAssets Total asset value in the vault after yield generation/loss
-    /// @param lastFeesChargedManagement Timestamp when management fees were last charged (0 = no fees)
-    /// @param lastFeesChargedPerformance Timestamp when performance fees were last charged (0 = no fees)
     function proposeSettleBatch(
         address asset,
         address vault,
         bytes32 batchId,
-        uint256 totalAssets,
-        uint64 lastFeesChargedManagement,
-        uint64 lastFeesChargedPerformance
+        uint256 totalAssets
     )
         external
         payable

@@ -371,7 +371,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         dnVault.closeBatch(_dnBatchId, true);
 
         // Propose settlement for dnVault (creates pending proposal)
-        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0, 0, 0);
+        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0);
         vm.stopPrank();
 
         // Try to remove vault with pending proposal - should fail
@@ -696,7 +696,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         dnVault.closeBatch(_dnBatchId, true);
 
         // Propose settlement for dnVault (creates pending proposal)
-        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0, 0, 0);
+        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0);
         vm.stopPrank();
 
         // Get the adapter for this vault-asset pair

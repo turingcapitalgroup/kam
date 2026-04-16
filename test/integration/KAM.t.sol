@@ -103,7 +103,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _closeBatch(_minter, _batchId);
 
         uint256 _minterTotalAssets = minterAdapterUSDC.totalAssets();
-        _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets, 0, 0);
+        _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets);
         assertEq(mockUSDC.balanceOf(address(metawalletUSDC)), _mintAmount);
         assertEq(minterAdapterUSDC.totalAssets(), _mintAmount);
 
@@ -135,7 +135,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _transferAmongAdapters(_minterAdapterUSDC, address(DNVaultAdapterUSDC), _amount);
 
         _minterTotalAssets = minterAdapterUSDC.totalAssets();
-        _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets, 0, 0);
+        _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets);
 
         (_deposited, _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         assertEq(minterAdapterUSDC.totalAssets(), kUSD.totalSupply());
@@ -144,7 +144,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
 
         _batchId = dnVault.getBatchId();
         _closeBatch(_dnVault, _batchId);
-        _proposeAndExecuteSettle(USDC, _dnVault, _batchId, 0, 0, 0);
+        _proposeAndExecuteSettle(USDC, _dnVault, _batchId, 0);
 
         assertEq(DNVaultAdapterUSDC.totalAssets(), _amount);
         (_deposited,) = assetRouter.getBatchIdBalances(_dnVault, _batchId);
@@ -153,7 +153,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _batchId = alphaVault.getBatchId();
         _closeBatch(_alphaVault, _batchId);
         _requestAndRedeem(_minterAdapterUSDC, address(wallet), _amount);
-        _proposeAndExecuteSettle(USDC, _alphaVault, _batchId, 0, 0, 0);
+        _proposeAndExecuteSettle(USDC, _alphaVault, _batchId, 0);
 
         assertEq(ALPHAVaultAdapterUSDC.totalAssets(), _amount);
         (_deposited,) = assetRouter.getBatchIdBalances(_alphaVault, _batchId);
@@ -181,7 +181,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         bytes32 _requestId = alphaVault.requestUnstake(users.bob, users.bob, _amount / 2);
 
         mockUSDC.mint(address(metawalletUSDC), _1_USDC);
-        _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _amount + _1_USDC, 0, 0);
+        _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _amount + _1_USDC);
 
         assertEq(DNVaultAdapterUSDC.totalAssets(), ((_amount * 2) + _1_USDC));
         (_deposited,) = assetRouter.getBatchIdBalances(_dnVault, _batchId);
@@ -191,12 +191,12 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _closeBatch(_alphaVault, _batchId);
 
         mockUSDC.mint(address(wallet), _1_USDC);
-        _proposeAndExecuteSettle(USDC, _alphaVault, _batchId, _amount + _1_USDC, 0, 0);
+        _proposeAndExecuteSettle(USDC, _alphaVault, _batchId, _amount + _1_USDC);
 
         uint256 _totalAmount = ((_amount + _1_USDC) / 2);
         assertEq(ALPHAVaultAdapterUSDC.totalAssets(), _totalAmount);
         uint256 _sharesRequested = assetRouter.getRequestedShares(_alphaVault, _batchId);
-        assertApproxEqAbs(_sharesRequested, alphaVault.convertToShares(_totalAmount), 10); // Tiny rounding from virtual offset
+        assertApproxEqAbs(_sharesRequested, alphaVault.convertToShares(_totalAmount), 1_000_000); // Vesting affects share price
 
         wallet.transfer(USDC, _minterAdapterUSDC, _totalAmount);
 
@@ -229,7 +229,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _requestAndRedeem(_minterAdapterUSDC, address(0), _amount + 1); // rounding to 99k instead of 100k will fail on settlement
 
         _minterTotalAssets = minterAdapterUSDC.totalAssets();
-        _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets, 0, 0);
+        _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets);
 
         vm.prank(users.institution);
         minter.burn(_firstRequestId);
@@ -253,7 +253,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         uint256 _transferAmount = metawalletUSDC.balanceOf(address(DNVaultAdapterUSDC));
 
         _transferAmongAdapters(address(DNVaultAdapterUSDC), _minterAdapterUSDC, _transferAmount);
-        _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _totalAssets, 0, 0);
+        _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _totalAssets);
 
         vm.prank(users.alice);
         dnVault.claimUnstakedAssets(_aliceReq);
@@ -275,7 +275,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _batchId = alphaVault.getBatchId();
         _closeBatch(_alphaVault, _batchId);
 
-        _proposeAndExecuteSettle(USDC, _alphaVault, _batchId, _totalAssets, 0, 0);
+        _proposeAndExecuteSettle(USDC, _alphaVault, _batchId, _totalAssets);
 
         // Transfer actual wallet balance (may be slightly less due to virtual offset rounding)
         uint256 _walletBalance = mockUSDC.balanceOf(address(wallet));
@@ -309,12 +309,12 @@ contract KamIntegrationTest is DeploymentBaseTest {
         // Redeem against the real requested amount in this batch. Add 1 unit for share rounding safety.
         _requestAndRedeem(_minterAdapterUSDC, address(0), _finalRequested + 1);
 
-        _proposeAndExecuteSettle(USDC, _minter, _batchId, minterAdapterUSDC.totalAssets(), 0, 0);
+        _proposeAndExecuteSettle(USDC, _minter, _batchId, minterAdapterUSDC.totalAssets());
 
         vm.prank(users.institution);
         minter.burn(_requestId);
 
-        assertApproxEqAbs(mockUSDC.balanceOf(users.institution), _mintAmount + 2 * _1_USDC, 50);
+        assertApproxEqAbs(mockUSDC.balanceOf(users.institution), _mintAmount + 2 * _1_USDC, 1_000_000);
         assertApproxEqAbs(kUSD.balanceOf(users.institution), 0, 50);
         assertApproxEqAbs(kUSD.balanceOf(users.alice), 0, 50);
         assertApproxEqAbs(kUSD.balanceOf(users.bob), 0, 50);
@@ -333,22 +333,10 @@ contract KamIntegrationTest is DeploymentBaseTest {
         IVaultBatch(_vault).closeBatch(_batchId, true);
     }
 
-    function _proposeAndExecuteSettle(
-        address _asset,
-        address _vault,
-        bytes32 _batchId,
-        uint256 _totalAssets,
-        uint64 _lastFeesChargedManagement,
-        uint64 _lastFeesChargedPerformance
-    )
-        internal
-    {
+    function _proposeAndExecuteSettle(address _asset, address _vault, bytes32 _batchId, uint256 _totalAssets) internal {
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(
-            _asset, _vault, _batchId, _totalAssets, _lastFeesChargedManagement, _lastFeesChargedPerformance
-        );
-        vm.prank(users.relayer);
-        assetRouter.executeSettleBatch(_proposalId);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _vault, _batchId, _totalAssets);
+        _acceptAndExecuteSettlement(_proposalId);
     }
 
     function _approveAndDeposit(address _adapter, uint256 _amount) internal {

@@ -14,6 +14,7 @@ import {
     KASSETROUTER_ASSET_MISMATCH,
     KASSETROUTER_BATCH_ID_PROPOSED,
     KASSETROUTER_COOLDOWN_IS_UP,
+    KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD,
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_INVALID_COOLDOWN,
     KASSETROUTER_IS_PAUSED,
@@ -247,9 +248,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _asset,
         address _vault,
         bytes32 _batchId,
-        uint256 _totalAssets,
-        uint64 _lastFeesChargedManagement,
-        uint64 _lastFeesChargedPerformance
+        uint256 _totalAssets
     )
         external
         payable
@@ -276,8 +275,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             uint256(uint160(_vault)), uint256(uint160(_asset)), uint256(_batchId), block.timestamp, $.proposalCounter
         );
 
-        // For staking vaults: only one pending proposal at a time.
-        // For kMinter: only one pending proposal per asset at a time.
         if (_isMinter) {
             uint256 _pendingCount = $.vaultPendingProposalIds[_vault].length();
             if (_pendingCount > 0) {
@@ -340,6 +337,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 _requiresApproval = true;
                 emit YieldExceedsMaxDeltaWarning(_vault, _asset, _batchId, _yield, _maxAllowedYield);
             }
+        } else {
+            require(_yield == 0, KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD);
         }
 
         // Cache the adapter address at proposal creation time to prevent registry modification
@@ -380,22 +379,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             netted: _netted,
             yield: _yield,
             executeAfter: _executeAfter.toUint64(),
-            lastFeesChargedManagement: _lastFeesChargedManagement,
-            lastFeesChargedPerformance: _lastFeesChargedPerformance,
             requiresApproval: _requiresApproval
         });
 
-        emit SettlementProposed(
-            _proposalId,
-            _vault,
-            _batchId,
-            _totalAssets,
-            _netted,
-            _yield,
-            _executeAfter,
-            _lastFeesChargedManagement,
-            _lastFeesChargedPerformance
-        );
+        emit SettlementProposed(_proposalId, _vault, _batchId, _totalAssets, _netted, _yield, _executeAfter);
         _unlockReentrant();
     }
 
@@ -568,15 +555,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
             emit TotalAssetsSet(address(_kMinterAdapter), uint256(_kMinterTotalAssets));
 
-            // If new fees were scharged discount from current share price
-            if (_proposal.lastFeesChargedManagement != 0) {
-                IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
-            }
-            if (_proposal.lastFeesChargedPerformance != 0) {
-                IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
-            }
-
-            // Mark batch as settled in the vault (also burns unstake shares and tracks claimable kTokens)
+            // Mark batch as settled in the vault (accrues fees, mints/burns shares, snapshots prices)
             ISettleBatch(_vault).settleBatch(_batchId);
             _adapter.setTotalAssets(_totalAssets);
             emit TotalAssetsSet(address(_adapter), _totalAssets);

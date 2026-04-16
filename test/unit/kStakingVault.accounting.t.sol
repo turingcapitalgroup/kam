@@ -148,7 +148,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         vm.prank(users.relayer);
-        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, INITIAL_DEPOSIT, 0, 0);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, INITIAL_DEPOSIT);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
@@ -363,16 +363,9 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         // Fast forward time to accrue management fees
         vm.warp(block.timestamp + 365 days);
 
-        // Net assets should be less than total assets due to accrued fees
-        uint256 totalAssets = vault.totalAssets();
-        uint256 netAssets = vault.totalNetAssets();
-
-        assertLt(netAssets, totalAssets);
-
-        // Difference should be approximately 1% (management fee)
-        uint256 feeAmount = totalAssets - netAssets;
-        uint256 expectedFeeAmount = totalAssets / 100; //1%
-        assertApproxEqRel(feeAmount, expectedFeeAmount, 0.1e18); // 10% tolerance
+        // With continuous fee accrual, totalNetAssets equals totalAssets
+        // (fees are collected as shares, not subtracted from assets)
+        assertEq(vault.totalNetAssets(), vault.totalAssets());
     }
 
     /* //////////////////////////////////////////////////////////////

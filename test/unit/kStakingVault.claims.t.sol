@@ -363,7 +363,8 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         lastTotalAssets = vault.totalAssets();
         _executeBatchSettlement(address(vault), unstakeBatchId, lastTotalAssets);
 
-        assertApproxEqRel(vault.sharePrice(), sharePrice, 0.001 ether);
+        // Net share price should stay stable (gross share price may jump since accrued fees
+        // remain in the vault with near-zero supply after all unstake shares are burned)
         assertApproxEqRel(vault.netSharePrice(), netSharePrice, 0.001 ether);
 
         // Get kToken balance before claim
@@ -373,7 +374,6 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         vm.prank(users.alice);
         vault.claimUnstakedAssets(unstakeRequestId);
 
-        assertApproxEqRel(vault.sharePrice(), sharePrice, 0.01 ether); // 1% tolerance
         assertApproxEqRel(vault.netSharePrice(), netSharePrice, 0.01 ether); // 1% tolerance
 
         // Verify user received kTokens back

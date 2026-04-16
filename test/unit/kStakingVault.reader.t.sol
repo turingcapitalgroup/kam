@@ -84,82 +84,10 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         assertTrue(isHard);
     }
 
-    function test_sharePriceWatermark_ReturnsInitialValue() public view {
-        uint256 watermark = vault.sharePriceWatermark();
-        // Initial watermark should be set to 1e6 (1:1 ratio with 6 decimals)
-        assertEq(watermark, 1e6);
-    }
-
-    function test_lastFeesChargedManagement_ReturnsTimestamp() public view {
-        uint256 lastCharged = vault.lastFeesChargedManagement();
+    function test_lastFeeTimestamp_ReturnsTimestamp() public view {
+        uint256 lastCharged = vault.lastFeeTimestamp();
         // Should be set to deployment time
         assertGt(lastCharged, 0);
-    }
-
-    function test_lastFeesChargedPerformance_ReturnsTimestamp() public view {
-        uint256 lastCharged = vault.lastFeesChargedPerformance();
-        // Should be set to deployment time
-        assertGt(lastCharged, 0);
-    }
-
-    function test_nextManagementFeeTimestamp_ReturnsEndOfMonth() public view {
-        uint256 nextTimestamp = vault.nextManagementFeeTimestamp();
-        // Should be in the future or at end of current month
-        assertGt(nextTimestamp, 0);
-    }
-
-    function test_nextPerformanceFeeTimestamp_ReturnsQuarterEnd() public view {
-        uint256 nextTimestamp = vault.nextPerformanceFeeTimestamp();
-        // Should be in the future (quarterly)
-        assertGt(nextTimestamp, 0);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        COMPUTE FEES TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_computeLastBatchFees_ReturnsZero_WhenNoTimeElapsed() public view {
-        (uint256 managementFees, uint256 performanceFees, uint256 totalFees) = vault.computeLastBatchFees();
-
-        // With no assets and minimal time, fees should be minimal
-        // Note: actual values depend on vault state
-        assertEq(totalFees, managementFees + performanceFees);
-    }
-
-    function test_computeLastBatchFees_AccruesManagementFees_OverTime() public {
-        _setupTestFees();
-
-        // Stake some assets first
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Fast forward time
-        vm.warp(block.timestamp + 365 days);
-
-        (uint256 managementFees, uint256 performanceFees, uint256 totalFees) = vault.computeLastBatchFees();
-
-        // Management fees should be approximately 1% of total assets after 1 year
-        assertGt(managementFees, 0);
-        assertEq(totalFees, managementFees + performanceFees);
-    }
-
-    function test_computeLastBatchFees_AccruesPerformanceFees_OnProfit() public {
-        _setupTestFees();
-
-        // Stake some assets
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Fast forward and settle with profit
-        vm.warp(block.timestamp + 90 days);
-        int256 profit = int256(INITIAL_DEPOSIT / 10); // 10% profit
-        _performStakeAndSettle(users.bob, SMALL_DEPOSIT, profit);
-
-        // Check fees after more time
-        vm.warp(block.timestamp + 90 days);
-        (uint256 managementFees, uint256 performanceFees, uint256 totalFees) = vault.computeLastBatchFees();
-
-        assertGt(managementFees, 0);
-        // Performance fees may or may not be charged depending on hurdle
-        assertEq(totalFees, managementFees + performanceFees);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -354,6 +282,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         int256 profit = int256(INITIAL_DEPOSIT / 10); // 10% profit
         _performStakeAndSettle(users.bob, SMALL_DEPOSIT, profit);
 
+        // No vesting - share price reflects profit immediately
         uint256 priceAfter = vault.sharePrice();
 
         // Share price should increase after profit
@@ -365,27 +294,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         uint256 total = vault.totalAssets();
         assertGt(total, 0);
-    }
-
-    function test_totalNetAssets_ReturnsNetAssets() public {
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        uint256 total = vault.totalNetAssets();
-        assertGt(total, 0);
-    }
-
-    function test_totalNetAssets_LessThanOrEqualTotalAssets_AfterFees() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Fast forward to accrue fees
-        vm.warp(block.timestamp + 365 days);
-
-        uint256 totalGross = vault.totalAssets();
-        uint256 totalNet = vault.totalNetAssets();
-
-        // Net assets should be less than or equal to gross after fee accrual
-        assertLe(totalNet, totalGross);
     }
 
     function test_convertToShares_ConvertsCorrectly() public {
@@ -554,14 +462,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         vault.performanceFee();
         vault.hurdleRate();
         vault.isHardHurdleRate();
-        vault.sharePriceWatermark();
-        vault.lastFeesChargedManagement();
-        vault.lastFeesChargedPerformance();
-        vault.nextManagementFeeTimestamp();
-        vault.nextPerformanceFeeTimestamp();
-
-        // Fee computation
-        vault.computeLastBatchFees();
+        vault.lastFeeTimestamp();
 
         // Batch info
         vault.getBatchId();

@@ -17,6 +17,8 @@ import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces/IVault.sol";
 
+import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
+
 import {
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
     KSTAKINGVAULT_BATCH_NOT_VALID,
@@ -36,8 +38,7 @@ import {
     VAULTCLAIMS_BATCH_NOT_SETTLED,
     VAULTCLAIMS_NOT_BENEFICIARY,
     VAULTCLAIMS_REQUEST_NOT_PENDING,
-    VAULTFEES_FEE_EXCEEDS_MAXIMUM,
-    VAULTFEES_INVALID_TIMESTAMP
+    VAULTFEES_FEE_EXCEEDS_MAXIMUM
 } from "kam/src/errors/Errors.sol";
 
 import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
@@ -118,7 +119,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         $.symbol = _symbol;
         _setDecimals($, _decimals);
         $.underlyingAsset = _asset;
-        $.sharePriceWatermark = (10 ** _decimals).toUint128();
         $.kToken = _registry().assetToKToken(_asset);
         $.maxTotalAssets = _maxTotalAssets;
 
@@ -215,7 +215,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Enforce limit using asset-based tracking
         uint256 _requestedAssets = _convertToAssetsWithTotals(
-            $.batches[_batchId].requestedSharesInBatch += _stkTokenAmount.toUint128(), _totalNetAssets(), totalSupply()
+            $.batches[_batchId].requestedSharesInBatch += _stkTokenAmount.toUint128(), _totalAssets(), totalSupply()
         );
         require(_requestedAssets <= _registry().getMaxBurnPerBatch(address(this)), KSTAKINGVAULT_BATCH_LIMIT_REACHED);
 
@@ -259,6 +259,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         _lockReentrant();
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         _checkPaused($);
+
         bytes32 _batchId = $.stakeRequests[_requestId].batchId;
         require($.batches[_batchId].isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
 
@@ -272,7 +273,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Calculate stkToken amount based on settlement-time values
         BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
         uint256 _stkTokensToTransfer =
-            _convertToSharesWithTotals(_request.kTokenAmount, batch.totalNetAssets, batch.totalSupply);
+            _convertToSharesWithTotals(_request.kTokenAmount, batch.totalAssets, batch.totalSupply);
         _checkAmountNotZero(_stkTokensToTransfer);
 
         emit StakingSharesClaimed(_batchId, _requestId, _request.recipient, _stkTokensToTransfer);
@@ -303,8 +304,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(_request.status == BaseVaultTypes.RequestStatus.PENDING, VAULTCLAIMS_REQUEST_NOT_PENDING);
         require(_msgSender() == user, VAULTCLAIMS_NOT_BENEFICIARY);
 
-        // Calculate total kTokens to return: (stkTokenAmount * totalNetAssets) / totalSupply
-        uint256 _totalKTokensNet = _convertToAssetsWithTotals(stkTokenAmount, batch.totalNetAssets, batch.totalSupply);
+        // Calculate total kTokens to return: (stkTokenAmount * totalAssets) / totalSupply
+        uint256 _totalKTokensNet = _convertToAssetsWithTotals(stkTokenAmount, batch.totalAssets, batch.totalSupply);
         _checkAmountNotZero(_totalKTokensNet);
 
         require($.userRequests[_msgSender()].remove(_requestId), KSTAKINGVAULT_REQUEST_NOT_FOUND);
@@ -355,19 +356,56 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(!$.batches[_batchId].isSettled, VAULTBATCHES_VAULT_SETTLED);
         $.batches[_batchId].isSettled = true;
 
-        // Cache total assets and supply at settlement time for calculations
+        // Capture elapsed time before _accrueFees() updates the timestamp
+        uint256 _settlementElapsed = block.timestamp - _getLastFeeTimestamp($);
+
+        // 1. Accrue management fees
+        uint256 _mgmtFeeAssets = _accrueFees();
+
+        // 2. Calculate interest AFTER management fees
+        uint256 _previousBalance = _getLastSettlementBalance();
+        uint256 _currentBalance = _totalBalance();
+        // forge-lint: disable-next-line(unsafe-typecast) safe because diff of uint128 values
+        int256 _interest = int256(_currentBalance) - int256(_previousBalance) - int256(_mgmtFeeAssets);
+
+        // 3. Mint management fee shares
+        if (_mgmtFeeAssets > 0) {
+            _mintManagementFees(_mgmtFeeAssets);
+        }
+
+        // 4. Charge performance fees on net interest
+        uint256 _performanceFeeShares;
+        if (_interest > 0) {
+            // forge-lint: disable-next-line(unsafe-typecast) safe because _interest > 0
+            uint256 _interestUint = uint256(_interest);
+            uint256 _perfFeeAssets = VaultMathLib.computePerformanceFee(
+                _interestUint,
+                _previousBalance,
+                _getPerformanceFee($),
+                _getHurdleRate($),
+                _getIsHardHurdleRate($),
+                _settlementElapsed
+            );
+
+            if (_perfFeeAssets > 0) {
+                _performanceFeeShares = _convertToSharesWithTotals(_perfFeeAssets, _totalAssets(), totalSupply());
+                if (_performanceFeeShares > 0) {
+                    _mint(_registry().getTreasury(), _performanceFeeShares);
+                    emit PerformanceFeesCharged(_performanceFeeShares);
+                }
+            }
+        }
+
+        // 5. Cache total assets and supply after fee accrual for share calculations
         uint256 _batchTotalAssets = _totalAssets();
-        uint256 _batchTotalNetAssets = _totalNetAssets();
         uint256 _batchTotalSupply = totalSupply();
 
         // Mint shares for this batch's pending stakes to the vault itself
-        // This effectively "claims" shares for all pending stakers in this batch at settlement price
         uint128 batchDeposited = $.batches[_batchId].depositedInBatch;
 
         if (batchDeposited != 0) {
-            uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalNetAssets, _batchTotalSupply);
+            uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
-            // Deposits become active assets in internal balance
             _increaseBalance(batchDeposited);
         }
 
@@ -375,34 +413,22 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         uint128 requestedShares = $.batches[_batchId].requestedSharesInBatch;
 
         if (requestedShares != 0) {
-            // Calculate total kTokens corresponding to all requested shares at gross price
-            uint256 _totalKTokensForShares =
+            uint256 _claimableKTokens =
                 _convertToAssetsWithTotals(requestedShares, _batchTotalAssets, _batchTotalSupply);
 
-            // Calculate claimable kTokens for users (net amount after fees)
-            uint256 _claimableKTokens =
-                _convertToAssetsWithTotals(requestedShares, _batchTotalNetAssets, _batchTotalSupply);
-
-            // Burn all requested shares
             _burn(address(this), requestedShares);
-
-            // Fee assets is the difference between gross and net kTokens
-            uint256 _feeAssets = _totalKTokensForShares - _claimableKTokens;
-
-            if (_feeAssets != 0) {
-                // Send fees in form of assets to the treasury
-                _getBaseVaultStorage().kToken.safeTransfer(_registry().getTreasury(), _feeAssets);
-            }
-
-            // Deduct total gross kTokens from internal balance (claimable + fees leave active management)
-            _decreaseBalance(_totalKTokensForShares.toUint128());
+            _decreaseBalance(_claimableKTokens.toUint128());
 
             emit UnstakeSharesBurned(_batchId, requestedShares, _claimableKTokens);
         }
 
-        // Snapshot total assets and supply at the time of settelement
+        // Snapshot for next settlement's interest calculation
+        _setLastSettlementBalance(uint128(_totalBalance()));
+
+        // Snapshot the pre-operation totals used for settlement calculations.
+        // Individual claims must use the same conversion rate as the bulk settlement
+        // to guarantee sum(individual claims) <= total reserved amount.
         $.batches[_batchId].totalAssets = _batchTotalAssets;
-        $.batches[_batchId].totalNetAssets = _batchTotalNetAssets;
         $.batches[_batchId].totalSupply = _batchTotalSupply;
 
         emit BatchSettled(_batchId);
@@ -499,17 +525,6 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         require(_isAdmin(_admin), KSTAKINGVAULT_WRONG_ROLE);
     }
 
-    /// @notice Validates timestamp progression preventing manipulation and ensuring logical sequence
-    /// @dev This function ensures fee timestamp updates follow logical progression and remain within valid ranges.
-    /// Validation checks: (1) New timestamp must be >= last timestamp to prevent backwards time manipulation,
-    /// (2) New timestamp must be <= current block time to prevent future-dating. These validations are critical
-    /// for accurate fee calculations and preventing temporal manipulation attacks on the fee system.
-    /// @param _timestamp The new timestamp being set for fee tracking
-    /// @param _lastTimestamp The previous timestamp for progression validation
-    function _validateTimestamp(uint256 _timestamp, uint256 _lastTimestamp) private view {
-        require(_timestamp >= _lastTimestamp && _timestamp <= block.timestamp, VAULTFEES_INVALID_TIMESTAMP);
-    }
-
     /* //////////////////////////////////////////////////////////////
                           VAULT FEES FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -518,6 +533,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     function setManagementFee(uint16 _managementFee) external {
         _checkAdmin(_msgSender());
         _checkValidBPS(_managementFee);
+        uint256 mgmtFeeAssets = _accrueFees();
+        _mintManagementFees(mgmtFeeAssets);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint16 oldFee = _getManagementFee($);
         _setManagementFee($, _managementFee);
@@ -528,46 +545,12 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     function setPerformanceFee(uint16 _performanceFee) external {
         _checkAdmin(_msgSender());
         _checkValidBPS(_performanceFee);
+        uint256 mgmtFeeAssets = _accrueFees();
+        _mintManagementFees(mgmtFeeAssets);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint16 oldFee = _getPerformanceFee($);
         _setPerformanceFee($, _performanceFee);
         emit PerformanceFeeSet(oldFee, _performanceFee);
-    }
-
-    /// @inheritdoc IVaultFees
-    function notifyManagementFeesCharged(uint64 _timestamp) external {
-        _checkRouter(_msgSender());
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        _validateTimestamp(_timestamp, _getLastFeesChargedManagement($));
-        _setLastFeesChargedManagement($, _timestamp);
-        emit ManagementFeesCharged(_timestamp);
-    }
-
-    /// @inheritdoc IVaultFees
-    function notifyPerformanceFeesCharged(uint64 _timestamp) external {
-        _checkRouter(_msgSender());
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        _validateTimestamp(_timestamp, _getLastFeesChargedPerformance($));
-        _updateGlobalWatermark(_timestamp);
-        _setLastFeesChargedPerformance($, _timestamp);
-        emit PerformanceFeesCharged(_timestamp);
-    }
-
-    /// @notice Updates the share price watermark using the share price at a specific timestamp
-    /// @dev Updates the high water mark if the share price at _timestamp exceeds the previous mark.
-    ///      Uses VaultMathLib to compute fees at the given timestamp for accurate historical pricing.
-    /// @param _timestamp The timestamp at which to evaluate the share price for watermark comparison
-    function _updateGlobalWatermark(uint64 _timestamp) private {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        uint256 _totalAssetsVal = _totalAssets();
-        uint256 _totalSupplyVal = totalSupply();
-        uint8 _decimals = _getDecimals($);
-
-        uint256 _sp = _convertToAssetsWithTotals(10 ** _decimals, _totalAssetsVal, _totalSupplyVal);
-        if (_sp > $.sharePriceWatermark) {
-            $.sharePriceWatermark = _sp.toUint128();
-            emit SharePriceWatermarkUpdated(_sp);
-        }
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -670,7 +653,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     }
 
     function totalNetAssets() external view returns (uint256) {
-        return _totalNetAssets();
+        return _totalAssets();
     }
 
     function sharePrice() external view returns (uint256) {
@@ -678,15 +661,15 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     }
 
     function netSharePrice() external view returns (uint256) {
-        return _netSharePrice();
+        return _sharePrice();
     }
 
     function convertToShares(uint256 _shares) external view returns (uint256) {
-        return _convertToSharesWithTotals(_shares, _totalNetAssets(), totalSupply());
+        return _convertToSharesWithTotals(_shares, _totalAssets(), totalSupply());
     }
 
     function convertToAssets(uint256 _assets) external view returns (uint256) {
-        return _convertToAssetsWithTotals(_assets, _totalNetAssets(), totalSupply());
+        return _convertToAssetsWithTotals(_assets, _totalAssets(), totalSupply());
     }
 
     function convertToSharesWithTotals(
@@ -773,7 +756,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         uint8 decimals = _getDecimals($);
 
         sharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalAssets, _totalSupply);
-        netSharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalNetAssets, _totalSupply);
+        netSharePrice_ = sharePrice_;
 
         return (
             batch.batchReceiver,
@@ -782,7 +765,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             sharePrice_,
             netSharePrice_,
             batch.totalAssets,
-            batch.totalNetAssets,
+            batch.totalAssets,
             batch.totalSupply,
             batch.depositedInBatch,
             batch.requestedSharesInBatch
