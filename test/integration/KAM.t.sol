@@ -183,7 +183,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         mockUSDC.mint(address(metawalletUSDC), _1_USDC);
         _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _amount + _1_USDC);
 
-        assertEq(DNVaultAdapterUSDC.totalAssets(), ((_amount * 2) + _1_USDC));
+        assertApproxEqAbs(DNVaultAdapterUSDC.totalAssets(), ((_amount * 2) + _1_USDC), 10); // Rounding from convertToAssetsWithTotals
         (_deposited,) = assetRouter.getBatchIdBalances(_dnVault, _batchId);
         assertEq(_deposited, _amount);
 
@@ -194,7 +194,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _proposeAndExecuteSettle(USDC, _alphaVault, _batchId, _amount + _1_USDC);
 
         uint256 _totalAmount = ((_amount + _1_USDC) / 2);
-        assertEq(ALPHAVaultAdapterUSDC.totalAssets(), _totalAmount);
+        assertApproxEqAbs(ALPHAVaultAdapterUSDC.totalAssets(), _totalAmount, 10); // Rounding from convertToAssetsWithTotals
         uint256 _sharesRequested = assetRouter.getRequestedShares(_alphaVault, _batchId);
         assertApproxEqAbs(_sharesRequested, alphaVault.convertToShares(_totalAmount), 1_000_000); // Vesting affects share price
 
@@ -234,7 +234,9 @@ contract KamIntegrationTest is DeploymentBaseTest {
         vm.prank(users.institution);
         minter.burn(_firstRequestId);
 
-        assertEq(minterAdapterUSDC.totalAssets(), _mintAmount - ((_amount * 3) + ((_amount - _1_USDC) / 2))); // 3x stakes vaults + alpha unstaked
+        assertApproxEqAbs(
+            minterAdapterUSDC.totalAssets(), _mintAmount - ((_amount * 3) + ((_amount - _1_USDC) / 2)), 10
+        ); // 3x stakes vaults + alpha unstaked; rounding from convertToAssetsWithTotals
         // 2 * _1_USDC = yield generated. GetTotalLockedAsssets is only for deposited amount from the kMinter.
         assertEq(kUSD.totalSupply(), minter.getTotalLockedAssets(USDC) + (2 * _1_USDC)); // 2 * _1_USDC is yield
 
