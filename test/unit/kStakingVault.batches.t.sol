@@ -172,7 +172,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
 
         // Settle batch through assetRouter (which calls settleBatch)
         uint256 lastTotalAssets = vault.totalAssets();
-        _executeBatchSettlement(address(vault), batchId, lastTotalAssets + 1000 * _1_USDC);
+        _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
     }
 
     function test_SettleBatch_RequiresKAssetRouter() public {
