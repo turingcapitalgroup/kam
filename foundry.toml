@@ -6,7 +6,6 @@ gas_reports = ['*']
 solc_version = "0.8.30"
 optimizer = true
 optimizer_runs = 100
-via_ir = true
 ffi = true
 ast = true
 build_info = true
@@ -16,7 +15,6 @@ fs_permissions = [{ access = "read-write", path = "." }]
 
 [profile.deploy]
 solc_version = "0.8.30"
-via_ir = true
 optimizer = true
 optimizer_runs = 5000
 

@@ -745,33 +745,51 @@ contract kAssetRouterTest is DeploymentBaseTest {
         vm.prank(users.institution);
         kUSD.approve(_minter, _totalBurns);
 
-        // ---- Batch 1 ----
-        vm.prank(users.institution);
-        minter.requestBurn(USDC, users.institution, _burn1);
-        bytes32 _b1 = minter.getBatchId(USDC);
-        _closeBatch(_minter, _b1);
+        // Create and close 3 burn batches, store batch IDs
+        bytes32 _b1;
+        bytes32 _b2;
+        bytes32 _b3;
+        {
+            vm.prank(users.institution);
+            minter.requestBurn(USDC, users.institution, _burn1);
+            _b1 = minter.getBatchId(USDC);
+            _closeBatch(_minter, _b1);
 
-        // ---- Batch 2 ----
-        vm.prank(users.institution);
-        minter.requestBurn(USDC, users.institution, _burn2);
-        bytes32 _b2 = minter.getBatchId(USDC);
-        _closeBatch(_minter, _b2);
+            vm.prank(users.institution);
+            minter.requestBurn(USDC, users.institution, _burn2);
+            _b2 = minter.getBatchId(USDC);
+            _closeBatch(_minter, _b2);
 
-        // ---- Batch 3 ----
-        vm.prank(users.institution);
-        minter.requestBurn(USDC, users.institution, _burn3);
-        bytes32 _b3 = minter.getBatchId(USDC);
-        _closeBatch(_minter, _b3);
+            vm.prank(users.institution);
+            minter.requestBurn(USDC, users.institution, _burn3);
+            _b3 = minter.getBatchId(USDC);
+            _closeBatch(_minter, _b3);
+        }
 
         // INVARIANT: globalPending == sum of all burns
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), _totalBurns);
 
-        // ---- Propose and execute sequentially (1 per asset at a time) ----
-        _ta = minterAdapterUSDC.totalAssets();
+        // Execute settle/cancel/re-propose sequence and verify globalPending integrity
+        _fuzzExecuteMultiBatchSequence(_minter, _totalBurns, _burn1, _burn2, _burn3, _b1, _b2, _b3);
+    }
+
+    function _fuzzExecuteMultiBatchSequence(
+        address _minter,
+        uint256 _totalBurns,
+        uint128 _burn1,
+        uint128 _burn2,
+        uint128 _burn3,
+        bytes32 _b1,
+        bytes32 _b2,
+        bytes32 _b3
+    )
+        internal
+    {
+        // ---- Propose and execute batch 1 ----
+        uint256 _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _p1 = assetRouter.proposeSettleBatch(USDC, _minter, _b1, _ta);
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), _totalBurns - _burn1);
-
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_p1);
 
@@ -785,7 +803,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assetRouter.cancelProposal(_p2);
         assertEq(assetRouter.getGlobalPendingRequests(_minter, USDC), _totalBurns - _burn1);
 
-        // Re-propose and execute
+        // Re-propose and execute batch 2
         _ta = minterAdapterUSDC.totalAssets();
         vm.prank(users.relayer);
         bytes32 _p2b = assetRouter.proposeSettleBatch(USDC, _minter, _b2, _ta);

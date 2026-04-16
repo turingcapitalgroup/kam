@@ -14,6 +14,19 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         address erc20ExecutionValidator;
     }
 
+    struct ExecutorAddrs {
+        address registry;
+        address kMinterAdapterUSDC;
+        address kMinterAdapterWBTC;
+        address dnVaultAdapterUSDC;
+        address dnVaultAdapterWBTC;
+        address alphaVaultAdapter;
+        address betaVaultAdapter;
+        address metawalletUSDC;
+        address metawalletWBTC;
+        address walletUSDC;
+    }
+
     // Asset addresses (can be overridden for tests)
     address internal _usdc;
     address internal _wbtc;
@@ -88,191 +101,34 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
 
     /// @notice Configure executor permissions and deploy execution validator
     /// @param writeToJson Whether to write deployed addresses to JSON (true for real deployments, false for tests)
-    /// @param registryAddr Address of kRegistry
-    /// @param kMinterAdapterUSDCAddr Address of kMinterAdapterUSDC
-    /// @param kMinterAdapterWBTCAddr Address of kMinterAdapterWBTC
-    /// @param dnVaultAdapterUSDCAddr Address of dnVaultAdapterUSDC
-    /// @param dnVaultAdapterWBTCAddr Address of dnVaultAdapterWBTC
-    /// @param alphaVaultAdapterAddr Address of alphaVaultAdapter
-    /// @param betaVaultAdapterAddr Address of betaVaultAdapter
-    /// @param metawalletUSDCAddr Address of metawalletUSDC mock vault
-    /// @param metawalletWBTCAddr Address of metawalletWBTC mock vault
-    /// @param walletUSDCAddr Address of WalletUSDC mock
+    /// @param addr Struct containing all executor addresses (registry, adapters, metawallets, wallet)
     /// @param usdcAddr Address of USDC asset (if zero, reads from JSON)
     /// @param wbtcAddr Address of WBTC asset (if zero, reads from JSON)
     function run(
         bool writeToJson,
-        address registryAddr,
-        address kMinterAdapterUSDCAddr,
-        address kMinterAdapterWBTCAddr,
-        address dnVaultAdapterUSDCAddr,
-        address dnVaultAdapterWBTCAddr,
-        address alphaVaultAdapterAddr,
-        address betaVaultAdapterAddr,
-        address metawalletUSDCAddr,
-        address metawalletWBTCAddr,
-        address walletUSDCAddr,
+        ExecutorAddrs memory addr,
         address usdcAddr,
         address wbtcAddr
     )
         public
         returns (ExecutorPermissionsDeployment memory deployment)
     {
-        // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
         DeploymentOutput memory existing;
 
-        // Use provided asset addresses or fall back to config
         _usdc = usdcAddr != address(0) ? usdcAddr : config.assets.USDC;
         _wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
 
-        // Read deployment output for other contract addresses
         existing = readDeploymentOutput();
-
-        // For non-metawallet addresses, read from deployment output if not provided
-        if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
-        if (kMinterAdapterUSDCAddr == address(0)) kMinterAdapterUSDCAddr = existing.contracts.kMinterAdapterUSDC;
-        if (kMinterAdapterWBTCAddr == address(0)) kMinterAdapterWBTCAddr = existing.contracts.kMinterAdapterWBTC;
-        if (dnVaultAdapterUSDCAddr == address(0)) dnVaultAdapterUSDCAddr = existing.contracts.dnVaultAdapterUSDC;
-        if (dnVaultAdapterWBTCAddr == address(0)) dnVaultAdapterWBTCAddr = existing.contracts.dnVaultAdapterWBTC;
-        if (alphaVaultAdapterAddr == address(0)) alphaVaultAdapterAddr = existing.contracts.alphaVaultAdapter;
-        if (betaVaultAdapterAddr == address(0)) betaVaultAdapterAddr = existing.contracts.betaVaultAdapter;
-        if (walletUSDCAddr == address(0)) walletUSDCAddr = existing.contracts.WalletUSDC;
-
-        // For metawallet addresses: prefer config file (production), fallback to addresses.json (mocks)
-        if (metawalletUSDCAddr == address(0)) {
-            // Try config first (production deployments set this manually)
-            if (config.metawallets.USDC != address(0)) {
-                metawalletUSDCAddr = config.metawallets.USDC;
-            } else {
-                // Fallback to addresses.json (mock deployments)
-                metawalletUSDCAddr = existing.contracts.metawalletUSDC;
-            }
-        }
-        if (metawalletWBTCAddr == address(0)) {
-            // Try config first (production deployments set this manually)
-            if (config.metawallets.WBTC != address(0)) {
-                metawalletWBTCAddr = config.metawallets.WBTC;
-            } else {
-                // Fallback to addresses.json (mock deployments)
-                metawalletWBTCAddr = existing.contracts.metawalletWBTC;
-            }
-        }
-
-        // Validate metawallet assets match expected underlying assets
-        _validateMetawalletAsset(metawalletUSDCAddr, _usdc, "metawalletUSDC", "USDC");
-        _validateMetawalletAsset(metawalletWBTCAddr, _wbtc, "metawalletWBTC", "WBTC");
-
-        // Populate existing for logging
-        existing.contracts.kRegistry = registryAddr;
-        existing.contracts.kMinterAdapterUSDC = kMinterAdapterUSDCAddr;
-        existing.contracts.kMinterAdapterWBTC = kMinterAdapterWBTCAddr;
-        existing.contracts.dnVaultAdapterUSDC = dnVaultAdapterUSDCAddr;
-        existing.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
-        existing.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
-        existing.contracts.betaVaultAdapter = betaVaultAdapterAddr;
-        existing.contracts.metawalletUSDC = metawalletUSDCAddr;
-        existing.contracts.metawalletWBTC = metawalletWBTCAddr;
-        existing.contracts.WalletUSDC = walletUSDCAddr;
-
-        // Log script header and configuration
-        logScriptHeader("11_ConfigureExecutorPermissions");
-        logRoles(config);
-        logAssets(config);
-        logExternalTargets(config);
-        logParameterCheckerConfig(config);
-        logDependencies(existing);
-        logBroadcaster(config.roles.admin);
-
-        // Validate required contracts
-        require(registryAddr != address(0), "kRegistry address required");
-
-        logExecutionStart();
 
         vm.startBroadcast(config.roles.admin);
 
-        IkRegistry registry = IkRegistry(payable(registryAddr));
-
-        // Deploy ERC20 execution validator
-        ERC20ExecutionValidator erc20ExecutionValidator = new ERC20ExecutionValidator(registryAddr);
-        _log("Deployed ERC20ExecutionValidator at:", address(erc20ExecutionValidator));
-
-        // Get asset addresses
-        address usdc = _usdc;
-        address wbtc = _wbtc;
-
-        _log("");
-        _log("1. Configuring Executor permissions...");
-        configureExecutorPermissions(registry, kMinterAdapterUSDCAddr, metawalletUSDCAddr, usdc, true);
-        configureExecutorPermissions(registry, kMinterAdapterWBTCAddr, metawalletWBTCAddr, wbtc, true);
-        configureExecutorPermissions(registry, dnVaultAdapterUSDCAddr, metawalletUSDCAddr, usdc, false);
-        configureExecutorPermissions(registry, dnVaultAdapterWBTCAddr, metawalletWBTCAddr, wbtc, false);
-        // Alpha/Beta adapters for custodial targets
-        configureCustodialExecutorPermissions(registry, alphaVaultAdapterAddr, walletUSDCAddr);
-        configureCustodialExecutorPermissions(registry, betaVaultAdapterAddr, walletUSDCAddr);
-        // Alpha/Beta adapters for metawallets (ERC4626 share transfers)
-        configureExecutorPermissions(registry, alphaVaultAdapterAddr, metawalletUSDCAddr, usdc, false);
-        configureExecutorPermissions(registry, betaVaultAdapterAddr, metawalletUSDCAddr, usdc, false);
-
-        _log("");
-        _log("2. Configuring execution validators...");
-        address validator = address(erc20ExecutionValidator);
-        configureExecutionValidator(registry, kMinterAdapterUSDCAddr, usdc, validator, true);
-        configureExecutionValidator(registry, kMinterAdapterWBTCAddr, wbtc, validator, true);
-        configureExecutionValidator(registry, kMinterAdapterUSDCAddr, metawalletUSDCAddr, validator, true);
-        configureExecutionValidator(registry, kMinterAdapterWBTCAddr, metawalletWBTCAddr, validator, true);
-        configureExecutionValidator(registry, dnVaultAdapterUSDCAddr, metawalletUSDCAddr, validator, false);
-        configureExecutionValidator(registry, dnVaultAdapterWBTCAddr, metawalletWBTCAddr, validator, false);
-        configureExecutionValidator(registry, alphaVaultAdapterAddr, walletUSDCAddr, validator, false);
-        configureExecutionValidator(registry, betaVaultAdapterAddr, walletUSDCAddr, validator, false);
-        // Alpha/Beta adapters for metawallets
-        configureExecutionValidator(registry, alphaVaultAdapterAddr, metawalletUSDCAddr, validator, true);
-        configureExecutionValidator(registry, betaVaultAdapterAddr, metawalletUSDCAddr, validator, true);
-
-        _log("");
-        _log("3. Configuring execution validator permissions from config...");
-
-        // Create a temporary DeploymentOutput struct for _resolveAddress helper
-        existing.contracts.kMinterAdapterUSDC = kMinterAdapterUSDCAddr;
-        existing.contracts.kMinterAdapterWBTC = kMinterAdapterWBTCAddr;
-        existing.contracts.dnVaultAdapterUSDC = dnVaultAdapterUSDCAddr;
-        existing.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
-        existing.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
-        existing.contracts.betaVaultAdapter = betaVaultAdapterAddr;
-        existing.contracts.metawalletUSDC = metawalletUSDCAddr;
-        existing.contracts.metawalletWBTC = metawalletWBTCAddr;
-        existing.contracts.WalletUSDC = walletUSDCAddr;
-
-        // Set allowed receivers from config
-        _configureAllowedReceivers(erc20ExecutionValidator, config, existing, usdc, metawalletUSDCAddr, walletUSDCAddr);
-
-        // Set allowed sources from config
-        _configureAllowedSources(erc20ExecutionValidator, config, existing, metawalletUSDCAddr, metawalletWBTCAddr);
-
-        // Set allowed spenders from config
-        _configureAllowedSpenders(
-            erc20ExecutionValidator, config, existing, usdc, wbtc, metawalletUSDCAddr, metawalletWBTCAddr
-        );
-
-        // Set max transfer limits from config
-        _log("   - Set max transfer limits");
-        erc20ExecutionValidator.setMaxSingleTransfer(usdc, config.parameterChecker.maxSingleTransfer.USDC);
-        erc20ExecutionValidator.setMaxSingleTransfer(wbtc, config.parameterChecker.maxSingleTransfer.WBTC);
-        erc20ExecutionValidator.setMaxSingleTransfer(
-            metawalletUSDCAddr, config.parameterChecker.maxSingleTransfer.metawalletUSDC
-        );
-        erc20ExecutionValidator.setMaxSingleTransfer(
-            metawalletWBTCAddr, config.parameterChecker.maxSingleTransfer.metawalletWBTC
-        );
+        deployment = _executeConfiguration(addr, config, existing);
 
         vm.stopBroadcast();
 
-        // Populate return struct
-        deployment = ExecutorPermissionsDeployment({ erc20ExecutionValidator: address(erc20ExecutionValidator) });
-
-        // Write to JSON only if requested (for real deployments)
         if (writeToJson) {
-            writeContractAddress("erc20ExecutionValidator", address(erc20ExecutionValidator));
+            writeContractAddress("erc20ExecutionValidator", deployment.erc20ExecutionValidator);
         }
 
         _log("");
@@ -282,57 +138,101 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         return deployment;
     }
 
-    /// @notice Wrapper for backward compatibility (11 args)
-    function run(
-        bool writeToJson,
-        address registryAddr,
-        address kMinterAdapterUSDCAddr,
-        address kMinterAdapterWBTCAddr,
-        address dnVaultAdapterUSDCAddr,
-        address dnVaultAdapterWBTCAddr,
-        address alphaVaultAdapterAddr,
-        address betaVaultAdapterAddr,
-        address metawalletUSDCAddr,
-        address metawalletWBTCAddr,
-        address walletUSDCAddr
+    function _executeConfiguration(
+        ExecutorAddrs memory a,
+        NetworkConfig memory config,
+        DeploymentOutput memory existing
     )
-        public
-        returns (ExecutorPermissionsDeployment memory)
+        internal
+        returns (ExecutorPermissionsDeployment memory deployment)
     {
-        return run(
-            writeToJson,
-            registryAddr,
-            kMinterAdapterUSDCAddr,
-            kMinterAdapterWBTCAddr,
-            dnVaultAdapterUSDCAddr,
-            dnVaultAdapterWBTCAddr,
-            alphaVaultAdapterAddr,
-            betaVaultAdapterAddr,
-            metawalletUSDCAddr,
-            metawalletWBTCAddr,
-            walletUSDCAddr,
-            address(0),
-            address(0)
+        IkRegistry registry = IkRegistry(payable(a.registry));
+
+        ERC20ExecutionValidator erc20ExecutionValidator = new ERC20ExecutionValidator(a.registry);
+        _log("Deployed ERC20ExecutionValidator at:", address(erc20ExecutionValidator));
+
+        address usdc = _usdc;
+        address wbtc = _wbtc;
+
+        _log("");
+        _log("1. Configuring Executor permissions...");
+        configureExecutorPermissions(registry, a.kMinterAdapterUSDC, a.metawalletUSDC, usdc, true);
+        configureExecutorPermissions(registry, a.kMinterAdapterWBTC, a.metawalletWBTC, wbtc, true);
+        configureExecutorPermissions(registry, a.dnVaultAdapterUSDC, a.metawalletUSDC, usdc, false);
+        configureExecutorPermissions(registry, a.dnVaultAdapterWBTC, a.metawalletWBTC, wbtc, false);
+        configureCustodialExecutorPermissions(registry, a.alphaVaultAdapter, a.walletUSDC);
+        configureCustodialExecutorPermissions(registry, a.betaVaultAdapter, a.walletUSDC);
+        configureExecutorPermissions(registry, a.alphaVaultAdapter, a.metawalletUSDC, usdc, false);
+        configureExecutorPermissions(registry, a.betaVaultAdapter, a.metawalletUSDC, usdc, false);
+
+        _log("");
+        _log("2. Configuring execution validators...");
+        address validator = address(erc20ExecutionValidator);
+        configureExecutionValidator(registry, a.kMinterAdapterUSDC, usdc, validator, true);
+        configureExecutionValidator(registry, a.kMinterAdapterWBTC, wbtc, validator, true);
+        configureExecutionValidator(registry, a.kMinterAdapterUSDC, a.metawalletUSDC, validator, true);
+        configureExecutionValidator(registry, a.kMinterAdapterWBTC, a.metawalletWBTC, validator, true);
+        configureExecutionValidator(registry, a.dnVaultAdapterUSDC, a.metawalletUSDC, validator, false);
+        configureExecutionValidator(registry, a.dnVaultAdapterWBTC, a.metawalletWBTC, validator, false);
+        configureExecutionValidator(registry, a.alphaVaultAdapter, a.walletUSDC, validator, false);
+        configureExecutionValidator(registry, a.betaVaultAdapter, a.walletUSDC, validator, false);
+        configureExecutionValidator(registry, a.alphaVaultAdapter, a.metawalletUSDC, validator, true);
+        configureExecutionValidator(registry, a.betaVaultAdapter, a.metawalletUSDC, validator, true);
+
+        _log("");
+        _log("3. Configuring execution validator permissions from config...");
+
+        // Create a temporary DeploymentOutput struct for _resolveAddress helper
+        existing.contracts.kMinterAdapterUSDC = a.kMinterAdapterUSDC;
+        existing.contracts.kMinterAdapterWBTC = a.kMinterAdapterWBTC;
+        existing.contracts.dnVaultAdapterUSDC = a.dnVaultAdapterUSDC;
+        existing.contracts.dnVaultAdapterWBTC = a.dnVaultAdapterWBTC;
+        existing.contracts.alphaVaultAdapter = a.alphaVaultAdapter;
+        existing.contracts.betaVaultAdapter = a.betaVaultAdapter;
+        existing.contracts.metawalletUSDC = a.metawalletUSDC;
+        existing.contracts.metawalletWBTC = a.metawalletWBTC;
+        existing.contracts.WalletUSDC = a.walletUSDC;
+
+        _configureAllowedReceivers(erc20ExecutionValidator, config, existing, usdc, a.metawalletUSDC, a.walletUSDC);
+
+        _configureAllowedSources(erc20ExecutionValidator, config, existing, a.metawalletUSDC, a.metawalletWBTC);
+
+        _configureAllowedSpenders(
+            erc20ExecutionValidator, config, existing, usdc, wbtc, a.metawalletUSDC, a.metawalletWBTC
         );
+
+        // Set max transfer limits from config
+        _log("   - Set max transfer limits");
+        erc20ExecutionValidator.setMaxSingleTransfer(usdc, config.parameterChecker.maxSingleTransfer.USDC);
+        erc20ExecutionValidator.setMaxSingleTransfer(wbtc, config.parameterChecker.maxSingleTransfer.WBTC);
+        erc20ExecutionValidator.setMaxSingleTransfer(
+            a.metawalletUSDC, config.parameterChecker.maxSingleTransfer.metawalletUSDC
+        );
+        erc20ExecutionValidator.setMaxSingleTransfer(
+            a.metawalletWBTC, config.parameterChecker.maxSingleTransfer.metawalletWBTC
+        );
+
+        // Populate return struct
+        deployment = ExecutorPermissionsDeployment({ erc20ExecutionValidator: address(erc20ExecutionValidator) });
     }
 
     /// @notice Convenience wrapper for real deployments (reads addresses from JSON)
     function run() public returns (ExecutorPermissionsDeployment memory) {
-        return run(
-            true,
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0)
-        );
+        DeploymentOutput memory existing = readDeploymentOutput();
+
+        ExecutorAddrs memory addr;
+        addr.registry = existing.contracts.kRegistry;
+        addr.kMinterAdapterUSDC = existing.contracts.kMinterAdapterUSDC;
+        addr.kMinterAdapterWBTC = existing.contracts.kMinterAdapterWBTC;
+        addr.dnVaultAdapterUSDC = existing.contracts.dnVaultAdapterUSDC;
+        addr.dnVaultAdapterWBTC = existing.contracts.dnVaultAdapterWBTC;
+        addr.alphaVaultAdapter = existing.contracts.alphaVaultAdapter;
+        addr.betaVaultAdapter = existing.contracts.betaVaultAdapter;
+        addr.metawalletUSDC = existing.contracts.metawalletUSDC;
+        addr.metawalletWBTC = existing.contracts.metawalletWBTC;
+        addr.walletUSDC = existing.contracts.WalletUSDC;
+
+        return run(true, addr, address(0), address(0));
     }
 
     function _configureAllowedReceivers(

@@ -14,213 +14,157 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
     address internal _usdc;
     address internal _wbtc;
 
-    /// @notice Configure protocol (register vaults, adapters, grant roles) - NO NEW DEPLOYS
-    /// @dev This script only configures existing contracts, doesn't deploy anything new
-    function run(
-        address registryAddr,
-        address minterAddr,
-        address assetRouterAddr,
-        address kUSDAddr,
-        address kBTCAddr,
-        address dnVaultUSDCAddr,
-        address dnVaultWBTCAddr,
-        address alphaVaultAddr,
-        address betaVaultAddr,
-        address dnVaultAdapterUSDCAddr,
-        address dnVaultAdapterWBTCAddr,
-        address alphaVaultAdapterAddr,
-        address betaVaultAdapterAddr,
-        address minterAdapterUSDCAddr,
-        address minterAdapterWBTCAddr,
-        address usdcAddr,
-        address wbtcAddr
-    )
-        public
-    {
-        // Read network configuration
-        NetworkConfig memory config = readNetworkConfig();
-        DeploymentOutput memory existing;
+    struct ProtocolAddresses {
+        address registry;
+        address minter;
+        address assetRouter;
+        address kUSD;
+        address kBTC;
+        address dnVaultUSDC;
+        address dnVaultWBTC;
+        address alphaVault;
+        address betaVault;
+        address dnVaultAdapterUSDC;
+        address dnVaultAdapterWBTC;
+        address alphaVaultAdapter;
+        address betaVaultAdapter;
+        address minterAdapterUSDC;
+        address minterAdapterWBTC;
+    }
 
-        // Use provided asset addresses or fall back to config
+    /// @notice Configure protocol (register vaults, adapters, grant roles) - NO NEW DEPLOYS
+    /// @dev Reads all addresses from deployment JSON.
+    function run() public {
+        NetworkConfig memory config = readNetworkConfig();
+        DeploymentOutput memory existing = readDeploymentOutput();
+
+        _usdc = config.assets.USDC;
+        _wbtc = config.assets.WBTC;
+
+        ProtocolAddresses memory addr = ProtocolAddresses({
+            registry: existing.contracts.kRegistry,
+            minter: existing.contracts.kMinter,
+            assetRouter: existing.contracts.kAssetRouter,
+            kUSD: existing.contracts.kUSD,
+            kBTC: existing.contracts.kBTC,
+            dnVaultUSDC: existing.contracts.dnVaultUSDC,
+            dnVaultWBTC: existing.contracts.dnVaultWBTC,
+            alphaVault: existing.contracts.alphaVault,
+            betaVault: existing.contracts.betaVault,
+            dnVaultAdapterUSDC: existing.contracts.dnVaultAdapterUSDC,
+            dnVaultAdapterWBTC: existing.contracts.dnVaultAdapterWBTC,
+            alphaVaultAdapter: existing.contracts.alphaVaultAdapter,
+            betaVaultAdapter: existing.contracts.betaVaultAdapter,
+            minterAdapterUSDC: existing.contracts.kMinterAdapterUSDC,
+            minterAdapterWBTC: existing.contracts.kMinterAdapterWBTC
+        });
+
+        _configure(config, addr);
+    }
+
+    /// @notice Configure protocol with explicit addresses (for testing)
+    /// @param addr Protocol addresses struct
+    /// @param usdcAddr USDC address (address(0) to use config default)
+    /// @param wbtcAddr WBTC address (address(0) to use config default)
+    function runWithAddresses(ProtocolAddresses memory addr, address usdcAddr, address wbtcAddr) public {
+        NetworkConfig memory config = readNetworkConfig();
         _usdc = usdcAddr != address(0) ? usdcAddr : config.assets.USDC;
         _wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
 
-        // If any address is zero, read from JSON (for real deployments)
-        if (
-            registryAddr == address(0) || minterAddr == address(0) || assetRouterAddr == address(0)
-                || kUSDAddr == address(0) || kBTCAddr == address(0) || dnVaultUSDCAddr == address(0)
-                || dnVaultWBTCAddr == address(0) || alphaVaultAddr == address(0) || betaVaultAddr == address(0)
-                || dnVaultAdapterUSDCAddr == address(0) || dnVaultAdapterWBTCAddr == address(0)
-                || alphaVaultAdapterAddr == address(0) || betaVaultAdapterAddr == address(0)
-                || minterAdapterUSDCAddr == address(0) || minterAdapterWBTCAddr == address(0)
-        ) {
-            existing = readDeploymentOutput();
-            if (registryAddr == address(0)) registryAddr = existing.contracts.kRegistry;
-            if (minterAddr == address(0)) minterAddr = existing.contracts.kMinter;
-            if (assetRouterAddr == address(0)) assetRouterAddr = existing.contracts.kAssetRouter;
-            if (kUSDAddr == address(0)) kUSDAddr = existing.contracts.kUSD;
-            if (kBTCAddr == address(0)) kBTCAddr = existing.contracts.kBTC;
-            if (dnVaultUSDCAddr == address(0)) dnVaultUSDCAddr = existing.contracts.dnVaultUSDC;
-            if (dnVaultWBTCAddr == address(0)) dnVaultWBTCAddr = existing.contracts.dnVaultWBTC;
-            if (alphaVaultAddr == address(0)) alphaVaultAddr = existing.contracts.alphaVault;
-            if (betaVaultAddr == address(0)) betaVaultAddr = existing.contracts.betaVault;
-            if (dnVaultAdapterUSDCAddr == address(0)) dnVaultAdapterUSDCAddr = existing.contracts.dnVaultAdapterUSDC;
-            if (dnVaultAdapterWBTCAddr == address(0)) dnVaultAdapterWBTCAddr = existing.contracts.dnVaultAdapterWBTC;
-            if (alphaVaultAdapterAddr == address(0)) alphaVaultAdapterAddr = existing.contracts.alphaVaultAdapter;
-            if (betaVaultAdapterAddr == address(0)) betaVaultAdapterAddr = existing.contracts.betaVaultAdapter;
-            if (minterAdapterUSDCAddr == address(0)) minterAdapterUSDCAddr = existing.contracts.kMinterAdapterUSDC;
-            if (minterAdapterWBTCAddr == address(0)) minterAdapterWBTCAddr = existing.contracts.kMinterAdapterWBTC;
-        }
+        _configure(config, addr);
+    }
 
-        // Populate existing for logging
-        existing.contracts.kRegistry = registryAddr;
-        existing.contracts.kMinter = minterAddr;
-        existing.contracts.kAssetRouter = assetRouterAddr;
-        existing.contracts.kUSD = kUSDAddr;
-        existing.contracts.kBTC = kBTCAddr;
-        existing.contracts.dnVaultUSDC = dnVaultUSDCAddr;
-        existing.contracts.dnVaultWBTC = dnVaultWBTCAddr;
-        existing.contracts.alphaVault = alphaVaultAddr;
-        existing.contracts.betaVault = betaVaultAddr;
-        existing.contracts.dnVaultAdapterUSDC = dnVaultAdapterUSDCAddr;
-        existing.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
-        existing.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
-        existing.contracts.betaVaultAdapter = betaVaultAdapterAddr;
-        existing.contracts.kMinterAdapterUSDC = minterAdapterUSDCAddr;
-        existing.contracts.kMinterAdapterWBTC = minterAdapterWBTCAddr;
-
-        // Log script header and configuration
-        logScriptHeader("10_ConfigureProtocol");
-        logRoles(config);
-        logAssets(config);
-        logRegistryConfig(config);
-        logVaultConfig(config.dnVaultUSDC, "DN_VAULT_USDC");
-        logVaultConfig(config.dnVaultWBTC, "DN_VAULT_WBTC");
-        logVaultConfig(config.alphaVault, "ALPHA_VAULT");
-        logVaultConfig(config.betaVault, "BETA_VAULT");
-        logDependencies(existing);
-        logBroadcaster(config.roles.admin);
-
-        // Validate all required contracts
-        require(registryAddr != address(0), "kRegistry address required");
-        require(minterAddr != address(0), "kMinter address required");
-        require(assetRouterAddr != address(0), "kAssetRouter address required");
-        require(kUSDAddr != address(0), "kUSD address required");
-        require(kBTCAddr != address(0), "kBTC address required");
-        require(dnVaultUSDCAddr != address(0), "dnVaultUSDC address required");
-        require(dnVaultWBTCAddr != address(0), "dnVaultWBTC address required");
-        require(alphaVaultAddr != address(0), "alphaVault address required");
-        require(betaVaultAddr != address(0), "betaVault address required");
-        require(dnVaultAdapterUSDCAddr != address(0), "dnVaultAdapterUSDC address required");
-        require(dnVaultAdapterWBTCAddr != address(0), "dnVaultAdapterWBTC address required");
-        require(alphaVaultAdapterAddr != address(0), "alphaVaultAdapter address required");
-        require(betaVaultAdapterAddr != address(0), "betaVaultAdapter address required");
-        require(minterAdapterUSDCAddr != address(0), "kMinterAdapterUSDC address required");
-        require(minterAdapterWBTCAddr != address(0), "kMinterAdapterWBTC address required");
-
-        logExecutionStart();
-
+    /// @notice Performs the actual protocol configuration
+    function _configure(NetworkConfig memory config, ProtocolAddresses memory addr) internal {
         vm.startBroadcast(config.roles.admin);
 
-        kRegistry registry = kRegistry(payable(registryAddr));
+        kRegistry registry = kRegistry(payable(addr.registry));
 
         _log("1. Registering vaults with kRegistry...");
 
-        // Register kMinter as MINTER vault type for both assets
-        registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, _usdc);
+        registry.registerVault(addr.minter, IRegistry.VaultType.MINTER, _usdc);
         _log("   - Registered kMinter as MINTER vault for USDC");
-        registry.registerVault(minterAddr, IRegistry.VaultType.MINTER, _wbtc);
+        registry.registerVault(addr.minter, IRegistry.VaultType.MINTER, _wbtc);
         _log("   - Registered kMinter as MINTER vault for WBTC");
 
-        // Register DN Vaults
-        registry.registerVault(dnVaultUSDCAddr, IRegistry.VaultType.DN, _usdc);
+        registry.registerVault(addr.dnVaultUSDC, IRegistry.VaultType.DN, _usdc);
         _log("   - Registered DN Vault USDC as DN vault for USDC");
-        registry.registerVault(dnVaultWBTCAddr, IRegistry.VaultType.DN, _wbtc);
+        registry.registerVault(addr.dnVaultWBTC, IRegistry.VaultType.DN, _wbtc);
         _log("   - Registered DN Vault WBTC as DN vault for WBTC");
 
-        // Register Alpha Vault as ALPHA vault type
-        registry.registerVault(alphaVaultAddr, IRegistry.VaultType.ALPHA, _usdc);
+        registry.registerVault(addr.alphaVault, IRegistry.VaultType.ALPHA, _usdc);
         _log("   - Registered Alpha Vault as ALPHA vault for USDC");
 
-        // Register Beta Vault as BETA vault type
-        registry.registerVault(betaVaultAddr, IRegistry.VaultType.BETA, _usdc);
+        registry.registerVault(addr.betaVault, IRegistry.VaultType.BETA, _usdc);
         _log("   - Registered Beta Vault as BETA vault for USDC");
 
-        // Set asset batch limits
         registry.setBatchLimits(
-            dnVaultUSDCAddr, config.dnVaultUSDC.maxDepositPerBatch, config.dnVaultUSDC.maxWithdrawPerBatch
+            addr.dnVaultUSDC, config.dnVaultUSDC.maxDepositPerBatch, config.dnVaultUSDC.maxWithdrawPerBatch
         );
         registry.setBatchLimits(
-            dnVaultWBTCAddr, config.dnVaultWBTC.maxDepositPerBatch, config.dnVaultWBTC.maxWithdrawPerBatch
+            addr.dnVaultWBTC, config.dnVaultWBTC.maxDepositPerBatch, config.dnVaultWBTC.maxWithdrawPerBatch
         );
         registry.setBatchLimits(
-            alphaVaultAddr, config.alphaVault.maxDepositPerBatch, config.alphaVault.maxWithdrawPerBatch
+            addr.alphaVault, config.alphaVault.maxDepositPerBatch, config.alphaVault.maxWithdrawPerBatch
         );
         registry.setBatchLimits(
-            betaVaultAddr, config.betaVault.maxDepositPerBatch, config.betaVault.maxWithdrawPerBatch
+            addr.betaVault, config.betaVault.maxDepositPerBatch, config.betaVault.maxWithdrawPerBatch
         );
 
-        // Set max allowed delta per vault
-        kAssetRouter assetRouter = kAssetRouter(payable(assetRouterAddr));
-        assetRouter.setMaxAllowedDelta(minterAddr, config.assetRouter.maxAllowedDelta);
-        assetRouter.setMaxAllowedDelta(dnVaultUSDCAddr, config.assetRouter.maxAllowedDelta);
-        assetRouter.setMaxAllowedDelta(dnVaultWBTCAddr, config.assetRouter.maxAllowedDelta);
-        assetRouter.setMaxAllowedDelta(alphaVaultAddr, config.assetRouter.maxAllowedDelta);
-        assetRouter.setMaxAllowedDelta(betaVaultAddr, config.assetRouter.maxAllowedDelta);
+        kAssetRouter assetRouter = kAssetRouter(payable(addr.assetRouter));
+        assetRouter.setMaxAllowedDelta(addr.minter, config.assetRouter.maxAllowedDelta);
+        assetRouter.setMaxAllowedDelta(addr.dnVaultUSDC, config.assetRouter.maxAllowedDelta);
+        assetRouter.setMaxAllowedDelta(addr.dnVaultWBTC, config.assetRouter.maxAllowedDelta);
+        assetRouter.setMaxAllowedDelta(addr.alphaVault, config.assetRouter.maxAllowedDelta);
+        assetRouter.setMaxAllowedDelta(addr.betaVault, config.assetRouter.maxAllowedDelta);
 
         _log("");
         _log("2. Setting hurdle rates for vaults...");
 
-        // Set hurdle rates per vault from config
-        registry.setHurdleRate(dnVaultUSDCAddr, config.dnVaultUSDC.hurdleRate);
-        registry.setIsHardHurdleRate(dnVaultUSDCAddr, config.dnVaultUSDC.isHardHurdleRate);
+        registry.setHurdleRate(addr.dnVaultUSDC, config.dnVaultUSDC.hurdleRate);
+        registry.setIsHardHurdleRate(addr.dnVaultUSDC, config.dnVaultUSDC.isHardHurdleRate);
         _log("   - Set hurdle rate for DN USDC vault:", config.dnVaultUSDC.hurdleRate);
-        registry.setHurdleRate(dnVaultWBTCAddr, config.dnVaultWBTC.hurdleRate);
-        registry.setIsHardHurdleRate(dnVaultWBTCAddr, config.dnVaultWBTC.isHardHurdleRate);
+        registry.setHurdleRate(addr.dnVaultWBTC, config.dnVaultWBTC.hurdleRate);
+        registry.setIsHardHurdleRate(addr.dnVaultWBTC, config.dnVaultWBTC.isHardHurdleRate);
         _log("   - Set hurdle rate for DN WBTC vault:", config.dnVaultWBTC.hurdleRate);
-        registry.setHurdleRate(alphaVaultAddr, config.alphaVault.hurdleRate);
-        registry.setIsHardHurdleRate(alphaVaultAddr, config.alphaVault.isHardHurdleRate);
+        registry.setHurdleRate(addr.alphaVault, config.alphaVault.hurdleRate);
+        registry.setIsHardHurdleRate(addr.alphaVault, config.alphaVault.isHardHurdleRate);
         _log("   - Set hurdle rate for Alpha vault:", config.alphaVault.hurdleRate);
-        registry.setHurdleRate(betaVaultAddr, config.betaVault.hurdleRate);
-        registry.setIsHardHurdleRate(betaVaultAddr, config.betaVault.isHardHurdleRate);
+        registry.setHurdleRate(addr.betaVault, config.betaVault.hurdleRate);
+        registry.setIsHardHurdleRate(addr.betaVault, config.betaVault.isHardHurdleRate);
         _log("   - Set hurdle rate for Beta vault:", config.betaVault.hurdleRate);
 
         _log("");
         _log("3. Registering adapters with vaults...");
 
-        // Register adapters for kMinter
-        registry.registerAdapter(minterAddr, _usdc, minterAdapterUSDCAddr);
+        registry.registerAdapter(addr.minter, _usdc, addr.minterAdapterUSDC);
         _log("   - Registered kMinter USDC Adapter for kMinter");
-        registry.registerAdapter(minterAddr, _wbtc, minterAdapterWBTCAddr);
+        registry.registerAdapter(addr.minter, _wbtc, addr.minterAdapterWBTC);
         _log("   - Registered kMinter WBTC Adapter for kMinter");
 
-        // Register adapters for DN vaults
-        registry.registerAdapter(dnVaultUSDCAddr, _usdc, dnVaultAdapterUSDCAddr);
+        registry.registerAdapter(addr.dnVaultUSDC, _usdc, addr.dnVaultAdapterUSDC);
         _log("   - Registered DN Vault USDC Adapter for DN Vault USDC");
-        registry.registerAdapter(dnVaultWBTCAddr, _wbtc, dnVaultAdapterWBTCAddr);
+        registry.registerAdapter(addr.dnVaultWBTC, _wbtc, addr.dnVaultAdapterWBTC);
         _log("   - Registered DN Vault WBTC Adapter for DN Vault WBTC");
 
-        // Register adapters for Alpha and Beta vaults
-        registry.registerAdapter(alphaVaultAddr, _usdc, alphaVaultAdapterAddr);
+        registry.registerAdapter(addr.alphaVault, _usdc, addr.alphaVaultAdapter);
         _log("   - Registered Alpha Vault Adapter for Alpha Vault");
-        registry.registerAdapter(betaVaultAddr, _usdc, betaVaultAdapterAddr);
+        registry.registerAdapter(addr.betaVault, _usdc, addr.betaVaultAdapter);
         _log("   - Registered Beta Vault Adapter for Beta Vault");
 
         _log("");
         _log("4. Granting roles...");
 
-        // Grant MINTER_ROLE to kMinter and kAssetRouter on kTokens
-        kToken kUSD = kToken(payable(kUSDAddr));
-        kUSD.grantMinterRole(minterAddr);
-        kUSD.grantMinterRole(assetRouterAddr);
+        kToken kUSD = kToken(payable(addr.kUSD));
+        kUSD.grantMinterRole(addr.minter);
+        kUSD.grantMinterRole(addr.assetRouter);
         _log("   - Granted MINTER_ROLE on kUSD to kMinter and kAssetRouter");
 
-        kToken kBTC = kToken(payable(kBTCAddr));
-        kBTC.grantMinterRole(minterAddr);
-        kBTC.grantMinterRole(assetRouterAddr);
+        kToken kBTC = kToken(payable(addr.kBTC));
+        kBTC.grantMinterRole(addr.minter);
+        kBTC.grantMinterRole(addr.assetRouter);
         _log("   - Granted MINTER_ROLE on kBTC to kMinter and kAssetRouter");
 
-        // Grant INSTITUTION_ROLE to institution address
         registry.grantInstitutionRole(config.roles.institution);
         _log("   - Granted INSTITUTION_ROLE to institution address");
 
@@ -233,69 +177,5 @@ contract ConfigureProtocolScript is Script, DeploymentManager {
         _log("Hurdle rates set for all assets");
         _log("All adapters registered");
         _log("All roles granted");
-    }
-
-    /// @notice Wrapper for backward compatibility (15 args)
-    function run(
-        address registryAddr,
-        address minterAddr,
-        address assetRouterAddr,
-        address kUSDAddr,
-        address kBTCAddr,
-        address dnVaultUSDCAddr,
-        address dnVaultWBTCAddr,
-        address alphaVaultAddr,
-        address betaVaultAddr,
-        address dnVaultAdapterUSDCAddr,
-        address dnVaultAdapterWBTCAddr,
-        address alphaVaultAdapterAddr,
-        address betaVaultAdapterAddr,
-        address minterAdapterUSDCAddr,
-        address minterAdapterWBTCAddr
-    )
-        public
-    {
-        run(
-            registryAddr,
-            minterAddr,
-            assetRouterAddr,
-            kUSDAddr,
-            kBTCAddr,
-            dnVaultUSDCAddr,
-            dnVaultWBTCAddr,
-            alphaVaultAddr,
-            betaVaultAddr,
-            dnVaultAdapterUSDCAddr,
-            dnVaultAdapterWBTCAddr,
-            alphaVaultAdapterAddr,
-            betaVaultAdapterAddr,
-            minterAdapterUSDCAddr,
-            minterAdapterWBTCAddr,
-            address(0),
-            address(0)
-        );
-    }
-
-    /// @notice Convenience wrapper for real deployments (reads all addresses from JSON)
-    function run() public {
-        run(
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0),
-            address(0)
-        );
     }
 }

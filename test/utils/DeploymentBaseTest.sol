@@ -192,43 +192,42 @@ contract DeploymentBaseTest is BaseTest {
     function _configureProtocol() internal {
         ConfigureProtocolScript configProtocolScript = new ConfigureProtocolScript();
         configProtocolScript.setVerbose(false);
-        configProtocolScript.run(
-            _registryDeploy.registry,
-            _minterDeploy.minter,
-            _assetRouterDeploy.assetRouter,
-            _tokenDeploy.kUSD,
-            _tokenDeploy.kBTC,
-            _vaultsDeploy.dnVaultUSDC,
-            _vaultsDeploy.dnVaultWBTC,
-            _vaultsDeploy.alphaVault,
-            _vaultsDeploy.betaVault,
-            _adaptersDeploy.dnVaultAdapterUSDC,
-            _adaptersDeploy.dnVaultAdapterWBTC,
-            _adaptersDeploy.alphaVaultAdapter,
-            _adaptersDeploy.betaVaultAdapter,
-            _adaptersDeploy.kMinterAdapterUSDC,
-            _adaptersDeploy.kMinterAdapterWBTC,
-            _mocks.USDC,
-            _mocks.WBTC
-        );
+
+        ConfigureProtocolScript.ProtocolAddresses memory addr;
+        addr.registry = _registryDeploy.registry;
+        addr.minter = _minterDeploy.minter;
+        addr.assetRouter = _assetRouterDeploy.assetRouter;
+        addr.kUSD = _tokenDeploy.kUSD;
+        addr.kBTC = _tokenDeploy.kBTC;
+        addr.dnVaultUSDC = _vaultsDeploy.dnVaultUSDC;
+        addr.dnVaultWBTC = _vaultsDeploy.dnVaultWBTC;
+        addr.alphaVault = _vaultsDeploy.alphaVault;
+        addr.betaVault = _vaultsDeploy.betaVault;
+        addr.dnVaultAdapterUSDC = _adaptersDeploy.dnVaultAdapterUSDC;
+        addr.dnVaultAdapterWBTC = _adaptersDeploy.dnVaultAdapterWBTC;
+        addr.alphaVaultAdapter = _adaptersDeploy.alphaVaultAdapter;
+        addr.betaVaultAdapter = _adaptersDeploy.betaVaultAdapter;
+        addr.minterAdapterUSDC = _adaptersDeploy.kMinterAdapterUSDC;
+        addr.minterAdapterWBTC = _adaptersDeploy.kMinterAdapterWBTC;
+
+        configProtocolScript.runWithAddresses(addr, _mocks.USDC, _mocks.WBTC);
 
         ConfigureExecutorPermissionsScript executorPermissionsScript = new ConfigureExecutorPermissionsScript();
         executorPermissionsScript.setVerbose(false);
-        executorPermissionsScript.run(
-            false,
-            _registryDeploy.registry,
-            _adaptersDeploy.kMinterAdapterUSDC,
-            _adaptersDeploy.kMinterAdapterWBTC,
-            _adaptersDeploy.dnVaultAdapterUSDC,
-            _adaptersDeploy.dnVaultAdapterWBTC,
-            _adaptersDeploy.alphaVaultAdapter,
-            _adaptersDeploy.betaVaultAdapter,
-            _mocks.metawalletUSDC,
-            _mocks.metawalletWBTC,
-            _mocks.WalletUSDC,
-            _mocks.USDC,
-            _mocks.WBTC
-        );
+
+        ConfigureExecutorPermissionsScript.ExecutorAddrs memory execAddr;
+        execAddr.registry = _registryDeploy.registry;
+        execAddr.kMinterAdapterUSDC = _adaptersDeploy.kMinterAdapterUSDC;
+        execAddr.kMinterAdapterWBTC = _adaptersDeploy.kMinterAdapterWBTC;
+        execAddr.dnVaultAdapterUSDC = _adaptersDeploy.dnVaultAdapterUSDC;
+        execAddr.dnVaultAdapterWBTC = _adaptersDeploy.dnVaultAdapterWBTC;
+        execAddr.alphaVaultAdapter = _adaptersDeploy.alphaVaultAdapter;
+        execAddr.betaVaultAdapter = _adaptersDeploy.betaVaultAdapter;
+        execAddr.metawalletUSDC = _mocks.metawalletUSDC;
+        execAddr.metawalletWBTC = _mocks.metawalletWBTC;
+        execAddr.walletUSDC = _mocks.WalletUSDC;
+
+        executorPermissionsScript.run(false, execAddr, _mocks.USDC, _mocks.WBTC);
 
         // Note: ReaderModule is already registered to vaults in 07_DeployVaults.s.sol
 
