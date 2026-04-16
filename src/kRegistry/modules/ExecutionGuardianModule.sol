@@ -74,8 +74,27 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         bool _isAllowed
     )
         external
+        virtual
     {
         _checkAdmin(msg.sender);
+        _setAllowedSelector(_executor, _target, _targetType, _selector, _isAllowed);
+    }
+
+    /// @notice Internal function to set executor selector permissions
+    /// @param _executor The executor address
+    /// @param _target The target contract address
+    /// @param _targetType The target type classification
+    /// @param _selector The function selector
+    /// @param _isAllowed Whether the selector should be allowed
+    function _setAllowedSelector(
+        address _executor,
+        address _target,
+        uint8 _targetType,
+        bytes4 _selector,
+        bool _isAllowed
+    )
+        internal
+    {
         _checkAddressNotZero(_executor);
         _checkAddressNotZero(_target);
 
@@ -116,8 +135,25 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         address _executionValidator
     )
         external
+        virtual
     {
         _checkAdmin(msg.sender);
+        _setExecutionValidator(_executor, _target, _selector, _executionValidator);
+    }
+
+    /// @notice Internal function to set an execution validator
+    /// @param _executor The executor address
+    /// @param _target The target contract address
+    /// @param _selector The function selector
+    /// @param _executionValidator The execution validator contract address
+    function _setExecutionValidator(
+        address _executor,
+        address _target,
+        bytes4 _selector,
+        address _executionValidator
+    )
+        internal
+    {
         _checkAddressNotZero(_executor);
         _checkAddressNotZero(_target);
 

@@ -5,13 +5,13 @@ import { Test } from "forge-std/Test.sol";
 import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 
 import {
-    KREMOTEREGISTRY_NOT_ALLOWED,
-    KREMOTEREGISTRY_SELECTOR_ALREADY_SET,
-    KREMOTEREGISTRY_SELECTOR_NOT_FOUND,
+    GUARDIANMODULE_INVALID_EXECUTOR,
+    GUARDIANMODULE_NOT_ALLOWED,
+    GUARDIANMODULE_SELECTOR_NOT_FOUND,
     KREMOTEREGISTRY_ZERO_ADDRESS,
-    KREMOTEREGISTRY_ZERO_SELECTOR
+    KROLESBASE_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
-import { IkRemoteRegistry } from "kam/src/interfaces/IkRemoteRegistry.sol";
+import { IExecutionGuardian } from "kam/src/interfaces/modules/IExecutionGuardian.sol";
 import { kRemoteRegistry } from "kam/src/kRegistry/kRemoteRegistry.sol";
 
 contract kRemoteRegistryTest is Test {
@@ -25,6 +25,8 @@ contract kRemoteRegistryTest is Test {
     address public alice;
 
     bytes4 public testSelector;
+
+    uint8 constant DEFAULT_TARGET_TYPE = 0;
 
     function setUp() public {
         owner = makeAddr("Owner");
@@ -68,21 +70,21 @@ contract kRemoteRegistryTest is Test {
     function test_SetAllowedSelector_Success() public {
         vm.prank(owner);
         vm.expectEmit(true, true, true, true);
-        emit IkRemoteRegistry.SelectorAllowed(executor, target, testSelector, true);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        emit IExecutionGuardian.SelectorAllowed(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         assertTrue(registry.isSelectorAllowed(executor, target, testSelector));
     }
 
     function test_SetAllowedSelector_Disallow_Success() public {
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
         assertTrue(registry.isSelectorAllowed(executor, target, testSelector));
 
         vm.prank(owner);
         vm.expectEmit(true, true, true, true);
-        emit IkRemoteRegistry.SelectorAllowed(executor, target, testSelector, false);
-        registry.setAllowedSelector(executor, target, testSelector, false);
+        emit IExecutionGuardian.SelectorAllowed(executor, target, testSelector, false);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, false);
 
         assertFalse(registry.isSelectorAllowed(executor, target, testSelector));
     }
@@ -90,34 +92,36 @@ contract kRemoteRegistryTest is Test {
     function test_SetAllowedSelector_Require_Owner() public {
         vm.prank(alice);
         vm.expectRevert();
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
     }
 
     function test_SetAllowedSelector_Require_Not_Zero_Executor() public {
         vm.prank(owner);
-        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
-        registry.setAllowedSelector(address(0), target, testSelector, true);
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.setAllowedSelector(address(0), target, DEFAULT_TARGET_TYPE, testSelector, true);
     }
 
     function test_SetAllowedSelector_Require_Not_Zero_Target() public {
         vm.prank(owner);
-        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
-        registry.setAllowedSelector(executor, address(0), testSelector, true);
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
+        registry.setAllowedSelector(executor, address(0), DEFAULT_TARGET_TYPE, testSelector, true);
     }
 
     function test_SetAllowedSelector_Require_Not_Zero_Selector() public {
         vm.prank(owner);
-        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_SELECTOR));
-        registry.setAllowedSelector(executor, target, bytes4(0), true);
+        vm.expectRevert(bytes(GUARDIANMODULE_INVALID_EXECUTOR));
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, bytes4(0), true);
     }
 
-    function test_SetAllowedSelector_Require_Not_Already_Set() public {
+    function test_SetAllowedSelector_Idempotent() public {
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
+        // Setting to the same value again should not revert (idempotent behavior)
         vm.prank(owner);
-        vm.expectRevert(bytes(KREMOTEREGISTRY_SELECTOR_ALREADY_SET));
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
+
+        assertTrue(registry.isSelectorAllowed(executor, target, testSelector));
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -126,11 +130,11 @@ contract kRemoteRegistryTest is Test {
 
     function test_SetExecutionValidator_Success() public {
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         vm.prank(owner);
         vm.expectEmit(true, true, true, true);
-        emit IkRemoteRegistry.ExecutionValidatorSet(executor, target, testSelector, executionValidator);
+        emit IExecutionGuardian.ExecutionValidatorSet(executor, target, testSelector, executionValidator);
         registry.setExecutionValidator(executor, target, testSelector, executionValidator);
 
         assertEq(registry.getExecutionValidator(executor, target, testSelector), executionValidator);
@@ -138,7 +142,7 @@ contract kRemoteRegistryTest is Test {
 
     function test_SetExecutionValidator_Remove_Success() public {
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         vm.prank(owner);
         registry.setExecutionValidator(executor, target, testSelector, executionValidator);
@@ -151,7 +155,7 @@ contract kRemoteRegistryTest is Test {
 
     function test_SetExecutionValidator_Require_Owner() public {
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         vm.prank(alice);
         vm.expectRevert();
@@ -160,25 +164,25 @@ contract kRemoteRegistryTest is Test {
 
     function test_SetExecutionValidator_Require_Not_Zero_Executor() public {
         vm.prank(owner);
-        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
         registry.setExecutionValidator(address(0), target, testSelector, executionValidator);
     }
 
     function test_SetExecutionValidator_Require_Not_Zero_Target() public {
         vm.prank(owner);
-        vm.expectRevert(bytes(KREMOTEREGISTRY_ZERO_ADDRESS));
+        vm.expectRevert(bytes(KROLESBASE_ZERO_ADDRESS));
         registry.setExecutionValidator(executor, address(0), testSelector, executionValidator);
     }
 
     function test_SetExecutionValidator_Require_Selector_Allowed() public {
         vm.prank(owner);
-        vm.expectRevert(bytes(KREMOTEREGISTRY_SELECTOR_NOT_FOUND));
+        vm.expectRevert(bytes(GUARDIANMODULE_SELECTOR_NOT_FOUND));
         registry.setExecutionValidator(executor, target, testSelector, executionValidator);
     }
 
     function test_SetExecutionValidator_Removed_When_Selector_Disallowed() public {
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         vm.prank(owner);
         registry.setExecutionValidator(executor, target, testSelector, executionValidator);
@@ -186,7 +190,7 @@ contract kRemoteRegistryTest is Test {
 
         // Disallow selector - should also remove execution validator
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, false);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, false);
 
         assertEq(registry.getExecutionValidator(executor, target, testSelector), address(0));
     }
@@ -197,7 +201,7 @@ contract kRemoteRegistryTest is Test {
 
     function test_AuthorizeCall_Success() public {
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         vm.prank(executor);
         registry.authorizeCall(target, testSelector, "");
@@ -205,7 +209,7 @@ contract kRemoteRegistryTest is Test {
 
     function test_AuthorizeCall_Require_Selector_Allowed() public {
         vm.prank(executor);
-        vm.expectRevert(bytes(KREMOTEREGISTRY_NOT_ALLOWED));
+        vm.expectRevert(bytes(GUARDIANMODULE_NOT_ALLOWED));
         registry.authorizeCall(target, testSelector, "");
     }
 
@@ -217,7 +221,7 @@ contract kRemoteRegistryTest is Test {
         assertFalse(registry.isSelectorAllowed(executor, target, testSelector));
 
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         assertTrue(registry.isSelectorAllowed(executor, target, testSelector));
     }
@@ -227,7 +231,7 @@ contract kRemoteRegistryTest is Test {
         assertEq(_targets.length, 0);
 
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 1);
@@ -239,10 +243,10 @@ contract kRemoteRegistryTest is Test {
         bytes4 selector2 = bytes4(keccak256("testFunction2()"));
 
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target2, selector2, true);
+        registry.setAllowedSelector(executor, target2, DEFAULT_TARGET_TYPE, selector2, true);
 
         address[] memory _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 2);
@@ -260,13 +264,13 @@ contract kRemoteRegistryTest is Test {
 
     function test_GetExecutorTargets_Removed_When_Disallowed() public {
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, true);
 
         address[] memory _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 1);
 
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, testSelector, false);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, testSelector, false);
 
         _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 0);
@@ -278,16 +282,16 @@ contract kRemoteRegistryTest is Test {
 
         // Allow two selectors for the same target
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, selector1, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, selector1, true);
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, selector2, true);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, selector2, true);
 
         address[] memory _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 1);
 
         // Disallow first selector - target should remain since selector2 is still allowed
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, selector1, false);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, selector1, false);
 
         _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 1, "Target should remain when other selectors are still allowed");
@@ -295,7 +299,7 @@ contract kRemoteRegistryTest is Test {
 
         // Disallow second selector - now target should be removed
         vm.prank(owner);
-        registry.setAllowedSelector(executor, target, selector2, false);
+        registry.setAllowedSelector(executor, target, DEFAULT_TARGET_TYPE, selector2, false);
 
         _targets = registry.getExecutorTargets(executor);
         assertEq(_targets.length, 0, "Target should be removed when no selectors remain");
