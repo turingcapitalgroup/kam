@@ -47,14 +47,14 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 
 **Virtual Balance System**
 
-- `kAssetPush(address asset, uint256 amount, bytes32 batchId)` - Records incoming asset flows from caller to virtual balance
+- `kAssetPush(address asset, uint256 amount, bytes32 batchId)` - Transfers incoming assets from kMinter to the adapter (batchId is reserved for future use)
 - `kAssetRequestPull(address asset, uint256 amount, bytes32 batchId)` - Stages outgoing asset requests from caller's virtual balance
-- `kSharesRequestPush(address vault, uint256 amount, bytes32 batchId)` - Records incoming share flows for unstaking
+- `kSharesRequestPush(address vault, uint256 amount, bytes32 batchId)` - Emits share request event for off-chain tracking (no storage changes)
 
 **Settlement Operations**
 
 - `proposeSettleBatch(address asset, address vault, bytes32 batchId, uint256 totalAssets)` - Creates timelock settlement proposal with automatic yield calculations (RELAYER_ROLE required)
-- `executeSettleBatch(bytes32 proposalId)` - Executes approved settlement after cooldown using proposal ID (anyone can call after cooldown)
+- `executeSettleBatch(bytes32 proposalId)` - Executes approved settlement after cooldown using proposal ID (RELAYER_ROLE required)
 - `cancelProposal(bytes32 proposalId)` - Cancels settlement proposals during cooldown period (GUARDIAN_ROLE required)
 - `acceptProposal(bytes32 proposalId)` - Approves high-yield-delta proposals that exceed the yield tolerance threshold (GUARDIAN_ROLE required)
 
@@ -239,7 +239,7 @@ Interface for vault fee management including performance and management fees.
 
 **Internal Fee Accrual**
 
-- `_accrueFees()` - Internal function that computes pending management fees based on time elapsed since `lastFeeTimestamp` and returns the fee amount. Called in `settleBatch()` and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). Performance fees are computed separately in `settleBatch()` on net interest above the hurdle threshold.
+- `_accrueFees()` - Internal function that computes pending management fees based on time elapsed since `lastFeeTimestamp`, updates the timestamp, and returns the fee amount in assets. Called in `settleBatch()` and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). Does not mint shares itself; the caller handles minting via `_mintManagementFees()`. Performance fees are computed separately in `settleBatch()` on net interest above the hurdle threshold.
 
 ### IVaultReader
 

@@ -3,10 +3,11 @@ pragma solidity ^0.8.4;
 
 /// @title IVaultFees
 /// @notice Interface for vault fee management including performance and management fees with hurdle rate mechanisms
-/// @dev This interface defines the fee structure for staking vaults, implementing continuous fee accrual
-/// via share minting to the treasury. Fees are accrued on every user interaction and before fee rate changes.
-/// The hurdle rate mechanism can operate in two modes: soft hurdle (fees on all profits) or hard hurdle
-/// (fees only on excess above hurdle). All fees are expressed in basis points (1% = 100 bp).
+/// @dev This interface defines the fee structure for staking vaults, implementing fee accrual
+/// via share minting to the treasury. Fees are accrued at settlement time (settleBatch) and before fee rate
+/// changes (setManagementFee, setPerformanceFee). The hurdle rate mechanism can operate in two modes: soft
+/// hurdle (fees on all profits) or hard hurdle (fees only on excess above hurdle). All fees are expressed
+/// in basis points (1% = 100 bp).
 interface IVaultFees {
     /// @notice Sets the annual management fee rate charged on assets under management
     /// @dev Accrues pending fees before changing the rate. Management fees are calculated based on

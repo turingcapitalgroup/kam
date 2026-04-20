@@ -120,11 +120,11 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
    - `profit` = whether yield is positive or negative
    - Emits `YieldExceedsMaxDeltaWarning` if yield exceeds configured threshold (warning only, does not revert)
 
-2. **Cooldown Phase**: Mandatory waiting period (configurable, up to 24 hours) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds the configured threshold, a warning event is emitted and the proposal is flagged as requiring approval (`requiresApproval = true`). On a vault's first settlement (`_lastTotalAssets == 0`), `requiresApproval` is set unconditionally. Guardians must monitor for these warnings and either cancel suspicious proposals or approve legitimate proposals via `acceptProposal()`.
+2. **Cooldown Phase**: Mandatory waiting period (configurable, up to 24 hours) where guardians can `cancelProposal()`. **Yield Tolerance**: If yield deviation exceeds the configured threshold, a warning event is emitted and the proposal is flagged as requiring approval (`requiresApproval = true`). On a vault's first settlement (`_lastTotalAssets == 0`), non-zero yield causes the proposal to **revert** with `KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD` to prevent unverified bootstrapping. Guardians must monitor for these warnings and either cancel suspicious proposals or approve legitimate proposals via `acceptProposal()`.
 
 3. **Approval Phase** (conditional): Guardian calls `acceptProposal()` if required by high yield delta.
 
-4. **Execution Phase**: After cooldown (and approval if required), the relayer calls `executeSettleBatch()` to complete settlement
+4. **Execution Phase**: After cooldown (and approval if required), the relayer calls `executeSettleBatch()` to complete settlement (RELAYER_ROLE required)
 
 **Yield Distribution**: During settlement execution:
 
@@ -178,7 +178,7 @@ The kMinter contract maintains separate batch cycles for each supported asset:
 │  └────────┘   └────────┘   └────────┘                         │
 │                                                               │
 │  Batch ID Generation:                                         │
-│  hash(vault_address, assetBatchCounter, chain_id, time, asset)│
+│  hash(contract_address, assetBatchCounter, chain_id, time, asset)│
 │                                                               │
 │  • Independent lifecycles per asset                           │
 │  • No cross-asset blocking                                    │
@@ -262,7 +262,7 @@ The kAssetRouter serves as the central coordinator for all asset movements withi
 │                                                             │
 │  Retail Operations (kStakingVault):                         │
 │  • kAssetTransfer() - Virtual transfers between vaults      │
-│  • kSharesRequestPush() - Track share operations            │
+│  • kSharesRequestPush() - Emit share request events         │
 │                                                             │
 │  Settlement Operations (Relayers):                          │
 │  • proposeSettleBatch() - Create settlement proposal        │
@@ -314,7 +314,7 @@ The kAssetRouter is the most complex contract in the KAM protocol, serving as bo
 
 The router maintains three primary mappings for tracking asset states: vault batch balances for pending deposits/withdrawals per vault per batch, share redemption requests per vault per batch, and settlement proposals with timelock protection.
 
-Settlement uses a proposal-commit pattern that provides security through time delays and validation. Relayers submit settlement proposals containing total assets, netted amounts, yield calculations, and profit status. After a mandatory cooldown period where proposals can be reviewed and cancelled if errors are detected, anyone can execute the settlement atomically.
+Settlement uses a proposal-commit pattern that provides security through time delays and validation. Relayers submit settlement proposals containing total assets; the contract automatically calculates netted amounts, yield, and profit status. After a mandatory cooldown period where proposals can be reviewed and cancelled if errors are detected, a relayer (RELAYER_ROLE) executes the settlement atomically.
 
 The router handles four distinct types of asset movements: kMinter push operations when institutions mint tokens, kMinter pull requests when institutions request redemptions, vault transfers when retail users stake/unstake, and share management for complex multi-vault operations.
 
@@ -327,7 +327,7 @@ During settlement execution, the system handles kMinter versus regular vault set
 │                                                                                          │
 │  Phase 1: PROPOSAL      Phase 2: COOLDOWN      Phase 3: APPROVAL     Phase 4: EXECUTE   │
 │  ┌──────────────┐      ┌──────────────┐       ┌──────────────┐      ┌──────────────┐    │
-│  │   Relayer    │      │   Timelock   │       │   Guardian   │      │   Anyone     │    │
+│  │   Relayer    │      │   Timelock   │       │   Guardian   │      │   Relayer    │    │
 │  │              │      │              │       │  (if needed) │      │              │    │
 │  │ • Query      │      │ • 1hr wait   │       │ • Review     │      │ • Clear      │    │
 │  │   totalAssets│─────>│ • Can cancel │──────>│   high-delta │─────>│   balances   │    │
@@ -423,7 +423,7 @@ The above contracts depend on base contracts and libraries:
 
 **kBase**: Common functionality inherited by core protocol contracts, providing registry integration helpers, role management utilities, pause functionality, and standardized storage access patterns.
 
-**Extsload**: Allows external contracts to read storage slots efficiently, implementing EIP-2930 access list optimization for off-chain monitoring and verification.
+**Extsload**: Allows external contracts to read arbitrary storage slots efficiently, enabling off-chain monitoring, verification, and batch state queries without dedicated getter functions.
 
 **MultiFacetProxy**: Proxy pattern for modular vault architecture, enabling delegatecall routing to facet implementations, selector-based function dispatch, and admin-controlled facet management.
 
@@ -452,9 +452,9 @@ Institution                kMinter              kAssetRouter            kToken
 
 ### Institutional Redemption Flow
 
-The burn process implements a secure request-queue system that protects both the protocol and institutions. The process begins with request creation where institutions call requestBurn() with their kToken amount. A unique ID is created from user data, amount, and timestamp, and kTokens are transferred to kMinter for holding (not burned immediately). Virtual balances are updated in kAssetRouter to mark assets as requested for withdrawal.
+The burn process implements a secure request-queue system that protects both the protocol and institutions. The process begins with request creation where institutions call requestBurn() with their kToken amount. A unique ID is created from the recipient address, amount, timestamp, and an incrementing counter, and kTokens are transferred to kMinter for escrow (not burned immediately). Virtual balances are updated in kAssetRouter to mark assets as requested for withdrawal.
 
-During batch settlement, assets are retrieved from strategies and transferred to kBatchReceiver for distribution. Finally, institutions call burn() to burn the escrowed kTokens and receive underlying assets from the batch receiver, ensuring atomic exchange of tokens for assets.
+During batch settlement, escrowed kTokens are burned in bulk by `settleBatch()` and assets are retrieved from strategies and transferred to kBatchReceiver for distribution. Institutions then call `burn()` to mark their request as REDEEMED and claim underlying assets from the batch receiver.
 
 ```
 Institution            kMinter            kAssetRouter         BatchReceiver
@@ -469,10 +469,10 @@ Institution            kMinter            kAssetRouter         BatchReceiver
     │                     │                    ├──settle()─────────>│
     │                     │                    │                    │
     ├──burn(requestId)─>  │                    │                    │
-    │                     ├──burn(kTokens)     │                    │
+    │                     ├──mark REDEEMED     │                    │
     │                     ├──pullAssets────────────────────────────>│
     │<────────────────────┤                    │                    │
-    │   USDC received     │                    │                    │
+    │   USDC received     │  (kTokens already burned in settleBatch)
 ```
 
 ### Retail Staking Flow
@@ -503,7 +503,7 @@ Settlement is the critical synchronization point between virtual and actual bala
 
 The cooldown phase provides a mandatory waiting period (default 1 hour, configurable up to 1 day) where proposals can be reviewed and cancelled if errors are detected.
 
-In the execution phase, after cooldown expires, anyone can execute the settlement atomically. The system clears batch balances, handles different settlement types (kMinter vs regular vault), deploys netted assets to adapters with explicit approvals, updates adapter total asset tracking, and marks batches as settled in vaults.
+In the execution phase, after cooldown expires, a relayer (RELAYER_ROLE) executes the settlement atomically. The system clears batch balances, handles different settlement types (kMinter vs regular vault), deploys netted assets to adapters with explicit approvals, updates adapter total asset tracking, and marks batches as settled in vaults.
 
 ## Virtual Balance System
 
@@ -538,7 +538,7 @@ The multi-phase commit system provides multiple safeguards:
 ### Timelock Protection ###
 
 - Mandatory cooldown period (1hr default, max 1 day)
-- Guardian or emergency admin proposal cancellation during cooldown
+- Guardian (GUARDIAN_ROLE) or emergency admin (EMERGENCY_ADMIN_ROLE) proposal cancellation during cooldown
 - High-yield-delta approval system: Proposals exceeding yield tolerance require explicit guardian approval via `acceptProposal()` before execution
 - `canExecuteProposal()` returns specific reasons for blocked proposals (cooldown pending, requires approval, cancelled, already executed)
 - On-chain validation of all settlement parameters

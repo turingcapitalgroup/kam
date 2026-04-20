@@ -80,13 +80,13 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 
 - **Scope**: kAssetRouter
 - **Key Permissions**:
-  - Cancel settlement proposals during cooldown
+  - Cancel settlement proposals during cooldown (also available to EMERGENCY_ADMIN_ROLE)
   - Approve high-yield-delta proposals that exceed tolerance
   - Monitor settlement accuracy
   - Circuit breaker for incorrect settlements
 - **Key Functions**:
-  - `kAssetRouter.cancelProposal()` - Cancel settlement proposals during cooldown
-  - `kAssetRouter.acceptProposal()` - Approve high-yield-delta proposals that require guardian approval
+  - `kAssetRouter.cancelProposal()` - Cancel settlement proposals during cooldown (GUARDIAN_ROLE or EMERGENCY_ADMIN_ROLE)
+  - `kAssetRouter.acceptProposal()` - Approve high-yield-delta proposals that require guardian approval (GUARDIAN_ROLE only)
 
 ### RELAYER_ROLE
 
@@ -103,7 +103,7 @@ The KAM Protocol implements a comprehensive role-based access control system usi
   - `kMinter.createNewBatch()` - Create new minting batches
   - `kStakingVault.createNewBatch()` - Create new staking batches
   - `kStakingVault.closeBatch()` - Close staking batches
-- **Note**: `executeSettleBatch()` is permissionless (anyone can call after cooldown + optional approval)
+- **Note**: `executeSettleBatch()` requires RELAYER_ROLE (callable after cooldown + optional approval)
 
 ### INSTITUTION_ROLE
 
@@ -214,7 +214,7 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  │accepted         │    │cancel proposal  │                        │
 │  └─────────────────┘    └─────────────────┘                        │
 │                                                                    │
-│  Permissionless (after cooldown + optional approval):              │
+│  RELAYER_ROLE (after cooldown + optional approval):                │
 │  ┌─────────────────┐    ┌─────────────────┐                        │
 │  │Execute          │    │Settlement       │                        │
 │  │Settlement       │    │Executed         │                        │
@@ -320,9 +320,11 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  RELAYER_ROLE Functions:                                        │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │• proposeSettleBatch() - Propose settlement                  ││
+│  │• executeSettleBatch() - Execute settlement after cooldown   ││
+│  │  (callable once cooldown + optional approval is met)        ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
-│  GUARDIAN_ROLE Functions:                                       │
+│  GUARDIAN_ROLE / EMERGENCY_ADMIN_ROLE Functions:                │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │• cancelProposal() - Cancel settlement proposal              ││
 │  │• acceptProposal() - Approve high-yield-delta proposals      ││
@@ -333,12 +335,6 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │• setSettlementCooldown() - Configure cooldown period        ││
 │  │• setMaxAllowedDelta() - Configure yield tolerance           ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                 │
-│  Permissionless Functions:                                      │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │• executeSettleBatch() - Execute settlement after cooldown   ││
-│  │  (anyone can call once cooldown + approval is met)          ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -616,16 +612,16 @@ Day 0:              Day 1:              Day 2:              Day 3:
 ```
 Day 1:              Day 1 (cooldown):   Day 1+1hr:         Day 1+1hr:
 ┌─────────────┐     ┌────────────-─┐    ┌─────────────┐    ┌─────────────┐
-│RELAYER      │     │GUARDIAN      │    │Anyone       │    │Settlement   │
+│RELAYER      │     │GUARDIAN      │    │RELAYER      │    │Settlement   │
 │Proposes     │     │Can Cancel    │    │Can Execute  │    │Complete     │
-│Settlement   │     │(GUARDIAN_ROLE│    │(No Role)    │    │             │
-│(RELAYER_ROLE│     │)             │    │             │    │             │
+│Settlement   │     │(GUARDIAN_ROLE│    │(RELAYER_ROLE│    │             │
+│(RELAYER_ROLE│     │)             │    │)            │    │             │
 └─────────────┘     └─────────────-┘    └─────────────┘    └─────────────┘
 
 High-Yield-Delta Flow (when yield exceeds tolerance):
 Day 1:              Day 1 (cooldown):   Day 1+1hr:         Day 1+1hr:
 ┌─────────────┐     ┌────────────-─┐    ┌─────────────┐    ┌─────────────┐
-│RELAYER      │     │GUARDIAN Must │    │Anyone       │    │Settlement   │
+│RELAYER      │     │GUARDIAN Must │    │RELAYER      │    │Settlement   │
 │Proposes     │     │Accept or     │    │Can Execute  │    │Complete     │
 │Settlement   │     │Cancel        │    │(After       │    │             │
 │(RELAYER_ROLE│     │(GUARDIAN_ROLE│    │Approval)    │    │             │

@@ -160,7 +160,6 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /// (3) Maintaining read-only access to vault data and view functions during pause periods for transparency,
     /// (4) Allowing authorized emergency admins to resume operations once issues are resolved or maintenance completed.
     /// When paused, all state-changing functions (requestStake, requestUnstake,
-    /// cancelUnstakeRequest,
     /// claimStakedShares, claimUnstakedAssets) will revert with KSTAKINGVAULT_IS_PAUSED error. The pause mechanism
     /// serves as a circuit breaker protecting user funds during unexpected events while maintaining protocol integrity.
     /// Only emergency admins have permission to toggle this state, ensuring rapid response capabilities during critical

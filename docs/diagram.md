@@ -23,7 +23,7 @@ graph TB
         subgraph "kSTAKINGVAULT"
             STAKE_OPS[STAKE OPERATIONS<br/>1. requestStake<br/>2. Lock kTokens<br/>3. Settlement<br/>4. claimStakedShares]
             UNSTAKE_OPS[UNSTAKE OPERATIONS<br/>1. requestUnstake<br/>2. Lock stkTokens<br/>3. Settlement<br/>4. claimUnstakedAssets]
-            FEE_MGR[FEE MANAGER<br/>Management Fee: configurable<br/>Performance Fee: configurable<br/>Hurdle Rate: configurable<br/>Watermark Tracking]
+            FEE_MGR[FEE MANAGER<br/>Management Fee: configurable<br/>Performance Fee: configurable<br/>Hurdle Rate: configurable<br/>Settlement Balance Tracking]
         end
 
         subgraph "kASSETROUTER"
@@ -74,7 +74,7 @@ graph TB
     subgraph "SAFETY"
         PAUSE[⏸️ EMERGENCY PAUSE<br/>Halt all operations]
         COOLDOWN[⏲️ SETTLEMENT COOLDOWN<br/>1 hour review period]
-        TOLERANCE[📊 YIELD TOLERANCE<br/>Max 10% deviation<br/>Requires approval if exceeded]
+        TOLERANCE[📊 YIELD TOLERANCE<br/>Configurable per vault<br/>Requires approval if exceeded]
         APPROVE[✅ GUARDIAN APPROVE<br/>Accept high-delta proposals]
         CANCEL[❌ GUARDIAN CANCEL<br/>Stop bad proposals]
     end

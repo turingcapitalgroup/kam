@@ -331,7 +331,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Security Architecture**:
 
-- **Immutable Implementation**: No proxy pattern ensures token contract cannot be upgraded or modified
+- **UUPS Upgradeable**: kToken uses UUPS proxy pattern with ERC-7201 namespaced storage and atomic initialization
 - **Role-Based Access Control**: Uses OptimizedOwnableRoles for efficient permission management
 - **Emergency Controls**: EMERGENCY_ADMIN_ROLE can pause all transfers during crisis situations
 - **Supply Validation**: Total supply always equals underlying assets held across protocol vaults

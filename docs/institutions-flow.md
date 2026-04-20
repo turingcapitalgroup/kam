@@ -30,15 +30,15 @@
          │YES
          ▼
 ┌─────────────────┐    ┌─────────────────┐
-│Active batch     │NO  │Create new batch │
-│exists for asset?├───▶│for asset        │
-└────────┬────────┘    └────────┬────────┘
-         │YES                   │
-         ▼                      ▼
-┌─────────────────┐    ┌─────────────────┐
-│safeTransferFrom │◀───┤Transfer to      │
-│to kAssetRouter  │    │kAssetRouter     │
+│Active batch     │NO  │Transaction      │
+│exists for asset?├───▶│Reverts          │
 └────────┬────────┘    └─────────────────┘
+         │YES
+         ▼
+┌─────────────────┐
+│safeTransferFrom │
+│to kAssetRouter  │
+└────────┬────────┘
          │
          ▼
 ┌─────────────────┐
@@ -189,7 +189,7 @@
          ▼
 ┌─────────────────┐
 │Mark request as  │
-│REDEEMED         │ ── kTokens already burned in bulk during settleBatch()
+│REDEEMED         │ ── kTokens were already burned in bulk during settleBatch()
 └────────┬────────┘
          │
          ▼

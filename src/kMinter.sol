@@ -46,9 +46,8 @@ import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 /// share-based accounting used for retail users, (2) Two-phase redemption process that handles requests through
 /// batch settlements to optimize gas costs and maintain protocol efficiency, (3) Integration with kStakingVault
 /// for yield generation on deposited assets, (4) Request tracking and management system with unique IDs for each
-/// redemption, (5) Cancellation mechanism for pending requests before batch closure. The contract enforces strict
-/// access control, ensuring only verified institutions can access these privileged operations while maintaining
-/// the security and integrity of the protocol's asset backing.
+/// redemption. The contract enforces strict access control, ensuring only verified institutions can access these
+/// privileged operations while maintaining the security and integrity of the protocol's asset backing.
 contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, Ownable {
     using SafeTransferLib for address;
     using OptimizedSafeCastLib for uint256;
@@ -109,7 +108,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
 
     /// @notice Initializes the kMinter contract
     /// @param _registry Address of the registry contract
-    /// @param _owner Initial owner fo the contract
+    /// @param _owner Initial owner of the contract
     function initialize(address _registry, address _owner) external initializer {
         require(_registry != address(0), KMINTER_ZERO_ADDRESS);
         require(_owner != address(0), KMINTER_ZERO_ADDRESS);
@@ -208,7 +207,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         // Add request ID to user's set for efficient lookup of all their requests
         $.userRequests[msg.sender].add(_requestId);
 
-        // Escrow kTokens in this contract - NOT burned yet to allow cancellation
+        // Escrow kTokens in this contract - burned in bulk during settleBatch()
         _kToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         // Register redemption request with router for batch processing and settlement

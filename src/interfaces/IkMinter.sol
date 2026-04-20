@@ -33,7 +33,7 @@ interface IkMinter is IVersioned {
         address asset;
         /// @dev Timestamp when the request was created, used for tracking and auditing
         uint64 requestTimestamp;
-        /// @dev Current status in the redemption lifecycle (PENDING, REDEEMED, or CANCELLED)
+        /// @dev Current status in the redemption lifecycle (PENDING or REDEEMED)
         RequestStatus status;
         /// @dev The batch identifier this request belongs to for settlement processing
         bytes32 batchId;
@@ -139,13 +139,11 @@ interface IkMinter is IVersioned {
     /// withdrawal
     /// @dev This function implements the first phase of the redemption process for qualified institutions. The workflow
     /// consists of: (1) transferring kTokens from the caller to this contract for escrow (not burned yet), (2)
-    /// generating
-    /// a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4) registering the
-    /// request with kAssetRouter for batch processing. The kTokens remain in escrow until the batch is settled and the
-    /// user calls burn() to complete the process. This two-phase approach is necessary because redemptions are
-    /// processed
-    /// in batches through the DN vault system, which requires waiting for batch settlement to ensure proper asset
-    /// availability and yield distribution. The request can be cancelled before batch closure/settlement.
+    /// generating a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4)
+    /// registering the request with kAssetRouter for batch processing. The kTokens remain in escrow until the
+    /// batch is settled (when they are burned in bulk by settleBatch()) and the user calls burn() to claim assets.
+    /// This two-phase approach is necessary because redemptions are processed in batches through the DN vault system,
+    /// which requires waiting for batch settlement to ensure proper asset availability and yield distribution.
     /// @param asset The underlying asset address to burn (must match the kToken's underlying asset)
     /// @param to The recipient address that will receive the underlying assets after batch settlement
     /// @param amount The amount of kTokens to burn (will receive equivalent underlying assets)

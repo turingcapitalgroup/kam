@@ -487,7 +487,7 @@ Managers (MANAGER_ROLE) call this to:
 - Both invest in same external strategy (per asset)
 - Transfer shares, not USDC/WBTC
 - More efficient (no physical moves)
-- Code: `vaultRequestedShares` mapping
+- Code: `requestedSharesInBatch` in `BatchInfo` struct
 
 **Asset Accounting** (kMinter ↔ Alpha/Beta):
 
@@ -496,14 +496,14 @@ Managers (MANAGER_ROLE) call this to:
 - Physical movement via kMinter Adapter
 - Code: `vaultBatchBalances.deposited/requested`
 
-### 4. kAssetRouter Never Holds USDC
+### 4. kAssetRouter Briefly Holds USDC During Mint
 
-The router just updates numbers! It:
+During institutional minting, the router temporarily receives USDC from kMinter via `safeTransferFrom`, then immediately forwards it to the kMinter adapter via `kAssetPush()`. Outside of this brief transit, the router does not hold assets. It:
 
 - Tracks virtual balances
 - Calculates yield
 - Tells adapters to update their totalAssets
-- Does NOT hold or transfer USDC itself
+- Forwards assets from kMinter to adapters during mint
 
 Physical USDC/WBTC is always in:
 
@@ -551,7 +551,7 @@ A: NO! They only track virtual balances. All physical USDC stays in kMinter adap
 A: Yes! Multiple protections:
 
 - 1 hour settlement cooldown (guardians can cancel)
-- Yield tolerance checks (max 10% deviation)
+- Yield tolerance checks (configurable per vault via `setMaxAllowedDelta`, defaults to 0 until set)
 - Strict adapter permissions
 - All movements are auditable on-chain
 
