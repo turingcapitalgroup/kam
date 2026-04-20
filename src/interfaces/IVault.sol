@@ -203,10 +203,10 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     function netSharePrice() external view returns (uint256);
 
     /// @notice Converts assets to shares at current price
-    function convertToShares(uint256 shares) external view returns (uint256);
+    function convertToShares(uint256 assets) external view returns (uint256);
 
     /// @notice Converts shares to assets at current price
-    function convertToAssets(uint256 assets) external view returns (uint256);
+    function convertToAssets(uint256 shares) external view returns (uint256);
 
     /// @notice Converts shares to assets with specified totals
     function convertToAssetsWithTotals(

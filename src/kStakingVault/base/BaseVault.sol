@@ -92,30 +92,28 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         //2 - asset tracking (both read in _totalAssets hot path)
         uint128 totalBalance;
         uint128 maxTotalAssets;
-        //3 - reserved (previously vesting fields)
-        uint256 _reserved3;
-        //4
+        //3
         uint256 currentBatch;
-        //5
+        //4
         uint256 requestCounter;
-        //6
+        //5
         bytes32 currentBatchId;
-        //7
+        //6
         address registry;
-        //8
+        //7
         address underlyingAsset;
-        //9
+        //8
         address kToken;
-        //10
+        //9 - last settlement balance for performance fee calculation
+        uint128 lastSettlementBalance;
+        uint128 totalPendingStake;
+        // Dynamic values
         string name;
-        //11
         string symbol;
         mapping(bytes32 => BaseVaultTypes.BatchInfo) batches;
         mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;
         mapping(bytes32 => BaseVaultTypes.UnstakeRequest) unstakeRequests;
         mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set) userRequests;
-        //12 - last settlement balance for performance fee calculation
-        uint128 lastSettlementBalance;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.BaseVault")) - 1)) & ~bytes32(uint256(0xff))
