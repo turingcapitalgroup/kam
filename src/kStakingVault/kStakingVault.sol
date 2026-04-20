@@ -411,7 +411,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
             _increaseBalance(batchDeposited);
-            // $.totalPendingStake -= batchDeposited.toUint128();
+            $.totalPendingStake -= batchDeposited.toUint128();
         }
 
         // Burn all unstake shares and deduct from internal balance
