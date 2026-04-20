@@ -1,5 +1,5 @@
 # kAssetRouter
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kAssetRouter.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/kAssetRouter.sol)
 
 **Inherits:**
 [IkAssetRouter](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.IkAssetRouter.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
@@ -141,12 +141,12 @@ function kAssetPush(address _asset, uint256 _amount, bytes32 _batchId) external 
 
 Requests asset withdrawal from vault to fulfill institutional redemption through kMinter
 
-This function initiates the first phase of the institutional redemption process. The workflow
-involves: (1) registering the redemption request with the vault, (2) creating a kBatchReceiver minimal
-proxy to hold assets for distribution, (3) updating virtual balance accounting, (4) preparing for
-batch settlement. The actual asset transfer occurs later during batch settlement when the vault
-processes all pending requests together. This two-phase approach optimizes gas costs and ensures
-fair settlement across all institutional redemption requests in the batch.
+This function records a pending redemption request from kMinter. The workflow involves:
+(1) incrementing globalPendingRequests to track cumulative pending withdrawals,
+(2) validating that the effective virtual balance remains sufficient after this request,
+(3) emitting an event for off-chain tracking. The kBatchReceiver is created separately by kMinter
+during requestBurn(). The actual asset transfer occurs later during batch settlement when the
+router processes all pending requests together.
 
 
 ```solidity
@@ -227,7 +227,9 @@ process involves: (1) calculating final yields after a batch period, (2) determi
 redemptions, (3) creating a proposal with cooldown period for security verification, (4) preparing for
 kToken supply adjustment to maintain 1:1 backing. Positive yields result in kToken minting (distributing
 gains to all holders), while losses result in kToken burning (socializing losses). The cooldown period
-allows guardians to verify calculations before execution, ensuring protocol integrity.
+allows guardians to verify calculations before execution, ensuring protocol integrity. On a vault's first
+settlement (no prior virtual balance), non-zero yields revert with KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD
+to prevent unverified bootstrapping.
 
 
 ```solidity
@@ -235,9 +237,7 @@ function proposeSettleBatch(
     address _asset,
     address _vault,
     bytes32 _batchId,
-    uint256 _totalAssets,
-    uint64 _lastFeesChargedManagement,
-    uint64 _lastFeesChargedPerformance
+    uint256 _totalAssets
 )
     external
     payable
@@ -251,8 +251,6 @@ function proposeSettleBatch(
 |`_vault`|`address`||
 |`_batchId`|`bytes32`||
 |`_totalAssets`|`uint256`||
-|`_lastFeesChargedManagement`|`uint64`||
-|`_lastFeesChargedPerformance`|`uint64`||
 
 
 ### executeSettleBatch
@@ -370,12 +368,13 @@ operational flexibility, allowing normal yield fluctuations while blocking suspi
 
 
 ```solidity
-function setMaxAllowedDelta(uint256 _maxDelta) external;
+function setMaxAllowedDelta(address _vault, uint256 _maxDelta) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
+|`_vault`|`address`||
 |`_maxDelta`|`uint256`|The new yield tolerance in basis points (e.g., 1000 = 10%)|
 
 
@@ -443,7 +442,7 @@ human-readable reason for failures, enabling better error handling and user feed
 
 
 ```solidity
-function canExecuteProposal(bytes32 _proposalId) external view returns (bool _canExecute, string memory _reason);
+function canExecuteProposal(bytes32 _proposalId) external view returns (bool _canExecute, ProposalStatus _status);
 ```
 **Parameters**
 
@@ -456,7 +455,7 @@ function canExecuteProposal(bytes32 _proposalId) external view returns (bool _ca
 |Name|Type|Description|
 |----|----|-----------|
 |`_canExecute`|`bool`|canExecute True if the proposal can be executed immediately|
-|`_reason`|`string`|reason Descriptive message explaining why execution is blocked (if applicable)|
+|`_status`|`ProposalStatus`|status The proposal status code indicating the current state|
 
 
 ### isProposalPending
@@ -532,13 +531,13 @@ function getSettlementCooldown() external view returns (uint256);
 Gets the current yield tolerance threshold for settlement proposals
 
 The yield tolerance determines the maximum acceptable yield deviation before settlement proposals
-are automatically rejected. This acts as a safety mechanism to prevent processing of settlement proposals
-with excessive yield values that could indicate calculation errors or potential manipulation. The tolerance
+require guardian approval. Proposals exceeding this threshold are flagged with `requiresApproval = true`
+rather than rejected, requiring explicit guardian acceptance via `acceptProposal()`. The tolerance
 is expressed in basis points where 10000 equals 100%.
 
 
 ```solidity
-function getMaxAllowedDelta() external view returns (uint256);
+function getMaxAllowedDelta(address _vault) external view returns (uint256);
 ```
 **Returns**
 
@@ -673,6 +672,9 @@ function _checkAddressNotZero(address _addr) private pure;
 
 Check if virtual balance is sufficient
 
+Checks if the virtual balance is sufficient to cover the required amount,
+taking into account any pending proposals
+
 
 ```solidity
 function _checkSufficientVirtualBalance(address _vault, address _asset, uint256 _requiredAmount) private view;
@@ -684,6 +686,34 @@ function _checkSufficientVirtualBalance(address _vault, address _asset, uint256 
 |`_vault`|`address`|Vault address|
 |`_asset`|`address`||
 |`_requiredAmount`|`uint256`|Required amount|
+
+
+### _effectiveVirtualBalanceInt
+
+Computes effective virtual balance including all pending proposal netting for an asset
+
+
+```solidity
+function _effectiveVirtualBalanceInt(
+    address _vault,
+    address _asset
+)
+    private
+    view
+    returns (int256 _effectiveVirtualBalanceSigned);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_vault`|`address`|Vault address|
+|`_asset`|`address`|Asset address|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_effectiveVirtualBalanceSigned`|`int256`|Effective virtual balance as signed integer|
 
 
 ### _checkAdmin
@@ -990,8 +1020,8 @@ struct kAssetRouterStorage {
     uint256 proposalCounter;
     /// @dev Current cooldown period in seconds before settlement proposals can be executed
     uint256 vaultSettlementCooldown;
-    /// @dev Maximum allowed yield deviation in basis points before settlement proposal is rejected
-    uint256 maxAllowedDelta;
+    /// @dev Maximum allowed yield deviation in basis points per vault before settlement proposal is rejected
+    mapping(address vault => uint256) maxAllowedDelta;
     /// @dev Set of proposal IDs that have been executed to prevent double-execution
     OptimizedBytes32EnumerableSetLib.Bytes32Set executedProposalIds;
     /// @dev Set of all batch IDs processed by the router for tracking and management

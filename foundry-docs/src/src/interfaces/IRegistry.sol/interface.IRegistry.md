@@ -1,5 +1,5 @@
 # IRegistry
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IRegistry.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/interfaces/IRegistry.sol)
 
 **Inherits:**
 [IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -101,7 +101,7 @@ Removes a registered asset from the protocol
 This function deregisters an asset and cleans up all associated storage mappings. Critical safety checks
 ensure the asset cannot be removed if any vaults still reference it (vaultsByAsset must be empty).
 This prevents orphaned state where vaults reference a non-existent asset. Clears: supportedAssets set,
-maxMintPerBatch, maxBurnPerBatch, assetToKToken mapping, and assetHurdleRate. Note that the kToken contract
+maxMintPerBatch, maxBurnPerBatch, and assetToKToken mapping. Note that the kToken contract
 remains deployed but becomes orphaned - this is intentional as existing kToken holders should retain their
 tokens. Only callable by ADMIN_ROLE.
 
@@ -756,47 +756,91 @@ function getTreasury() external view returns (address);
 
 ### setHurdleRate
 
-Sets the hurdle rate for a specific asset
+Sets the hurdle rate for a specific vault
 
 Only admin can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
-Asset must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
+Vault must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
 A hurdle rate of 0 is valid and means performance fees will be charged on all positive yield with no minimum
 threshold.
 
 
 ```solidity
-function setHurdleRate(address asset, uint16 hurdleRate) external payable;
+function setHurdleRate(address vault, uint16 hurdleRate) external payable;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset`|`address`|The asset address to set hurdle rate for|
+|`vault`|`address`|The vault address to set hurdle rate for|
 |`hurdleRate`|`uint16`|The hurdle rate in basis points (100 = 1%), 0 means no minimum threshold|
+
+
+### setIsHardHurdleRate
+
+Sets the hard hurdle rate mode for a specific vault
+
+Only admin can set hurdle rate modes. Vault must be registered.
+Hard hurdle (true): performance fees charged only on excess return above hurdle rate.
+Soft hurdle (false): performance fees charged on all profits when returns exceed hurdle rate.
+
+
+```solidity
+function setIsHardHurdleRate(address vault, bool isHard) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`vault`|`address`|The vault address to set mode for|
+|`isHard`|`bool`|True for hard hurdle, false for soft hurdle|
 
 
 ### getHurdleRate
 
-Gets the hurdle rate for a specific asset
+Gets the hurdle rate for a specific vault
 
 Returns minimum performance threshold in basis points for yield distribution.
-Asset must be registered to query hurdle rate.
+Vault must be registered to query hurdle rate.
 
 
 ```solidity
-function getHurdleRate(address asset) external view returns (uint16);
+function getHurdleRate(address vault) external view returns (uint16);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset`|`address`|The asset address to query|
+|`vault`|`address`|The vault address to query|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`uint16`|The hurdle rate in basis points|
+
+
+### getIsHardHurdleRate
+
+Gets the hard hurdle rate mode for a specific vault
+
+Returns whether the vault uses hard or soft hurdle rate mode.
+Vault must be registered to query.
+
+
+```solidity
+function getIsHardHurdleRate(address vault) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`vault`|`address`|The vault address to query|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if hard hurdle rate, false if soft hurdle rate|
 
 
 ### removeVault
@@ -1331,19 +1375,34 @@ event GlobalPauseSet(bool paused);
 |`paused`|`bool`|The new global pause state|
 
 ### HurdleRateSet
-Emitted when a hurdle rate is set for an asset
+Emitted when a hurdle rate is set for a vault
 
 
 ```solidity
-event HurdleRateSet(address indexed asset, uint16 hurdleRate);
+event HurdleRateSet(address indexed vault, uint16 hurdleRate);
 ```
 
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`asset`|`address`|The asset receiving the hurdle rate|
+|`vault`|`address`|The vault receiving the hurdle rate|
 |`hurdleRate`|`uint16`|The hurdle rate in basis points|
+
+### IsHardHurdleRateSet
+Emitted when the hard hurdle rate mode is set for a vault
+
+
+```solidity
+event IsHardHurdleRateSet(address indexed vault, bool isHard);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`vault`|`address`|The vault receiving the mode change|
+|`isHard`|`bool`|Whether the hurdle rate is hard (true) or soft (false)|
 
 ### VaultTargetSelectorRegistered
 Emitted when a vault-target-selector permission is registered

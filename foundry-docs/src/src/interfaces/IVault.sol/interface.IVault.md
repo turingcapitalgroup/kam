@@ -1,8 +1,8 @@
 # IVault
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IVault.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/interfaces/IVault.sol)
 
 **Inherits:**
-[IERC2771](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVaultBatch](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
+[IERC2771](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md), [IVaultBatch](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
 
 Core interface for retail staking operations enabling kToken holders to earn yield through vault strategies
 
@@ -103,7 +103,6 @@ to pause all user-facing operations during security incidents, market anomalies,
 (3) Maintaining read-only access to vault data and view functions during pause periods for transparency,
 (4) Allowing authorized emergency admins to resume operations once issues are resolved or maintenance completed.
 When paused, all state-changing functions (requestStake, requestUnstake,
-cancelUnstakeRequest,
 claimStakedShares, claimUnstakedAssets) will revert with KSTAKINGVAULT_IS_PAUSED error. The pause mechanism
 serves as a circuit breaker protecting user funds during unexpected events while maintaining protocol integrity.
 Only emergency admins have permission to toggle this state, ensuring rapid response capabilities during critical
@@ -150,6 +149,242 @@ function setTrustedForwarder(address trustedForwarder_) external;
 |Name|Type|Description|
 |----|----|-----------|
 |`trustedForwarder_`|`address`|The new trusted forwarder address (address(0) to disable)|
+
+
+### registry
+
+Returns the protocol registry address
+
+
+```solidity
+function registry() external view returns (address);
+```
+
+### asset
+
+Returns the vault's kToken address
+
+
+```solidity
+function asset() external view returns (address);
+```
+
+### underlyingAsset
+
+Returns the underlying asset address
+
+
+```solidity
+function underlyingAsset() external view returns (address);
+```
+
+### totalAssets
+
+Returns total assets under management
+
+
+```solidity
+function totalAssets() external view returns (uint256);
+```
+
+### totalNetAssets
+
+Returns net assets after fees
+
+
+```solidity
+function totalNetAssets() external view returns (uint256);
+```
+
+### sharePrice
+
+Returns gross share price
+
+
+```solidity
+function sharePrice() external view returns (uint256);
+```
+
+### netSharePrice
+
+Returns net share price after fees
+
+
+```solidity
+function netSharePrice() external view returns (uint256);
+```
+
+### convertToShares
+
+Converts assets to shares at current price
+
+
+```solidity
+function convertToShares(uint256 assets) external view returns (uint256);
+```
+
+### convertToAssets
+
+Converts shares to assets at current price
+
+
+```solidity
+function convertToAssets(uint256 shares) external view returns (uint256);
+```
+
+### convertToAssetsWithTotals
+
+Converts shares to assets with specified totals
+
+
+```solidity
+function convertToAssetsWithTotals(
+    uint256 shares,
+    uint256 totalAssets_,
+    uint256 totalSupply_
+)
+    external
+    pure
+    returns (uint256);
+```
+
+### convertToSharesWithTotals
+
+Converts assets to shares with specified totals
+
+
+```solidity
+function convertToSharesWithTotals(
+    uint256 assets,
+    uint256 totalAssets_,
+    uint256 totalSupply_
+)
+    external
+    pure
+    returns (uint256);
+```
+
+### getBatchId
+
+Returns the current active batch ID
+
+
+```solidity
+function getBatchId() external view returns (bytes32);
+```
+
+### getSafeBatchId
+
+Returns current batch ID with safety validation
+
+
+```solidity
+function getSafeBatchId() external view returns (bytes32);
+```
+
+### isClosed
+
+Returns the close state of a given batch
+
+
+```solidity
+function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
+```
+
+### isBatchClosed
+
+Returns whether the current batch is closed
+
+
+```solidity
+function isBatchClosed() external view returns (bool);
+```
+
+### isBatchSettled
+
+Returns whether the current batch is settled
+
+
+```solidity
+function isBatchSettled() external view returns (bool);
+```
+
+### getCurrentBatchInfo
+
+Returns comprehensive info about the current batch
+
+
+```solidity
+function getCurrentBatchInfo()
+    external
+    view
+    returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
+```
+
+### getBatchIdInfo
+
+Returns comprehensive info about a specific batch
+
+
+```solidity
+function getBatchIdInfo(bytes32 batchId)
+    external
+    view
+    returns (
+        address batchReceiver,
+        bool isClosed_,
+        bool isSettled,
+        uint256 sharePrice_,
+        uint256 netSharePrice_,
+        uint256 totalAssets_,
+        uint256 totalNetAssets_,
+        uint256 totalSupply_,
+        uint256 depositedInBatch,
+        uint256 requestedSharesInBatch
+    );
+```
+
+### maxTotalAssets
+
+Returns the maximum total assets (TVL cap)
+
+
+```solidity
+function maxTotalAssets() external view returns (uint128);
+```
+
+### increaseBalance
+
+Increases the vault's internal balance
+
+Only callable by authorized addresses (router)
+
+
+```solidity
+function increaseBalance(uint128 amount) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`amount`|`uint128`|The amount to increase the balance by|
+
+
+### decreaseBalance
+
+Decreases the vault's internal balance
+
+Only callable by authorized addresses (router)
+
+
+```solidity
+function decreaseBalance(uint128 amount) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`amount`|`uint128`|The amount to decrease the balance by|
 
 
 ## Events
@@ -277,62 +512,6 @@ event PerformanceFeeSet(uint16 oldFee, uint16 newFee);
 |----|----|-----------|
 |`oldFee`|`uint16`|Previous performance fee in basis points|
 |`newFee`|`uint16`|New performance fee in basis points|
-
-### HardHurdleRateSet
-Emitted when the hard hurdle rate is set
-
-
-```solidity
-event HardHurdleRateSet(bool isHard);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`isHard`|`bool`|True for hard hurdle, false for soft hurdle|
-
-### ManagementFeesCharged
-Emitted when management fees are charged
-
-
-```solidity
-event ManagementFeesCharged(uint256 timestamp);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`timestamp`|`uint256`|Timestamp of the fee charge|
-
-### PerformanceFeesCharged
-Emitted when performance fees are charged
-
-
-```solidity
-event PerformanceFeesCharged(uint256 timestamp);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`timestamp`|`uint256`|Timestamp of the fee charge|
-
-### SharePriceWatermarkUpdated
-Emitted when share price watermark is updated
-
-
-```solidity
-event SharePriceWatermarkUpdated(uint256 newWatermark);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`newWatermark`|`uint256`|The new share price watermark value|
 
 ### MaxTotalAssetsUpdated
 Emitted when max total assets is updated

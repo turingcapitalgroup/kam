@@ -1,5 +1,5 @@
 # ExecutionGuardianModule
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kRegistry/modules/ExecutionGuardianModule.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/kRegistry/modules/ExecutionGuardianModule.sol)
 
 **Inherits:**
 [IExecutionGuardian](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md), [IModule](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
@@ -14,7 +14,7 @@ Inherits from kBaseRoles for role-based access control
 
 ```solidity
 bytes32 private constant EXECUTIONGUARDIANMODULE_STORAGE_LOCATION =
-    0xd14aec45f1b64da194d5b24d6a4dfb8fd6ac8faca4e3d35f6c5e6d5e6f748f00
+    0x1cf339485c663c819058b30a6fe2837d9e6929a0f830fe23d7a50344bd0f3a00
 ```
 
 
@@ -53,7 +53,8 @@ function setAllowedSelector(
     bytes4 _selector,
     bool _isAllowed
 )
-    external;
+    external
+    virtual;
 ```
 **Parameters**
 
@@ -64,6 +65,32 @@ function setAllowedSelector(
 |`_targetType`|`uint8`||
 |`_selector`|`bytes4`||
 |`_isAllowed`|`bool`||
+
+
+### _setAllowedSelector
+
+Internal function to set executor selector permissions
+
+
+```solidity
+function _setAllowedSelector(
+    address _executor,
+    address _target,
+    uint8 _targetType,
+    bytes4 _selector,
+    bool _isAllowed
+)
+    internal;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_executor`|`address`|The executor address|
+|`_target`|`address`|The target contract address|
+|`_targetType`|`uint8`|The target type classification|
+|`_selector`|`bytes4`|The function selector|
+|`_isAllowed`|`bool`|Whether the selector should be allowed|
 
 
 ### setExecutionValidator
@@ -80,7 +107,8 @@ function setExecutionValidator(
     bytes4 _selector,
     address _executionValidator
 )
-    external;
+    external
+    virtual;
 ```
 **Parameters**
 
@@ -90,6 +118,30 @@ function setExecutionValidator(
 |`_target`|`address`||
 |`_selector`|`bytes4`||
 |`_executionValidator`|`address`||
+
+
+### _setExecutionValidator
+
+Internal function to set an execution validator
+
+
+```solidity
+function _setExecutionValidator(
+    address _executor,
+    address _target,
+    bytes4 _selector,
+    address _executionValidator
+)
+    internal;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_executor`|`address`|The executor address|
+|`_target`|`address`|The target contract address|
+|`_selector`|`bytes4`|The function selector|
+|`_executionValidator`|`address`|The execution validator contract address|
 
 
 ### authorizeCall
