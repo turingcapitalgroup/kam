@@ -70,7 +70,7 @@ interface IkAssetRouter is IVersioned {
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Emitted when the kAssetRouter contract is initialized with registry configuration
+    /// @notice Emitted when an adapter's total assets are updated during settlement execution
     /// @param adapter The address of the adapter that was updated
     /// @param totalAssets the totalAssets used as param to update
     event TotalAssetsSet(address indexed adapter, uint256 totalAssets);
@@ -222,12 +222,12 @@ interface IkAssetRouter is IVersioned {
     function kAssetPush(address _asset, uint256 amount, bytes32 batchId) external payable;
 
     /// @notice Requests asset withdrawal from vault to fulfill institutional redemption through kMinter
-    /// @dev This function initiates the first phase of the institutional redemption process. The workflow
-    /// involves: (1) registering the redemption request with the vault, (2) creating a kBatchReceiver minimal
-    /// proxy to hold assets for distribution, (3) updating virtual balance accounting, (4) preparing for
-    /// batch settlement. The actual asset transfer occurs later during batch settlement when the vault
-    /// processes all pending requests together. This two-phase approach optimizes gas costs and ensures
-    /// fair settlement across all institutional redemption requests in the batch.
+    /// @dev This function records a pending redemption request from kMinter. The workflow involves:
+    /// (1) incrementing globalPendingRequests to track cumulative pending withdrawals,
+    /// (2) validating that the effective virtual balance remains sufficient after this request,
+    /// (3) emitting an event for off-chain tracking. The kBatchReceiver is created separately by kMinter
+    /// during requestBurn(). The actual asset transfer occurs later during batch settlement when the
+    /// router processes all pending requests together.
     /// @param _asset The underlying asset address being redeemed
     /// @param amount The quantity of assets requested for redemption
     /// @param batchId The batch identifier for coordinating this redemption with other requests
@@ -338,10 +338,10 @@ interface IkAssetRouter is IVersioned {
 
     /// @notice Updates the yield tolerance threshold for settlement proposals
     /// @dev This function allows protocol governance to adjust the maximum acceptable yield deviation before
-    /// settlement proposals are rejected. The yield tolerance acts as a safety mechanism to prevent settlement
-    /// proposals with extremely high or low yield values that could indicate calculation errors, data corruption,
-    /// or potential manipulation attempts. Setting an appropriate tolerance balances protocol safety with
-    /// operational flexibility, allowing normal yield fluctuations while blocking suspicious proposals.
+    /// settlement proposals require guardian approval. The yield tolerance acts as a safety mechanism: proposals
+    /// with yield exceeding this threshold are flagged with `requiresApproval = true` and emit a
+    /// `YieldExceedsMaxDeltaWarning` event, requiring explicit guardian approval via `acceptProposal()` before
+    /// execution. Setting an appropriate tolerance balances protocol safety with operational flexibility.
     /// Only admin roles can modify this parameter as it affects protocol safety.
     /// @param tolerance_ The new yield tolerance in basis points (e.g., 1000 = 10%)
     function setMaxAllowedDelta(address vault_, uint256 tolerance_) external;
@@ -441,8 +441,8 @@ interface IkAssetRouter is IVersioned {
 
     /// @notice Gets the current yield tolerance threshold for settlement proposals
     /// @dev The yield tolerance determines the maximum acceptable yield deviation before settlement proposals
-    /// are automatically rejected. This acts as a safety mechanism to prevent processing of settlement proposals
-    /// with excessive yield values that could indicate calculation errors or potential manipulation. The tolerance
+    /// require guardian approval. Proposals exceeding this threshold are flagged with `requiresApproval = true`
+    /// rather than rejected, requiring explicit guardian acceptance via `acceptProposal()`. The tolerance
     /// is expressed in basis points where 10000 equals 100%.
     /// @return tolerance The current yield tolerance in basis points
     function getMaxAllowedDelta(address vault_) external view returns (uint256 tolerance);

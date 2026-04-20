@@ -1,6 +1,6 @@
 # KAM Protocol
 
-KAM is an institutional asset management protocol that implements a dual-track architecture for both institutional and retail access. The protocol creates kTokens (kUSD, kBTC) backed 1:1 by real assets (USDC, WBTC), providing institutions with direct minting and redemption capabilities while offering retail users yield opportunities through external strategy deployment. The system features batch processing with virtual balance accounting, two-phase settlement with timelock proposals, and modular vault architecture through diamond pattern implementation.
+KAM is an institutional asset management protocol that implements a dual-track architecture for both institutional and retail access. The protocol creates kTokens (kUSD, kBTC) backed 1:1 by real assets (USDC, WBTC), providing institutions with direct minting and redemption capabilities while offering retail users yield opportunities through external strategy deployment. The system features batch processing with virtual balance accounting, two-phase settlement with timelock proposals, and modular vault architecture through MultiFacetProxy routing.
 
 For more information, refer to the [architecture documentation](./docs/architecture.md).
 
@@ -109,8 +109,8 @@ This will open the documentation at http://localhost:4000
 Institutions can mint kTokens 1:1 with underlying assets and request redemptions through batch settlement:
 
 - `kMinter.mint()` - Creates new kTokens by accepting underlying asset deposits
-- `kMinter.requestBurn()` - Requests the burn of X shares for Y kTokens
-- `kMinter.burn()` - Claims underlying assets from the batch receiver after settlement
+- `kMinter.requestBurn()` - Escrows kTokens and creates a redemption request for the current batch
+- `kMinter.burn()` - Claims underlying assets from the batch receiver after settlement (kTokens already burned during settleBatch)
 
 ### Retail Operations
 
@@ -126,29 +126,31 @@ Retail users can stake kTokens to earn yield from external strategies:
 The protocol uses virtual balance accounting to optimize gas efficiency:
 
 - `kAssetRouter` maintains virtual balances between vaults and strategies
-- Physical transfers minimized to settlement operations only
-- All inter-vault transfers are virtual until settlement execution
+- Physical transfers occur during mint (institution → router → adapter) and settlement (adapter → batch receiver for redemptions)
+- Inter-vault transfers between kMinter and staking vaults are virtual (adapter totalAssets updates only)
 
 ### Batch Processing
 
 Requests are grouped into time-based batches for gas-efficient settlement:
 
 - Each vault manages independent batch cycles
-- Batch receivers deployed per batch for isolated asset distribution
-- Settlement coordinated through timelock proposals with correction mechanisms
+- Batch receivers deployed per kMinter batch for isolated institutional redemption distribution
+- Settlement coordinated through timelock proposals with guardian oversight and correction mechanisms
 
 ## Role Hierarchy
 
-| Role                 | Permissions                | Contracts                  |
-| -------------------- | -------------------------- | -------------------------  |
-| OWNER                | Ultimate control, upgrades | All                        |
-| ADMIN_ROLE           | Operational management     | All                        |
-| EMERGENCY_ADMIN_ROLE | Emergency pause            | All                        |
-| MINTER_ROLE          | Mint/burn tokens           | kToken                     |
-| INSTITUTION_ROLE     | Mint/redeem kTokens        | kMinter                    |
-| RELAYER_ROLE         | Settle batches             | kAssetRouter, VaultBatches |
-| VENDOR_ROLE          | Adds Institutions          | kRegistry                  |
-| MANAGER_ROLE         | Manages the Adapter        | kVaultAdapter              |
+| Role                 | Permissions                          | Contracts                          |
+| -------------------- | ------------------------------------ | ---------------------------------- |
+| OWNER                | Ultimate control, upgrades           | All                                |
+| ADMIN_ROLE           | Operational management               | All                                |
+| EMERGENCY_ADMIN_ROLE | Emergency pause, cancel proposals    | All                                |
+| GUARDIAN_ROLE        | Cancel/approve settlement proposals  | kAssetRouter                       |
+| MINTER_ROLE          | Mint/burn tokens                     | kToken                             |
+| INSTITUTION_ROLE     | Mint/redeem kTokens                  | kMinter                            |
+| RELAYER_ROLE         | Propose/execute settlements, batches | kAssetRouter, kMinter, kStakingVault |
+| VENDOR_ROLE          | Grant institution roles              | kRegistry                          |
+| MANAGER_ROLE         | Execute adapter calls                | VaultAdapter                       |
+| BLACKLIST_ADMIN_ROLE | Freeze/unfreeze accounts             | kToken                             |
 
 ## Safety
 

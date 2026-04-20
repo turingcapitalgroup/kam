@@ -156,7 +156,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // Make sure we dont exceed the max total assets
         // Use actual kToken balance (not _totalAssets()) to prevent bypass via pending stakes
         require(
-            $.kToken.balanceOf(address(this)) + _amount128 <= $.maxTotalAssets, KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED
+            $.totalBalance + $.totalPendingStake + _amount128 <= $.maxTotalAssets,
+            KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED
         );
 
         // Generate request ID
@@ -170,6 +171,9 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         // Deposit ktokens (held by vault but not counted in totalBalance until settlement)
         $.kToken.safeTransferFrom(_msgSender(), address(this), _amount);
+
+        // Increase pending stake
+        $.totalPendingStake += _amount.toUint128();
 
         // Add to user requests tracking
         $.userRequests[_owner].add(_requestId);
@@ -407,6 +411,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
             uint256 sharesToMint = _convertToSharesWithTotals(batchDeposited, _batchTotalAssets, _batchTotalSupply);
             _mint(address(this), sharesToMint);
             _increaseBalance(batchDeposited);
+            $.totalPendingStake -= batchDeposited.toUint128();
         }
 
         // Burn all unstake shares and deduct from internal balance
@@ -664,27 +669,15 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         return _sharePrice();
     }
 
-    function convertToShares(uint256 _shares) external view returns (uint256) {
-        return _convertToSharesWithTotals(_shares, _totalAssets(), totalSupply());
+    function convertToShares(uint256 _assets) external view returns (uint256) {
+        return _convertToSharesWithTotals(_assets, _totalAssets(), totalSupply());
     }
 
-    function convertToAssets(uint256 _assets) external view returns (uint256) {
-        return _convertToAssetsWithTotals(_assets, _totalAssets(), totalSupply());
+    function convertToAssets(uint256 _shares) external view returns (uint256) {
+        return _convertToAssetsWithTotals(_shares, _totalAssets(), totalSupply());
     }
 
     function convertToSharesWithTotals(
-        uint256 _shares,
-        uint256 _totalAssetsVal,
-        uint256 _totalSupplyVal
-    )
-        external
-        pure
-        returns (uint256)
-    {
-        return _convertToSharesWithTotals(_shares, _totalAssetsVal, _totalSupplyVal);
-    }
-
-    function convertToAssetsWithTotals(
         uint256 _assets,
         uint256 _totalAssetsVal,
         uint256 _totalSupplyVal
@@ -693,7 +686,19 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         pure
         returns (uint256)
     {
-        return _convertToAssetsWithTotals(_assets, _totalAssetsVal, _totalSupplyVal);
+        return _convertToSharesWithTotals(_assets, _totalAssetsVal, _totalSupplyVal);
+    }
+
+    function convertToAssetsWithTotals(
+        uint256 _shares,
+        uint256 _totalAssetsVal,
+        uint256 _totalSupplyVal
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _convertToAssetsWithTotals(_shares, _totalAssetsVal, _totalSupplyVal);
     }
 
     function getBatchId() public view returns (bytes32) {

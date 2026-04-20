@@ -150,6 +150,7 @@
 │After Cooldown      │     │Guardian Can     │     
 │Execute Settlement  │     │Cancel Proposal  │     
 │executeSettleBatch()│     │cancelProposal() │     
+│(RELAYER_ROLE)      │     │                 │     
 └-───────┬──-──────--┘     └─────────────────┘     
          │
          ▼

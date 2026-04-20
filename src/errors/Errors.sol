@@ -61,6 +61,7 @@ string constant BASEVAULT_CONTRACT_NOT_FOUND = "BV2";
 string constant BASEVAULT_INVALID_REGISTRY = "BV3";
 string constant BASEVAULT_INVALID_VAULT = "BV4";
 string constant BASEVAULT_NOT_INITIALIZED = "BV5";
+string constant BASEVAULT_INVALID_TREASURY = "BV6";
 
 // kBatchReceiver Errors
 string constant KBATCHRECEIVER_ALREADY_INITIALIZED = "B1";
