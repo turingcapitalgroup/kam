@@ -371,7 +371,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         $.supportedAssets.add(_asset);
         emit AssetSupported(_asset);
 
-        address _kToken = _deployKToken(_asset, _emergencyAdmin, _name, _symbol);
+        (address _kToken, uint8 _decimals) = _deployKToken(_asset, _emergencyAdmin, _name, _symbol);
 
         $.maxMintPerBatch[_asset] = _maxMintPerBatch;
         $.maxBurnPerBatch[_asset] = _maxBurnPerBatch;
@@ -381,7 +381,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         $.kTokenToAsset[_kToken] = _asset;
         emit AssetRegistered(_asset, _kToken);
 
-        emit KTokenDeployed(_kToken, _name, _symbol, _getDecimals(_asset));
+        emit KTokenDeployed(_kToken, _name, _symbol, _decimals);
 
         return _kToken;
     }
@@ -815,6 +815,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// @param _name Token name
     /// @param _symbol Token symbol
     /// @return _kToken The deployed kToken address
+    /// @return _decimals The decimals of the underlying asset
     function _deployKToken(
         address _asset,
         address _emergencyAdmin,
@@ -822,9 +823,10 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         string memory _symbol
     )
         private
-        returns (address _kToken)
+        returns (address _kToken, uint8 _decimals)
     {
-        (bool _success, uint8 _decimals) = _tryGetAssetDecimals(_asset);
+        bool _success;
+        (_success, _decimals) = _tryGetAssetDecimals(_asset);
         require(_success, KREGISTRY_WRONG_ASSET);
 
         address _factory = getContractById(K_TOKEN_FACTORY);
@@ -835,15 +837,6 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
 
         _kToken = IkTokenFactory(_factory)
             .deployKToken(owner(), msg.sender, _emergencyAdmin, _minter, _name, _symbol, _decimals);
-    }
-
-    /// @notice Gets the decimals of an underlying asset, reverting if unavailable
-    /// @param _asset The asset address to query decimals for
-    /// @return _decimals The number of decimals of the asset
-    function _getDecimals(address _asset) private view returns (uint8 _decimals) {
-        (bool _success, uint8 _result) = _tryGetAssetDecimals(_asset);
-        require(_success, KREGISTRY_WRONG_ASSET);
-        _decimals = _result;
     }
 
     /// @dev Helper function to get the decimals of the underlying asset.

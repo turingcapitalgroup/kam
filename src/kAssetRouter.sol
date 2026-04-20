@@ -275,7 +275,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // Validate global pending coverage for kMinter BEFORE adding proposal to the set,
         // so _effectiveVirtualBalanceInt doesn't iterate this uninitialized proposal slot.
         if (_isMinter) {
-            _validateAndDecrementGlobalPending(_vault, _asset, _requestedInBatch, _netted);
+            _validateAndDecrementGlobalPending($, _vault, _asset, _requestedInBatch, _netted);
         }
 
         _createProposal($, _proposalId, _asset, _vault, _batchId, _totalAssets, _netted);
@@ -296,9 +296,11 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     )
         private
     {
+        uint256 _lastTotalAssets = _virtualBalance(_vault, _asset);
+
         // casting to 'int256' is safe because we're doing arithmetic on uint256 values
         // forge-lint: disable-next-line(unsafe-typecast)
-        int256 _yield = int256(_totalAssets) - int256(_virtualBalance(_vault, _asset));
+        int256 _yield = int256(_totalAssets) - int256(_lastTotalAssets);
 
         // To calculate the strategy yield we need to include the deposits and requests into the new total
         // assets to match last total assets.
@@ -306,7 +308,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // forge-lint: disable-next-line(unsafe-typecast)
         uint256 _totalAssetsAdjusted = uint256(int256(_totalAssets) + _netted);
 
-        bool _requiresApproval = _checkYieldTolerance($, _vault, _asset, _batchId, _yield);
+        bool _requiresApproval = _checkYieldTolerance($, _vault, _asset, _batchId, _lastTotalAssets, _yield);
 
         address _adapter = _registry().getAdapter(_vault, _asset);
         _checkAddressNotZero(_adapter);
@@ -366,19 +368,18 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         bool _isMinter
     )
         private
+        view
     {
         uint256 _pendingCount = $.vaultPendingProposalIds[_vault].length();
         if (_pendingCount == 0) return;
 
-        if (_isMinter) {
-            bytes32[] memory _pendingIds = $.vaultPendingProposalIds[_vault].values();
-            for (uint256 i; i < _pendingCount; i++) {
-                require(
-                    $.settlementProposals[_pendingIds[i]].asset != _asset, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME
-                );
-            }
-        } else {
-            require(false, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME);
+        // kStakingVaults only allow a single pending proposal
+        require(_isMinter, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME);
+
+        // kMinter allows multiple pending proposals but only one per asset
+        bytes32[] memory _pendingIds = $.vaultPendingProposalIds[_vault].values();
+        for (uint256 i; i < _pendingCount; i++) {
+            require($.settlementProposals[_pendingIds[i]].asset != _asset, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME);
         }
     }
 
@@ -424,13 +425,12 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _vault,
         address _asset,
         bytes32 _batchId,
+        uint256 _lastTotalAssets,
         int256 _yield
     )
         private
         returns (bool _requiresApproval)
     {
-        uint256 _lastTotalAssets = _virtualBalance(_vault, _asset);
-
         if (_lastTotalAssets > 0) {
             uint256 _maxAllowedYield = _lastTotalAssets * $.maxAllowedDelta[_vault] / MAX_BPS;
             if (_yield.abs() > _maxAllowedYield) {
@@ -446,6 +446,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// @dev Checks virtual balance after applying netting to ensure no overdraft. Must be called
     /// BEFORE adding the proposal to the pending set to avoid iterating an uninitialized proposal slot.
     function _validateAndDecrementGlobalPending(
+        kAssetRouterStorage storage $,
         address _vault,
         address _asset,
         uint256 _requestedInBatch,
@@ -453,7 +454,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     )
         private
     {
-        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         uint256 _globalPendingBefore = $.globalPendingRequests[_vault][_asset];
         require(_globalPendingBefore >= _requestedInBatch, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
         uint256 _globalPendingAfterProposal = _globalPendingBefore - _requestedInBatch;
