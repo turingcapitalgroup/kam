@@ -425,7 +425,7 @@ The above contracts depend on base contracts and libraries:
 
 **Extsload**: Allows external contracts to read arbitrary storage slots efficiently, enabling off-chain monitoring, verification, and batch state queries without dedicated getter functions.
 
-**MultiFacetProxy**: Proxy pattern for modular vault architecture, enabling delegatecall routing to facet implementations, selector-based function dispatch, and admin-controlled facet management.
+**MultiFacetProxy**: Proxy pattern for modular vault architecture, enabling delegatecall routing to facet implementations, selector-based function dispatch, and admin-controlled facet management. Implementation addresses are validated on registration (non-zero, not self, contract code present). The routing table is auditable on-chain via `implementationOf(selector)`, `registeredSelectors()`, and `selectorCount()`.
 
 ## Operational Flows
 

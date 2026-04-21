@@ -156,11 +156,20 @@ Central registry managing protocol contracts, supported assets, vault registrati
 - `isInstitution(address user)` - Checks institutional user status
 - `isVendor(address user)` - Checks vendor role
 - `isManager(address user)` - Checks manager role
-- `grantInstitutionRole(address institution)` - Grants institutional access (VENDOR_ROLE required)
+- `grantAdminRole(address admin)` - Grants admin role (OWNER required)
+- `grantEmergencyAdminRole(address emergencyAdmin)` - Grants emergency admin role (OWNER required)
+- `grantGuardianRole(address guardian)` - Grants guardian role (OWNER required)
 - `grantVendorRole(address vendor)` - Grants vendor role (ADMIN_ROLE required)
 - `grantRelayerRole(address relayer)` - Grants relayer role (ADMIN_ROLE required)
 - `grantManagerRole(address manager)` - Grants manager role (ADMIN_ROLE required)
-- `revokeGivenRoles(address user, uint256 role)` - Revokes specified roles (ADMIN_ROLE required)
+- `grantInstitutionRole(address institution)` - Grants institutional access (VENDOR_ROLE required)
+- `revokeAdminRole(address admin)` - Revokes admin role (OWNER required)
+- `revokeEmergencyAdminRole(address emergencyAdmin)` - Revokes emergency admin role (OWNER required)
+- `revokeGuardianRole(address guardian)` - Revokes guardian role (OWNER required)
+- `revokeVendorRole(address vendor)` - Revokes vendor role (ADMIN_ROLE required)
+- `revokeRelayerRole(address relayer)` - Revokes relayer role (ADMIN_ROLE required)
+- `revokeManagerRole(address manager)` - Revokes manager role (ADMIN_ROLE required)
+- `revokeInstitutionRole(address institution)` - Revokes institution role (VENDOR_ROLE primary, ADMIN_ROLE backstop)
 
 **Global Pause**
 
@@ -184,6 +193,11 @@ Comprehensive interface combining retail staking operations with ERC20 share tok
 - Main kStakingVault contract handles core staking operations and ERC20 functionality
 - ReaderModule handles all view functions for vault state and calculations
 - Proxy pattern enables modular upgrades while maintaining a single contract interface
+- Implementations are validated at registration: rejects `address(0)`, `address(this)`, and addresses without deployed code
+- Routing table is introspectable on-chain:
+  - `implementationOf(bytes4 selector)` - Returns the routed implementation (address(0) if unregistered)
+  - `registeredSelectors()` - Returns the full list of active selectors
+  - `selectorCount()` - Returns the number of registered selectors
 
 **ERC20 Operations**
 
