@@ -193,6 +193,11 @@ Comprehensive interface combining retail staking operations with ERC20 share tok
 - Main kStakingVault contract handles core staking operations and ERC20 functionality
 - ReaderModule handles all view functions for vault state and calculations
 - Proxy pattern enables modular upgrades while maintaining a single contract interface
+- Implementations are validated at registration: rejects `address(0)`, `address(this)`, and addresses without deployed code
+- Routing table is introspectable on-chain:
+  - `implementationOf(bytes4 selector)` - Returns the routed implementation (address(0) if unregistered)
+  - `registeredSelectors()` - Returns the full list of active selectors
+  - `selectorCount()` - Returns the number of registered selectors
 
 **ERC20 Operations**
 

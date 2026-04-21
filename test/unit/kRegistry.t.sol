@@ -21,7 +21,11 @@ import {
     KREGISTRY_ZERO_ADDRESS,
     KREGISTRY_ZERO_AMOUNT,
     KROLESBASE_WRONG_ROLE,
-    KROLESBASE_ZERO_ADDRESS
+    KROLESBASE_ZERO_ADDRESS,
+    MULTIFACETPROXY_NOT_CONTRACT,
+    MULTIFACETPROXY_SELECTOR_ALREADY_SET,
+    MULTIFACETPROXY_SELF_DELEGATION,
+    MULTIFACETPROXY_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
@@ -730,7 +734,7 @@ contract kRegistryTest is DeploymentBaseTest {
         bytes4[] memory _testSelectors = new bytes4[](2);
         _testSelectors[0] = bytes4(keccak256("testFunction1()"));
         _testSelectors[1] = bytes4(keccak256("testFunction2()"));
-        address _testImpl = makeAddr("TEST_IMPL");
+        address _testImpl = TEST_ASSET;
 
         vm.prank(users.owner);
         registry.addFunctions(_testSelectors, _testImpl, false);
@@ -757,7 +761,7 @@ contract kRegistryTest is DeploymentBaseTest {
         bytes4[] memory _testSelectors = new bytes4[](2);
         _testSelectors[0] = bytes4(keccak256("testFunction1()"));
         _testSelectors[1] = bytes4(keccak256("testFunction2()"));
-        address _testImpl = makeAddr("TEST_IMPL");
+        address _testImpl = TEST_ASSET;
 
         vm.prank(users.owner);
         registry.addFunctions(_testSelectors, _testImpl, false);
@@ -770,7 +774,7 @@ contract kRegistryTest is DeploymentBaseTest {
         bytes4[] memory _testSelectors = new bytes4[](2);
         _testSelectors[0] = bytes4(keccak256("testFunction1()"));
         _testSelectors[1] = bytes4(keccak256("testFunction2()"));
-        address _testImpl = makeAddr("TEST_IMPL");
+        address _testImpl = TEST_ASSET;
 
         vm.prank(users.owner);
         registry.addFunctions(_testSelectors, _testImpl, false);
@@ -786,6 +790,90 @@ contract kRegistryTest is DeploymentBaseTest {
         vm.prank(users.guardian);
         vm.expectRevert(Ownable.Unauthorized.selector);
         registry.removeFunctions(_testSelectors);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                MULTIFACETPROXY IMPLEMENTATION VALIDATION
+    //////////////////////////////////////////////////////////////*/
+
+    function test_AddFunction_RevertsOnZeroAddress() public {
+        bytes4 _sel = bytes4(keccak256("testZero()"));
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(MULTIFACETPROXY_ZERO_ADDRESS));
+        registry.addFunction(_sel, address(0), false);
+    }
+
+    function test_AddFunction_RevertsOnSelfDelegation() public {
+        bytes4 _sel = bytes4(keccak256("testSelf()"));
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(MULTIFACETPROXY_SELF_DELEGATION));
+        registry.addFunction(_sel, address(registry), false);
+    }
+
+    function test_AddFunction_RevertsOnNonContract() public {
+        bytes4 _sel = bytes4(keccak256("testEOA()"));
+        address _eoa = makeAddr("EOA");
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(MULTIFACETPROXY_NOT_CONTRACT));
+        registry.addFunction(_sel, _eoa, false);
+    }
+
+    function test_AddFunction_RevertsOnSelectorAlreadySet() public {
+        bytes4 _sel = bytes4(keccak256("testDup()"));
+        vm.prank(users.owner);
+        registry.addFunction(_sel, TEST_ASSET, false);
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(MULTIFACETPROXY_SELECTOR_ALREADY_SET));
+        registry.addFunction(_sel, TEST_ASSET, false);
+    }
+
+    function test_AddFunction_ForceOverride_UpdatesImpl() public {
+        bytes4 _sel = bytes4(keccak256("testOverride()"));
+        uint256 _startCount = registry.selectorCount();
+        vm.prank(users.owner);
+        registry.addFunction(_sel, TEST_ASSET, false);
+        vm.prank(users.owner);
+        registry.addFunction(_sel, address(mockDAI), true);
+        assertEq(registry.implementationOf(_sel), address(mockDAI));
+        assertEq(registry.selectorCount(), _startCount + 1);
+    }
+
+    function test_ImplementationOf_ReturnsRegistered() public {
+        bytes4 _sel = bytes4(keccak256("testImplOf()"));
+        vm.prank(users.owner);
+        registry.addFunction(_sel, TEST_ASSET, false);
+        assertEq(registry.implementationOf(_sel), TEST_ASSET);
+    }
+
+    function test_ImplementationOf_ReturnsZeroForUnregistered() public view {
+        assertEq(registry.implementationOf(bytes4(keccak256("nonexistent()"))), address(0));
+    }
+
+    function test_RegisteredSelectors_AddAndRemove() public {
+        uint256 _startCount = registry.selectorCount();
+        bytes4 _a = bytes4(keccak256("a()"));
+        bytes4 _b = bytes4(keccak256("b()"));
+
+        vm.prank(users.owner);
+        registry.addFunction(_a, TEST_ASSET, false);
+        vm.prank(users.owner);
+        registry.addFunction(_b, TEST_ASSET, false);
+        assertEq(registry.selectorCount(), _startCount + 2);
+
+        bytes4[] memory _all = registry.registeredSelectors();
+        bool _foundA;
+        bool _foundB;
+        for (uint256 _i = 0; _i < _all.length; _i++) {
+            if (_all[_i] == _a) _foundA = true;
+            if (_all[_i] == _b) _foundB = true;
+        }
+        assertTrue(_foundA);
+        assertTrue(_foundB);
+
+        vm.prank(users.owner);
+        registry.removeFunction(_a);
+        assertEq(registry.selectorCount(), _startCount + 1);
+        assertEq(registry.implementationOf(_a), address(0));
     }
 
     /* //////////////////////////////////////////////////////////////
