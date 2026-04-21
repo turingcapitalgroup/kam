@@ -225,11 +225,58 @@ interface IRegistry is IVersioned {
     /// @param manager_ The address to grant manager privileges
     function grantManagerRole(address manager_) external payable;
 
-    /// @notice Revokes the specific role of a given user
-    /// @dev Only callable by ADMIN_ROLE.
-    /// @param user the address to revoke acess to
-    /// @param role the role of the address that we want to revoke
-    function revokeGivenRoles(address user, uint256 role) external payable;
+    /// @notice Grants ADMIN_ROLE to an address
+    /// @dev Only callable by contract owner
+    /// @param admin_ Admin role recipient
+    function grantAdminRole(address admin_) external;
+
+    /// @notice Grants EMERGENCY_ADMIN_ROLE to an address
+    /// @dev Only callable by contract owner
+    /// @param emergencyAdmin_ Emergency admin role recipient
+    function grantEmergencyAdminRole(address emergencyAdmin_) external;
+
+    /// @notice Grants GUARDIAN_ROLE to an address
+    /// @dev Only callable by contract owner
+    /// @param guardian_ Guardian role recipient
+    function grantGuardianRole(address guardian_) external;
+
+    /// @notice Revokes ADMIN_ROLE from an address
+    /// @dev Only callable by contract owner
+    /// @param admin_ Address to strip of admin privileges
+    function revokeAdminRole(address admin_) external;
+
+    /// @notice Revokes EMERGENCY_ADMIN_ROLE from an address
+    /// @dev Only callable by contract owner
+    /// @param emergencyAdmin_ Address to strip of emergency admin privileges
+    function revokeEmergencyAdminRole(address emergencyAdmin_) external;
+
+    /// @notice Revokes GUARDIAN_ROLE from an address
+    /// @dev Only callable by contract owner
+    /// @param guardian_ Address to strip of guardian privileges
+    function revokeGuardianRole(address guardian_) external;
+
+    /// @notice Revokes VENDOR_ROLE from an address
+    /// @dev Only callable by addresses holding ADMIN_ROLE
+    /// @param vendor_ Address to strip of vendor privileges
+    function revokeVendorRole(address vendor_) external payable;
+
+    /// @notice Revokes RELAYER_ROLE from an address
+    /// @dev Only callable by addresses holding ADMIN_ROLE
+    /// @param relayer_ Address to strip of relayer privileges
+    function revokeRelayerRole(address relayer_) external payable;
+
+    /// @notice Revokes MANAGER_ROLE from an address
+    /// @dev Only callable by addresses holding ADMIN_ROLE
+    /// @param manager_ Address to strip of manager privileges
+    function revokeManagerRole(address manager_) external payable;
+
+    /// @notice Revokes INSTITUTION_ROLE from an address
+    /// @dev Callable by VENDOR_ROLE (primary KYC lifecycle owner) or ADMIN_ROLE
+    /// (documented backstop for compliance-team unavailability, erroneous grants,
+    /// or urgent sanctions action). This is the one documented exception to strict
+    /// grant/revoke authority symmetry in kRegistry.
+    /// @param institution_ Address to strip of institution privileges
+    function revokeInstitutionRole(address institution_) external payable;
 
     /// @notice Retrieves a singleton contract address by identifier
     /// @dev Reverts if contract not registered. Used for protocol contract discovery.

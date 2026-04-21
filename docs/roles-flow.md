@@ -35,8 +35,12 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 - **Scope**: All contracts
 - **Key Permissions**:
   - Contract upgrades and critical changes
-  - Role management and delegation
+  - Role management for ADMIN_ROLE, EMERGENCY_ADMIN_ROLE, and GUARDIAN_ROLE (symmetric grant/revoke)
   - Emergency protocol interventions
+- **Key Functions**:
+  - `kRegistry.grantAdminRole()` / `revokeAdminRole()`
+  - `kRegistry.grantEmergencyAdminRole()` / `revokeEmergencyAdminRole()`
+  - `kRegistry.grantGuardianRole()` / `revokeGuardianRole()`
 - **Usage**: Protocol governance and critical decisions
 
 ### ADMIN_ROLE
@@ -49,15 +53,17 @@ The KAM Protocol implements a comprehensive role-based access control system usi
   - Registry updates
   - Vault and adapter registration
   - Treasury management
-  - Role delegation (VENDOR, RELAYER, MANAGER)
+  - Role management for VENDOR, RELAYER, MANAGER (symmetric grant/revoke)
+  - Backstop revoker for INSTITUTION_ROLE (documented exception to strict symmetry)
 - **Key Functions**:
   - `kRegistry.setSingletonContract()` - Register core contracts
   - `kRegistry.registerVault()` - Register new vaults
   - `kRegistry.registerAdapter()` - Register external adapters
   - `kRegistry.setTreasury()` - Set treasury address
-  - `kRegistry.grantVendorRole()` - Grant vendor privileges
-  - `kRegistry.grantRelayerRole()` - Grant relayer privileges
-  - `kRegistry.grantManagerRole()` - Grant manager privileges
+  - `kRegistry.grantVendorRole()` / `revokeVendorRole()`
+  - `kRegistry.grantRelayerRole()` / `revokeRelayerRole()`
+  - `kRegistry.grantManagerRole()` / `revokeManagerRole()`
+  - `kRegistry.revokeInstitutionRole()` - Operational backstop only (VENDOR is the primary revoker)
 
 ### EMERGENCY_ADMIN_ROLE
 
@@ -125,11 +131,12 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 
 - **Scope**: kRegistry
 - **Key Permissions**:
-  - Grant institution roles
+  - Grant and revoke institution roles (primary KYC/KYB lifecycle owner)
   - KYC/KYB Controller
   - Manage vendor-specific operations
 - **Key Functions**:
   - `kRegistry.grantInstitutionRole()` - Grant institutional access
+  - `kRegistry.revokeInstitutionRole()` - Revoke institutional access (primary revoker)
 
 ### MANAGER_ROLE
 
@@ -398,20 +405,29 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │                        kRegistry Roles                           │
 ├─────────────────────────────────────────────────────────────────-┤
 │                                                                  │
+│  OWNER Functions:                                                │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │• grantAdminRole() / revokeAdminRole()                       │ │
+│  │• grantEmergencyAdminRole() / revokeEmergencyAdminRole()     │ │
+│  │• grantGuardianRole() / revokeGuardianRole()                 │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                  │
 │  ADMIN_ROLE Functions:                                           │
 │  ┌─────────────────────────────────────────────────────────────┐ │
 │  │• setSingletonContract() - Register core contracts           │ │
 │  │• registerVault() - Register new vaults                      │ │
 │  │• registerAdapter() - Register external adapters             │ │
 │  │• setTreasury() - Set treasury address                       │ │
-│  │• grantVendorRole() - Grant vendor privileges                │ │
-│  │• grantRelayerRole() - Grant relayer privileges              │ │
-│  │• grantManagerRole() - Grant manager privileges              │ │
+│  │• grantVendorRole() / revokeVendorRole()                     │ │
+│  │• grantRelayerRole() / revokeRelayerRole()                   │ │
+│  │• grantManagerRole() / revokeManagerRole()                   │ │
+│  │• revokeInstitutionRole() - Backstop only                    │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                  │
 │  VENDOR_ROLE Functions:                                          │
 │  ┌─────────────────────────────────────────────────────────────┐ │
 │  │• grantInstitutionRole() - Grant institutional access        │ │
+│  │• revokeInstitutionRole() - Revoke (primary revoker)         │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                  │
 │  ADMIN_ROLE Functions (continued):                               │
@@ -522,17 +538,30 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │                    Role Delegation Flow                            │
 ├─────────────────────────────────────────────────────────────---────┤
 │                                                                    │
-│  ADMIN_ROLE can grant:                                             │
+│  Authority Symmetry: every role's grant and revoke share the      │
+│  same authority (one documented exception: ADMIN may revoke        │
+│  INSTITUTION_ROLE as a backstop).                                  │
+│                                                                    │
+│  OWNER can grant/revoke:                                           │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐ │
+│  │ADMIN_ROLE       │    │EMERGENCY_ADMIN  │    │GUARDIAN_ROLE    │ │
+│  │                 │    │_ROLE            │    │                 │ │
+│  │grant/revoke     │    │grant/revoke     │    │grant/revoke     │ │
+│  │AdminRole()      │    │EmergencyAdminRo.│    │GuardianRole()   │ │
+│  └─────────────────┘    └─────────────────┘    └─────────────────┘ │
+│                                                                    │
+│  ADMIN_ROLE can grant/revoke:                                      │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐ │
 │  │VENDOR_ROLE      │    │RELAYER_ROLE     │    │MANAGER_ROLE     │ │
 │  │                 │    │                 │    │                 │ │
-│  │grantVendorRole()│    │grantRelayerRole │    │grantManagerRole │ │
+│  │grant/revoke     │    │grant/revoke     │    │grant/revoke     │ │
+│  │VendorRole()     │    │RelayerRole()    │    │ManagerRole()    │ │
 │  └─────────────────┘    └─────────────────┘    └─────────────────┘ │
 │           │                       │                       │        │
 │           ▼                       ▼                       ▼        │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐ │
 │  │VENDOR_ROLE can  │    │RELAYER_ROLE can │    │MANAGER_ROLE can │ │
-│  │grant:           │    │execute:         │    │execute:         │ │
+│  │grant/revoke:    │    │execute:         │    │execute:         │ │
 │  │                 │    │                 │    │                 │ │
 │  │INSTITUTION_ROLE │    │Settlement Ops   │    │Adapter Ops      │ │
 │  └─────────────────┘    └─────────────────┘    └─────────────────┘ │

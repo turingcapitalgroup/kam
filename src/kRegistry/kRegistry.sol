@@ -7,6 +7,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import {
+    KROLESBASE_WRONG_ROLE,
     KREGISTRY_ADAPTER_ALREADY_SET,
     KREGISTRY_ADAPTER_HAS_BALANCE,
     KREGISTRY_ALREADY_REGISTERED,
@@ -216,9 +217,71 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     }
 
     /// @inheritdoc IRegistry
-    function revokeGivenRoles(address _user, uint256 _role) external payable {
+    function grantAdminRole(address _admin) external {
+        _checkOwner();
+        _checkAddressNotZero(_admin);
+        _grantRoles(_admin, ADMIN_ROLE);
+    }
+
+    /// @inheritdoc IRegistry
+    function grantEmergencyAdminRole(address _emergencyAdmin) external {
+        _checkOwner();
+        _checkAddressNotZero(_emergencyAdmin);
+        _grantRoles(_emergencyAdmin, EMERGENCY_ADMIN_ROLE);
+    }
+
+    /// @inheritdoc IRegistry
+    function grantGuardianRole(address _guardian) external {
+        _checkOwner();
+        _checkAddressNotZero(_guardian);
+        _grantRoles(_guardian, GUARDIAN_ROLE);
+    }
+
+    /// @inheritdoc IRegistry
+    function revokeAdminRole(address _admin) external {
+        _checkOwner();
+        _removeRoles(_admin, ADMIN_ROLE);
+    }
+
+    /// @inheritdoc IRegistry
+    function revokeEmergencyAdminRole(address _emergencyAdmin) external {
+        _checkOwner();
+        _removeRoles(_emergencyAdmin, EMERGENCY_ADMIN_ROLE);
+    }
+
+    /// @inheritdoc IRegistry
+    function revokeGuardianRole(address _guardian) external {
+        _checkOwner();
+        _removeRoles(_guardian, GUARDIAN_ROLE);
+    }
+
+    /// @inheritdoc IRegistry
+    function revokeVendorRole(address _vendor) external payable {
         _checkAdmin(msg.sender);
-        _removeRoles(_user, _role);
+        _removeRoles(_vendor, VENDOR_ROLE);
+    }
+
+    /// @inheritdoc IRegistry
+    function revokeRelayerRole(address _relayer) external payable {
+        _checkAdmin(msg.sender);
+        _removeRoles(_relayer, RELAYER_ROLE);
+    }
+
+    /// @inheritdoc IRegistry
+    function revokeManagerRole(address _manager) external payable {
+        _checkAdmin(msg.sender);
+        _removeRoles(_manager, MANAGER_ROLE);
+    }
+
+    /// @inheritdoc IRegistry
+    function revokeInstitutionRole(address _institution) external payable {
+        // Explicit require (not a modifier or mask) so the documented
+        // VENDOR-primary, ADMIN-backstop authority split is visible in code.
+        require(
+            _hasRole(msg.sender, VENDOR_ROLE) || _hasRole(msg.sender, ADMIN_ROLE),
+            KROLESBASE_WRONG_ROLE
+        );
+        _removeRoles(_institution, INSTITUTION_ROLE);
     }
 
     /* //////////////////////////////////////////////////////////////

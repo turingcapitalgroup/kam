@@ -146,11 +146,11 @@ contract kRegistryTest is DeploymentBaseTest {
         assertTrue(registry.hasAnyRole(users.alice, INSTITUTION_ROLE));
 
         vm.prank(users.admin);
-        registry.revokeGivenRoles(users.alice, INSTITUTION_ROLE);
+        registry.revokeInstitutionRole(users.alice);
         assertFalse(registry.hasAnyRole(users.alice, INSTITUTION_ROLE));
 
         vm.prank(users.admin);
-        registry.revokeGivenRoles(users.bob, VENDOR_ROLE);
+        registry.revokeVendorRole(users.bob);
         assertFalse(registry.hasAnyRole(users.bob, VENDOR_ROLE));
     }
 
@@ -174,7 +174,7 @@ contract kRegistryTest is DeploymentBaseTest {
         assertTrue(registry.hasAnyRole(users.bob, VENDOR_ROLE));
 
         vm.prank(users.admin);
-        registry.revokeGivenRoles(users.bob, VENDOR_ROLE);
+        registry.revokeVendorRole(users.bob);
         assertFalse(registry.hasAnyRole(users.bob, VENDOR_ROLE));
     }
 
@@ -198,7 +198,7 @@ contract kRegistryTest is DeploymentBaseTest {
         assertTrue(registry.hasAnyRole(users.bob, RELAYER_ROLE));
 
         vm.prank(users.admin);
-        registry.revokeGivenRoles(users.bob, RELAYER_ROLE);
+        registry.revokeRelayerRole(users.bob);
         assertFalse(registry.hasAnyRole(users.bob, RELAYER_ROLE));
     }
 
@@ -222,7 +222,7 @@ contract kRegistryTest is DeploymentBaseTest {
         assertTrue(registry.hasAnyRole(users.bob, MANAGER_ROLE));
 
         vm.prank(users.admin);
-        registry.revokeGivenRoles(users.bob, MANAGER_ROLE);
+        registry.revokeManagerRole(users.bob);
         assertFalse(registry.hasAnyRole(users.bob, MANAGER_ROLE));
     }
 
@@ -240,22 +240,22 @@ contract kRegistryTest is DeploymentBaseTest {
         registry.grantManagerRole(users.bob);
     }
 
-    function test_RevokeGivenRoles_Require_Only_Admin() public {
+    function test_RevokeManagerRole_Require_Only_Admin() public {
         vm.prank(users.admin);
         registry.grantManagerRole(users.bob);
         assertTrue(registry.hasAnyRole(users.bob, MANAGER_ROLE));
 
         vm.prank(users.bob);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.revokeGivenRoles(users.bob, MANAGER_ROLE);
+        registry.revokeManagerRole(users.bob);
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.revokeGivenRoles(users.bob, MANAGER_ROLE);
+        registry.revokeManagerRole(users.bob);
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
-        registry.revokeGivenRoles(users.bob, MANAGER_ROLE);
+        registry.revokeManagerRole(users.bob);
 
         assertTrue(registry.hasAnyRole(users.bob, MANAGER_ROLE));
     }
@@ -1037,5 +1037,186 @@ contract kRegistryTest is DeploymentBaseTest {
 
     function test_IsGlobalPaused_InitialValue() public view {
         assertFalse(registry.isGlobalPaused());
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        AUTHORITY MATRIX TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    // -------- Owner-gated grants --------
+
+    function test_grantAdminRole_byOwner_succeeds() public {
+        vm.prank(users.owner);
+        registry.grantAdminRole(users.bob);
+        assertTrue(registry.isAdmin(users.bob));
+    }
+
+    function test_grantAdminRole_byNonOwner_reverts() public {
+        vm.prank(users.charlie);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.grantAdminRole(users.bob);
+    }
+
+    function test_grantEmergencyAdminRole_byOwner_succeeds() public {
+        vm.prank(users.owner);
+        registry.grantEmergencyAdminRole(users.bob);
+        assertTrue(registry.isEmergencyAdmin(users.bob));
+    }
+
+    function test_grantEmergencyAdminRole_byNonOwner_reverts() public {
+        vm.prank(users.charlie);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.grantEmergencyAdminRole(users.bob);
+    }
+
+    function test_grantGuardianRole_byOwner_succeeds() public {
+        vm.prank(users.owner);
+        registry.grantGuardianRole(users.bob);
+        assertTrue(registry.isGuardian(users.bob));
+    }
+
+    function test_grantGuardianRole_byNonOwner_reverts() public {
+        vm.prank(users.charlie);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.grantGuardianRole(users.bob);
+    }
+
+    // -------- Owner-gated revokes --------
+
+    function test_revokeAdminRole_byOwner_succeeds() public {
+        vm.prank(users.owner);
+        registry.grantAdminRole(users.bob);
+        vm.prank(users.owner);
+        registry.revokeAdminRole(users.bob);
+        assertFalse(registry.isAdmin(users.bob));
+    }
+
+    function test_revokeAdminRole_byNonOwner_reverts() public {
+        vm.prank(users.owner);
+        registry.grantAdminRole(users.bob);
+        vm.prank(users.charlie);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.revokeAdminRole(users.bob);
+    }
+
+    function test_revokeEmergencyAdminRole_byOwner_succeeds() public {
+        vm.prank(users.owner);
+        registry.revokeEmergencyAdminRole(users.emergencyAdmin);
+        assertFalse(registry.isEmergencyAdmin(users.emergencyAdmin));
+    }
+
+    function test_revokeEmergencyAdminRole_byNonOwner_reverts() public {
+        vm.prank(users.charlie);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.revokeEmergencyAdminRole(users.emergencyAdmin);
+    }
+
+    function test_revokeGuardianRole_byOwner_succeeds() public {
+        vm.prank(users.owner);
+        registry.revokeGuardianRole(users.guardian);
+        assertFalse(registry.isGuardian(users.guardian));
+    }
+
+    function test_revokeGuardianRole_byNonOwner_reverts() public {
+        vm.prank(users.charlie);
+        vm.expectRevert(Ownable.Unauthorized.selector);
+        registry.revokeGuardianRole(users.guardian);
+    }
+
+    // -------- Admin-gated revokes --------
+
+    function test_revokeVendorRole_byAdmin_succeeds() public {
+        vm.prank(users.admin);
+        registry.grantVendorRole(users.bob);
+        vm.prank(users.admin);
+        registry.revokeVendorRole(users.bob);
+        assertFalse(registry.isVendor(users.bob));
+    }
+
+    function test_revokeVendorRole_byNonAdmin_reverts() public {
+        vm.prank(users.admin);
+        registry.grantVendorRole(users.bob);
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.revokeVendorRole(users.bob);
+    }
+
+    function test_revokeRelayerRole_byAdmin_succeeds() public {
+        vm.prank(users.admin);
+        registry.grantRelayerRole(users.bob);
+        vm.prank(users.admin);
+        registry.revokeRelayerRole(users.bob);
+        assertFalse(registry.isRelayer(users.bob));
+    }
+
+    function test_revokeRelayerRole_byNonAdmin_reverts() public {
+        vm.prank(users.admin);
+        registry.grantRelayerRole(users.bob);
+        vm.prank(users.bob);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.revokeRelayerRole(users.bob);
+    }
+
+    function test_revokeManagerRole_byAdmin_succeeds() public {
+        vm.prank(users.admin);
+        registry.grantManagerRole(users.bob);
+        vm.prank(users.admin);
+        registry.revokeManagerRole(users.bob);
+        assertFalse(registry.isManager(users.bob));
+    }
+
+    function test_revokeManagerRole_byNonAdmin_reverts() public {
+        vm.prank(users.admin);
+        registry.grantManagerRole(users.bob);
+        vm.prank(users.bob);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.revokeManagerRole(users.bob);
+    }
+
+    // -------- Institution revoke: VENDOR primary, ADMIN backstop --------
+
+    function test_revokeInstitutionRole_byVendor_succeeds() public {
+        vm.prank(users.admin);
+        registry.grantVendorRole(users.bob);
+        vm.prank(users.bob);
+        registry.grantInstitutionRole(users.alice);
+        vm.prank(users.bob);
+        registry.revokeInstitutionRole(users.alice);
+        assertFalse(registry.isInstitution(users.alice));
+    }
+
+    function test_revokeInstitutionRole_byAdmin_backstop_succeeds() public {
+        vm.prank(users.admin);
+        registry.grantVendorRole(users.bob);
+        vm.prank(users.bob);
+        registry.grantInstitutionRole(users.alice);
+        vm.prank(users.admin);
+        registry.revokeInstitutionRole(users.alice);
+        assertFalse(registry.isInstitution(users.alice));
+    }
+
+    function test_revokeInstitutionRole_byRelayer_reverts() public {
+        vm.prank(users.admin);
+        registry.grantVendorRole(users.bob);
+        vm.prank(users.bob);
+        registry.grantInstitutionRole(users.alice);
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(KROLESBASE_WRONG_ROLE));
+        registry.revokeInstitutionRole(users.alice);
+    }
+
+    // -------- Removed function regression guard --------
+
+    function test_revokeGivenRoles_selector_absent() public {
+        // Low-level call on the old 4-byte selector of revokeGivenRoles(address,uint256)
+        // should revert (function was removed). Selector is 0xc7b2a80e — precomputed.
+        bytes memory callData = abi.encodeWithSelector(
+            bytes4(keccak256("revokeGivenRoles(address,uint256)")),
+            users.bob,
+            INSTITUTION_ROLE
+        );
+        vm.prank(users.admin);
+        (bool success, ) = address(registry).call(callData);
+        assertFalse(success, "revokeGivenRoles selector must not be dispatchable");
     }
 }
