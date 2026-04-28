@@ -2,380 +2,493 @@
 
 ## Purpose
 
-This document turns the Trail of Bits comprehensive report into a concrete improvement plan for the KAM codebase. It intentionally does not track direct remediation of individual vulnerabilities that have already been fixed. Instead, it focuses on the broader design, consistency, testing, operations, and specification work that should make the protocol easier to reason about and safer to maintain.
-
-The main goals are:
-
-- Make the protocol behavior explicit before new implementation work starts.
-- Consolidate duplicated accounting, access-control, and execution patterns.
-- Improve test coverage around security-sensitive state transitions and edge cases.
-- Reduce privileged-role risk through clearer role boundaries, timelocks, and operational controls.
-- Clean up code quality issues that increase review burden or create future regression risk.
-
-## Guiding Principles
-
-- Specifications come first. Any material protocol change should start from a written spec covering state transitions, roles, invariants, events, and tests.
-- One concept should have one canonical implementation. Fee math, share conversion, target resolution, and pause behavior should not be recalculated or interpreted differently across contracts.
-- Privileged operations should be delayed, observable, and recoverable. Production operation should assume key compromise is possible and design around that risk.
-- Tests should prove negative behavior as much as positive behavior. Access-control, pause, invalid-state, reentrancy, and edge-boundary tests are first-class requirements.
-- Operational assumptions must be enforced or documented. Token behavior, target uniqueness, batch lifecycle, and relayer responsibilities should not depend on tribal knowledge.
-
-## Phase 0: Establish the Baseline
-
-Before changing implementation logic, create an auditable baseline for the current fixed branch.
-
-- Record the exact commits of all protocol repositories deployed or intended for deployment: `kam`, `kam-settler`, `kam-paymaster`, `ktoken0`, `metawallet`, `minimal-smart-account`, and `minimal-uups-factory`.
-- Document which Trail of Bits findings have been fixed, which were intentionally accepted, and which are superseded by refactors.
-- Run and archive the current test baseline for every repository:
-  - Unit tests.
-  - Integration tests.
-  - Invariant tests.
-  - Fork tests, if any production assumptions depend on them.
-  - Coverage reports.
-  - Mutation-test summary for prioritized files.
-- Add CI jobs that run all non-fork unit and integration tests on every pull request, and schedule longer invariant, fork, and mutation campaigns.
-- Treat this baseline as the comparison point for all future refactors.
-
-## Phase 1: Write and Adopt Specifications
-
-Create a lightweight specification workflow and require it for protocol changes that affect accounting, settlement, roles, adapters, external integrations, or upgradeability.
-
-The initial required specs are:
-
-- `security-design-roles-spec.md`: protocol security model, design model, role hierarchy, pause behavior, incident response, and role-management rules.
-- Fee and accounting spec: canonical definitions for gross assets, net assets, total balance, pending stake, pending unstake, yield, netting, management fees, performance fees, hurdle rates, rounding, and settlement snapshots.
-- Batch lifecycle spec: explicit state machine for kMinter and kStakingVault batches, including valid transitions, invalid transitions, and who can trigger each transition.
-- Adapter and target-resolution spec: executor-target-selector model, target type uniqueness, validator requirements, parameter-level validation, and supported external protocol assumptions.
-- Token onboarding spec: accepted ERC20 properties, rejected token behaviors, decimals expectations, fee-on-transfer policy, rebasing policy, blocklist policy, and operational review checklist.
-- Incident response plan: pause triggers, escalation path, authorized responders, public communications, recovery conditions, and post-incident review.
-
-Every spec should include:
-
-- Scope and non-goals.
-- State variables and derived values used by the design.
-- Allowed state transitions.
-- Role matrix.
-- Events and monitoring expectations.
-- Invariants.
-- Test plan.
-- Migration or deployment notes.
-
-## Phase 2: Consolidate Accounting and Fee Design
-
-The report repeatedly points to the same root cause: accounting is split across multiple components with slightly different formulas and timing assumptions. This should be fixed as a design problem, not only as local patches.
-
-### Canonical Accounting Library
-
-- Make `VaultMathLib` the single source for share conversion, fee calculation, hurdle-rate handling, and rounding direction.
-- Remove or collapse duplicate formulas from router, vault reader modules, and off-chain settler code where possible.
-- For every mathematical helper, document:
-  - Inputs.
-  - Units.
-  - Rounding direction.
-  - Whether pending stake and pending unstake are included.
-  - Whether values are pre-fee or post-fee.
-  - Whether values include current settlement yield.
-
-### Settlement Snapshot Model
-
-- Introduce a single settlement snapshot structure that carries all values needed for execution:
-  - Asset.
-  - Vault.
-  - Batch ID.
-  - Adapter address.
-  - Total assets.
-  - Total supply.
-  - Deposited amount.
-  - Requested shares or requested assets.
-  - Netting value.
-  - Yield value.
-  - Fee configuration.
-  - Treasury and insurance recipients.
-  - Timestamp.
-  - Approval requirements.
-- Compute values once at proposal time where the cooldown can expose changes to guardians and users.
-- Use the snapshot during execution instead of rereading mutable fee, treasury, and registry parameters.
-- Make explicit which values are allowed to change between proposal and execution and which are frozen.
-
-### Fee Model Simplification
-
-- Replace multiple fee-computation paths with one canonical fee computation per settlement cycle.
-- Decide whether fees are collected via share dilution, asset transfer, or adapter share extraction, then enforce the same model everywhere.
-- Define exact semantics for:
-  - Management fee accrual period.
-  - Performance fee crystallization.
-  - Hard versus soft hurdle.
-  - First settlement.
-  - Zero supply.
-  - Deposits above the watermark.
-  - Loss periods and high-water mark behavior.
-- Add tests that compare expected exact values, not only sign or approximate direction.
+This document turns the Trail of Bits general recommendations, codebase maturity evaluation, code quality issues (Appendix C), and mutation testing results (Appendix D) into a concrete, implementable improvement plan.
 
-## Phase 3: Normalize State Machines
+All numbered security findings (TOB-KAM-1 through 38) have already been fixed and are **not** tracked here. This plan covers only the non-finding items: design consolidation, code quality, test coverage, operational security, and cleanup.
 
-Batch and settlement logic should be modeled as explicit state machines.
+> **Note**: The audit was performed against the `main` branch at commit `0db6ef9`. The current `audit-fixes-ToB` branch has already addressed many items. Each section below reflects only what is **still outstanding** on this branch.
 
-### Batch Lifecycle
+---
 
-Define and enforce these states:
+## Phase 1: Consolidate Fee Accounting into a Single Path
 
-- `UNDEFINED`: batch does not exist.
-- `ACTIVE`: accepting user requests.
-- `CLOSED`: no new requests accepted; proposal may be created.
-- `PROPOSED`: settlement proposal exists.
-- `SETTLED`: settlement executed; claims are available.
-- `CANCELLED` or `EXPIRED`: only if the protocol supports reopening or replacing proposals.
+**Source**: Recommendations ("Redesign the watermark and fee accounting"), Codebase Maturity — Arithmetic ("Moderate").
 
-Required changes:
+**Problem**: Fee computations exist in three separate locations — the kSettler, the vault's ReaderModule, and the kAssetRouter — each reading inputs at different points in the settlement flow. This redundancy makes it difficult to reason about correctness and increases the risk of future regressions. Rounding direction is not documented or consistently enforced across share conversion paths, and `zeroFloorSub` in kMinter silently floors accounting underflows to zero rather than reverting.
 
-- Prevent creating a new batch while the current batch is still active unless the old batch is explicitly closed or abandoned through a specified path.
-- Make kMinter per-asset batches and kStakingVault single-asset batches follow the same conceptual lifecycle.
-- Add transition guards to every externally callable batch function.
-- Add event fields that let off-chain monitoring correlate all batch actions by `asset`, `vault`, and `batchId`.
+**Already fixed on this branch**: `setManagementFee` and `setPerformanceFee` now call `_accrueFees()` + `_mintManagementFees()` before changing the rate (commit `f020291`).
 
-### Proposal Lifecycle
+### Remaining work
 
-Define and enforce these states:
+1. **Designate `VaultMathLib` as the single source of truth** for all fee math. It already contains `computeManagementFee` and `computePerformanceFee` in `src/libraries/VaultMathLib.sol`. Any code in kSettler or ReaderModule that computes fees independently must be replaced with calls to (or the same formulas as) `VaultMathLib`.
 
-- `NONE`.
-- `PENDING_COOLDOWN`.
-- `REQUIRES_APPROVAL`.
-- `APPROVED`.
-- `CANCELLED`.
-- `EXECUTED`.
+2. **Audit the kSettler fee path** (`kam-settler/src/kSettler.sol`): search for any independent management/performance fee calculation and replace with a call forwarded to the on-chain vault or a shared library. If kSettler computes fees off-chain, document that the on-chain `kStakingVault.settleBatch` is authoritative and the kSettler result is advisory only.
 
-Required changes:
+3. **Audit the ReaderModule fee path** (`src/kStakingVault/modules/ReaderModule.sol`): the reader exposes fee views for the frontend. Verify these call `VaultMathLib` or `BaseVault._accrueFees` internally, not independent math. If they diverge, rewrite to delegate to the canonical path.
 
-- Make all asset-moving settlement follow idempotency rules.
-- Track finalization where finalization is separate from router execution.
-- Decide whether kMinter may have one pending proposal per asset or one globally, then make the storage key match the chosen design.
-- Require first-settlement safety checks to be at least as strict as later-settlement checks.
+4. **Document rounding direction**: add a comment block at the top of `VaultMathLib` stating:
+   - `convertToShares` rounds **down** (favors the vault).
+   - `convertToAssets` rounds **down** (favors the vault).
+   - Management fee rounds **down** (favors users).
+   - Performance fee rounds **down** (favors users).
 
-## Phase 4: Unify Pause and Incident Response Behavior
+5. **Replace silent floors with reverts**: In `kMinter.settleBatch` (~line 303), `OptimizedFixedPointMathLib.zeroFloorSub` is used for `totalLockedAssets`. If the subtraction underflows, the accounting has gone wrong and should revert rather than silently zero. Replace:
 
-The report highlights inconsistent pause coverage. Fixing this requires a protocol-level policy.
+```solidity
+// Old: silently floors to zero
+$.totalLockedAssets[_asset] =
+    OptimizedFixedPointMathLib.zeroFloorSub($.totalLockedAssets[_asset], _requestedShares);
+// New: revert on underflow
+$.totalLockedAssets[_asset] -= _requestedShares;
+```
 
-### Pause Policy
+### Tests
 
-- Define local pause and global pause semantics.
-- Create an allow-while-paused matrix for every state-changing function.
-- Default to blocking user fund movements, settlement execution, adapter execution, and admin configuration while globally paused unless the spec explicitly justifies an exception.
-- Keep read-only functions always available.
-- Decide whether claims should remain available during pause. If claims remain available, document why and prove they cannot worsen the incident class being paused for.
+- `test_VaultMathLib_computeManagementFee_exactValue_6decimals`: use known inputs and assert the exact output to the wei.
+- `test_VaultMathLib_computePerformanceFee_hardHurdle_exactValue`: same pattern.
+- `test_VaultMathLib_computePerformanceFee_softHurdle_exactValue`: same pattern.
 
-### Implementation Plan
+---
 
-- Make every contract that participates in protocol fund movement consult the same global pause source.
-- Add pause gates to off-chain-facing settlement helpers and adapter execution where applicable.
-- Add integration tests that activate global pause and attempt every state-changing entry point.
-- Add monitoring alerts for pause changes and for state-changing operations attempted while paused.
+## Phase 2: Extend the Execution Validator System
 
-## Phase 5: Strengthen Roles and Operational Security
+**Source**: Recommendations ("Extend the execution validator system to fully constrain the allowed Executor actions"), Codebase Maturity — Authentication ("Moderate").
 
-The protocol is centralized by design, so role management must be treated as part of the security model.
+**Problem**: `ERC20ExecutionValidator` validates parameters for `transfer`, `transferFrom`, and `approve`, but ERC-4626 functions (`deposit`, `withdraw`, `redeem`) that are allowed on adapter/MetaWallet targets pass with no parameter validation. The validator pattern should be extended to cover all selectors allowed on targets.
 
-### Role Model Cleanup
+### Implementation
 
-- Define every role once, with a unique name and purpose across repositories.
-- Avoid reusing the same role name for different bit positions or different trust boundaries.
-- Replace generic `revokeGivenRoles` patterns with per-role revocation functions that mirror grant authority.
-- Add missing revoke functions where grants exist.
-- Separate deny-list or freeze state from privilege roles where self-renounce would be unsafe.
-- Define role holder expectations: multisig, timelock, hot key, automation key, or contract.
+1. **Create `ERC4626ExecutionValidator`** in `src/adapters/parameters/ERC4626ExecutionValidator.sol`:
 
-### Timelock and Multisig Plan
+```solidity
+contract ERC4626ExecutionValidator is IExecutionValidator {
+    IkRegistry public immutable registry;
+    mapping(address vault => bool) private _allowedVaults;
 
-Put timelocks in front of operations that can affect user assets or protocol configuration:
+    function setAllowedVault(address _vault, bool _allowed) external {
+        _checkAdmin(msg.sender);
+        _allowedVaults[_vault] = _allowed;
+    }
 
-- Contract upgrades.
-- Treasury and insurance recipient changes.
-- Fee parameter changes.
-- Batch limit changes.
-- Adapter registration and removal.
-- Executor target and selector permissions.
-- Token onboarding.
-- LayerZero peer and delegate configuration.
-
-Use short emergency paths only for well-defined incident actions such as pausing, cancelling proposals, and disabling executor permissions. Emergency actions should emit events and trigger immediate monitoring alerts.
+    function authorizeCall(
+        address,     // _executor
+        address _target,
+        bytes4 _selector,
+        bytes calldata _params
+    ) external {
+        require(msg.sender == address(registry), "EV1");
+        if (_selector == IERC4626.deposit.selector) {
+            (, address receiver) = abi.decode(_params, (uint256, address));
+            require(_allowedVaults[_target], "EV_VAULT_NOT_ALLOWED");
+        } else if (_selector == IERC4626.withdraw.selector) {
+            (, address receiver,) = abi.decode(_params, (uint256, address, address));
+            require(_allowedVaults[_target], "EV_VAULT_NOT_ALLOWED");
+        }
+        // ... same for mint, redeem
+    }
+}
+```
 
-### Key Management
+2. **Register the validator**: for each target that has ERC-4626 selectors allowed, call `ExecutionGuardianModule.setExecutionValidator(target, address(erc4626Validator))`.
 
-- Use multisigs for owner/admin/guardian roles in production.
-- Use tightly scoped hot keys only for relayer and manager automation.
-- Require documented key rotation and emergency revocation runbooks.
-- Monitor every privileged call and alert on unexpected caller, target, parameter, or timing.
+3. **Add vault whitelist validation in hook contracts** (metawallet repo): in `ERC4626ApproveAndDepositHook.buildExecutions`, add a check that `_depositData.vault` is in an approved vault set. In `OneInchSwapHook.approveForSwap`, validate the `_router` against `_allowedRouters` (matching the check already in `buildExecutions`).
 
-## Phase 6: Harden Adapter and External Execution Design
+### Tests
 
-The execution guardian model is useful, but selector-level permissions are not enough for functions that take target addresses, receivers, spenders, routers, or vaults as calldata.
+- `test_ERC4626ExecutionValidator_deposit_allowedVault_succeeds`
+- `test_ERC4626ExecutionValidator_deposit_unknownVault_reverts`
+- `test_ERC4626ExecutionValidator_nonAdmin_setAllowedVault_reverts`
 
-### Validator Coverage
+---
 
-- Require a validator for every allowed selector that can move funds, approve funds, change receiver, change spender, or call an external protocol.
-- Validators should check:
-  - Target contract identity.
-  - Asset identity.
-  - Receiver.
-  - Spender.
-  - Router.
-  - Vault.
-  - Amount limits.
-  - Deadline and slippage parameters.
-  - Per-block or per-window limits where appropriate.
-- Make validators callable only through the registry or authorized guardian module path if they mutate state.
-
-### Target Resolution
-
-- Replace first-match target selection with direct mappings when the flow depends on one target per type.
-- Enforce uniqueness of `(executor, targetType)` where the design expects exactly one target.
-- Prefer enums over raw `uint8` target types.
-- Add view functions that expose the effective routing table for operational verification.
+## Phase 3: Reduce Code Duplication and Remove Dead Code
 
-### External Integration Policy
+**Source**: Recommendations ("Refactor the system to reduce code duplication, remove dead code, and simplify"), Codebase Maturity — Complexity Management ("Weak").
 
-- Create integration-specific adapters or validators for ERC4626, 1inch, custodial wallets, and insurance flows.
-- Bubble meaningful revert data from external protocol calls.
-- Avoid raw ERC20 calls when safe transfer wrappers are available.
-- Add integration tests with malicious or non-standard external contracts.
+### kPaymaster consolidation (kam-paymaster repo)
 
-## Phase 7: Reduce Complexity and Dead Code
-
-The report identifies duplication and inconsistencies that make future bugs more likely.
-
-### Refactor Targets
-
-- Consolidate kPaymaster autoclaim functions into one internal implementation parameterized by claim type.
-- Remove dead or redundant functions and constants that do not serve distinct use cases.
-- Collapse thin external wrappers where they add no validation or access control.
-- Make interface inheritance explicit where contracts are cast to interfaces.
-- Normalize event parameter names for equivalent concepts.
-- Add `UNDEFINED` enum states for request and batch state where zero-initialized storage is otherwise ambiguous.
-- Remove or document every use of `EnumerableSet.values()` in state-changing paths.
-- Add query functions for module selector routing in `MultiFacetProxy`.
-- Align vendored libraries with upstream where local changes are not intentional and documented.
-
-### Documentation Cleanup
-
-- Update stale NatSpec and docs that describe functionality that does not exist.
-- Document every accepted centralization risk and why it remains acceptable.
-- Keep architecture diagrams synchronized with implementation after each major refactor.
-
-## Phase 8: Expand Test Coverage
-
-Testing should be upgraded from "happy path plus selected invariants" to a security regression suite.
-
-### Coverage Goals
-
-- Every role-protected function has positive and negative access-control tests.
-- Every pauseable state-changing function has local-pause and global-pause tests.
-- Every externally callable state transition has invalid-state tests.
-- Every settlement branch has exact boundary tests:
-  - Zero yield.
-  - Positive yield.
-  - Negative yield.
-  - Zero netting.
-  - Positive netting.
-  - Negative netting.
-  - Exactly at cooldown.
-  - Just before cooldown.
-  - First settlement.
-  - Zero supply.
-- Every accounting formula has exact-value tests with decimals, rounding, and virtual offsets.
-- Every reentrancy guard has at least one malicious-callback test where feasible.
-
-### KAM Repository Priorities
-
-- `SmartAdapterAccount.sol`: manager authorization, selector whitelist, unsupported interface paths, and non-manager execution.
-- `MultiFacetProxy.sol`: add/remove access control, zero implementation, codeless implementation, self implementation, unregistered selector, selector replacement, selector query views.
-- `kAssetRouter.sol`: settlement branch boundaries, first settlement, per-asset kMinter proposals, proposal cancellation, proposal approval, global pending requests, exact cooldown boundaries.
-- `kRegistry.sol`: asset/vault/adapter bookkeeping, remove guards, role grant/revoke symmetry, target type uniqueness, batch creation on vault registration.
-- `kMinter.sol`: multi-asset batches, duplicate active batch rejection, burn request lifecycle, receiver creation, rescue authorization, request status guards.
-- `kStakingVault.sol` and `BaseVault.sol`: fee exactness, request lifecycle, pending unstake isolation, cap calculations, zero supply, global pause, ERC2771 paths.
-- `VaultMathLib.sol`: exact management fee, performance fee, hard/soft hurdle, loss periods, rounding, virtual offset behavior, decimals.
-- `ExecutionGuardianModule.sol`: idempotent add/remove, no-op enable/disable, reference counts, target enumeration, validator invocation and unauthorized validator access.
-- `VaultAdapter.sol`: router-only paths, pause paths, pull failures, totalAssets updates, adapter execution negative cases.
-- `ERC2771Context.sol`: trusted forwarder, untrusted forwarder, short calldata, disabled forwarder.
-
-### Cross-Repository Priorities
-
-- `kam-paymaster`: invalid signatures, fee boundary at amount equals fee, retry-after-failure autoclaim state, trusted-forwarder checks, permit fallback, batch entry points, reentrancy.
-- `ktoken0`: ERC3009 signature validity, nonce replay, validity windows, cancellation, kToken freeze/pause/mint/burn/blacklist branches, factory deployer authorization and deterministic collisions.
-- `metawallet`: hook idempotency, selector authorization, error bubbling, dynamic 1inch amount patching, malicious vault/router parameters, post-hook cleanup, callback-capable assets.
-- `minimal-smart-account`: upgrade authorization, execution-mode branches, failed try-execution events, dead-code removal.
-- `minimal-uups-factory`: ETH forwarding, empty init data, deterministic deploy-and-call, init-call revert bubbling.
-
-### Invariant Testing
-
-Promote invariant tests into CI and add invariants for:
-
-- kToken supply is backed by registered asset value according to the protocol's accepted accounting model.
-- Adapter virtual balances cannot drift from physical strategy values beyond documented tolerances.
-- Pending unstake assets cannot be burned by later strategy losses.
-- Batch state transitions are monotonic.
-- Proposal IDs cannot be executed or finalized twice.
-- Target enumeration matches selector permission state.
-- Role grant/revoke operations preserve the role hierarchy.
-- Total pending requests never exceed effective virtual balance.
-
-### Mutation Testing
-
-- Use the Trail of Bits mutation results as the first backlog.
-- Target the lowest-score, highest-risk files first.
-- Add mutation testing to a scheduled CI job or run it before major releases.
-- Define release gates:
-  - No surviving mutants for access-control removals on critical functions.
-  - No surviving mutants for signature verification.
-  - No surviving mutants for settlement state transition guards.
-  - No unexplained surviving mutants in accounting formulas.
-
-## Phase 9: Monitoring and Operations
-
-Protocol safety depends on catching bad states quickly.
-
-### Required Monitoring
-
-- Role grants and revokes.
-- Upgrades and module selector changes.
-- Global and local pause changes.
-- Settlement proposals, approvals, cancellations, and executions.
-- Proposals with high yield deltas.
-- First settlements for new vaults.
-- Treasury, insurance, fee, and batch-limit changes.
-- Adapter target, selector, and validator changes.
-- Adapter virtual balance versus physical strategy value drift.
-- Claims and unclaimed balances that age beyond expected thresholds.
-- Failed external executions and bubbled external revert reasons.
-
-### Incident Response
-
-- Define who can pause, cancel proposals, disable selectors, rotate keys, and communicate with users.
-- Define severity levels and response timelines.
-- Require post-incident review and test additions for every production incident or near miss.
-
-## Phase 10: Acceptance Criteria
-
-This improvement program should be considered complete only when:
-
-- The core specifications are written, reviewed, and referenced by implementation PRs.
-- All security-sensitive state machines are documented and tested.
-- Fee/accounting logic has one canonical implementation and exact-value tests.
-- Pause behavior is consistent and covered by integration tests.
-- Role management is symmetric, documented, and operationally controlled by multisigs and timelocks.
-- Adapter target resolution is deterministic and parameter-level validation covers all fund-moving selectors.
-- Mutation-testing gaps called out by the report have been converted into tests or documented as equivalent/inert mutants.
-- CI runs unit, integration, invariant, formatting, and static analysis checks.
-- Longer mutation and fork campaigns run before releases.
-- Documentation, NatSpec, events, and interfaces match the implementation.
-
-## Suggested Execution Order
-
-1. Land the specification and incident-response docs.
-2. Add missing CI jobs and baseline all repositories.
-3. Add tests for already-fixed findings so regressions cannot reappear.
-4. Consolidate fee and accounting logic behind a canonical spec.
-5. Normalize pause, role, and batch state-machine behavior.
-6. Harden adapter and external execution validation.
-7. Refactor duplicated and dead code.
-8. Fill mutation-testing gaps by priority.
-9. Re-run a focused internal review against the specs.
-10. Run a final external review or targeted diff review before production deployment.
+The `executeAutoclaimStakedShares` and `executeAutoclaimUnstakedAssets` functions perform nearly identical logic with only the claim selector and request type differing. Their batch counterparts duplicate the same pattern again in loop form. Consolidate into a single parameterized implementation.
+
+### Dead code removal (kam repo)
+
+| Item | File | Action |
+|------|------|--------|
+| Unused `DEFAULT_MAX_DELTA` constant | `src/kAssetRouter.sol` line 86 | Delete `uint256 private constant DEFAULT_MAX_DELTA = 1000;` |
+| Unused `_checkAdmin` helper | `src/adapters/VaultAdapter.sol` line 125 | Delete the never-called private function |
+
+### Other simplifications (kam repo)
+
+| Item | File | Action |
+|------|------|--------|
+| Simplify `registerVault` conditional | `src/kRegistry/kRegistry.sol` ~line 449 | Move `$.allVaults.add(_vault)` above the `if(_isKMinter)` branch; the `add` is a no-op when already present |
+| Merge double-pass loop in `getExecutorTargetsByType` | `src/kRegistry/modules/ExecutionGuardianModule.sol` lines 241-265 | Over-allocate to parent-set length, populate in one pass, trim with assembly |
+| Remove redundant `_checkAddressNotZero` on adapter | `src/kAssetRouter.sol` line 346 | `_registry().getAdapter()` already reverts on zero; this check is unreachable |
+| Remove redundant zero-address check in `_authorizeUpgrade` | `src/kMinter.sol` line 532 | Solady's `UUPSUpgradeable` already rejects zero implementation |
+| Collapse two interface calls in kSettler | `kam-settler/src/kSettler.sol` ~lines 500-503 | `getBatchIdBalances` and `getRequestedShares` can be a single call returning both values |
+| Remove `registry.getSettlementConfig` double-read in kSettler | `kam-settler/src/kSettler.sol` ~lines 816 and 864 | Read once and pass the values to `_getInsuranceDeficit` as a parameter |
+
+---
+
+## Phase 4: Code Quality Fixes (Appendix C Items)
+
+**Source**: Appendix C — Code Quality Issues.
+
+> Items already fixed on this branch are marked ~~strikethrough~~.
+
+### Events
+
+| # | Issue | File | Fix |
+|---|-------|------|-----|
+| 1 | `BurnRequestCreated` emits `_to` (recipient) in the `user` field | `src/kMinter.sol` line 216 | Either rename the event parameter to `recipient`, or emit `msg.sender` in that position |
+| ~~2~~ | ~~Inconsistent field naming across claim events~~ | ~~`src/kStakingVault/kStakingVault.sol`~~ | ~~Fixed by commit `1841ac1`~~ |
+
+### Enums and types
+
+| # | Issue | File | Fix |
+|---|-------|------|-----|
+| 3 | `RequestStatus` defaults to `PENDING` (value 0) — zero-initialized storage looks like a valid pending request | `src/kStakingVault/types/BaseVaultTypes.sol` lines 9-12 | Add `UNDEFINED = 0` as first variant: `enum RequestStatus { UNDEFINED, PENDING, CLAIMED }` |
+| 4 | `IkMinter.RequestStatus` is missing a sentinel | `src/interfaces/IkMinter.sol` lines 18-22 | Add `UNDEFINED = 0`: `enum RequestStatus { UNDEFINED, PENDING, REDEEMED }` |
+| 5 | `RequestStatus` not consulted before state mutation in kMinter | `src/kMinter.sol` ~line 248 | Add `require(_burnRequest.status == RequestStatus.PENDING, ...)` before the status assignment |
+| 6 | Executor target type is raw `uint8` instead of an enum | `src/kRegistry/modules/ExecutionGuardianModule.sol` lines 42 and 72 | Replace `uint8 targetType` mapping with `enum TargetType { METAWALLET, ADAPTER, ... }` |
+
+### Interface inheritance
+
+| # | Issue | File | Fix |
+|---|-------|------|-----|
+| 7 | `ReaderModule` doesn't inherit `IVaultReader` | `src/kStakingVault/modules/ReaderModule.sol` line 16 | Add `IVaultReader` to the inheritance list |
+| 8 | `kMinter` and `kStakingVault` don't inherit `ISettleBatch` despite being called through it | `src/kMinter.sol` and `src/kStakingVault/kStakingVault.sol` | Add `ISettleBatch` to both inheritance lists |
+
+### View function correctness
+
+| # | Issue | File | Fix |
+|---|-------|------|-----|
+| 9 | `isPaused()` on kMinter doesn't consider global pause | `src/kMinter.sol` line 495 | Change `return _getBaseStorage().paused;` to `return _isPaused();` which checks both `$.paused` and `_registry().isGlobalPaused()` |
+| ~~10~~ | ~~`convertToShares`/`convertToAssets` swapped parameter names~~ | ~~`src/kStakingVault/kStakingVault.sol`~~ | ~~Fixed by commit `1841ac1`~~ |
+
+### Documentation accuracy
+
+| # | Issue | File | Fix |
+|---|-------|------|-----|
+| 11 | kMinter NatSpec still says "(3) Integration with kStakingVault" — not implemented | `src/kMinter.sol` line 47 | Remove the non-existent feature from the docstring |
+| ~~12~~ | ~~Typo "stakt" → "stake"~~ | ~~`src/kStakingVault/kStakingVault.sol`~~ | ~~Fixed~~ |
+| ~~13~~ | ~~Typo "wen" → "when"~~ | ~~`src/kMinter.sol`~~ | ~~Fixed~~ |
+
+### Miscellaneous
+
+| # | Issue | File | Fix |
+|---|-------|------|-----|
+| 14 | Non-view `authorizeCall` grouped under `VIEW FUNCTIONS` banner | `src/kRegistry/modules/ExecutionGuardianModule.sol` lines 170-175 | Move `authorizeCall` and `_authorizeCall` to the mutating-function section |
+| 15 | `ERC3009` doesn't use ERC-7201 namespaced storage | `ktoken0/src/base/ERC3009.sol` ~line 66 | Move `_authorizationStates` mapping to a namespaced struct |
+| 16 | `onlyOwner` on view functions in hooks adds gas without security benefit | `metawallet/src/hooks/` (multiple files) | Remove `onlyOwner` from `buildExecutions` and `validateMin*` view functions |
+| 17 | Misleading error `KTOKEN_WRONG_ROLE` in freeze when checking `_account != owner()` | `ktoken0/src/kToken.sol` ~line 458 | Introduce `KTOKEN_CANNOT_FREEZE_OWNER` |
+| 18 | `Executed` event emitted even when execution fails in `_tryExec` | `minimal-smart-account/src/MinimalSmartAccount.sol` ~lines 195-203 | Emit `Executed` only on `_success`, or add a `success` field to the event |
+| 19 | `EnumerableSet.values()` used on-chain despite implementation warning against it | Multiple files | Refactor to `at(i)` iteration with length checks, or add size limits |
+| 20 | Dead `_executionContext` state variable in MetaWallet hooks | metawallet hook contracts | Remove — set but never read |
+| 21 | Dead `decodeSingle`/`encodeSingle` in ExecutionLib | `minimal-smart-account/src/ExecutionLib.sol` ~lines 59-62 | Remove — only `CALLTYPE_BATCH` is used |
+| 22 | Unused `ADMIN_ROLE` in MinimalSmartAccount | `minimal-smart-account/src/MinimalSmartAccount.sol` line 33 | Delete the declared-but-never-checked constant |
+| 23 | Variable shadowing: `_registry` parameter shadows `kBase._registry()` in `kAssetRouter.initialize`, `kAssetRouter._executeSettlement`, `kMinter.initialize` | Multiple files | Rename parameter to `_registryAddr` |
+
+---
+
+## Phase 5: Standardize Access Control Patterns
+
+**Source**: Codebase Maturity — Authentication / Access Controls ("Moderate").
+
+**Already fixed on this branch**: Per-role revoke functions all exist. `revokeGivenRoles` removed. `revokeInstitutionRole` accepts vendor OR admin.
+
+### Remaining work
+
+1. **Standardize on `OptimizedOwnableRoles`** everywhere. If any contract still uses the non-optimized `OwnableRoles`, migrate.
+
+2. **Rename kSettler's `RELAYER_ROLE`**: kSettler uses `_ROLE_1` for `RELAYER_ROLE`, while kRegistry's `RELAYER_ROLE` is `_ROLE_3`. The same name with different bit values is confusing. Rename kSettler's to `SETTLER_RELAYER_ROLE` or use the same bit position.
+
+3. **Separate dual-role grants in production**: in `kBaseRoles.__kBaseRoles_init`, the admin is auto-granted `VENDOR_ROLE` and the relayer is auto-granted `MANAGER_ROLE`. Add a comment documenting that these are convenience defaults for testnets, and production deployments should use separate addresses.
+
+---
+
+## Phase 6: Implement Timelocks for Administrative Operations
+
+**Source**: Recommendations ("Implement timelocks, use multisigs, and establish strong operational security practices"), Codebase Maturity — Decentralization ("Weak").
+
+**Problem**: The protocol is fully centralized. Multiple privileged roles can directly affect user assets, and no timelocks exist on any administrative operation.
+
+### Implementation
+
+1. **Deploy a `TimelockController`** (OpenZeppelin or custom) as the owner of all UUPS contracts and the kRegistry.
+
+2. **Timelock-gated operations** (minimum 24h delay):
+   - `setTreasury`, `setInsurance`, `setTreasuryBps`, `setInsuranceBps` on kRegistry
+   - `setManagementFee`, `setPerformanceFee` on kStakingVault
+   - `_authorizeUpgrade` on all UUPS contracts
+   - `addFunction`, `removeFunction` on MultiFacetProxy (kStakingVault)
+
+3. **Exempt from timelock** (must remain instant for incident response):
+   - `setGlobalPause` (EMERGENCY_ADMIN)
+   - `setPaused` on individual contracts (EMERGENCY_ADMIN)
+   - `cancelProposal` (GUARDIAN)
+   - `rescueAssets`, `rescueETH` (ADMIN)
+
+4. **Document user exit paths**: add a section to `docs/architecture.md` explaining the timelock window.
+
+---
+
+## Phase 7: Improve Events and Auditing
+
+**Source**: Codebase Maturity — Auditing ("Moderate").
+
+1. **Add `_batchId` to `AssetsPushed` and `AssetsTransferred` events** in `src/kAssetRouter.sol`. Update event declarations in `src/interfaces/IkAssetRouter.sol`.
+
+2. **Add `success` field to `Executed` event** in `minimal-smart-account/src/MinimalSmartAccount.sol` (or only emit on success — see Phase 4 item 18).
+
+3. **Emit distinct events for role grant/revoke**: consider adding protocol-level events like `InstitutionRoleGranted(address indexed institution, address indexed grantedBy)` in kRegistry for easier off-chain indexing beyond Solady's generic `RolesUpdated`.
+
+---
+
+## Phase 8: VaultAdapter Global Pause
+
+**Source**: Codebase Maturity — Auditing ("Moderate", pause consistency section).
+
+`VaultAdapter._authorizeExecute` calls `_checkPaused($)` which only checks `VaultAdapterStorage.paused`. It does NOT check `registry.isGlobalPaused()`. This means a global pause does not halt adapter strategy execution.
+
+### Fix in `src/adapters/VaultAdapter.sol` line 87
+
+```solidity
+function _authorizeExecute(address user) internal override {
+    VaultAdapterStorage storage $ = _getVaultAdapterStorage();
+    require(
+        !$.paused && !IkRegistry(address(_getMinimalAccountStorage().registry)).isGlobalPaused(),
+        VAULTADAPTER_IS_PAUSED
+    );
+    super._authorizeExecute(user);
+}
+```
+
+### Tests
+
+- `test_execute_globalPaused_reverts`: set global pause, call execute as manager. Expect revert.
+- `test_execute_localPaused_reverts`: set adapter-local pause, call execute. Expect revert.
+- `test_execute_bothUnpaused_succeeds`: neither paused. Succeeds.
+
+---
+
+## Phase 9: Expand Test Coverage (Mutation Testing)
+
+**Source**: Recommendations ("Use the mutation testing results to improve coverage"), Codebase Maturity — Testing ("Weak"), Appendix D.
+
+### Priority 1: kam-paymaster (45.4% catch rate)
+
+```
+test_stakeWithAutoclaim_forgedSignature_reverts
+test_stakeWithAutoclaim_invalidSignature_reverts
+test_stakeWithAutoclaim_expiredSignature_reverts
+test_stakeWithAutoclaim_amountEqualsFee_reverts
+test_stakeWithAutoclaim_amountLessThanFee_reverts
+test_executeAutoclaim_failedClaim_authNotMarkedExecuted
+test_executeAutoclaim_retryAfterFailure_succeeds
+test_permitFallback_tokenWithPreApproval_usesAllowance
+test_batchStakeWithPermit_basicFlow
+test_batchUnstakeWithPermit_basicFlow
+test_batchStakeNoPermit_basicFlow
+test_batchUnstakeNoPermit_basicFlow
+```
+
+### Priority 2: ktoken0 — ERC3009 (8.7%) and kTokenFactory (11.3%)
+
+```
+test_transferWithAuthorization_validSignature_succeeds
+test_transferWithAuthorization_invalidSignature_reverts
+test_transferWithAuthorization_expiredWindow_reverts
+test_transferWithAuthorization_nonceReuse_reverts
+test_cancelAuthorization_validNonce_succeeds
+test_deploy_nonDeployer_reverts
+test_deploy_deployer_succeeds
+test_deploy_deterministicAddressCollision_reverts
+```
+
+### Priority 3: kToken branch coverage (69.5%, only 2/36 branches)
+
+```
+test_freeze_byAdmin_succeeds
+test_freeze_byNonAdmin_reverts
+test_freeze_owner_reverts
+test_unfreeze_byAdmin_succeeds
+test_pause_byEmergencyAdmin_succeeds
+test_pause_byNonEmergencyAdmin_reverts
+test_mint_byMinter_succeeds
+test_mint_byNonMinter_reverts
+test_mint_whenPaused_reverts
+test_burn_byMinter_succeeds
+test_transfer_frozenSender_reverts
+test_transfer_frozenRecipient_reverts
+```
+
+### Priority 4: minimal-uups-factory (44.8%)
+
+```
+test_deployAndCall_withETH_emptyInitData_forwardsETH
+test_deployAndCall_initCallReverts_bubblesError
+test_deployDeterministicAndCall_withETH_emptyInitData
+test_deploy_nonOwner_reverts
+```
+
+### Priority 5: kam repo — lowest coverage files
+
+**SmartAdapterAccount (18.2%)** — `test/unit/SmartAdapterAccount.t.sol` (new):
+
+```
+test_execute_nonManager_reverts
+test_execute_manager_allowedSelector_succeeds
+test_execute_manager_disallowedSelector_reverts
+test_execute_manager_disallowedTarget_reverts
+test_authorizeUpgrade_nonOwner_reverts
+test_supportsInterface_erc165_returnsTrue
+test_supportsInterface_unknown_returnsFalse
+```
+
+**MultiFacetProxy (67.2%)** — `test/unit/MultiFacetProxy.t.sol`:
+
+```
+test_fallback_unregisteredSelector_reverts
+test_addFunction_nonAuthorized_reverts
+test_addFunction_duplicateSelector_noOverride_reverts
+test_addFunction_forceOverride_succeeds
+test_removeFunction_existing_thenFallback_reverts
+test_removeFunction_nonExistent_noRevert
+```
+
+**ExecutionGuardianModule (73.2%)** — `test/unit/ExecutionGuardianModule.t.sol`:
+
+```
+test_setAllowedSelector_reAddAlreadyAllowed_isIdempotent
+test_setAllowedSelector_removeNotAllowed_isIdempotent
+test_setAllowedSelector_thenRemoveAll_targetRemovedFromSet
+test_getExecutorTargetsByType_returnsCorrectSubset
+test_authorizeCall_validatorConfigured_callsValidator
+test_authorizeCall_noValidator_passesDirectly
+test_authorizeCall_disallowedSelector_reverts
+```
+
+**VaultAdapter (71.0%)** — `test/unit/VaultAdapter.t.sol`:
+
+```
+test_setTotalAssets_nonRouter_reverts
+test_pull_nonRouter_reverts
+test_pull_paused_reverts
+test_execute_targetAllowedSelectorNotAllowed_reverts
+test_execute_selectorAllowedTargetNotAllowed_reverts
+test_rescueAssets_recipientZero_reverts
+```
+
+**ERC2771Context (78.5%)** — `test/unit/ERC2771Context.t.sol`:
+
+```
+test_msgSender_trustedForwarder_extractsAppendedAddress
+test_msgSender_notTrustedForwarder_returnsMsgSender
+test_msgSender_trustedForwarder_shortCalldata_returnsMsgSender
+test_msgSender_forwarderDisabled_returnsMsgSender
+```
+
+**kAssetRouter settlement boundaries (78.8%)** — `test/unit/kAssetRouter.t.sol`:
+
+```
+test_proposeSettleBatch_exactlyZeroYield_noApprovalRequired
+test_proposeSettleBatch_exactlyZeroNetted_succeeds
+test_proposeSettleBatch_exactlyAtCooldown_cannotExecute
+test_proposeSettleBatch_oneSecondPastCooldown_canExecute
+test_executeSettleBatch_negativeYield_burnsCapped
+test_cancelProposal_restoresGlobalPendingRequests
+```
+
+**kRegistry bookkeeping (74.7%)** — `test/unit/kRegistry.register.t.sol`:
+
+```
+test_registerVault_createsInitialBatch
+test_removeVault_adapterHasBalance_reverts
+test_removeVault_pendingProposals_reverts
+test_registerAdapter_duplicateForSameVaultAsset_reverts
+test_removeAdapter_pendingProposals_reverts
+```
+
+**kStakingVault / BaseVault / VaultMathLib fee math (73%-82%)** — `test/unit/kStakingVault.fees.t.sol`:
+
+```
+test_settleBatch_managementFee_exactValue_6decimals
+test_settleBatch_performanceFee_hardHurdle_exactValue
+test_settleBatch_performanceFee_softHurdle_exactValue
+test_settleBatch_performanceFee_belowHurdle_noFee
+test_settleBatch_performanceFee_zeroSupply_noFee
+test_settleBatch_performanceFee_lossPeriod_noFee
+test_watermark_unchangedWhenTotalAssetsDropBelowWatermark
+```
+
+### Priority 6: metawallet (67.8%)
+
+```
+test_executeWithHook_postHookCleanup_executionContextReset
+test_executeWithHook_errorBubbling_preservesRevertReason
+test_executeWithHook_selectorAuthorization_reverts
+test_executeOperations_selectorParsing_batchMode
+test_executeOperations_invalidMode_reverts
+test_approveAndDeposit_preExistingAllowance_succeeds
+test_redeemHook_postRedeemCleanup_succeeds
+```
+
+### Invariant test promotion
+
+Move invariant harnesses into the default CI profile. In `foundry.toml`:
+
+```toml
+[invariant]
+runs = 64
+depth = 64
+fail_on_revert = true
+```
+
+Add new invariant properties in `test/invariant/`:
+
+```
+invariant_kTokenSupplyBackedByAdapterValue
+invariant_adapterVirtualBalanceNonNegative
+invariant_batchStateTransitionsMonotonic
+invariant_proposalIdNeverExecutedTwice
+invariant_pendingRequestsNeverExceedVirtualBalance
+invariant_targetEnumerationMatchesSelectorState
+invariant_reentrancyGuardNotRemovable
+```
+
+---
+
+## Phase 10: Monitoring and Alerts
+
+**Source**: Codebase Maturity — Auditing ("Moderate"), Recommendations ("Implement operational security practices").
+
+These don't require code changes but should be instrumented in the off-chain monitoring system:
+
+| Signal | Source | Severity |
+|--------|--------|----------|
+| `GlobalPauseSet(true)` | kRegistry | P1 |
+| `YieldExceedsMaxDeltaWarning` | kAssetRouter | P2 |
+| First settlement for any vault (adapter.totalAssets was 0) | kAssetRouter `SettlementProposed` | P2 |
+| Role grant/revoke outside business hours | kRegistry role events | P2 |
+| `_authorizeUpgrade` called | Any UUPS contract | P1 |
+| `FunctionAdded` / `FunctionRemoved` on MultiFacetProxy | kStakingVault | P1 |
+| Treasury or insurance address changed | kRegistry `TreasurySet` / `InsuranceSet` | P2 |
+| Fee parameter changed | kStakingVault `ManagementFeeSet` / `PerformanceFeeSet` | P2 |
+| Settlement execution failed (reverted) | Transaction monitoring | P2 |
+| Adapter `totalAssets` drifts from physical strategy value by > 1% | Off-chain comparison job | P3 |
+| Unclaimed unstake kTokens older than 7 days | Off-chain batch scan | P3 |
+
+---
+
+## Execution Order
+
+1. Phase 4 (Code quality fixes) — mechanical, zero-risk, improves readability.
+2. Phase 3 (Dead code removal) — mechanical, reduces surface area.
+3. Phase 8 (VaultAdapter global pause) — small, targeted security fix.
+4. Phase 1 (Fee consolidation) — design improvement, reduces future regression risk.
+5. Phase 7 (Events/auditing) — small changes, improves operational visibility.
+6. Phase 5 (Access control standardization) — aligns patterns across repos.
+7. Phase 2 (Execution validator extension) — closes parameter validation gap.
+8. Phase 6 (Timelocks) — largest operational change, requires multisig coordination.
+9. Phase 9 (Test coverage) — runs in parallel with every phase above.
+10. Phase 10 (Monitoring) — operational, no code changes, deploy alongside Phase 6.

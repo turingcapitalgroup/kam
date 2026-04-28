@@ -1,570 +1,480 @@
 # KAM Security, Design, and Roles Specification
 
-## Purpose
-
-This specification defines the intended security model, protocol design model, and privileged-role management model for KAM. It should be used as the starting point for future implementation work, reviews, and tests.
-
-The report recommended writing specifications before executing changes. For KAM, that means every material change to settlement, accounting, adapters, roles, pausing, upgrades, token onboarding, or external integrations should reference this document or a more specific child spec.
-
-## Scope
-
-This spec applies to the KAM protocol system across the core repository and its related protocol repositories:
-
-- `kam`: registry, minter, asset router, staking vault, adapters, modules, and deployment configuration.
-- `kam-settler`: off-chain/on-chain settlement orchestration helpers.
-- `kam-paymaster`: meta-transaction and autoclaim flows.
-- `ktoken0`: kToken, kTokenFactory, OFT/OFT adapter, freeze and compliance controls.
-- `metawallet`: strategy vault, hook execution, ERC4626 and 1inch integrations.
-- `minimal-smart-account`: adapter smart-account execution engine.
-- `minimal-uups-factory`: deterministic UUPS deployment factory.
-
-The spec describes desired behavior. If current code differs, implementation work should either bring code in line with this spec or update the spec with a reviewed design decision.
-
-## Protocol Design Model
-
-### Core Participants
-
-- Institutions mint and redeem kTokens through `kMinter`.
-- Retail users stake kTokens into `kStakingVault` instances and receive stkTokens.
-- Relayers close batches, propose settlements, and execute operational workflows.
-- Guardians review, approve, or cancel settlement proposals.
-- Managers execute whitelisted adapter actions into external strategies.
-- Admins configure assets, vaults, adapters, fees, limits, roles, and protocol recipients.
-- Owners control upgrades and module installation.
-- Emergency admins pause protocol components and execute emergency-only actions.
-
-### Core Contracts
-
-- `kRegistry` is the source of truth for protocol contracts, assets, vaults, adapters, fee recipients, batch limits, and roles.
-- `kMinter` is the institutional gateway. It supports immediate minting and batched redemptions.
-- `kAssetRouter` is the settlement and virtual-balance coordinator. It creates settlement proposals and executes them after cooldown and approval rules are satisfied.
-- `kStakingVault` is the retail staking vault. It batches stake and unstake requests and snapshots settlement-time pricing for claims.
-- `VaultAdapter` holds protocol assets or strategy positions and exposes virtual total-assets accounting to the router.
-- `ExecutionGuardianModule` controls what adapter accounts may call through executor-target-selector permissions and optional parameter validators.
-- `kBatchReceiver` isolates settled institutional redemption assets per batch.
-
-### Asset Model
-
-Every registered asset must have:
-
-- A corresponding kToken.
-- A registered kMinter adapter.
-- Explicit batch limits.
-- A documented token behavior profile.
-- A deployment-time onboarding checklist.
-
-Supported asset assumptions:
-
-- The token must not be fee-on-transfer.
-- The token must not be rebasing unless a dedicated integration spec supports it.
-- The token must have stable, known decimals.
-- The token must have standard ERC20 transfer behavior or be explicitly wrapped by safe integration code.
-- The token must not introduce callbacks that can reenter protocol accounting paths unless those paths are guarded and tested.
-- Any token with blocklist, pause, upgrade, or admin controls must be reviewed as part of onboarding.
-
-### Vault and Adapter Model
-
-Each vault-asset relationship must be explicit in the registry.
-
-Required invariants:
-
-- A vault cannot be registered with a type inconsistent with its intended function.
-- The kMinter singleton may support multiple assets, but it must always be registered as the minter type.
-- A non-minter staking vault manages exactly the assets documented for that vault.
-- Each `(vault, asset)` pair has at most one active adapter.
-- Adapter removal is allowed only when no pending proposals exist and the adapter has no protocol-accounted balance.
-- Adapter totalAssets must reflect the canonical virtual balance for its `(vault, asset)` pair.
-
-Adapter execution policy:
-
-- Managers may execute only through registered adapters.
-- Every external call must pass registry authorization.
-- Selector allowlists must be paired with parameter validation when calldata controls assets, receivers, spenders, routers, vaults, or target contracts.
-- External target resolution must be deterministic. Flows that require one target of a type must use a direct mapping or enforce one target per type structurally.
-- Iterating unordered target sets and accepting the first match is not valid for value-moving flows.
-
-### Batch Lifecycle
-
-All batch systems must follow an explicit state machine.
-
-States:
-
-- `UNDEFINED`: the batch does not exist.
-- `ACTIVE`: the batch accepts user requests.
-- `CLOSED`: the batch no longer accepts user requests.
-- `PROPOSED`: a settlement proposal exists for the batch.
-- `SETTLED`: settlement has completed and claims may be served.
-- `CANCELLED` or `EXPIRED`: optional states only if a future design supports replacing stale proposals.
-
-Valid transitions:
-
-- `UNDEFINED -> ACTIVE`: batch creation.
-- `ACTIVE -> CLOSED`: relayer closes the batch.
-- `CLOSED -> PROPOSED`: relayer proposes settlement.
-- `PROPOSED -> SETTLED`: proposal executes after cooldown and required approval.
-- `PROPOSED -> CANCELLED`: guardian or emergency admin cancels the proposal.
-
-Invalid transitions must revert:
-
-- Creating a new active batch while the current one remains active, unless the spec for that vault explicitly supports parallel batches.
-- Proposing settlement for an active batch.
-- Settling a batch without a valid proposal.
-- Settling a batch twice.
-- Claiming from an unsettled batch.
-- Reusing a request ID.
-- Processing a request whose status is not pending.
-
-### Settlement Lifecycle
-
-Settlement must be deterministic and idempotent.
-
-Required proposal data:
-
-- Asset.
-- Vault.
-- Batch ID.
-- Adapter used for settlement.
-- Total assets.
-- Total supply where relevant.
-- Deposited amount.
-- Requested amount or requested shares.
-- Netting value.
-- Yield value.
-- Fee configuration snapshot if fees apply.
-- Treasury and insurance recipient snapshot if fees or distribution apply.
-- Cooldown expiration.
-- Whether guardian approval is required.
-
-Settlement rules:
-
-- Proposal creation must compute or snapshot all values that should not change during cooldown.
-- Execution must use proposal data, not live mutable configuration, for any value that affects user payouts or fees.
-- First settlements must not bypass yield checks.
-- High-delta proposals must require guardian approval before execution.
-- Proposal execution and any post-execution finalization must be one-time operations.
-- Cancellation must restore any pending accounting that was reserved at proposal time.
-- kMinter settlement may proceed independently per asset if the design permits multiple assets.
-
-### Accounting and Fee Model
-
-The protocol must define one canonical meaning for each accounting term.
-
-Definitions:
-
-- `grossAssets`: total assets before accrued fees are applied.
-- `netAssets`: total assets after accrued fees are applied.
-- `totalBalance`: vault internal balance used for share pricing.
-- `pendingStake`: kTokens deposited into an active batch but not yet converted into stkTokens.
-- `pendingUnstake`: kTokens reserved for settled unstake claims but not yet claimed.
-- `virtualBalance`: adapter-reported totalAssets used by router accounting.
-- `physicalBalance`: actual token or strategy value controlled by the adapter or MetaWallet.
-- `netted`: deposited assets minus requested assets for a batch.
-- `yield`: current strategy value minus prior virtual balance, after applying the canonical settlement basis.
-
-Rules:
-
-- Share conversion must use one canonical function and one documented rounding direction.
-- Any use of virtual assets or virtual shares must be consistent across router, vault, and settler code.
-- Fees must be computed once per settlement cycle or from one canonical helper with identical inputs.
-- Fee configuration and recipients that affect a pending settlement must be snapshotted or timelocked so they cannot change unexpectedly during cooldown.
-- Performance fees must be based on actual strategy yield, not deposit volume or stale watermark artifacts.
-- Management fee duration and performance fee duration must be explicit and independently tested.
-- Losses must not burn assets already earmarked for settled unstake claims unless a reviewed loss-socialization design says otherwise.
-- Zero-supply vault behavior must be specified for profit, loss, insurance, treasury, and future staker treatment.
-
-### Request and Claim Model
-
-Requests should have explicit non-zero initial states.
-
-Required request states:
-
-- `UNDEFINED`.
-- `PENDING`.
-- `CLAIMED` or `REDEEMED`.
-- `CANCELLED`, only if cancellation is implemented.
-
-Rules:
-
-- Zero-initialized storage must not appear to be a valid pending request.
-- Claim functions must check request status before mutating it.
-- Request ownership and beneficiary must be explicit.
-- Event fields must consistently distinguish request creator, owner, recipient, and beneficiary.
-- Claims must use settlement-time snapshots, not live share price.
-- Assets earmarked for claims should be isolated or protected from later settlements.
-
-## Security Specification
-
-### Core Security Invariants
-
-The following invariants should be documented in tests and monitored operationally:
-
-- Circulating kToken supply is backed by accepted protocol asset value under the documented accounting model.
-- A batch cannot be settled more than once.
-- A settlement proposal cannot be executed more than once.
-- Finalization steps that move assets cannot be repeated.
-- Pending requests cannot exceed effective virtual balance.
-- Adapter virtual balances cannot become negative.
-- A vault cannot burn into assets reserved for settled unstake claims.
-- Role grant and revoke operations preserve the role hierarchy.
-- Executor target enumeration matches selector authorization state.
-- Every target used by settler automation is deterministic for the asset and executor.
-- Global pause halts all state-changing functions required by the pause matrix.
-- Users cannot self-remove deny-list or freeze state.
-- Unauthorized callers cannot execute fund-moving actions, upgrades, module changes, role changes, or configuration changes.
-
-### Pause Model
-
-KAM has two pause concepts:
-
-- Local pause: disables a single contract or vault.
-- Global pause: disables the protocol as a whole through the registry.
-
-Global pause must be checked by every state-changing function that can:
-
-- Move user or protocol funds.
-- Mint or burn kTokens.
-- Mint or burn stkTokens.
-- Execute settlement.
-- Propose settlement.
-- Execute adapter calls.
-- Change adapter permissions.
-- Change critical protocol configuration.
-
-Functions that may remain callable while globally paused must be listed in the pause matrix with a justification. Read-only functions should remain callable.
-
-Default pause matrix:
-
-| Function class | While globally paused | Rationale |
-| --- | --- | --- |
-| View functions | Allowed | Monitoring and user visibility must continue. |
-| New mint, burn, stake, unstake requests | Blocked | Prevent new exposure during incident response. |
-| Claims | Blocked by default | Claims move funds and may worsen accounting incidents. Exceptions require a written incident-specific policy. |
-| Settlement proposal | Blocked | Prevent new settlement state during incident. |
-| Settlement execution | Blocked by default | Execution moves funds and mints/burns tokens. Emergency execution needs a separate guarded path. |
-| Proposal cancellation | Allowed for guardian/emergency admin | Cancelling suspicious proposals is protective. |
-| Adapter execution | Blocked | Prevent strategy movement during incident. |
-| Role grants and revokes | Emergency revokes allowed, grants blocked by default | Revocation may contain compromise; grants increase authority. |
-| Upgrades | Timelocked by default; emergency upgrade only via documented process | Upgrades can save or compromise the system. |
-| Pause/unpause | Allowed for emergency admin | Required for incident response. |
-
-### Incident Response
-
-Incident response must define roles, triggers, actions, and recovery conditions.
-
-Severity levels:
-
-- Severity 1: active exploit, key compromise, backing loss, unauthorized upgrade, or broad fund movement risk.
-- Severity 2: settlement anomaly, adapter drift, failed invariant, oracle or relayer malfunction, or high-delta proposal.
-- Severity 3: isolated integration failure, failed autoclaim, monitoring issue, or non-critical configuration error.
-- Severity 4: documentation, test, or minor operational issue.
-
-Required response steps:
-
-1. Detect and classify the incident.
-2. Pause affected components or the full protocol if needed.
-3. Cancel pending suspicious proposals.
-4. Disable risky executor selectors or validators if the issue is adapter-related.
-5. Rotate or revoke compromised roles.
-6. Snapshot protocol state and preserve logs.
-7. Communicate impact and user instructions.
-8. Prepare and review a fix.
-9. Run targeted tests and invariants.
-10. Resume only after documented preconditions are met.
-11. Publish a post-incident review and add regression tests.
-
-### Upgrade and Module Safety
-
-Rules:
-
-- UUPS upgrades must be owner-controlled and timelocked in production.
-- Upgrade proposals must include storage layout diff, initializer behavior, rollback plan, and tests.
-- ERC-7201 storage constants must be generated and tested against their namespace strings.
-- New storage fields must be appended inside the correct namespaced struct.
-- Module selector installation must reject zero address, self address, and codeless implementations.
-- Module selector installation and removal must emit accurate events and expose queryable state.
-- Deployment scripts must verify implementation code exists before registration.
-
-### External Call Safety
-
-Rules:
-
-- Prefer structured interfaces and safe transfer libraries over raw low-level calls.
-- Low-level calls to external protocols should bubble revert data when possible.
-- Every call that can move assets must be covered by access control and parameter validation.
-- Reentrancy guards are required around flows that call untrusted tokens, external protocols, hooks, or adapters.
-- Checks-effects-interactions should be followed unless a parent implementation requires another order; in that case, use reentrancy guards and tests.
-- Callback-capable tokens must be tested before onboarding.
-
-### Token Onboarding Security
-
-Every new supported asset requires a written review covering:
-
-- Decimals.
-- Transfer return behavior.
-- Fee-on-transfer behavior.
-- Rebasing behavior.
-- Pause or blocklist controls.
-- Upgradeability.
-- Callback behavior.
-- Permit or signature behavior, if used.
-- Liquidity and oracle assumptions.
-- Custodian or issuer risks.
-- Compatibility with mint, burn, settlement, adapter, and MetaWallet flows.
-
-Unsupported by default:
-
-- Fee-on-transfer tokens.
-- Rebasing tokens.
-- ERC777-like callback tokens.
-- Tokens that return false instead of reverting, unless every path uses safe wrappers that check return values.
-- Tokens with unexpected decimals or mutable decimals.
-
-## Roles Management Specification
-
-### Role Principles
-
-- Every role must have a unique name, purpose, grant authority, revoke authority, and expected holder type.
-- Grant and revoke authority should be symmetric unless a documented reason says otherwise.
-- Production owner and admin roles should be multisigs.
-- Critical configuration should be timelocked.
-- Hot keys should have only narrow automation roles.
-- Emergency roles should be able to reduce risk quickly but not silently increase authority.
-- Deny-list state should not be modeled as a self-renounceable privilege role.
-
-### Role Matrix
-
-| Role | Purpose | Expected holder | Can grant | Can revoke | Timelock |
-| --- | --- | --- | --- | --- | --- |
-| Owner | Upgrades, module installation, ultimate contract control | Multisig | Deployment or current owner | Current owner | Yes for upgrades/modules |
-| Admin | Asset, vault, adapter, fee, treasury, limits, and role administration | Multisig behind timelock | Owner or admin, depending on contract | Same authority as grant | Yes for non-emergency config |
-| Emergency admin | Pause, emergency cancellation, emergency disabling | Smaller emergency multisig | Owner/admin | Owner/admin | No for pause; yes for broader actions |
-| Guardian | Review, approve, and cancel settlement proposals | Independent multisig or monitored signer set | Admin | Admin | No for cancellation; optional for approval |
-| Relayer | Batch closure, proposal creation, settlement execution, routine automation | Hot key or automation service | Admin | Admin | No, but tightly monitored |
-| Manager | Adapter execution through allowlisted targets/selectors | Hot key or automation service | Admin | Admin | No, but tightly monitored |
-| Vendor | Institution onboarding | Business operations multisig or controlled account | Admin | Admin or vendor, if vendor can grant institutions | Optional |
-| Institution | kMinter mint and burn access | Approved institution wallet | Vendor | Vendor or admin | No |
-| kToken minter | Mint and burn kTokens | Protocol contracts only | Admin | Admin | Yes for grants |
-| Blacklist admin | Freeze and unfreeze accounts | Compliance multisig | Admin | Admin | No for freeze; monitored |
-| Paymaster executor | Submit signed paymaster/autoclaim flows | Automation key | Admin | Admin | No, but monitored |
-| LayerZero delegate | Configure OFT messaging | Dedicated multisig separate from owner | Owner/admin | Owner/admin | Yes |
-
-### Owner
-
-Owner powers:
-
-- Upgrade UUPS implementations.
-- Install or remove module selectors.
-- Transfer ownership.
-- Initialize owner-only components.
-
-Rules:
-
-- Production owner must be a multisig.
-- Owner operations that change implementation or routing must be timelocked.
-- Emergency owner actions must be documented before use and reviewed after use.
-- Owner must not also be a day-to-day relayer or manager hot key.
-
-### Admin
-
-Admin powers:
-
-- Register and remove assets.
-- Register and remove vaults.
-- Register and remove adapters.
-- Set batch limits.
-- Set fee parameters.
-- Set treasury and insurance recipients.
-- Grant and revoke operational roles.
-- Configure execution permissions.
-
-Rules:
-
-- Admin must be a multisig.
-- Admin configuration that can affect user funds must be timelocked.
-- Fee, treasury, insurance, adapter, and selector changes must not be able to affect already-pending settlements unless explicitly snapshotted in the proposal design.
-- Admin revocation authority must not exceed its grant authority unless documented.
-
-### Emergency Admin
-
-Emergency admin powers:
-
-- Set global pause.
-- Set local pause where supported.
-- Cancel suspicious proposals if authorized.
-- Disable compromised executor permissions through a documented fast path if implemented.
-
-Rules:
-
-- Emergency admin may act without a timelock for pause and cancellation.
-- Emergency admin should not be able to upgrade, grant broad roles, or redirect funds without a timelock.
-- Every emergency action must emit events and alert operators.
-
-### Guardian
-
-Guardian powers:
-
-- Cancel proposals during cooldown.
-- Approve proposals that require high-delta approval.
-
-Rules:
-
-- Guardian should be independent from relayer where operationally possible.
-- Guardian approvals must be based on documented checks:
-  - Proposal batch exists and is closed.
-  - Total assets source is known.
-  - Yield delta is explainable.
-  - Adapter and target addresses match expected configuration.
-  - Fee and recipient snapshots are expected.
-  - No conflicting incident is active.
-- Guardian should not be able to create proposals or execute adapter strategy moves.
-
-### Relayer
-
-Relayer powers:
-
-- Create and close batches.
-- Propose settlements.
-- Execute settlements.
-- Execute settler helper flows where applicable.
-
-Rules:
-
-- Relayer is trusted but should not be able to bypass guardian checks.
-- Relayer actions must be idempotent or protected against accidental retry.
-- Relayer should not hold admin, owner, guardian, or blacklist admin privileges.
-- Relayer keys should be monitored and rotated frequently.
-
-### Manager
-
-Manager powers:
-
-- Execute adapter calls through whitelisted selectors.
-- Move capital between approved external strategy targets according to validator constraints.
-
-Rules:
-
-- Manager may only operate through registered adapters.
-- Every manager-callable selector that can affect funds must have parameter validation.
-- Manager cannot select arbitrary external vaults, routers, receivers, spenders, or custodial targets.
-- Manager cannot bypass hook-level validation through direct execution.
-
-### Vendor and Institution
-
-Vendor powers:
-
-- Grant institution access, if this remains the chosen model.
-
-Institution powers:
-
-- Mint kTokens through kMinter.
-- Request and claim redemptions through kMinter.
-
-Rules:
-
-- If vendor can grant institution, vendor should also have a revoke path or revocation should be clearly assigned to admin.
-- Institution wallets should be screened and documented.
-- Institution access should be revocable quickly if a wallet is compromised.
-
-### Blacklist Admin and Freeze State
-
-Rules:
-
-- Freeze state must not be implemented as a self-renounceable privilege role.
-- Frozen accounts cannot transfer, receive, mint, burn, approve where relevant, or claim through flows that would move blocked tokens.
-- The owner address and zero address rules must be explicit.
-- Freeze and unfreeze events must identify target and operator.
-- Tests must prove frozen accounts cannot unfreeze themselves.
-
-### Grant and Revoke Requirements
-
-Every role must have:
-
-- `grantRoleName(address account)` or equivalent.
-- `revokeRoleName(address account)` or equivalent.
-- Matching authority for grant and revoke, unless documented.
-- Events for grant and revoke.
-- Tests for authorized grant, unauthorized grant, authorized revoke, unauthorized revoke, and effect of revoked privileges.
-
-Generic role revocation functions are discouraged unless they enforce a role-specific policy internally.
-
-## Specification Workflow for Future Changes
-
-Before implementation, create or update a spec for any change that touches:
-
-- Settlement.
-- Fees.
-- Share conversion.
-- Batch lifecycle.
-- Request lifecycle.
-- Adapter execution.
-- External protocol integration.
-- Token onboarding.
-- Roles or permissions.
-- Pausing.
-- Upgrades or modules.
-- Cross-chain messaging.
-- Paymaster forwarding or signatures.
-
-Minimum spec template:
-
-```markdown
-# <Feature Name> Specification
-
-## Purpose
-What problem this change solves.
-
-## Scope
-Contracts and repositories affected.
-
-## Non-Goals
-What this change intentionally does not solve.
-
-## Current Behavior
-Brief description of current implementation.
-
-## Proposed Behavior
-New behavior and user/operator flows.
-
-## State Machine
-States, transitions, invalid transitions.
-
-## Roles and Permissions
-Who can call each function and why.
-
-## Accounting
-Values, units, formulas, rounding, snapshots.
-
-## Events and Monitoring
-Events emitted and alerts expected.
-
-## Invariants
-Properties that must always hold.
-
-## Failure Modes
-What can go wrong and how the system responds.
-
-## Tests
-Unit, integration, invariant, fuzz, mutation targets.
-
-## Migration
-Deployment, upgrade, and data migration plan.
+> This spec reflects the state of the `audit-fixes-ToB` branch, which includes fixes applied after the Trail of Bits audit on `main` at `0db6ef9`.
+
+## 1. Contract Inventory and Ownership
+
+| Contract | Proxy | Owner | Upgrade Auth | Storage Pattern |
+|----------|-------|-------|-------------|-----------------|
+| kRegistry | UUPS | Multisig | `_authorizeUpgrade` → `onlyOwner` (Solady) | ERC-7201 `"kam.storage.kRegistry"` + `"kam.storage.kBaseRoles"` |
+| kMinter | UUPS | Multisig | `_authorizeUpgrade` → `onlyOwner` (Solady) | ERC-7201 `"kam.storage.kMinter"` + `"kam.storage.kBase"` |
+| kAssetRouter | UUPS | Multisig | `_authorizeUpgrade` → `onlyOwner` (Solady) | ERC-7201 `"kam.storage.kAssetRouter"` + `"kam.storage.kBase"` |
+| kStakingVault | UUPS + MultiFacetProxy | Multisig | `_authorizeUpgrade` → `onlyOwner` (Solady) | ERC-7201 `"kam.storage.BaseVault"` |
+| VaultAdapter | Minimal proxy (non-upgradeable) | n/a | n/a | ERC-7201 `"kam.storage.VaultAdapter"` + `SmartAdapterAccount` |
+| kBatchReceiver | Minimal proxy clone | n/a | n/a | Immutable after `initialize` |
+| kToken | Separate repo (kToken0) | Multisig | Separate upgrade path | Separate storage |
+| ExecutionGuardianModule | Module on kRegistry | n/a | Lives in kRegistry storage | ERC-7201 `"kam.storage.ExecutionGuardianModule"` |
+| ERC20ExecutionValidator | Standalone (immutable) | n/a | n/a | Plain mappings + immutable `registry` ref |
+
+---
+
+## 2. Role Definitions
+
+Roles are defined in `src/base/kBaseRoles.sol` using Solady's `OptimizedOwnableRoles` bit positions:
+
+| Role | Constant | Bit | Granted by | Revoked by | Purpose |
+|------|----------|-----|-----------|------------|---------|
+| Owner | (Solady built-in) | — | `requestOwnershipHandover` / `completeOwnershipHandover` | `renounceOwnership` | Protocol root. Upgrades, grants/revokes admin/emergency/guardian. Expected holder: hardware multisig. |
+| ADMIN | `_ROLE_0` | 1 | Owner via `grantAdminRole` | Owner via `revokeAdminRole` | Day-to-day configuration: fees, treasury, adapters, vaults, delta, grant/revoke vendor/relayer/manager. Expected holder: ops multisig. |
+| EMERGENCY_ADMIN | `_ROLE_1` | 2 | Owner via `grantEmergencyAdminRole` | Owner via `revokeEmergencyAdminRole` | Global pause (`setGlobalPause`), per-contract pause on kBase children (`setPaused`), adapter pause. Expected holder: automated monitoring key or hot multisig. |
+| GUARDIAN | `_ROLE_2` | 4 | Owner via `grantGuardianRole` | Owner via `revokeGuardianRole` | Approve/reject settlement proposals that exceed `maxAllowedDelta`. Cancel proposals. Expected holder: off-chain watcher service. |
+| RELAYER | `_ROLE_3` | 8 | Admin via `grantRelayerRole` | Admin via `revokeRelayerRole` | Batch lifecycle ops: `createNewBatch`, `closeBatch`, `proposeSettleBatch`. Meta-tx relay. Expected holder: backend service key. |
+| INSTITUTION | `_ROLE_4` | 16 | Vendor via `grantInstitutionRole` | Vendor or Admin via `revokeInstitutionRole` | Whitelisted institutional minter: `mint`, `burn` on kMinter. Expected holder: KYC-verified institutional wallet. |
+| VENDOR | `_ROLE_5` | 32 | Admin via `grantVendorRole` | Admin via `revokeVendorRole` | Onboards institutions. Has `grantInstitutionRole`. Expected holder: licensed distribution partner. |
+| MANAGER | `_ROLE_6` | 64 | Admin via `grantManagerRole` | Admin via `revokeManagerRole` | Executes strategy transactions on VaultAdapters via `SmartAdapterAccount._authorizeExecute`. Expected holder: strategy execution service. |
+
+### Role-escalation boundaries (must never be violated)
+
+1. Admin MUST NOT be able to grant ADMIN, EMERGENCY_ADMIN, GUARDIAN, or Owner. Only Owner can.
+2. Vendor MUST NOT be able to grant anything other than INSTITUTION.
+3. No role can self-escalate (grant itself a higher role).
+4. `renounceRoles` MUST NOT allow renouncing critical roles (ADMIN, EMERGENCY_ADMIN, GUARDIAN) — override `renounceRoles` in kRegistry to block these, and in kToken to prevent frozen accounts from shedding the freeze role.
+
+### Role initialization in `kBaseRoles.__kBaseRoles_init`
+
+```
+_initializeOwner(_owner)
+_grantRoles(_admin, ADMIN_ROLE)
+_grantRoles(_admin, VENDOR_ROLE)         // admin starts as vendor too
+_grantRoles(_emergencyAdmin, EMERGENCY_ADMIN_ROLE)
+_grantRoles(_guardian, GUARDIAN_ROLE)
+_grantRoles(_relayer, RELAYER_ROLE)
+_grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 ```
 
-Implementation PRs should link to the relevant spec and include tests for the listed invariants and failure modes.
+**Design note**: The dual-role grants (`admin+vendor`, `relayer+manager`) are convenience defaults for initial deployment. In production, these should be separated to distinct addresses for proper separation of duties.
 
-## Review Checklist
+---
 
-Before merging security-sensitive changes, reviewers should confirm:
+## 3. Pause Model
 
-- The behavior is specified.
-- The spec and implementation match.
-- Roles are least-privilege and tested.
-- Pause behavior is covered.
-- State transitions reject invalid states.
-- Accounting uses canonical helpers and documented rounding.
-- Events include enough data for monitoring.
-- External calls are validated and revert data is preserved where useful.
-- Reentrancy assumptions are tested.
-- Upgrade and storage-layout implications are reviewed.
-- Tests include positive, negative, boundary, and adversarial cases.
-- Any accepted centralization risk is documented.
+### Pause layers
+
+| Layer | Storage location | Set by | Checked by |
+|-------|-----------------|--------|-----------|
+| Global pause | `kRegistry.kRegistryStorage.globalPaused` | `EMERGENCY_ADMIN` via `kRegistry.setGlobalPause(true)` | Every contract via `_registry().isGlobalPaused()` |
+| kBase local pause | `kBase.kBaseStorage.paused` | `EMERGENCY_ADMIN` via `kBase.setPaused(true)` on each contract | `kBase._isPaused()` returns `$.paused \|\| _registry().isGlobalPaused()` |
+| BaseVault packed pause | Bit 1 of `BaseVaultStorage.config` | `EMERGENCY_ADMIN` via BaseVault | `BaseVault._getPaused($)` returns `(config >> PAUSED_SHIFT & PAUSED_MASK) != 0 \|\| registry.isGlobalPaused()` |
+| VaultAdapter pause | `VaultAdapterStorage.paused` | `EMERGENCY_ADMIN` via `VaultAdapter.setPaused(true)` | `VaultAdapter._checkPaused($)` — local only, does NOT check global |
+
+### Pause matrix — which operations are blocked
+
+| Contract | Function | Pause check | Global? | Notes |
+|----------|----------|------------|---------|-------|
+| kMinter | `mint` | `_checkNotPaused()` → `_isPaused()` | Yes | Blocks institutional minting |
+| kMinter | `burn` | `_checkNotPaused()` → `_isPaused()` | Yes | Blocks institutional redemption requests |
+| kMinter | `createNewBatch` | None | — | Relayer-only, no pause gate |
+| kMinter | `closeBatch` | None | — | Relayer-only, no pause gate |
+| kMinter | `settleBatch` | None | — | Router-only, no pause gate (deliberate: allows draining pending batches) |
+| kMinter | `isPaused()` (view) | **INCONSISTENCY**: returns `_getBaseStorage().paused` only | **No** | Does not reflect global pause. Fix: change to `return _isPaused();` (improvement plan Phase 4 item 9) |
+| kAssetRouter | `proposeSettleBatch` | `_checkPaused()` → `_isPaused()` | Yes | Blocks new proposals |
+| kAssetRouter | `executeSettleBatch` | `_checkPaused()` → `_isPaused()` | Yes | Blocks execution |
+| kAssetRouter | `cancelProposal` | `_checkPaused()` → `_isPaused()` | Yes | Blocks cancellation during pause — intentional or not? Consider allowing guardian to cancel even during pause |
+| kStakingVault | `stake` | `_checkNotPaused()` | Yes (via BaseVault) | Blocks retail deposits |
+| kStakingVault | `unstake` | `_checkNotPaused()` | Yes (via BaseVault) | Blocks retail withdrawal requests |
+| kStakingVault | `claimStakedShares` | `_checkNotPaused()` | Yes (via BaseVault) | Blocks claim. Consider: should settled claims be claimable even while paused? |
+| kStakingVault | `claimUnstakedAssets` | `_checkNotPaused()` | Yes (via BaseVault) | Same consideration as above |
+| kStakingVault | `settleBatch` | None | — | Router-only, no pause gate |
+| VaultAdapter | `execute` | `_checkPaused($)` — local only | **No** | Does not check global pause. Fix: add `require(!IkRegistry(registry).isGlobalPaused())` |
+| VaultAdapter | `pull` | Router-only, no pause check | — | |
+| VaultAdapter | `setTotalAssets` | Router-only, no pause check | — | |
+
+### Pause invariants
+
+1. **Global pause halts all user-facing state changes** except `rescueAssets` and `rescueETH` (admin-only recovery).
+2. **Local pause is additive**: contract X can be paused while the rest of the protocol runs.
+3. **Settlement completion is not paused**: `settleBatch` on kMinter and kStakingVault has no pause check, which is intentional — pending settlements must complete to avoid stuck funds.
+4. **VaultAdapter.execute must also respect global pause** — currently it does not. (Fix required — improvement plan Phase 8)
+5. **`isPaused()` view functions must match enforcement**: kMinter's `isPaused()` must return `_isPaused()`, not just `$.paused`. (Fix required — improvement plan Phase 4 item 9)
+
+---
+
+## 4. Batch Lifecycle
+
+### State machine
+
+```
+                  createNewBatch()              closeBatch()
+   (no batch) ─────────────────► OPEN ────────────────────► CLOSED
+                                  │                           │
+                                  │   Users: mint/burn        │   proposeSettleBatch
+                                  │          stake/unstake    │   (kAssetRouter)
+                                  │                           │
+                                  │                           ▼
+                                  │                      PROPOSED
+                                  │                      (cooldown)
+                                  │                           │
+                                  │                           │ executeSettleBatch
+                                  │                           ▼
+                                  │                      SETTLED
+                                  │                           │
+                                  │                           │ Users: claimStakedShares
+                                  │                           │        claimUnstakedAssets
+                                  │                           │        claimBurnedAssets
+```
+
+### Invariants for batch lifecycle
+
+1. **Monotonic transitions**: `OPEN → CLOSED → SETTLED`. No state can go backward.
+   - Enforced by: `isClosed` and `isSettled` booleans, checked with `require(!isClosed)` and `require(!isSettled)`.
+2. **No orphaned batches**: `createNewBatch` MUST revert if `currentBatchId` points to an open batch.
+   - Enforced by: `require($.batches[currentBatch].isClosed)` guard in `_createNewBatch`.
+3. **One proposal per vault-asset at a time** (kMinter), **one proposal per vault** (kStakingVault).
+   - Enforced by: `$.vaultPendingProposalIds[_vault].length()` checks in `proposeSettleBatch` (~line 278-290).
+4. **Batch ID uniqueness**: IDs are hashed from `(address(this), counter, chainid, timestamp, asset)`.
+   - Collision risk is negligible because `counter` is monotonically incremented per asset (kMinter) or globally (kStakingVault).
+5. **Settlement totalAssets comes from off-chain**: The relayer passes `_totalAssets` to `proposeSettleBatch`. The protocol trusts this value subject to `maxAllowedDelta` tolerance.
+   - If `abs(yield)` exceeds `maxAllowedDelta * lastTotalAssets / MAX_BPS`, the proposal requires GUARDIAN approval.
+
+### kMinter batch fields (`IkMinter.BatchInfo`)
+
+| Field | Type | Set when |
+|-------|------|----------|
+| `batchId` | `bytes32` | `_createNewBatch` |
+| `asset` | `address` | `_createNewBatch` |
+| `batchReceiver` | `address` | `_createBatchReceiver` (lazy, on first burn in batch) |
+| `isClosed` | `bool` | `closeBatch` |
+| `isSettled` | `bool` | `settleBatch` |
+| `depositedInBatch` | `uint128` | Incremented by `mint` |
+| `requestedSharesInBatch` | `uint128` | Incremented by `burn` |
+
+### kStakingVault batch fields (`BaseVaultTypes.BatchInfo`)
+
+| Field | Type | Set when |
+|-------|------|----------|
+| `batchReceiver` | `address` | Not used (always `address(0)` for staking vaults) |
+| `isClosed` | `bool` | `closeBatch` |
+| `isSettled` | `bool` | `settleBatch` |
+| `batchId` | `bytes32` | `_createNewBatch` |
+| `depositedInBatch` | `uint128` | Incremented by `stake` |
+| `requestedSharesInBatch` | `uint128` | Incremented by `unstake` |
+| `totalAssets` | `uint256` | Snapshot at settlement (gross, before fees) |
+| `totalNetAssets` | `uint256` | Snapshot at settlement (after fees) |
+| `totalSupply` | `uint256` | Snapshot at settlement |
+
+**Design note**: `totalAssets` and `totalSupply` snapshots are critical for claim conversion. `claimStakedShares` and `claimUnstakedAssets` use these snapshots (not live values) to compute the exact amount each user receives, ensuring `sum(individual claims) <= total reserved amount`.
+
+---
+
+## 5. Settlement Lifecycle
+
+### Proposal struct (`IkAssetRouter.VaultSettlementProposal`)
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `asset` | `address` | The underlying asset |
+| `vault` | `address` | kMinter or kStakingVault |
+| `adapter` | `address` | Cached at proposal time to prevent registry changes from breaking execution |
+| `batchId` | `bytes32` | The batch being settled |
+| `totalAssets` | `uint256` | New total assets (adjusted for netted deposits/withdrawals) |
+| `netted` | `int256` | `deposits - withdrawals` for the batch |
+| `yield` | `int256` | `newTotalAssets - lastVirtualBalance` |
+| `executeAfter` | `uint64` | `block.timestamp + vaultSettlementCooldown` |
+| `requiresApproval` | `bool` | True if yield exceeds `maxAllowedDelta` |
+
+### Settlement flow
+
+1. **Propose** (`proposeSettleBatch`): Relayer submits `(asset, vault, batchId, totalAssets)`. Router computes `netted`, `yield`, checks tolerance, caches adapter, sets cooldown. Gas: ~120k.
+2. **Cooldown**: `executeAfter` must pass. During this window, guardian can `approveProposal` or `cancelProposal`.
+3. **Approve** (optional): If `requiresApproval`, guardian must call `approveProposal(_proposalId)` before execution.
+4. **Execute** (`executeSettleBatch`): Relayer calls after cooldown. Router:
+   - Calls `vault.settleBatch(_batchId)` which handles fee accrual, share minting/burning, and balance snapshots.
+   - Handles physical asset movement: if `netted > 0` (net inflow), transfers assets from vault to adapter. If `netted < 0` (net outflow), pulls from adapter.
+   - Distributes yield to treasury and insurance per `treasuryBps` and `insuranceBps`.
+   - Updates virtual balance: `$.virtualBalances[_vault][_asset] = proposal.totalAssets`.
+   - Moves proposal to `executedProposalIds` set.
+
+### Settlement invariants
+
+1. **Virtual balance matches adapter value** (approximately): `virtualBalances[vault][asset] ≈ adapter.lastTotalAssets`. Discrepancy is bounded by `maxAllowedDelta`.
+2. **Proposal executed exactly once**: `executedProposalIds` is an enumerable set, `proposalId` is checked against it before execution.
+3. **Adapter address frozen at proposal time**: `proposal.adapter` is cached at creation. Even if the admin changes the adapter mapping in kRegistry during cooldown, execution uses the cached address.
+4. **Fee parameters should ideally be frozen at proposal time** — consider snapshotting fee config in the `VaultSettlementProposal` struct at proposal creation so that admin changes during the cooldown window cannot affect the in-flight settlement.
+5. **Net yield never exceeds actual adapter returns**: `_yield = _totalAssets - _lastTotalAssets` where `_lastTotalAssets = virtualBalances[vault][asset]` (the previous settlement's total).
+
+---
+
+## 6. Fee Model
+
+### Fee types
+
+| Fee | Computed in | Formula | Recipient |
+|-----|------------|---------|-----------|
+| Management fee | `VaultMathLib.computeManagementFee` → called from `BaseVault._accrueFees` → called from `kStakingVault.settleBatch` | `totalAssets * elapsed * managementFee / (SECS_PER_YEAR * MAX_BPS)` | Treasury (minted as stkToken shares) |
+| Performance fee (hard hurdle) | `VaultMathLib.computePerformanceFee` → called from `kStakingVault.settleBatch` | `excessAboveHurdle * performanceFee / MAX_BPS` | Treasury (minted as stkToken shares) |
+| Performance fee (soft hurdle) | Same path | `totalInterest * performanceFee / MAX_BPS` (if return > hurdle) | Treasury (minted as stkToken shares) |
+| Yield split — treasury | `kAssetRouter._executeSettlement` | `yieldForTreasury = yield * treasuryBps / MAX_BPS` | Treasury address from registry |
+| Yield split — insurance | `kAssetRouter._executeSettlement` | `yieldForInsurance = yield * insuranceBps / MAX_BPS` | Insurance address from registry |
+
+### Fee invariants
+
+1. **Management fee is always ≥ 0**: `elapsed ≥ 0`, `managementFee ≥ 0`, `totalAssets ≥ 0`.
+2. **Performance fee is 0 when interest ≤ hurdle return**: `if (_interest <= hurdleReturn) return 0;` in `VaultMathLib.computePerformanceFee` line 75.
+3. **Fee shares can never exceed total supply**: management fee shares are minted proportionally. Performance fee shares are computed using `_convertToSharesWithTotals` which divides by `(totalAssets + VIRTUAL_ASSETS)`.
+4. **Fee parameters are bounded**: `managementFee ≤ MAX_BPS`, `performanceFee ≤ MAX_BPS`, enforced by `require(_fee <= MAX_BPS, VAULTFEES_FEE_EXCEEDS_MAXIMUM)` in `setManagementFee` and `setPerformanceFee`.
+5. **Hurdle rate is annualized**: `hurdleReturn = previousTotalAssets * hurdleRate * elapsed / (SECS_PER_YEAR * MAX_BPS)`.
+6. **Fee timestamp is advanced on every fee accrual**: `_setLastFeeTimestamp($, uint64(block.timestamp))` to prevent double-counting.
+7. **Fee parameter changes accrue pending fees first**: `setManagementFee` and `setPerformanceFee` call `_accrueFees()` + `_mintManagementFees()` before updating the rate. Implemented in commit `f020291`.
+
+### Fee parameter storage
+
+- **Management fee**: packed into `BaseVaultStorage.config` (bits at `MANAGEMENT_FEE_SHIFT`), per-vault.
+- **Performance fee**: packed into `BaseVaultStorage.config` (bits at `PERFORMANCE_FEE_SHIFT`), per-vault.
+- **Hurdle rate**: stored in kRegistry via `setHurdleRate(vault, rate)`, read by vault at settlement.
+- **Hard/soft hurdle flag**: stored in kRegistry via `setIsHardHurdleRate(vault, bool)`.
+- **Treasury/insurance BPS**: stored in kRegistry (`treasuryBps`, `insuranceBps`), applied in kAssetRouter.
+- **Treasury/insurance addresses**: stored in kRegistry (`treasury`, `insurance`).
+
+---
+
+## 7. Adapter and External Execution Model
+
+### Architecture
+
+```
+Manager (EOA/Service)
+    │
+    │ calls execute(target, value, data)
+    ▼
+VaultAdapter (proxy)
+    │ inherits SmartAdapterAccount
+    │ _authorizeExecute → registry.isManager(msg.sender)
+    │
+    ├──► _checkPaused (local only — TODO: add global check)
+    │
+    └──► MinimalSmartAccount._execute(target, value, data)
+              │
+              │ before execution:
+              ├──► registry.authorizeCall(executor, target, selector, params)
+              │         │
+              │         ├──► check allowedSelectors[executor][target][selector]
+              │         ├──► check targetType-level selectors
+              │         └──► if validator configured: validator.authorizeCall(executor, target, selector, params)
+              │
+              └──► target.call{value}(data)
+```
+
+### Allowlist layers
+
+1. **Executor-target-selector allowlist**: `ExecutionGuardianModule.allowedSelectors[executor][target][selector]` — must be `true`.
+2. **Target-type-selector allowlist**: `ExecutionGuardianModule.targetTypeSelectors[targetType][selector]` — alternative path.
+3. **Parameter validator** (optional): If `executionValidators[target]` is set, the validator's `authorizeCall` is invoked for deeper parameter checking.
+
+### `ERC20ExecutionValidator` (`src/adapters/parameters/ERC20ExecutionValidator.sol`)
+
+Validates ERC20 `transfer`, `transferFrom`, and `approve` calls:
+
+| Selector | Validations |
+|----------|------------|
+| `transfer(address,uint256)` | Receiver allowlisted per token, cumulative block amount ≤ `maxSingleTransfer` |
+| `transferFrom(address,address,uint256)` | Source and receiver allowlisted per token, cumulative block amount ≤ `maxSingleTransfer` |
+| `approve(address,uint256)` | Spender allowlisted per token |
+| Any other selector | Reverts with `EXECUTIONVALIDATOR_SELECTOR_NOT_ALLOWED` |
+
+### Adapter security invariants
+
+1. **Only MANAGER can trigger execution**: `SmartAdapterAccount._authorizeExecute` → `registry.isManager(user)`.
+2. **Only allowed selectors can be called**: Checked by `ExecutionGuardianModule.authorizeCall`.
+3. **Validator configuration is ADMIN-only**: `ERC20ExecutionValidator.setAllowedReceiver`, `setAllowedSource`, `setAllowedSpender`, `setMaxSingleTransfer` all call `_checkAdmin(msg.sender)`.
+4. **Adapter state is managed only by kAssetRouter**: `setTotalAssets` and `pull` both verify `msg.sender == K_ASSET_ROUTER` via `_checkRouter`.
+5. **Adapter pause is EMERGENCY_ADMIN-only**: `VaultAdapter.setPaused` checks `registry.isEmergencyAdmin(msg.sender)`.
+
+### Missing: Global pause on adapter execution
+
+`VaultAdapter._authorizeExecute` calls `_checkPaused($)` which only checks `VaultAdapterStorage.paused`. It does NOT check `registry.isGlobalPaused()`. Fix:
+
+```solidity
+function _authorizeExecute(address user) internal override {
+    VaultAdapterStorage storage $ = _getVaultAdapterStorage();
+    require(!$.paused && !IkRegistry(address(_getMinimalAccountStorage().registry)).isGlobalPaused(), VAULTADAPTER_IS_PAUSED);
+    super._authorizeExecute(user);
+}
+```
+
+---
+
+## 8. Virtual Balance Accounting
+
+### How it works
+
+Each vault-asset pair has a `virtualBalance` stored in `kAssetRouter.kAssetRouterStorage.virtualBalances[vault][asset]`. This tracks how many assets are logically assigned to a vault, without requiring physical token movement until settlement.
+
+### Update points
+
+| Event | Virtual balance change |
+|-------|----------------------|
+| First vault registration | Set to 0 |
+| `executeSettleBatch` completes | Set to `proposal.totalAssets` (the adjusted new total) |
+| `cancelProposal` | No change (proposal never executed) |
+
+### Virtual balance invariant
+
+```
+virtualBalances[vault][asset] == adapter.lastTotalAssets
+```
+
+This should hold after every successful settlement. Between settlements, the adapter's actual strategy value may diverge (due to DeFi yields/losses), but the virtual balance is only updated at settlement.
+
+### Effective virtual balance during pending proposals
+
+For kMinter vaults with multiple assets, there can be one pending proposal per asset simultaneously. The `_effectiveVirtualBalanceInt` function iterates all pending proposals for a vault to compute the "what-if" balance assuming all pending proposals execute:
+
+```
+effectiveVB = virtualBalance + sum(proposal.netted for each pending proposal)
+```
+
+The global pending requests (`globalPendingRequests[vault][asset]`) track burn requests that have been filed but not yet proposed. At proposal time:
+
+```
+globalPendingAfterProposal = globalPendingBefore - requestedInBatch
+effectiveVirtualBalanceAfterProposal >= globalPendingAfterProposal
+```
+
+This ensures the protocol never promises more redemptions than it can cover.
+
+---
+
+## 9. Request and Claim Model
+
+### kMinter (institutional)
+
+**Mint flow**: `institution → mint(asset, amount, recipient)` → immediately mints kTokens 1:1 and records deposit in current batch.
+
+**Burn flow**: `institution → burn(asset, amount, recipient)` → locks kTokens, creates `BurnRequest` with status `PENDING`, records in current batch.
+
+**Claim flow**: After batch is settled and kAssetRouter executes settlement, the `batchReceiver` contract holds the underlying assets. Institution calls `kMinter.claimBurnedAssets(requestId)` which:
+1. Verifies batch is settled
+2. Verifies request status is PENDING
+3. Transfers underlying from batchReceiver to recipient
+4. Sets status to REDEEMED
+
+### kStakingVault (retail)
+
+**Stake flow**: `user → stake(kTokenAmount, recipient)` → transfers kTokens to vault, creates `StakeRequest` with status `PENDING`, increments `depositedInBatch`.
+
+**Unstake flow**: `user → unstake(stkTokenAmount, recipient)` → transfers stkTokens to vault (self-custody), creates `UnstakeRequest` with status `PENDING`, increments `requestedSharesInBatch`.
+
+**Claim stake flow**: After batch settlement, `user → claimStakedShares(requestId)` → uses batch snapshot (`totalAssets`, `totalSupply`) to convert kTokens to stkTokens, transfers stkTokens to recipient. Status → CLAIMED.
+
+**Claim unstake flow**: After batch settlement, `user → claimUnstakedAssets(requestId)` → uses batch snapshot to convert stkTokens to kTokens, transfers kTokens to recipient. Status → CLAIMED.
+
+### Request invariants
+
+1. **Request IDs are unique per vault**: generated from `keccak256(user, amount, counter, timestamp, chainid, ...)`.
+2. **Each request belongs to exactly one batch**: `request.batchId` is set at creation and never changes.
+3. **Claims can only happen after settlement**: `require(batch.isSettled)`.
+4. **Claims are idempotent**: `require(request.status == PENDING)` and status is set to CLAIMED atomically.
+5. **Zero-initialized requests must be distinguishable from valid PENDING requests**: Currently `RequestStatus.PENDING == 0`, which means zero-init looks valid. Fix: add `UNDEFINED = 0` variant (improvement plan Phase 4, items 4-5).
+
+---
+
+## 10. Upgrade Safety
+
+### UUPS contracts
+
+All upgradeable contracts use Solady's `UUPSUpgradeable` with `_authorizeUpgrade` restricted to `onlyOwner`.
+
+### Upgrade invariants
+
+1. **Storage layout must be append-only**: New fields go at the end of the ERC-7201 struct. Never reorder, remove, or change types of existing fields.
+2. **ERC-7201 location constants must be correct**: Computed as `keccak256(abi.encode(uint256(keccak256(namespace)) - 1)) & ~bytes32(uint256(0xff))`. Regression test recommended (improvement plan Phase 9).
+3. **Initializer must not be re-callable**: `_disableInitializers()` in constructor + Solady's `Initializable` guard.
+4. **MultiFacetProxy function table is upgrade-sensitive**: Adding/removing delegated selectors on kStakingVault must be coordinated with UUPS upgrades. If a new implementation removes a function that was delegated, the proxy table entry becomes a dangling pointer.
+
+### MultiFacetProxy safety
+
+- `addFunction(selector, impl, forceOverride)` must validate `impl` is a non-zero contract address (not `address(this)`, and has `code.length > 0`).
+- `removeFunction` silently succeeds if the selector was never registered — this is safe but should emit an event for monitoring.
+- `getImplementation(selector)` should exist as a view function for debugging and monitoring.
+
+---
+
+## 11. Token Onboarding Security
+
+### Adding a new asset
+
+1. Admin calls `kRegistry.addAsset(assetName, assetAddress, kTokenAddress)`.
+2. Admin calls `kRegistry.registerVault(vault, asset, type, ...)` to associate a vault with the asset.
+3. Admin calls `kRegistry.registerAdapter(vault, asset, adapter)` to set the adapter.
+4. Admin calls `kAssetRouter.setMaxAllowedDelta(vault, bps)` to set the yield tolerance.
+5. Relayer calls `kMinter.createNewBatch(asset)` or batch is auto-created during `registerVault`.
+
+### Onboarding invariants
+
+1. **Asset address must be non-zero and must be an ERC20**: No on-chain code-length check currently exists. Consider adding `require(asset.code.length > 0)`.
+2. **kToken must match the asset**: `kRegistry.getKTokenForAsset(asset)` must return the correct kToken. Misconfiguration here would allow minting the wrong kToken for an asset.
+3. **Adapter must be initialized with the correct registry**: `VaultAdapter.initialize(registry, ...)`. A mismatched registry means role checks fail.
+4. **maxAllowedDelta must be set before first settlement**: Otherwise defaults to 0, which means any non-zero yield requires guardian approval. Consider bounding to `[10, 5000]` BPS to prevent accidental misconfiguration.
+
+---
+
+## 12. Incident Response Procedures
+
+### Scenario: Suspicious adapter activity
+
+1. EMERGENCY_ADMIN calls `VaultAdapter.setPaused(true)` on the specific adapter.
+2. EMERGENCY_ADMIN calls `kRegistry.setGlobalPause(true)` if the threat is systemic.
+3. GUARDIAN calls `kAssetRouter.cancelProposal(proposalId)` for any pending proposals involving the adapter.
+4. ADMIN investigates and either:
+   - Unpauses after confirming safety, or
+   - Calls `kRegistry.removeAdapter(vault, asset)` to deregister the adapter.
+5. EMERGENCY_ADMIN calls `kRegistry.setGlobalPause(false)` to resume.
+
+### Scenario: Compromised relayer key
+
+1. ADMIN calls `kRegistry.revokeRelayerRole(compromisedAddress)`.
+2. ADMIN calls `kRegistry.grantRelayerRole(newAddress)`.
+3. Any proposals created by the compromised relayer during the window are reviewed by GUARDIAN before approval.
+4. No retroactive damage: relayer cannot steal funds (only create batches and propose settlements, both of which require cooldown + guardian approval for large amounts).
+
+### Scenario: Compromised admin key
+
+1. OWNER calls `kRegistry.revokeAdminRole(compromisedAddress)`.
+2. OWNER reviews all recent admin actions: fee changes, vault registrations, adapter changes, treasury/insurance changes.
+3. OWNER reverts any malicious configuration changes.
+4. If admin changed treasury to attacker address, any yield distributed to that address during the window is lost — monitoring should catch `TreasurySet` events within minutes.
+
+### Scenario: Need emergency asset recovery
+
+1. ADMIN calls `kBase.rescueAssets(asset, to, amount)` — only works for non-protocol assets (reverts if `asset` is a registered protocol asset).
+2. ADMIN calls `kBase.rescueETH(to, amount)` — for stuck ETH.
+3. On VaultAdapter: `rescueAssets(asset, to, amount)` restricted to ADMIN, but CAN rescue any asset (including strategy assets) — this is intentional for emergency recovery.
+
+---
+
+## 13. External Dependencies
+
+| Dependency | Version | Usage | Trust assumption |
+|-----------|---------|-------|-----------------|
+| Solady `OptimizedOwnableRoles` | vendored in `src/vendor/solady/` | Role management for kBaseRoles, kRegistry | Trusted. Code is vendored and audited. |
+| Solady `UUPSUpgradeable` | vendored | Upgrade mechanism | Trusted. |
+| Solady `OptimizedFixedPointMathLib` | vendored | `fullMulDiv` in VaultMathLib | Trusted. Overflow-safe math. |
+| Solady `SafeTransferLib` | vendored | Token transfers | Trusted. Handles non-standard ERC20 returns. |
+| Solady `OptimizedReentrancyGuardTransient` | vendored | Reentrancy protection on kBase | Trusted. Uses transient storage (EIP-1153). |
+| Solady `Initializable` | vendored | One-time initialization | Trusted. |
+| Solady `EnumerableSetLib` | vendored | Proposal ID tracking, adapter sets | Trusted. |
+| kToken0 (external repo) | separate package | kToken ERC20 implementation | Must be co-audited. Freeze/blacklist behavior must align with this spec. |
+
+---
+
+## 14. Specification Workflow for Future Changes
+
+When proposing a protocol change, follow this sequence:
+
+1. **Spec update**: Add a section to this document describing the new invariant, role change, or state transition.
+2. **Test first**: Write a failing test that asserts the new behavior.
+3. **Implement**: Write the minimal code change to make the test pass.
+4. **Invariant test**: Add an invariant property if the change affects accounting, roles, or state machines.
+5. **Pause matrix update**: If the change adds a new external function, add it to the pause matrix in section 3.
+6. **Role matrix update**: If the change adds a new role-gated function, add it to the role table.
+7. **Review**: At least one team member reviews the spec diff alongside the code diff.
