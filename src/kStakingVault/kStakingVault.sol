@@ -353,6 +353,28 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     }
 
     /// @inheritdoc IVaultBatch
+    /// @dev CALL CONTRACT — DO NOT REORDER. Each step depends on state mutated by the previous
+    ///      step; reordering produces silent fee-math errors (zero-duration hurdle returns,
+    ///      double-charging of management fees as yield, stale settlement baselines).
+    ///
+    ///   1. Capture `_settlementElapsed` BEFORE `_accrueFees()` advances `_lastFeeTimestamp`.
+    ///      If this capture happens after the accrual, elapsed = 0 and the performance-fee
+    ///      hurdle return collapses to zero, charging perf-fee on the entire interest.
+    ///   2. `_accrueFees()` computes the management fee on pre-yield total assets and advances
+    ///      `_lastFeeTimestamp`. Returns the management-fee amount in asset terms.
+    ///   3. Compute net interest as
+    ///         `_currentBalance - _previousBalance - _mgmtFeeAssets`
+    ///      so the management fee is removed from the perf-fee base. Without this subtraction
+    ///      the management-fee charge appears as "yield" and is performance-fee'd a second time.
+    ///   4. Mint management-fee shares (`_mintManagementFees`).
+    ///   5. Compute performance fee using the captured elapsed and the net interest, against
+    ///      `_previousBalance` as the hurdle baseline.
+    ///   6. Mint performance-fee shares.
+    ///   7. Process pending stake/unstake at `_totalAssets()` / `totalSupply()`. These values
+    ///      include the just-minted fee shares — that is intentional: stakers join at the
+    ///      post-fee rate.
+    ///   8. Snapshot `_lastSettlementBalance = _totalBalance()` LAST so the next settlement's
+    ///      interest baseline is correct.
     function settleBatch(bytes32 _batchId) external {
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
