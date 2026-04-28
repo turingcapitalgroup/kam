@@ -15,6 +15,7 @@ import {
     KASSETROUTER_BATCH_ID_PROPOSED,
     KASSETROUTER_COOLDOWN_IS_UP,
     KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD,
+    KASSETROUTER_INSUFFICIENT_ACTIVE_ASSETS,
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_INVALID_COOLDOWN,
     KASSETROUTER_IS_PAUSED,
@@ -537,6 +538,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                     IkStakingVault(_vault).increaseBalance(_absYield.toUint128());
                 } else {
                     uint256 _absYield = _yield.abs();
+                    require(_absYield <= IkStakingVault(_vault).totalAssets(), KASSETROUTER_INSUFFICIENT_ACTIVE_ASSETS);
                     IkToken(_kToken).burn(_vault, _absYield);
                     IkStakingVault(_vault).decreaseBalance(_absYield.toUint128());
                 }
