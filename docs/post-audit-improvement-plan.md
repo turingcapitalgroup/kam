@@ -14,7 +14,7 @@ All numbered security findings (TOB-KAM-1 through 38) have already been fixed an
 
 **Source**: Recommendations ("Redesign the watermark and fee accounting"), Codebase Maturity — Arithmetic ("Moderate").
 
-**Problem**: Fee computations exist in three separate locations — the kSettler, the vault's ReaderModule, and the kAssetRouter — each reading inputs at different points in the settlement flow. This redundancy makes it difficult to reason about correctness and increases the risk of future regressions. Rounding direction is not documented or consistently enforced across share conversion paths, and `zeroFloorSub` in kMinter silently floors accounting underflows to zero rather than reverting.
+**Problem**: Fee computations exist in three separate locations — the kSettler, the vault's ReaderModule, and the kAssetRouter — each reading inputs at different points in the settlement flow. This redundancy makes it difficult to reason about correctness and increases the risk of future regressions. Rounding direction is not documented or consistently enforced across share conversion paths.
 
 **Already fixed on this branch**: `setManagementFee` and `setPerformanceFee` now call `_accrueFees()` + `_mintManagementFees()` before changing the rate (commit `f020291`).
 
@@ -31,16 +31,6 @@ All numbered security findings (TOB-KAM-1 through 38) have already been fixed an
    - `convertToAssets` rounds **down** (favors the vault).
    - Management fee rounds **down** (favors users).
    - Performance fee rounds **down** (favors users).
-
-5. **Replace silent floors with reverts**: In `kMinter.settleBatch` (~line 303), `OptimizedFixedPointMathLib.zeroFloorSub` is used for `totalLockedAssets`. If the subtraction underflows, the accounting has gone wrong and should revert rather than silently zero. Replace:
-
-```solidity
-// Old: silently floors to zero
-$.totalLockedAssets[_asset] =
-    OptimizedFixedPointMathLib.zeroFloorSub($.totalLockedAssets[_asset], _requestedShares);
-// New: revert on underflow
-$.totalLockedAssets[_asset] -= _requestedShares;
-```
 
 ### Tests
 
