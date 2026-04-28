@@ -6,7 +6,29 @@ import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMath
 
 /// @title VaultMathLib
 /// @notice Fee calculation and share conversion math for KAM vaults
-/// @dev Uses Solady OptimizedFixedPointMathLib for precision-safe fixed-point arithmetic.
+/// @dev Single source of truth for protocol fee/share math. All callers must route through
+///      this library — no caller is permitted to reimplement these formulas. Stateless
+///      (`internal pure`) so it has no upgrade story of its own.
+///
+///      ROUNDING CONTRACT (load-bearing — do not change without protocol-wide review):
+///        - convertToShares      rounds DOWN (favors the vault on deposit)
+///        - convertToAssets      rounds DOWN (favors the vault on withdrawal)
+///        - computeManagementFee rounds DOWN (favors users)
+///        - computePerformanceFee rounds DOWN (favors users)
+///      All four use Solady's `fullMulDiv`, which rounds toward zero (== down for non-negative
+///      operands).
+///
+///      VIRTUAL OFFSETS for inflation-attack resistance:
+///        - VIRTUAL_SHARES = VIRTUAL_ASSETS = 1e6, added to both sides of every conversion.
+///        - Effect: an attacker must inflate the share price by ~1e6× the victim's deposit
+///          before rounding becomes exploitable. Sized for 6-decimal assets (USDC, WBTC).
+///
+///      CALL CONTRACT for vault integrators:
+///        - Pass POST-MANAGEMENT-FEE total assets to computePerformanceFee, so performance
+///          fee is never charged on assets already deducted as management fee.
+///        - Call _accrueFees() before mutating fee rates; otherwise pending management fees
+///          would be re-priced at the new rate.
+///
 ///      Management fees are time-prorated on total assets, charged on every interaction.
 ///      Performance fees are charged on interest gains at settlement, with hurdle rate filtering.
 library VaultMathLib {
