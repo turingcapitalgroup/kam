@@ -81,11 +81,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// Prevents excessive delays that could harm user experience while maintaining security standards
     uint256 private constant MAX_VAULT_SETTLEMENT_COOLDOWN = 1 days;
 
-    /// @notice Default yield tolerance for settlement proposals (10%)
-    /// @dev Provides initial yield deviation threshold to prevent settlements with excessive yield changes
-    /// that could indicate errors in yield calculation or potential manipulation attempts
-    uint256 private constant DEFAULT_MAX_DELTA = 1000; // 10% in basis points
-
     /* //////////////////////////////////////////////////////////////
                             STORAGE LAYOUT
     //////////////////////////////////////////////////////////////*/
@@ -343,8 +338,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // Cache the adapter address at proposal creation time to prevent registry modification
         // from breaking execution. This ensures settlement can proceed even if vault/adapter
         // mappings are modified after proposal creation.
+        // `getAdapter` already reverts via _checkAddressNotZero on a missing/zero adapter.
         address _adapter = _registry().getAdapter(_vault, _asset);
-        _checkAddressNotZero(_adapter);
 
         // Compute execution time in the future
         uint256 _executeAfter;

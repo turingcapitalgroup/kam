@@ -520,14 +520,13 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         // Classify vault by type for routing logic
         $.vaultType[_vault] = _vaultType;
 
+        // Track in the global set; `add` is a no-op when the vault is already present
+        // (allowed for kMinter, which gets re-registered for additional assets).
+        $.allVaults.add(_vault);
+
         // Handle kMinter special case: create batch for each new asset
         if (_isKMinter) {
-            if (!_alreadyRegistered) {
-                $.allVaults.add(_vault);
-            }
             IkMinter(_vault).createNewBatch(_asset);
-        } else {
-            $.allVaults.add(_vault);
         }
 
         emit VaultRegistered(_vault, _asset, _type);
