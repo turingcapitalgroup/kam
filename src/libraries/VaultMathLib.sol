@@ -71,6 +71,8 @@ library VaultMathLib {
     /// @dev Called at settlement when totalAssets increases (yield realization). The hurdle rate
     ///      filters whether performance fees apply: returns must exceed the hurdle threshold.
     ///      Hard hurdle: fee only on excess above hurdle. Soft hurdle: fee on all return.
+    ///      Reverts with `VAULTMATHLIB_ZERO_ELAPSED` when `_elapsed == 0` and `_interest > 0`,
+    ///      preventing the silent hurdle bypass that would otherwise occur.
     /// @param _interest The interest gained (newTotalAssets - oldTotalAssets after management fees)
     /// @param _previousTotalAssets Total assets before the yield was added
     /// @param _performanceFee Performance fee rate in basis points
@@ -95,9 +97,7 @@ library VaultMathLib {
         // Reject zero-elapsed settlements: with elapsed = 0 the hurdle return collapses to 0,
         // silently bypassing the hurdle filter and charging fee on the entire interest.
         // Forces operators to never run settlement in the same block as a fee-rate change.
-        // The `_interest == 0` clause is unreachable today (line above early-returns), kept as
-        // defense-in-depth against future refactors that might remove the early return.
-        require(_interest == 0 || _elapsed != 0, VAULTMATHLIB_ZERO_ELAPSED);
+        require(_elapsed != 0, VAULTMATHLIB_ZERO_ELAPSED);
 
         // Calculate hurdle return: minimum return threshold for the period
         uint256 hurdleReturn = (_previousTotalAssets * _hurdleRate).fullMulDiv(_elapsed, SECS_PER_YEAR) / MAX_BPS;
