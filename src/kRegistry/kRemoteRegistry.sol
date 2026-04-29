@@ -51,7 +51,7 @@ contract kRemoteRegistry is IkRemoteRegistry, ExecutionGuardianModule, Initializ
     function setAllowedSelector(
         address _executor,
         address _target,
-        uint8 _targetType,
+        IExecutionGuardian.TargetType _targetType,
         bytes4 _selector,
         bool _isAllowed
     )

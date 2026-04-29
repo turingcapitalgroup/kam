@@ -26,7 +26,7 @@ contract kRemoteRegistryTest is Test {
 
     bytes4 public testSelector;
 
-    uint8 constant DEFAULT_TARGET_TYPE = 0;
+    IExecutionGuardian.TargetType constant DEFAULT_TARGET_TYPE = IExecutionGuardian.TargetType.METAWALLET;
 
     function setUp() public {
         owner = makeAddr("Owner");
