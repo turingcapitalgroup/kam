@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import { Test } from "forge-std/Test.sol";
 
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
+import { VAULTMATHLIB_ZERO_ELAPSED } from "kam/src/errors/Errors.sol";
 import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 
@@ -321,6 +322,7 @@ contract VaultMathLibFuzzTest is Test {
         excessReturn = uint128(bound(excessReturn, 1, type(uint128).max));
         performanceFee = uint16(bound(performanceFee, 1, MAX_BPS));
         hurdleRate = uint16(bound(hurdleRate, 0, MAX_BPS));
+        elapsed = uint32(bound(elapsed, 1, type(uint32).max));
 
         uint256 hurdleReturn = _hurdleReturn(previousTotalAssets, hurdleRate, elapsed);
         uint256 interest = hurdleReturn + excessReturn;
@@ -353,6 +355,7 @@ contract VaultMathLibFuzzTest is Test {
         excessReturn = uint128(bound(excessReturn, 1, type(uint128).max));
         performanceFee = uint16(bound(performanceFee, 1, MAX_BPS));
         hurdleRate = uint16(bound(hurdleRate, 0, MAX_BPS));
+        elapsed = uint32(bound(elapsed, 1, type(uint32).max));
 
         uint256 interest = _hurdleReturn(previousTotalAssets, hurdleRate, elapsed) + excessReturn;
 
@@ -378,12 +381,35 @@ contract VaultMathLibFuzzTest is Test {
         interest = uint128(bound(interest, 1, type(uint128).max));
         previousTotalAssets = uint128(bound(previousTotalAssets, 1, type(uint128).max));
         performanceFee = uint16(bound(performanceFee, 1, MAX_BPS));
+        elapsed = uint32(bound(elapsed, 1, type(uint32).max));
 
         assertEq(
             VaultMathLib.computePerformanceFee(
                 interest, previousTotalAssets, performanceFee, 0, isHardHurdleRate, elapsed
             ),
             uint256(interest) * performanceFee / MAX_BPS
+        );
+    }
+
+    function test_WhenElapsedIsZero(
+        uint128 interest,
+        uint128 previousTotalAssets,
+        uint16 performanceFee,
+        uint16 hurdleRate,
+        bool isHardHurdleRate
+    )
+        external
+        whenComputingPerformanceFees
+    {
+        // it reverts
+        interest = uint128(bound(interest, 1, type(uint128).max));
+        previousTotalAssets = uint128(bound(previousTotalAssets, 1, type(uint128).max));
+        performanceFee = uint16(bound(performanceFee, 1, MAX_BPS));
+        hurdleRate = uint16(bound(hurdleRate, 0, MAX_BPS));
+
+        vm.expectRevert(bytes(VAULTMATHLIB_ZERO_ELAPSED));
+        this.computePerformanceFeeExternal(
+            interest, previousTotalAssets, performanceFee, hurdleRate, isHardHurdleRate, 0
         );
     }
 
@@ -399,7 +425,9 @@ contract VaultMathLibFuzzTest is Test {
         performanceFee = uint16(bound(performanceFee, 1, MAX_BPS));
         vm.assume(uint256(interest) * performanceFee % MAX_BPS != 0);
 
-        uint256 result = VaultMathLib.computePerformanceFee(interest, 1, performanceFee, 0, false, 0);
+        // _elapsed = 1 (not 0) to satisfy the VAULTMATHLIB_ZERO_ELAPSED guard. With _hurdleRate = 0
+        // the elapsed term is zeroed in hurdleReturn anyway, so the result is unchanged.
+        uint256 result = VaultMathLib.computePerformanceFee(interest, 1, performanceFee, 0, false, 1);
         uint256 numerator = uint256(interest) * performanceFee;
 
         assertLt(result * MAX_BPS, numerator);

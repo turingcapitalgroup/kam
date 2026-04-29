@@ -356,12 +356,13 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     /// @inheritdoc IVaultBatch
     /// @dev CALL CONTRACT — DO NOT REORDER. Each step depends on state mutated by the previous
-    ///      step; reordering produces silent fee-math errors (zero-duration hurdle returns,
-    ///      double-charging of management fees as yield, stale settlement baselines).
+    ///      step; reordering produces silent fee-math errors (double-charging of management fees
+    ///      as yield, stale settlement baselines) or hard reverts (zero-duration settlements).
     ///
     ///   1. Capture `_settlementElapsed` BEFORE `_accrueFees()` advances `_lastFeeTimestamp`.
-    ///      If this capture happens after the accrual, elapsed = 0 and the performance-fee
-    ///      hurdle return collapses to zero, charging perf-fee on the entire interest.
+    ///      If this capture happens after the accrual, elapsed = 0 and `computePerformanceFee`
+    ///      reverts with `VAULTMATHLIB_ZERO_ELAPSED` (the library guard added to prevent the
+    ///      hurdle filter from being silently bypassed).
     ///   2. `_accrueFees()` computes the management fee on pre-yield total assets and advances
     ///      `_lastFeeTimestamp`. Returns the management-fee amount in asset terms.
     ///   3. Compute net interest as
