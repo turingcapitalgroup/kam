@@ -525,11 +525,10 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Authorizes contract upgrades
-    /// @dev Only callable by contract owner
-    /// @param _newImplementation New implementation address
-    function _authorizeUpgrade(address _newImplementation) internal view override {
+    /// @dev Only callable by contract owner. Solady's UUPSUpgradeable already rejects a zero
+    ///      implementation via the `proxiableUUID` staticcall in `upgradeToAndCall`.
+    function _authorizeUpgrade(address) internal view override {
         _checkOwner();
-        require(_newImplementation != address(0), KMINTER_ZERO_ADDRESS);
     }
 
     /* //////////////////////////////////////////////////////////////
