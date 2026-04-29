@@ -458,4 +458,71 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         assertEq(_exec2Selectors.length, 1);
         assertEq(_exec2Selectors[0], _selector2);
     }
+
+    /* //////////////////////////////////////////////////////////////
+                     GETEXECUTORTARGETSBYTYPE
+    //////////////////////////////////////////////////////////////*/
+
+    function test_GetExecutorTargetsByType_Empty_Returns_Empty() public view {
+        address[] memory _result = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
+        assertEq(_result.length, 0, "Empty executor should return empty array");
+    }
+
+    function test_GetExecutorTargetsByType_AllMatch() public {
+        address _t1 = makeAddr("T1");
+        address _t2 = makeAddr("T2");
+        bytes4 _s = bytes4(keccak256("f()"));
+
+        vm.startPrank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, _t1, TEST_TARGET_TYPE, _s, true);
+        guardianModule.setAllowedSelector(testExecutor, _t2, TEST_TARGET_TYPE, _s, true);
+        vm.stopPrank();
+
+        address[] memory _result = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
+        assertEq(_result.length, 2, "Both targets should be included");
+
+        bool _hasT1;
+        bool _hasT2;
+        for (uint256 _i; _i < _result.length; _i++) {
+            if (_result[_i] == _t1) _hasT1 = true;
+            if (_result[_i] == _t2) _hasT2 = true;
+        }
+        assertTrue(_hasT1 && _hasT2, "Result should include both T1 and T2");
+    }
+
+    function test_GetExecutorTargetsByType_NoneMatch_Returns_Empty() public {
+        address _t1 = makeAddr("T1");
+        bytes4 _s = bytes4(keccak256("f()"));
+
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, _t1, METAWALLET_TARGET_TYPE, _s, true);
+
+        address[] memory _result = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
+        assertEq(_result.length, 0, "No targets of TEST_TARGET_TYPE registered");
+    }
+
+    function test_GetExecutorTargetsByType_Mixed_FiltersCorrectly() public {
+        address _custodial1 = makeAddr("Custodial1");
+        address _custodial2 = makeAddr("Custodial2");
+        address _metawallet = makeAddr("Metawallet1");
+        bytes4 _s = bytes4(keccak256("f()"));
+
+        vm.startPrank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, _custodial1, TEST_TARGET_TYPE, _s, true);
+        guardianModule.setAllowedSelector(testExecutor, _metawallet, METAWALLET_TARGET_TYPE, _s, true);
+        guardianModule.setAllowedSelector(testExecutor, _custodial2, TEST_TARGET_TYPE, _s, true);
+        vm.stopPrank();
+
+        address[] memory _result = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
+        assertEq(_result.length, 2, "Should include only TEST_TARGET_TYPE targets");
+
+        bool _hasC1;
+        bool _hasC2;
+        for (uint256 _i; _i < _result.length; _i++) {
+            assertTrue(_result[_i] != _metawallet, "Result must not include metawallet");
+            if (_result[_i] == _custodial1) _hasC1 = true;
+            if (_result[_i] == _custodial2) _hasC2 = true;
+        }
+        assertTrue(_hasC1 && _hasC2, "Result should include both custodial targets");
+    }
 }
