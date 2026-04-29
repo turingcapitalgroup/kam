@@ -6,6 +6,7 @@ import { Extsload } from "uniswap/Extsload.sol";
 
 import { KSTAKINGVAULT_VAULT_SETTLED } from "kam/src/errors/Errors.sol";
 import { IModule } from "kam/src/interfaces/modules/IModule.sol";
+import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 
@@ -13,7 +14,7 @@ import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 /// @notice Contains fee, request, and auxiliary getters for the Staking Vault
 /// @dev Essential vault getters (totalAssets, sharePrice, conversions, batch info, etc.) live
 /// directly on kStakingVault. This module holds the remaining specialized readers.
-contract ReaderModule is BaseVault, Extsload, IModule {
+contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
 
     /* //////////////////////////////////////////////////////////////
