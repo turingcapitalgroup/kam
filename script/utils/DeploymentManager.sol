@@ -193,6 +193,7 @@ abstract contract DeploymentManager is Script {
         address WalletWBTC; // unused but kept for struct layout
         // Insurance
         address erc20ExecutionValidator;
+        address erc4626ExecutionValidator;
         address minimalSmartAccountImpl;
         address insuranceSmartAccount;
     }
@@ -257,6 +258,7 @@ abstract contract DeploymentManager is Script {
 
     // Insurance
     bytes32 internal constant JK_ERC20_EXECUTION_VALIDATOR = keccak256("erc20ExecutionValidator");
+    bytes32 internal constant JK_ERC4626_EXECUTION_VALIDATOR = keccak256("erc4626ExecutionValidator");
     bytes32 internal constant JK_MINIMAL_SMART_ACCOUNT_IMPL = keccak256("minimalSmartAccountImpl");
     bytes32 internal constant JK_INSURANCE_SMART_ACCOUNT = keccak256("insuranceSmartAccount");
 
@@ -569,6 +571,9 @@ abstract contract DeploymentManager is Script {
         output.contracts.metawalletWBTC = json.readAddress(".contracts.metawalletWBTC");
         output.contracts.WalletUSDC = json.readAddress(".contracts.WalletUSDC");
         output.contracts.erc20ExecutionValidator = json.readAddress(".contracts.erc20ExecutionValidator");
+        if (json.keyExists(".contracts.erc4626ExecutionValidator")) {
+            output.contracts.erc4626ExecutionValidator = json.readAddress(".contracts.erc4626ExecutionValidator");
+        }
         output.contracts.minimalSmartAccountImpl = json.readAddress(".contracts.minimalSmartAccountImpl");
         output.contracts.insuranceSmartAccount = json.readAddress(".contracts.insuranceSmartAccount");
 
@@ -666,6 +671,7 @@ abstract contract DeploymentManager is Script {
         else if (h == JK_METAWALLET_WBTC) output.contracts.metawalletWBTC = contractAddress;
         else if (h == JK_WALLET_USDC) output.contracts.WalletUSDC = contractAddress;
         else if (h == JK_ERC20_EXECUTION_VALIDATOR) output.contracts.erc20ExecutionValidator = contractAddress;
+        else if (h == JK_ERC4626_EXECUTION_VALIDATOR) output.contracts.erc4626ExecutionValidator = contractAddress;
         else if (h == JK_MINIMAL_SMART_ACCOUNT_IMPL) output.contracts.minimalSmartAccountImpl = contractAddress;
         else if (h == JK_INSURANCE_SMART_ACCOUNT) output.contracts.insuranceSmartAccount = contractAddress;
         // Support ExecutionGuardianModule key as alias for adapterGuardianModule
@@ -704,6 +710,7 @@ abstract contract DeploymentManager is Script {
         vm.serializeAddress(c, "metawalletWBTC", output.contracts.metawalletWBTC);
         vm.serializeAddress(c, "WalletUSDC", output.contracts.WalletUSDC);
         vm.serializeAddress(c, "erc20ExecutionValidator", output.contracts.erc20ExecutionValidator);
+        vm.serializeAddress(c, "erc4626ExecutionValidator", output.contracts.erc4626ExecutionValidator);
         vm.serializeAddress(c, "minimalSmartAccountImpl", output.contracts.minimalSmartAccountImpl);
         string memory contractsJson =
             vm.serializeAddress(c, "insuranceSmartAccount", output.contracts.insuranceSmartAccount);
@@ -1023,6 +1030,9 @@ abstract contract DeploymentManager is Script {
         }
         if (existing.contracts.erc20ExecutionValidator != address(0)) {
             console.log("ERC20ExecutionValidator:", existing.contracts.erc20ExecutionValidator);
+        }
+        if (existing.contracts.erc4626ExecutionValidator != address(0)) {
+            console.log("ERC4626ExecutionValidator:", existing.contracts.erc4626ExecutionValidator);
         }
         console.log("");
     }
