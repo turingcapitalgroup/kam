@@ -32,7 +32,7 @@ import {
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
-import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
+import { IkAssetRouter, ISettleBatch } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 
 import { kBase } from "kam/src/base/kBase.sol";
@@ -49,7 +49,7 @@ import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 /// system with unique IDs for each redemption. The contract enforces strict access control, ensuring only
 /// verified institutions can access these privileged operations while maintaining the security and integrity of
 /// the protocol's asset backing.
-contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, Ownable {
+contract kMinter is IkMinter, ISettleBatch, Initializable, UUPSUpgradeable, kBase, Extsload, Ownable {
     using SafeTransferLib for address;
     using OptimizedSafeCastLib for uint256;
     using OptimizedSafeCastLib for uint64;
@@ -292,7 +292,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
     }
 
     /// @inheritdoc IkMinter
-    function settleBatch(bytes32 _batchId) external {
+    function settleBatch(bytes32 _batchId) external override(IkMinter, ISettleBatch) {
         _checkRouter(msg.sender);
         kMinterStorage storage $ = _getkMinterStorage();
         require($.batches[_batchId].isClosed, KMINTER_BATCH_NOT_CLOSED);

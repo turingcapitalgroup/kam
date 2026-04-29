@@ -12,7 +12,7 @@ import { Initializable } from "solady/utils/Initializable.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
-import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
+import { IkAssetRouter, ISettleBatch } from "kam/src/interfaces/IkAssetRouter.sol";
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces/IVault.sol";
@@ -59,7 +59,7 @@ import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 /// kAssetRouter for asset flow coordination and yield distribution. Gas optimizations include packed storage,
 /// minimal proxy deployment for batch receivers, and efficient batch settlement processing. The modular architecture
 /// enables upgrades while maintaining state integrity through UUPS pattern and ERC-7201 storage.
-contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Ownable, MultiFacetProxy {
+contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUpgradeable, Ownable, MultiFacetProxy {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
     using SafeTransferLib for address;
     using OptimizedSafeCastLib for uint256;
@@ -378,7 +378,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     ///      post-fee rate.
     ///   8. Snapshot `_lastSettlementBalance = _totalBalance()` LAST so the next settlement's
     ///      interest baseline is correct.
-    function settleBatch(bytes32 _batchId) external {
+    function settleBatch(bytes32 _batchId) external override(IVaultBatch, ISettleBatch) {
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require($.batches[_batchId].isClosed, VAULTBATCHES_NOT_CLOSED);
