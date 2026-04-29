@@ -108,18 +108,18 @@ contract kMinter is IkMinter, ISettleBatch, Initializable, UUPSUpgradeable, kBas
     }
 
     /// @notice Initializes the kMinter contract
-    /// @param _registry Address of the registry contract
+    /// @param _registryAddr Address of the registry contract
     /// @param _owner Initial owner of the contract
-    function initialize(address _registry, address _owner) external initializer {
-        require(_registry != address(0), KMINTER_ZERO_ADDRESS);
+    function initialize(address _registryAddr, address _owner) external initializer {
+        require(_registryAddr != address(0), KMINTER_ZERO_ADDRESS);
         require(_owner != address(0), KMINTER_ZERO_ADDRESS);
-        __kBase_init(_registry);
+        __kBase_init(_registryAddr);
         _initializeOwner(_owner);
 
         kMinterStorage storage $ = _getkMinterStorage();
         $.receiverImplementation = address(new kBatchReceiver(address(this)));
 
-        emit ContractInitialized(_registry);
+        emit ContractInitialized(_registryAddr);
     }
 
     /* //////////////////////////////////////////////////////////////

@@ -140,18 +140,18 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// @dev Sets up the contract with protocol registry connection and default settlement cooldown.
     /// Must be called immediately after proxy deployment to establish connection with the protocol
     /// registry and initialize the money flow coordination system.
-    /// @param _registry Address of the kRegistry contract that manages protocol configuration
+    /// @param _registryAddr Address of the kRegistry contract that manages protocol configuration
     /// @param _owner Initial owner of the contract
-    function initialize(address _registry, address _owner) external initializer {
+    function initialize(address _registryAddr, address _owner) external initializer {
         _checkAddressNotZero(_owner);
-        __kBase_init(_registry);
+        __kBase_init(_registryAddr);
         _initializeOwner(_owner);
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         $.vaultSettlementCooldown = DEFAULT_VAULT_SETTLEMENT_COOLDOWN;
         // maxAllowedDelta is now per-vault, set via setMaxAllowedDelta(vault, delta)
 
-        emit ContractInitialized(_registry);
+        emit ContractInitialized(_registryAddr);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -482,7 +482,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         bool _profit = _yield > 0;
         address _kMinter = _getKMinter();
         address _kToken = _getKTokenForAsset(_asset);
-        IRegistry _registry = _registry();
+        IRegistry _reg = _registry();
 
         // Use cached adapter from proposal creation time - this prevents registry modification
         // from breaking settlement execution
@@ -541,7 +541,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             }
 
             // Update kMinter adapter total assets (must happen regardless of yield)
-            IVaultAdapter _kMinterAdapter = IVaultAdapter(_registry.getAdapter(_kMinter, _asset));
+            IVaultAdapter _kMinterAdapter = IVaultAdapter(_reg.getAdapter(_kMinter, _asset));
             _checkAddressNotZero(address(_kMinterAdapter));
             int256 _kMinterTotalAssets = int256(_kMinterAdapter.totalAssets()) - _netted;
             require(_kMinterTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
