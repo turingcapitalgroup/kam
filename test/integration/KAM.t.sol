@@ -370,17 +370,17 @@ contract KamIntegrationTest is DeploymentBaseTest {
     }
 
     function _requestAndRedeem(address _adapter, address _to, uint256 _amount) internal {
-        uint256 _convertedAmount = metawalletUSDC.convertToShares(_amount);
-
         uint256 _numberOfExecutions = 1;
         if (_to != address(0)) _numberOfExecutions = 2;
 
         Execution[] memory _executions = new Execution[](_numberOfExecutions);
 
-        bytes memory _redeemCallData =
-            abi.encodeWithSignature("redeem(uint256,address,address)", _convertedAmount, _adapter, _adapter);
+        // PR #249 (ERC4626ExecutionValidator) removed `redeem(...)` from the kMinter-adapter
+        // allowlist; the supported close-position selector is now `withdraw(assets,...)`.
+        bytes memory _withdrawCallData =
+            abi.encodeWithSignature("withdraw(uint256,address,address)", _amount, _adapter, _adapter);
 
-        _executions[0] = Execution({ target: address(metawalletUSDC), value: 0, callData: _redeemCallData });
+        _executions[0] = Execution({ target: address(metawalletUSDC), value: 0, callData: _withdrawCallData });
 
         if (_numberOfExecutions == 2) {
             bytes memory _transferCallData = abi.encodeWithSignature("transfer(address,uint256)", _to, _amount);
