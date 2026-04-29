@@ -268,6 +268,15 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /// @notice Returns the maximum total assets (TVL cap)
     function maxTotalAssets() external view returns (uint128);
 
+    /// @notice Returns kTokens reserved for pending stake requests
+    function totalPendingStake() external view returns (uint128);
+
+    /// @notice Returns kTokens reserved for settled unstake claims
+    function totalPendingUnstake() external view returns (uint128);
+
+    /// @notice Returns active assets plus pending kToken reserves expected in the vault
+    function expectedKTokenBalance() external view returns (uint256);
+
     /// @notice Increases the vault's internal balance
     /// @dev Only callable by authorized addresses (router)
     /// @param amount The amount to increase the balance by

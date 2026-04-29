@@ -20,6 +20,7 @@ import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces
 import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 import {
+    KSTAKINGVAULT_BALANCE_AUDIT_FAILED,
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
     KSTAKINGVAULT_BATCH_NOT_VALID,
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
@@ -316,7 +317,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
 
-        // Internal balance was already decreased during settlement - just transfer kTokens out
+        // Internal balance was already decreased during settlement - release reserved kTokens.
+        $.totalPendingUnstake -= _totalKTokensNet.toUint128();
 
         emit UnstakingAssetsClaimed(batchId, _requestId, user, _totalKTokensNet);
         emit KTokenUnstaked(user, stkTokenAmount, _totalKTokensNet);
@@ -445,6 +447,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
             _burn(address(this), requestedShares);
             _decreaseBalance(_claimableKTokens.toUint128());
+            $.totalPendingUnstake += _claimableKTokens.toUint128();
 
             emit UnstakeSharesBurned(_batchId, requestedShares, _claimableKTokens);
         }
@@ -457,6 +460,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // to guarantee sum(individual claims) <= total reserved amount.
         $.batches[_batchId].totalAssets = _batchTotalAssets;
         $.batches[_batchId].totalSupply = _batchTotalSupply;
+
+        _auditKTokenBalance($);
 
         emit BatchSettled(_batchId);
     }
@@ -594,6 +599,14 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     function decreaseBalance(uint128 _amount) external {
         _checkRouter(_msgSender());
         _decreaseBalance(_amount);
+    }
+
+    function _expectedKTokenBalance(BaseVaultStorage storage $) private view returns (uint256) {
+        return _totalAssets() + $.totalPendingStake + $.totalPendingUnstake;
+    }
+
+    function _auditKTokenBalance(BaseVaultStorage storage $) private view {
+        require($.kToken.balanceOf(address(this)) == _expectedKTokenBalance($), KSTAKINGVAULT_BALANCE_AUDIT_FAILED);
     }
 
     /// @notice Creates a unique request ID for a staking request
@@ -801,6 +814,19 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     function maxTotalAssets() external view returns (uint128) {
         return _getBaseVaultStorage().maxTotalAssets;
+    }
+
+    function totalPendingStake() external view returns (uint128) {
+        return _getBaseVaultStorage().totalPendingStake;
+    }
+
+    function totalPendingUnstake() external view returns (uint128) {
+        return _getBaseVaultStorage().totalPendingUnstake;
+    }
+
+    function expectedKTokenBalance() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        return _expectedKTokenBalance($);
     }
 
     function contractName() external pure returns (string memory) {

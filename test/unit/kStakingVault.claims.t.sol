@@ -290,6 +290,12 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         lastTotalAssets = vault.totalAssets();
         _executeBatchSettlement(address(vault), unstakeBatchId, lastTotalAssets);
 
+        assertEq(vault.totalAssets(), 0);
+        assertEq(vault.totalPendingStake(), 0);
+        assertEq(vault.totalPendingUnstake(), aliceDeposit);
+        assertEq(vault.expectedKTokenBalance(), aliceDeposit);
+        assertEq(kUSD.balanceOf(address(vault)), vault.expectedKTokenBalance());
+
         // Get kToken balance before claim
         uint256 kTokenBalanceBefore = kUSD.balanceOf(users.alice);
 
@@ -302,6 +308,8 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         // Verify user received kTokens back
         uint256 kTokenBalanceAfter = kUSD.balanceOf(users.alice);
         assertEq(kTokenBalanceAfter - kTokenBalanceBefore, aliceDeposit);
+        assertEq(vault.totalPendingUnstake(), 0);
+        assertEq(kUSD.balanceOf(address(vault)), vault.expectedKTokenBalance());
 
         // Verify stkTokens were burned from vault
         assertEq(vault.balanceOf(address(vault)), 0);
