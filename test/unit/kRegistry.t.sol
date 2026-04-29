@@ -1299,12 +1299,10 @@ contract kRegistryTest is DeploymentBaseTest {
         // Low-level call on the old 4-byte selector of revokeGivenRoles(address,uint256)
         // should revert (function was removed). Selector is 0xc7b2a80e — precomputed.
         bytes memory callData = abi.encodeWithSelector(
-            bytes4(keccak256("revokeGivenRoles(address,uint256)")),
-            users.bob,
-            INSTITUTION_ROLE
+            bytes4(keccak256("revokeGivenRoles(address,uint256)")), users.bob, INSTITUTION_ROLE
         );
         vm.prank(users.admin);
-        (bool success, ) = address(registry).call(callData);
+        (bool success,) = address(registry).call(callData);
         assertFalse(success, "revokeGivenRoles selector must not be dispatchable");
     }
 }

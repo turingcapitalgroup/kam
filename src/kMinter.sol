@@ -32,7 +32,7 @@ import {
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
-import { IkAssetRouter, ISettleBatch } from "kam/src/interfaces/IkAssetRouter.sol";
+import { ISettleBatch, IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 
 import { kBase } from "kam/src/base/kBase.sol";

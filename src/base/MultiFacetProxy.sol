@@ -7,8 +7,9 @@ import {
     MULTIFACETPROXY_SELF_DELEGATION,
     MULTIFACETPROXY_ZERO_ADDRESS
 } from "kam/src/errors/Errors.sol";
-import { OptimizedBytes32EnumerableSetLib } from
-    "kam/src/vendor/solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
+import {
+    OptimizedBytes32EnumerableSetLib
+} from "kam/src/vendor/solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { Proxy } from "openzeppelin/Proxy.sol";
 
 /// @title MultiFacetProxy
