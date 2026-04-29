@@ -44,10 +44,10 @@ import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 /// enabling them to mint kTokens by depositing underlying assets and burn them through a sophisticated batch
 /// settlement system. Key features include: (1) Immediate 1:1 kToken minting upon asset deposit, bypassing the
 /// share-based accounting used for retail users, (2) Two-phase redemption process that handles requests through
-/// batch settlements to optimize gas costs and maintain protocol efficiency, (3) Integration with kStakingVault
-/// for yield generation on deposited assets, (4) Request tracking and management system with unique IDs for each
-/// redemption. The contract enforces strict access control, ensuring only verified institutions can access these
-/// privileged operations while maintaining the security and integrity of the protocol's asset backing.
+/// batch settlements to optimize gas costs and maintain protocol efficiency, (3) Request tracking and management
+/// system with unique IDs for each redemption. The contract enforces strict access control, ensuring only
+/// verified institutions can access these privileged operations while maintaining the security and integrity of
+/// the protocol's asset backing.
 contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, Ownable {
     using SafeTransferLib for address;
     using OptimizedSafeCastLib for uint256;
