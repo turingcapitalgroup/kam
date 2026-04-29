@@ -23,6 +23,7 @@ import {
     KMINTER_INSUFFICIENT_BALANCE,
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
+    KMINTER_REQUEST_NOT_PENDING,
     KMINTER_UNAUTHORIZED,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
@@ -242,6 +243,11 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
 
         address _batchReceiver = $.batches[_batchId].batchReceiver;
         require(_batchReceiver != address(0), KMINTER_ZERO_ADDRESS);
+
+        // Defense-in-depth: refuse to mutate a request that is not in PENDING state
+        // (catches UNDEFINED slots and already-REDEEMED requests; the set-membership check
+        // above already covers most paths but this makes the lifecycle invariant explicit).
+        require(_burnRequest.status == RequestStatus.PENDING, KMINTER_REQUEST_NOT_PENDING);
 
         // Mark request as burned to prevent double-spending
         _burnRequest.status = RequestStatus.REDEEMED;
