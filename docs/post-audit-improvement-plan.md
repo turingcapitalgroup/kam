@@ -638,6 +638,157 @@ justification for warnings that remain, including:
 
 ---
 
+## Phase 12: Externalize Hardcoded Deployment Configuration
+
+**Source**: Deployment script review — values hardcoded in scripts that should be driven by config JSON.
+
+The deployment flow reads the majority of parameters from `deployments/config/{network}.json` via `DeploymentManager`, but several architectural decisions are baked into the script code. This creates a gap where the config file appears to be the single source of truth but critical values are actually scattered across scripts. The changes below move the remaining hardcoded values into config where they belong, and document what should stay hardcoded and why.
+
+### Clear wins for externalization
+
+#### 12.1 Adapter namespace strings
+
+**Current state**: Identity strings like `"kam.dnVault.usdc"`, `"kam.alphaVault.usdc"` are hardcoded in script 08
+(`08_DeployAdapters.s.sol`). These determine the adapter's identity in the MinimalSmartAccount registry.
+
+**Problem**: Deploying a second instance of the protocol or migrating adapters requires code changes. These are
+deployment-time identity parameters, not protocol invariants.
+
+**Fix**: Add an `adapters` section to the config JSON alongside the existing `vaults` section:
+
+```json
+{
+  "adapters": {
+    "dnVaultAdapterUSDC": {
+      "namespace": "kam.dnVault.usdc",
+      "owner": "config:roles.owner"
+    },
+    "dnVaultAdapterWBTC": {
+      "namespace": "kam.dnVault.wbtc",
+      "owner": "config:roles.owner"
+    },
+    "alphaVaultAdapter": {
+      "namespace": "kam.alphaVault.usdc",
+      "owner": "config:roles.owner"
+    },
+    "betaVaultAdapter": {
+      "namespace": "kam.betaVault.usdc",
+      "owner": "config:roles.owner"
+    },
+    "kMinterAdapterUSDC": {
+      "namespace": "kam.minter.usdc",
+      "owner": "config:roles.owner"
+    },
+    "kMinterAdapterWBTC": {
+      "namespace": "kam.minter.wbtc",
+      "owner": "config:roles.owner"
+    }
+  }
+}
+```
+
+Update script 08 to read namespace strings from config. Add a struct `AdapterConfig` to `DeploymentManager` and a
+`_readAdapterConfig` parser following the same pattern as `_readVaultConfig`.
+
+#### 12.2 Vault type assignments
+
+**Current state**: Script 10 (`10_ConfigureProtocol.s.sol`) hardcodes which `IRegistry.VaultType` each vault gets:
+kMinter is `MINTER`, DN vaults are `DN`, alpha is `ALPHA`, beta is `BETA`.
+
+**Problem**: Adding a new vault type or changing a vault's type requires editing the script. The config already
+defines vault entries — adding a type field is natural.
+
+**Fix**: Add a `"vaultType"` field to each vault config entry:
+
+```json
+{
+  "vaults": {
+    "dnVaultUSDC": {
+      "vaultType": "DN",
+      "...": "..."
+    },
+    "alphaVault": {
+      "vaultType": "ALPHA",
+      "...": "..."
+    }
+  }
+}
+```
+
+Update script 10 to parse the `vaultType` string and resolve it to `IRegistry.VaultType` via a helper:
+`_resolveVaultType("DN") => IRegistry.VaultType.DN`. The kMinter vault type assignment should also be configurable
+under a top-level `minter.vaultType` key, defaulting to `"MINTER"`.
+
+#### 12.3 Vault-to-asset pairing
+
+**Current state**: The config already has `"underlyingAsset": "USDC"` per vault, but script 10 ignores it and
+hardcodes which vaults get registered under which asset (e.g., alpha/beta always registered under `_usdc`).
+
+**Problem**: The config's `underlyingAsset` field is read for vault initialization (script 07) but not for vault
+registration (script 10). This creates an inconsistency where the config claims to define the pairing but the script
+overrides it.
+
+**Fix**: In script 10, replace hardcoded asset address arguments with a resolution from the vault's `underlyingAsset`
+config field:
+
+```solidity
+address assetAddress = getUnderlyingAssetAddress(config, config.alphaVault.underlyingAsset);
+registry.registerVault(alphaVaultAddr, vaultType, assetAddress);
+```
+
+This makes the config the single source of truth for vault-to-asset mapping.
+
+#### 12.4 `registry.insuranceBps` never applied on-chain
+
+**Current state**: The config JSON has `registry.insuranceBps`, `DeploymentManager` parses it into
+`config.registry.insuranceBps`, but no script ever calls a function to set it on-chain. This is dead config.
+
+**Fix**: Either:
+- (a) Apply it in script 10 (`ConfigureProtocol`) by calling `registry.setInsuranceBps(config.registry.insuranceBps)`,
+  or
+- (b) Remove it from the config and all three network JSON files if insurance BPS is not yet a supported feature.
+
+Decide which based on whether the on-chain setter exists. If it does not exist yet, remove the config entry to avoid
+confusion and track the feature separately.
+
+#### 12.5 Dead `custodialTargets` config section
+
+**Current state**: The config JSON has a `custodialTargets` section with `walletUSDC` and `walletWBTC` keys.
+However, `DeploymentManager._readCustodialTargets` ignores this section entirely and reads from
+`.mockAssets.WalletUSDC` instead, forcing `walletWBTC = walletUSDC`.
+
+**Fix**: Make `_readCustodialTargets` read from the actual `.custodialTargets` path:
+
+```solidity
+config.custodialTargets.walletUSDC = json.readAddress(".custodialTargets.walletUSDC");
+config.custodialTargets.walletWBTC = json.readAddress(".custodialTargets.walletWBTC");
+```
+
+For localhost/sepolia where mock assets write to both locations, this is already consistent. For mainnet, operators
+set `custodialTargets` directly.
+
+### Items that should stay hardcoded (with rationale)
+
+The following were reviewed and should remain in script code, not externalized to config:
+
+| # | Item | Rationale |
+|---|------|-----------|
+| 6 | ERC20 selector allowlists (`approve`, `transfer`, `transferFrom`, `deposit`, `withdraw`) | Protocol invariants — these selectors are the minimum required for any adapter to function. Configuring them adds deployment complexity with no real use case. |
+| 7 | Executor-to-target permission topology | The graph of which adapter talks to which target is fundamental protocol architecture. Externalizing it requires a complex nested config format that is error-prone and hard to validate. The `parameterChecker` config already handles constraints on these relationships. |
+| 8 | Infinite approvals (`type(uint256).max`) | No realistic scenario where partial approvals between protocol contracts are needed. Configurable approval amounts would add noise. |
+| 9 | Insurance account deterministic salt (`keccak256("kam.insurance.v1")`) | Changing this would break deterministic address prediction across chains. It is a protocol constant. |
+| 10 | Mock mint recipients (deployer, treasury, owner, admin) | Only relevant for testnets. The hardcoded recipient list covers all needed cases. |
+
+### Tests
+
+- `test_deployAdapter_namespaces_fromConfig`: deploy adapters and verify the namespace string matches the config value.
+- `test_configureProtocol_vaultType_fromConfig`: configure protocol and verify vault type registration matches config.
+- `test_configureProtocol_vaultAssetPairing_fromConfig`: verify vault-to-asset registration reads `underlyingAsset`
+  from config, not hardcoded addresses.
+- `test_insuranceBps_applied_orRemoved`: verify either the value is applied on-chain or the config key is removed.
+
+---
+
 ## Execution Order
 
 1. Phase 4 (Code quality fixes) — mechanical, zero-risk, improves readability.
@@ -650,4 +801,5 @@ justification for warnings that remain, including:
 8. Phase 6 (Timelocks) — largest operational change, requires multisig coordination.
 9. Phase 9 (Test coverage) — runs in parallel with every phase above.
 10. Phase 10 (Monitoring) — operational, no code changes, deploy alongside Phase 6.
-11. Phase 11 (Deployment readiness/interface polish) — final pre-deployment gate after code and operational changes.
+11. Phase 12 (Deployment config externalization) — cleans up hardcoded values, makes config the single source of truth.
+12. Phase 11 (Deployment readiness/interface polish) — final pre-deployment gate after code and operational changes.

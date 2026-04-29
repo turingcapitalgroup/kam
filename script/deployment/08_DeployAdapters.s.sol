@@ -104,8 +104,9 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         address kMinterAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataMinterUSDC);
 
         // Deploy kMinter WBTC Adapter
-        bytes memory adapterInitDataMinterWBTC =
-            abi.encodeCall(MinimalSmartAccount.initialize, (address(0), IRegistry(registryAddr), "kam.minter.wbtc"));
+        bytes memory adapterInitDataMinterWBTC = abi.encodeCall(
+            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.minter.wbtc")
+        );
         address kMinterAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataMinterWBTC);
 
         vm.stopBroadcast();
