@@ -338,8 +338,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // Cache the adapter address at proposal creation time to prevent registry modification
         // from breaking execution. This ensures settlement can proceed even if vault/adapter
         // mappings are modified after proposal creation.
+        // `getAdapter` already reverts via _checkAddressNotZero on a missing/zero adapter.
         address _adapter = _registry().getAdapter(_vault, _asset);
-        _checkAddressNotZero(_adapter);
 
         // Compute execution time in the future
         uint256 _executeAfter;
