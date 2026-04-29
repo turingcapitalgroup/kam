@@ -470,6 +470,174 @@ These don't require code changes but should be instrumented in the off-chain mon
 
 ---
 
+## Phase 11: Deployment Readiness and Interface Polish
+
+**Source**: Final pre-deployment review, documentation completeness, upgradeability risk management.
+
+This phase covers the last cleanup pass before deployment. The goal is to make the public surface easy to audit,
+ensure upgradeable storage is safe, and produce operational artifacts that can be used during launch and incident
+response.
+
+### Public interface NatSpec
+
+Several `kStakingVault` getters were moved from `ReaderModule` into `kStakingVault` directly. Add NatSpec on the
+implementation for every direct public/external getter:
+
+```
+registry
+asset
+underlyingAsset
+totalAssets
+totalNetAssets
+sharePrice
+netSharePrice
+convertToShares
+convertToAssets
+convertToSharesWithTotals
+convertToAssetsWithTotals
+getBatchId
+getSafeBatchId
+isClosed
+isBatchClosed
+isBatchSettled
+getCurrentBatchInfo
+getBatchIdInfo
+maxTotalAssets
+totalPendingStake
+totalPendingUnstake
+expectedKTokenBalance
+contractName
+contractVersion
+```
+
+Also synchronize `IVault` NatSpec with implementation behavior:
+
+- `asset()` returns the vault's **kToken**, not the underlying asset.
+- `underlyingAsset()` returns the underlying settlement asset.
+- `totalAssets()` returns active accounted vault assets, excluding pending stake and settled unstake reserves.
+- `totalNetAssets()` currently equals `totalAssets()` after fee-accounting consolidation.
+- `expectedKTokenBalance()` returns `totalAssets + totalPendingStake + totalPendingUnstake`.
+
+### Vault accounting invariants
+
+Add a "Vault Accounting Invariants" section to `docs/architecture.md` and/or `docs/security-design-roles-spec.md`:
+
+```solidity
+kToken.balanceOf(address(vault)) == vault.totalAssets() + vault.totalPendingStake() + vault.totalPendingUnstake()
+```
+
+Document that:
+
+- `totalAssets()` is the active asset base that can absorb strategy gains/losses.
+- `totalPendingStake()` is kToken collateral already transferred in but not converted into stkTokens yet.
+- `totalPendingUnstake()` is kToken collateral reserved for already-settled unstake claims.
+- Router negative-yield burns must be limited to `vault.totalAssets()` and must not consume pending reserves.
+- `kStakingVault.settleBatch()` audits the raw kToken balance against this invariant.
+
+### Upgradeable storage layout review
+
+Before deployment, archive storage layout outputs for every upgradeable contract:
+
+```bash
+forge inspect kMinter storage-layout
+forge inspect kStakingVault storage-layout
+forge inspect kAssetRouter storage-layout
+forge inspect kRegistry storage-layout
+forge inspect VaultAdapter storage-layout
+```
+
+Checklist:
+
+- New storage fields are appended only.
+- ERC-7201 storage namespaces are unique.
+- No struct field reordering occurred after audit fixes.
+- Module contracts that share storage use the same storage namespace and struct definition.
+- Layout artifacts are committed or attached to the deployment runbook.
+
+### Selector surface audit
+
+Because `kStakingVault` uses `MultiFacetProxy`, perform a selector review before deployment:
+
+- Dump direct implementation selectors.
+- Dump module selectors registered through `addFunction`.
+- Check selector collisions between the implementation and modules.
+- Check selector collisions across modules.
+- Verify removed/dead selectors are not dispatchable.
+- Verify each selector has a clear owning source file and interface declaration.
+
+### Deployment dry run
+
+Run a full rehearsal on fork or testnet using production-like addresses:
+
+1. Deploy all contracts.
+2. Register assets, kTokens, vaults, adapters, and targets.
+3. Configure roles using the intended multisig/timelock ownership graph.
+4. Configure execution validators and allowed selectors.
+5. Execute one full institutional mint and burn flow.
+6. Execute one DN stake, unstake, settlement, and claim flow.
+7. Execute one custodial vault stake, unstake, settlement, and claim flow.
+8. Execute one insurance liquidation flow.
+9. Verify adapter virtual balances against physical strategy balances.
+10. Verify all vault accounting invariants after every flow.
+
+### Cross-repo idle buffer integration
+
+The kSettler repo tracks MetaWallet idle-buffer requirements in:
+
+```
+kam-settler/docs/idle-buffer-and-settlement-invariants.md
+```
+
+Before deployment, complete the KAM-side dependencies for that plan:
+
+- Expose and document `totalPendingUnstake()` and `expectedKTokenBalance()` on `kStakingVault`.
+- Keep the vault invariant audit in `kStakingVault.settleBatch()`:
+
+```solidity
+kToken.balanceOf(address(vault)) == vault.totalAssets() + vault.totalPendingStake() + vault.totalPendingUnstake()
+```
+
+- Add or finalize the registry-level idle-buffer configuration required by kSettler, such as `minIdleBps`, if the
+  idle threshold is intended to be governance-controlled from KAM.
+- Document how `minIdleBps` is configured per deployment and who can update it.
+- Confirm kSettler's idle requirement includes both immediate kMinter redemptions and DN vault settled-but-unclaimed
+  unstake reserves.
+- Add an integration test spanning KAM + kSettler + MetaWallet where insufficient MetaWallet idle causes settlement
+  to revert before batch state is finalized, then succeeds after strategies are divested back to idle.
+
+This is a deployment blocker: if MetaWallet keeps a percentage of funds idle to fulfill redemptions, settlement
+automation must treat idle availability as an explicit precondition, not as an incidental MetaWallet redeem revert.
+
+### Operational runbooks
+
+Create or update runbooks for:
+
+- Normal kMinter settlement.
+- Normal DN vault settlement.
+- Normal custodial vault settlement.
+- Guardian approval for high-delta proposals.
+- Proposal cancellation and retry.
+- Global pause and unpause.
+- Local vault/adapter pause and unpause.
+- Failed settlement due to vault balance audit.
+- Failed settlement due to insufficient MetaWallet idle buffer.
+- Failed settlement due to insufficient active assets for a negative-yield burn.
+- Adapter rescue and batch receiver rescue policy.
+- Upgrade proposal, timelock queue, execution, and post-upgrade validation.
+
+### Warning cleanup policy
+
+Before deployment, either fix or explicitly accept every compiler/lint warning. Maintain an allowlist with a short
+justification for warnings that remain, including:
+
+- Payable fallback without receive function.
+- Unused function parameters.
+- Memory-unsafe assembly warnings emitted by `solx`.
+- Unused imports in tests.
+- Any forge lint warning introduced after audit fixes.
+
+---
+
 ## Execution Order
 
 1. Phase 4 (Code quality fixes) — mechanical, zero-risk, improves readability.
@@ -482,3 +650,4 @@ These don't require code changes but should be instrumented in the off-chain mon
 8. Phase 6 (Timelocks) — largest operational change, requires multisig coordination.
 9. Phase 9 (Test coverage) — runs in parallel with every phase above.
 10. Phase 10 (Monitoring) — operational, no code changes, deploy alongside Phase 6.
+11. Phase 11 (Deployment readiness/interface polish) — final pre-deployment gate after code and operational changes.
