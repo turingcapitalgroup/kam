@@ -16,9 +16,17 @@ contract VaultMathLibFuzzTest is Test {
     uint256 internal constant VIRTUAL_SHARES = 1e6;
     uint256 internal constant VIRTUAL_ASSETS = 1e6;
     uint256 internal constant START_TS = 1_000_000;
+    uint256 internal constant ONE_USDC = 1e6;
+    uint256 internal constant ONE_MILLION_USDC = 1_000_000 * ONE_USDC;
 
     modifier whenComputingManagementFees() {
         _;
+    }
+
+    function test_VaultMathLib_computeManagementFee_exactValue_6decimals() external pure {
+        uint256 result = VaultMathLib.computeManagementFee(ONE_MILLION_USDC, 100, START_TS, START_TS + SECS_PER_YEAR);
+
+        assertEq(result, 10_000 * ONE_USDC);
     }
 
     function test_WhenNoTimeHasElapsed(
@@ -164,6 +172,18 @@ contract VaultMathLibFuzzTest is Test {
 
     modifier whenComputingPerformanceFees() {
         _;
+    }
+
+    function test_VaultMathLib_computePerformanceFee_hardHurdle_exactValue() external pure {
+        uint256 result = VaultMathLib.computePerformanceFee(100_000, 1_000_000, 2000, 500, true, SECS_PER_YEAR);
+
+        assertEq(result, 10_000);
+    }
+
+    function test_VaultMathLib_computePerformanceFee_softHurdle_exactValue() external pure {
+        uint256 result = VaultMathLib.computePerformanceFee(100_000, 1_000_000, 2000, 500, false, SECS_PER_YEAR);
+
+        assertEq(result, 20_000);
     }
 
     function test_WhenInterestIsZero(
