@@ -95,7 +95,9 @@ library VaultMathLib {
         // Reject zero-elapsed settlements: with elapsed = 0 the hurdle return collapses to 0,
         // silently bypassing the hurdle filter and charging fee on the entire interest.
         // Forces operators to never run settlement in the same block as a fee-rate change.
-        require(_elapsed > 0, VAULTMATHLIB_ZERO_ELAPSED);
+        // The `_interest == 0` clause is unreachable today (line above early-returns), kept as
+        // defense-in-depth against future refactors that might remove the early return.
+        require(_interest == 0 || _elapsed != 0, VAULTMATHLIB_ZERO_ELAPSED);
 
         // Calculate hurdle return: minimum return threshold for the period
         uint256 hurdleReturn = (_previousTotalAssets * _hurdleRate).fullMulDiv(_elapsed, SECS_PER_YEAR) / MAX_BPS;
