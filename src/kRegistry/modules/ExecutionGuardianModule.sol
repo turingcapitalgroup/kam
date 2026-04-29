@@ -166,10 +166,6 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         emit ExecutionValidatorSet(_executor, _target, _selector, _executionValidator);
     }
 
-    /* //////////////////////////////////////////////////////////////
-                          VIEW FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
     /// @inheritdoc IExecutionGuardian
     function authorizeCall(address _target, bytes4 _selector, bytes calldata _params) external {
         _authorizeCall(_target, _selector, _params);
@@ -190,6 +186,10 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
 
         IExecutionValidator(_validator).authorizeCall(_executor, _target, _selector, _params);
     }
+
+    /* //////////////////////////////////////////////////////////////
+                          VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IExecutionGuardian
     function isSelectorAllowed(address _executor, address _target, bytes4 _selector) external view returns (bool) {
