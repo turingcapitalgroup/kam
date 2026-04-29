@@ -120,12 +120,6 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
                               INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Check if caller has admin role
-    /// @param _user Address to check
-    function _checkAdmin(address _user) private view {
-        require(IkRegistry(address(_getMinimalAccountStorage().registry)).isAdmin(_user), VAULTADAPTER_WRONG_ROLE);
-    }
-
     /// @notice Ensures the contract is not paused
     function _checkPaused(VaultAdapterStorage storage $) internal view {
         require(!$.paused, VAULTADAPTER_IS_PAUSED);
