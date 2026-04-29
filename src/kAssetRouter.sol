@@ -272,14 +272,17 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         );
 
         if (_isMinter) {
+            // Iterate the pending-proposal set directly with `at(i)` to avoid the per-call
+            // `.values()` memory allocation flagged by Solady's enumerable-set notes for
+            // on-chain (write-path) loops.
             uint256 _pendingCount = $.vaultPendingProposalIds[_vault].length();
-            if (_pendingCount > 0) {
-                bytes32[] memory _pendingIds = $.vaultPendingProposalIds[_vault].values();
-                for (uint256 i; i < _pendingCount; i++) {
-                    require(
-                        $.settlementProposals[_pendingIds[i]].asset != _asset,
-                        KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME
-                    );
+            for (uint256 i; i < _pendingCount;) {
+                require(
+                    $.settlementProposals[$.vaultPendingProposalIds[_vault].at(i)].asset != _asset,
+                    KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME
+                );
+                unchecked {
+                    ++i;
                 }
             }
         } else {
