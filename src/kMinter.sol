@@ -499,7 +499,10 @@ contract kMinter is IkMinter, ISettleBatch, Initializable, UUPSUpgradeable, kBas
 
     /// @inheritdoc IkMinter
     function isPaused() external view returns (bool) {
-        return _getBaseStorage().paused;
+        // Use `_isPaused()` so the local-only flag and the global registry pause are both honored
+        // — `kBase._checkNotPaused` already gates state-changing entry points on this combined value,
+        // so the read function should match.
+        return _isPaused();
     }
 
     /// @inheritdoc IkMinter
