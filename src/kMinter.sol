@@ -23,6 +23,7 @@ import {
     KMINTER_INSUFFICIENT_BALANCE,
     KMINTER_IS_PAUSED,
     KMINTER_REQUEST_NOT_FOUND,
+    KMINTER_REQUEST_NOT_PENDING,
     KMINTER_UNAUTHORIZED,
     KMINTER_WRONG_ROLE,
     KMINTER_ZERO_ADDRESS,
@@ -31,7 +32,7 @@ import {
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
-import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
+import { ISettleBatch, IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 import { IkMinter } from "kam/src/interfaces/IkMinter.sol";
 
 import { kBase } from "kam/src/base/kBase.sol";
@@ -44,11 +45,11 @@ import { kBatchReceiver } from "kam/src/kBatchReceiver.sol";
 /// enabling them to mint kTokens by depositing underlying assets and burn them through a sophisticated batch
 /// settlement system. Key features include: (1) Immediate 1:1 kToken minting upon asset deposit, bypassing the
 /// share-based accounting used for retail users, (2) Two-phase redemption process that handles requests through
-/// batch settlements to optimize gas costs and maintain protocol efficiency, (3) Integration with kStakingVault
-/// for yield generation on deposited assets, (4) Request tracking and management system with unique IDs for each
-/// redemption. The contract enforces strict access control, ensuring only verified institutions can access these
-/// privileged operations while maintaining the security and integrity of the protocol's asset backing.
-contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, Ownable {
+/// batch settlements to optimize gas costs and maintain protocol efficiency, (3) Request tracking and management
+/// system with unique IDs for each redemption. The contract enforces strict access control, ensuring only
+/// verified institutions can access these privileged operations while maintaining the security and integrity of
+/// the protocol's asset backing.
+contract kMinter is IkMinter, ISettleBatch, Initializable, UUPSUpgradeable, kBase, Extsload, Ownable {
     using SafeTransferLib for address;
     using OptimizedSafeCastLib for uint256;
     using OptimizedSafeCastLib for uint64;
@@ -107,18 +108,18 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
     }
 
     /// @notice Initializes the kMinter contract
-    /// @param _registry Address of the registry contract
+    /// @param _registryAddr Address of the registry contract
     /// @param _owner Initial owner of the contract
-    function initialize(address _registry, address _owner) external initializer {
-        require(_registry != address(0), KMINTER_ZERO_ADDRESS);
+    function initialize(address _registryAddr, address _owner) external initializer {
+        require(_registryAddr != address(0), KMINTER_ZERO_ADDRESS);
         require(_owner != address(0), KMINTER_ZERO_ADDRESS);
-        __kBase_init(_registry);
+        __kBase_init(_registryAddr);
         _initializeOwner(_owner);
 
         kMinterStorage storage $ = _getkMinterStorage();
         $.receiverImplementation = address(new kBatchReceiver(address(this)));
 
-        emit ContractInitialized(_registry);
+        emit ContractInitialized(_registryAddr);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -243,6 +244,11 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
         address _batchReceiver = $.batches[_batchId].batchReceiver;
         require(_batchReceiver != address(0), KMINTER_ZERO_ADDRESS);
 
+        // Defense-in-depth: refuse to mutate a request that is not in PENDING state
+        // (catches UNDEFINED slots and already-REDEEMED requests; the set-membership check
+        // above already covers most paths but this makes the lifecycle invariant explicit).
+        require(_burnRequest.status == RequestStatus.PENDING, KMINTER_REQUEST_NOT_PENDING);
+
         // Mark request as burned to prevent double-spending
         _burnRequest.status = RequestStatus.REDEEMED;
 
@@ -286,7 +292,7 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
     }
 
     /// @inheritdoc IkMinter
-    function settleBatch(bytes32 _batchId) external {
+    function settleBatch(bytes32 _batchId) external override(IkMinter, ISettleBatch) {
         _checkRouter(msg.sender);
         kMinterStorage storage $ = _getkMinterStorage();
         require($.batches[_batchId].isClosed, KMINTER_BATCH_NOT_CLOSED);
@@ -493,7 +499,10 @@ contract kMinter is IkMinter, Initializable, UUPSUpgradeable, kBase, Extsload, O
 
     /// @inheritdoc IkMinter
     function isPaused() external view returns (bool) {
-        return _getBaseStorage().paused;
+        // Use `_isPaused()` so the local-only flag and the global registry pause are both honored
+        // — `kBase._checkNotPaused` already gates state-changing entry points on this combined value,
+        // so the read function should match.
+        return _isPaused();
     }
 
     /// @inheritdoc IkMinter

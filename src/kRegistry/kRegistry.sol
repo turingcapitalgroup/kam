@@ -7,7 +7,6 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import {
-    KROLESBASE_WRONG_ROLE,
     KREGISTRY_ADAPTER_ALREADY_SET,
     KREGISTRY_ADAPTER_HAS_BALANCE,
     KREGISTRY_ALREADY_REGISTERED,
@@ -22,7 +21,8 @@ import {
     KREGISTRY_VAULT_TYPE_ASSIGNED,
     KREGISTRY_WRONG_ASSET,
     KREGISTRY_ZERO_ADDRESS,
-    KREGISTRY_ZERO_AMOUNT
+    KREGISTRY_ZERO_AMOUNT,
+    KROLESBASE_WRONG_ROLE
 } from "kam/src/errors/Errors.sol";
 
 import { IkTokenFactory } from "kToken0/interfaces/IkTokenFactory.sol";
@@ -277,10 +277,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     function revokeInstitutionRole(address _institution) external payable {
         // Explicit require (not a modifier or mask) so the documented
         // VENDOR-primary, ADMIN-backstop authority split is visible in code.
-        require(
-            _hasRole(msg.sender, VENDOR_ROLE) || _hasRole(msg.sender, ADMIN_ROLE),
-            KROLESBASE_WRONG_ROLE
-        );
+        require(_hasRole(msg.sender, VENDOR_ROLE) || _hasRole(msg.sender, ADMIN_ROLE), KROLESBASE_WRONG_ROLE);
         _removeRoles(_institution, INSTITUTION_ROLE);
     }
 

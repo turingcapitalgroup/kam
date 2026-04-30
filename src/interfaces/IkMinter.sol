@@ -14,8 +14,13 @@ interface IkMinter is IVersioned {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Represents the lifecycle status of a redemption request
-    /// @dev Used to track the progression of redemption requests through the batch system
+    /// @dev Used to track the progression of redemption requests through the batch system.
+    ///      `UNDEFINED = 0` is the zero-initialized sentinel — a fresh storage slot reads as
+    ///      `UNDEFINED`, not as a valid `PENDING` request, so callers can distinguish
+    ///      "request does not exist" from "request is in flight".
     enum RequestStatus {
+        /// @dev Zero-initialized sentinel — request does not exist
+        UNDEFINED,
         /// @dev Request has been created and tokens are held in escrow, awaiting batch settlement
         PENDING,
         /// @dev Request has been successfully executed and underlying assets have been distributed
@@ -75,12 +80,13 @@ interface IkMinter is IVersioned {
 
     /// @notice Emitted when a new redemption request is created and enters the batch queue
     /// @param requestId The unique identifier assigned to this redemption request
-    /// @param user The address that initiated the redemption request
+    /// @param recipient The address that will receive the underlying assets at settlement
+    ///                  (passed as `_to` in `requestBurn`, not necessarily the caller)
     /// @param kToken The kToken contract address being burned
     /// @param amount The amount of kTokens being burned
     /// @param batchId The batch identifier this request is associated with
     event BurnRequestCreated(
-        bytes32 indexed requestId, address indexed user, address indexed kToken, uint256 amount, bytes32 batchId
+        bytes32 indexed requestId, address indexed recipient, address indexed kToken, uint256 amount, bytes32 batchId
     );
 
     /// @notice Emitted when a redemption request is successfully executed after batch settlement
