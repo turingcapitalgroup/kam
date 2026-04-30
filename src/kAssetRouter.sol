@@ -170,7 +170,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         IVaultAdapter _adapter = IVaultAdapter(_registry().getAdapter(_kMinter, _asset));
         _asset.safeTransfer(address(_adapter), _amount);
 
-        emit AssetsPushed(_kMinter, _amount);
+        emit AssetsPushed(_kMinter, _batchId, _amount);
 
         _unlockReentrant();
     }
@@ -188,7 +188,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         uint256 _totalGlobalPending = $.globalPendingRequests[_kMinter][_asset] += _amount;
         _checkSufficientVirtualBalance(_kMinter, _asset, _totalGlobalPending);
 
-        emit AssetsRequestPulled(_kMinter, _asset, _amount);
+        emit AssetsRequestPulled(_kMinter, _asset, _batchId, _amount);
         _unlockReentrant();
     }
 
@@ -220,7 +220,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // Check against GLOBAL pending, not just this request amount
         _checkSufficientVirtualBalance(_sourceVault, _asset, _totalGlobalPending);
 
-        emit AssetsTransferred(_sourceVault, _targetVault, _asset, _amount);
+        emit AssetsTransferred(_sourceVault, _targetVault, _asset, _batchId, _amount);
         _unlockReentrant();
     }
 
