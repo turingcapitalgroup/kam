@@ -263,7 +263,9 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         bool _isMinter = _isKMinter(_vault);
 
         // Increase the counter to generate unique proposal id
-        $.proposalCounter++;
+        unchecked {
+            $.proposalCounter++;
+        }
 
         _proposalId = OptimizedEfficientHashLib.hash(
             uint256(uint160(_vault)), uint256(uint160(_asset)), uint256(_batchId), block.timestamp, $.proposalCounter
@@ -342,7 +344,9 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
         // Compute execution time in the future
         uint256 _executeAfter;
-        _executeAfter = block.timestamp + $.vaultSettlementCooldown;
+        unchecked {
+            _executeAfter = block.timestamp + $.vaultSettlementCooldown;
+        }
 
         // Validate global pending coverage for kMinter BEFORE adding proposal to the set,
         // so _effectiveVirtualBalanceInt doesn't iterate this uninitialized proposal slot.

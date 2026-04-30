@@ -71,7 +71,9 @@ abstract contract ERC2771Context is IERC2771 {
         uint256 calldataLength = msg.data.length;
         uint256 contextSuffixLength = _contextSuffixLength();
         if (calldataLength >= contextSuffixLength && isTrustedForwarder(msg.sender)) {
-            return address(bytes20(msg.data[calldataLength - contextSuffixLength:]));
+            unchecked {
+                return address(bytes20(msg.data[calldataLength - contextSuffixLength:]));
+            }
         } else {
             return msg.sender;
         }
@@ -84,7 +86,9 @@ abstract contract ERC2771Context is IERC2771 {
         uint256 calldataLength = msg.data.length;
         uint256 contextSuffixLength = _contextSuffixLength();
         if (calldataLength >= contextSuffixLength && isTrustedForwarder(msg.sender)) {
-            return msg.data[:calldataLength - contextSuffixLength];
+            unchecked {
+                return msg.data[:calldataLength - contextSuffixLength];
+            }
         } else {
             return msg.data;
         }
