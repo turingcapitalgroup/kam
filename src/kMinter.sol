@@ -345,9 +345,7 @@ contract kMinter is IkMinter, ISettleBatch, Initializable, UUPSUpgradeable, kBas
         kMinterStorage storage $ = _getkMinterStorage();
 
         // Increment the asset-specific batch counter
-        unchecked {
-            $.assetBatchCounters[_asset]++;
-        }
+        $.assetBatchCounters[_asset]++;
 
         uint256 _assetBatchNumber = $.assetBatchCounters[_asset];
 

@@ -263,9 +263,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         bool _isMinter = _isKMinter(_vault);
 
         // Increase the counter to generate unique proposal id
-        unchecked {
-            $.proposalCounter++;
-        }
+        $.proposalCounter++;
 
         _proposalId = OptimizedEfficientHashLib.hash(
             uint256(uint160(_vault)), uint256(uint160(_asset)), uint256(_batchId), block.timestamp, $.proposalCounter
@@ -281,9 +279,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                     $.settlementProposals[$.vaultPendingProposalIds[_vault].at(i)].asset != _asset,
                     KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME
                 );
-                unchecked {
-                    ++i;
-                }
+                ++i;
             }
         } else {
             require($.vaultPendingProposalIds[_vault].length() == 0, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME);
@@ -346,9 +342,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
         // Compute execution time in the future
         uint256 _executeAfter;
-        unchecked {
-            _executeAfter = block.timestamp + $.vaultSettlementCooldown;
-        }
+        _executeAfter = block.timestamp + $.vaultSettlementCooldown;
 
         // Validate global pending coverage for kMinter BEFORE adding proposal to the set,
         // so _effectiveVirtualBalanceInt doesn't iterate this uninitialized proposal slot.

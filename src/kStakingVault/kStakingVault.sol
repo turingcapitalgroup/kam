@@ -478,9 +478,7 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     /// @return Deterministic batch identifier for the newly created batch period
     function _createNewBatch() private returns (bytes32) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        unchecked {
-            $.currentBatch++;
-        }
+        $.currentBatch++;
         bytes32 _newBatchId = OptimizedEfficientHashLib.hash(
             uint256(uint160(address(this))),
             $.currentBatch,
@@ -617,9 +615,7 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     /// @return Request ID
     function _createStakeRequestId(address _user, uint256 _amount, uint256 _timestamp) private returns (bytes32) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        unchecked {
-            $.requestCounter++;
-        }
+        $.requestCounter++;
         return OptimizedEfficientHashLib.hash(
             uint256(uint160(address(this))), uint256(uint160(_user)), _amount, _timestamp, $.requestCounter
         );
