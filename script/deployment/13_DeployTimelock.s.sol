@@ -32,7 +32,7 @@ import { DeploymentManager } from "../utils/DeploymentManager.sol";
 /// **When adding a new UUPS contract to the protocol**, add a `_transferOwnership` call
 /// for it in this script and add a corresponding assertion to
 /// `test/integration/TimelockMigration.t.sol::test_PostMigration_AllUUPSContractsOwnedByTimelock`.
-contract DeployTimelock is Script, DeploymentManager {
+contract DeployTimelockScript is Script, DeploymentManager {
     /// @notice Minimum delay enforced by the Admin Timelock for every queued operation.
     uint256 internal constant ADMIN_TIMELOCK_DELAY = 3 days;
 
