@@ -111,13 +111,13 @@ After `transferOwnership(adminTimelock)`, every `_checkOwner()` call site automa
 | `VaultAdapter` | `_authorizeUpgrade` | UUPS upgrade |
 | `SmartAdapterAccount` | `_authorizeUpgrade` | UUPS upgrade |
 | `kToken` (kToken0) | `_authorizeUpgrade` | UUPS upgrade |
-| `kTokenFactory` (kToken0) | `_authorizeUpgrade` | UUPS upgrade |
 
 **Contract types vs. proxy instances**: the table above lists 9 *contract types*. Each type is deployed as one or more proxies (e.g. `kStakingVault` has multiple instances — `dnVaultUSDC`, `dnVaultWBTC`, `alphaVault`, `betaVault`; `VaultAdapter` has one per (vault × asset) combination). The deployment script transfers ownership of every proxy *instance* — see [`script/deployment/13_DeployTimelock.s.sol`](../script/deployment/13_DeployTimelock.s.sol) for the explicit list.
 
 **Special-case notes**:
 - `SmartAdapterAccount` is the parent class of `VaultAdapter`. It is not deployed as a standalone proxy in the kam protocol; transferring ownership of each `VaultAdapter` proxy is sufficient. The row above is retained for completeness — if a future deployment introduces standalone `SmartAdapterAccount` instances, they must be added to the script.
 - `kRemoteRegistry` is deployed via the multichain script (`script/multichain/DeployRemoteRegistry.s.sol`) and is **not** in the standard `DeploymentOutput`. Its ownership transfer must be performed in the multichain repository alongside each remote chain's deployment, not from `13_DeployTimelock.s.sol`. Cross-repo coordination per §5.5.
+- `kTokenFactory` (kToken0) is **not** a UUPS contract and **not** Ownable — it is a stateless deploy helper. It has no ownership to transfer; the upgrade authority lives on each deployed `kToken` proxy instead.
 
 **Net code change required: zero on existing contracts.** All of these already use `_checkOwner()`. The migration `transferOwnership(adminTimelock)` makes the timelock the only address that can pass the check.
 

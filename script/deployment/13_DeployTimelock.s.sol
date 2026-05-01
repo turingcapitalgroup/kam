@@ -113,7 +113,8 @@ contract DeployTimelockScript is Script, DeploymentManager {
         // kToken0 contracts (deployed via the kam pipeline; their addresses live in
         // the kam DeploymentOutput, so the transfer happens here rather than in a
         // separate kToken0 script).
-        _transferOwnership("kTokenFactory", output.contracts.kTokenFactory, adminTimelock);
+        // Note: kTokenFactory is a stateless deploy helper — it is NOT Ownable / NOT UUPS,
+        // so it has no ownership to transfer. Only kToken instances need the handover.
         _transferOwnership("kUSD", output.contracts.kUSD, adminTimelock);
         _transferOwnership("kBTC", output.contracts.kBTC, adminTimelock);
 
