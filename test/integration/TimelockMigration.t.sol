@@ -11,6 +11,7 @@ import { kMinter } from "kam/src/kMinter.sol";
 import { kAssetRouter } from "kam/src/kAssetRouter.sol";
 import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
+import { VAULTADAPTER_WRONG_ROLE } from "kam/src/errors/Errors.sol";
 
 /// @notice End-to-end Phase 6 migration test. Deploys the full kam protocol via
 /// `DeploymentBaseTest`, then performs the timelock migration in-memory and validates:
@@ -124,31 +125,57 @@ contract TimelockMigrationTest is DeploymentBaseTest {
                       UPGRADE VIA TIMELOCK SUCCEEDS
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev ERC-1967 implementation storage slot.
+    bytes32 internal constant ERC1967_IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    /// @dev Read the current implementation behind a UUPS proxy.
+    function _readImplementation(address proxy) internal view returns (address impl) {
+        impl = address(uint160(uint256(vm.load(proxy, ERC1967_IMPL_SLOT))));
+    }
+
     function test_PostMigration_UpgradeViaTimelock_Succeeds() public {
+        // Verify the upgrade actually lands on the proxy (not just that the timelock claims Done).
+        address implBefore = _readImplementation(address(registry));
         kRegistry newImpl = new kRegistry();
+        require(address(newImpl) != implBefore, "test setup: new impl collides with existing");
+
         bytes memory data = abi.encodeCall(registry.upgradeToAndCall, (address(newImpl), ""));
         bytes32 salt = keccak256("upgrade-registry-test");
 
         vm.prank(users.admin);
         timelock.schedule(address(registry), 0, data, bytes32(0), salt, DELAY);
 
-        // Before delay: cannot execute.
-        vm.expectRevert();
+        bytes32 id = timelock.hashOperation(address(registry), 0, data, bytes32(0), salt);
+
+        // Before delay: execute reverts with the OZ-specific Ready-state error.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TimelockController.TimelockUnexpectedOperationState.selector,
+                id,
+                _encodeStateBitmap(uint8(2)) // OperationState.Ready
+            )
+        );
         timelock.execute(address(registry), 0, data, bytes32(0), salt);
 
         // Skip the delay, then anyone can execute.
         vm.warp(block.timestamp + DELAY);
         timelock.execute(address(registry), 0, data, bytes32(0), salt);
 
-        // Upgrade landed.
-        bytes32 id = timelock.hashOperation(address(registry), 0, data, bytes32(0), salt);
-        assertTrue(timelock.isOperationDone(id));
+        // Timelock state advanced.
+        assertTrue(timelock.isOperationDone(id), "timelock not Done");
+
+        // The upgrade actually landed on the proxy: ERC-1967 implementation slot now points to newImpl.
+        address implAfter = _readImplementation(address(registry));
+        assertEq(implAfter, address(newImpl), "ERC-1967 impl slot did not change to newImpl");
+        assertTrue(implAfter != implBefore, "impl slot unchanged");
     }
 
     function test_PostMigration_GuardianCanCancelQueuedUpgrade() public {
         kMinter newImpl = new kMinter();
         bytes memory data = abi.encodeCall(minter.upgradeToAndCall, (address(newImpl), ""));
         bytes32 salt = keccak256("upgrade-minter-canceltest");
+
+        address implBefore = _readImplementation(address(minter));
 
         vm.prank(users.admin);
         timelock.schedule(address(minter), 0, data, bytes32(0), salt, DELAY);
@@ -158,9 +185,24 @@ contract TimelockMigrationTest is DeploymentBaseTest {
         timelock.cancel(id);
 
         // Even after delay passes, the cancelled op cannot be executed.
+        // The op is in Unset state (cancel resets to Unset), execute expects Ready.
         vm.warp(block.timestamp + DELAY);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TimelockController.TimelockUnexpectedOperationState.selector,
+                id,
+                _encodeStateBitmap(uint8(2)) // OperationState.Ready
+            )
+        );
         timelock.execute(address(minter), 0, data, bytes32(0), salt);
+
+        // The proxy implementation was never changed.
+        assertEq(_readImplementation(address(minter)), implBefore, "implementation unexpectedly changed");
+    }
+
+    /// @dev Encode an OperationState into the bitmap representation OZ uses.
+    function _encodeStateBitmap(uint8 state) internal pure returns (bytes32) {
+        return bytes32(uint256(1) << state);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -200,6 +242,27 @@ contract TimelockMigrationTest is DeploymentBaseTest {
         // VaultAdapter.setPaused uses an emergency-admin role check (via registry.isEmergencyAdmin),
         // not _checkOwner. Survives the ownership transfer untouched.
         vm.prank(users.emergencyAdmin);
+        minterAdapterUSDC.setPaused(true);
+        // The call succeeded — that is the positive assertion that the role check still passes
+        // for an emergency-admin caller after the migration. The negative path is the next test.
+    }
+
+    function test_PostMigration_AdapterSetPaused_NonEmergencyAdmin_Reverts() public {
+        // After migration, the role check on setPaused must still reject non-emergency-admin callers.
+        // This proves the role gate is functional, not bypassed (which would be a false positive
+        // for the previous test).
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(VAULTADAPTER_WRONG_ROLE));
+        minterAdapterUSDC.setPaused(true);
+
+        // ADMIN does not have the EMERGENCY_ADMIN role either — should also revert.
+        vm.prank(users.admin);
+        vm.expectRevert(bytes(VAULTADAPTER_WRONG_ROLE));
+        minterAdapterUSDC.setPaused(true);
+
+        // The previous owner (deployer) does not have the EMERGENCY_ADMIN role — should also revert.
+        vm.prank(users.owner);
+        vm.expectRevert(bytes(VAULTADAPTER_WRONG_ROLE));
         minterAdapterUSDC.setPaused(true);
     }
 }

@@ -111,8 +111,9 @@ contract AdminTimelockTest is BaseTest {
 
     function test_Schedule_BelowMinDelay_Reverts() public {
         vm.prank(admin);
-        vm.expectRevert();
-        // delay below `getMinDelay()` should revert.
+        vm.expectRevert(
+            abi.encodeWithSelector(TimelockController.TimelockInsufficientDelay.selector, DELAY - 1, DELAY)
+        );
         timelock.schedule(
             address(0xBEEF), 0, abi.encodeWithSignature("noop()"), bytes32(0), keccak256("short"), DELAY - 1
         );
@@ -129,12 +130,22 @@ contract AdminTimelockTest is BaseTest {
 
         vm.prank(admin);
         timelock.schedule(address(target), 0, data, bytes32(0), salt, DELAY);
+        bytes32 id = timelock.hashOperation(address(target), 0, data, bytes32(0), salt);
 
         // Move forward, but not enough.
         vm.warp(block.timestamp + DELAY - 1);
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TimelockController.TimelockUnexpectedOperationState.selector,
+                id,
+                _encodeStateBitmap(uint8(2)) // OperationState.Ready
+            )
+        );
         timelock.execute(address(target), 0, data, bytes32(0), salt);
+
+        // Bonus assertion: target was NOT called.
+        assertEq(target.counter(), 0);
     }
 
     function test_Execute_AfterDelay_ByAnyone_Succeeds() public {
@@ -162,13 +173,26 @@ contract AdminTimelockTest is BaseTest {
 
         vm.prank(admin);
         timelock.schedule(address(target), 0, data, bytes32(0), salt, DELAY);
+        bytes32 id = timelock.hashOperation(address(target), 0, data, bytes32(0), salt);
+
         vm.warp(block.timestamp + DELAY);
         vm.prank(alice);
         timelock.execute(address(target), 0, data, bytes32(0), salt);
+        assertEq(target.counter(), 1);
 
+        // Op is now in Done state — re-executing must revert with the OZ-specific state error.
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TimelockController.TimelockUnexpectedOperationState.selector,
+                id,
+                _encodeStateBitmap(uint8(2)) // OperationState.Ready
+            )
+        );
         timelock.execute(address(target), 0, data, bytes32(0), salt);
+
+        // Counter still 1 — the second call did not execute.
+        assertEq(target.counter(), 1);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -227,8 +251,18 @@ contract AdminTimelockTest is BaseTest {
     function test_UpdateDelay_Direct_Reverts() public {
         // Even ADMIN cannot call updateDelay directly — only the timelock can call it on itself.
         vm.prank(admin);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(TimelockController.TimelockUnauthorizedCaller.selector, admin));
         timelock.updateDelay(1 days);
+
+        // Delay was not changed.
+        assertEq(timelock.getMinDelay(), DELAY);
+
+        // Same revert for an unprivileged caller.
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(TimelockController.TimelockUnauthorizedCaller.selector, alice));
+        timelock.updateDelay(1 days);
+
+        assertEq(timelock.getMinDelay(), DELAY);
     }
 
     function test_UpdateDelay_ThroughTimelock_Succeeds() public {
@@ -244,6 +278,12 @@ contract AdminTimelockTest is BaseTest {
         timelock.execute(address(timelock), 0, data, bytes32(0), salt);
 
         assertEq(timelock.getMinDelay(), newDelay);
+    }
+
+    /// @dev Encode an OperationState into the bitmap representation OZ uses in its revert payloads.
+    /// Mirrors `TimelockController._encodeStateBitmap`. State indices: 0=Unset, 1=Waiting, 2=Ready, 3=Done.
+    function _encodeStateBitmap(uint8 state) internal pure returns (bytes32) {
+        return bytes32(uint256(1) << state);
     }
 
     function test_UpdateDelay_PendingOpsRetainOriginalDelay() public {
