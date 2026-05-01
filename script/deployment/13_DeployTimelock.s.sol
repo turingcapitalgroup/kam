@@ -110,6 +110,13 @@ contract DeployTimelockScript is Script, DeploymentManager {
         _transferOwnership("kMinterAdapterUSDC", output.contracts.kMinterAdapterUSDC, adminTimelock);
         _transferOwnership("kMinterAdapterWBTC", output.contracts.kMinterAdapterWBTC, adminTimelock);
 
+        // kToken0 contracts (deployed via the kam pipeline; their addresses live in
+        // the kam DeploymentOutput, so the transfer happens here rather than in a
+        // separate kToken0 script).
+        _transferOwnership("kTokenFactory", output.contracts.kTokenFactory, adminTimelock);
+        _transferOwnership("kUSD", output.contracts.kUSD, adminTimelock);
+        _transferOwnership("kBTC", output.contracts.kBTC, adminTimelock);
+
         vm.stopBroadcast();
 
         // Final assertions: verify timelock state and role graph after handover.

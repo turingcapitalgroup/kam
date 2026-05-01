@@ -74,6 +74,15 @@ contract TimelockMigrationTest is DeploymentBaseTest {
         Ownable(address(DNVaultAdapterUSDC)).transferOwnership(address(timelock));
         Ownable(address(ALPHAVaultAdapterUSDC)).transferOwnership(address(timelock));
         Ownable(address(BETHAVaultAdapterUSDC)).transferOwnership(address(timelock));
+        // kToken0 instances (deployed via the kam pipeline).
+        Ownable(address(kUSD)).transferOwnership(address(timelock));
+        Ownable(address(kBTC)).transferOwnership(address(timelock));
+        // kTokenFactory is the only kToken0 contract not exposed by DeploymentBaseTest as a typed
+        // field; the integration test deploys it via the regular deployment scripts but does not
+        // store its proxy in a public variable. The migration script DOES handle it. To keep this
+        // unit-level test self-contained, we skip kTokenFactory here and rely on
+        // `test/integration/TimelockKTokenFactory.t.sol` (in the kToken0 repo PR) for that
+        // proxy.
         vm.stopPrank();
     }
 
@@ -100,6 +109,9 @@ contract TimelockMigrationTest is DeploymentBaseTest {
         assertEq(Ownable(address(DNVaultAdapterUSDC)).owner(), address(timelock), "DNVaultAdapterUSDC");
         assertEq(Ownable(address(ALPHAVaultAdapterUSDC)).owner(), address(timelock), "ALPHAVaultAdapterUSDC");
         assertEq(Ownable(address(BETHAVaultAdapterUSDC)).owner(), address(timelock), "BETHAVaultAdapterUSDC");
+        // kToken0 token instances (2)
+        assertEq(Ownable(address(kUSD)).owner(), address(timelock), "kUSD");
+        assertEq(Ownable(address(kBTC)).owner(), address(timelock), "kBTC");
     }
 
     function test_PostMigration_TimelockSelfAdministered() public view {
