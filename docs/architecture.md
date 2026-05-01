@@ -712,9 +712,9 @@ The kBatchReceiver contract remains immutable by design with no upgrade capabili
 
 ## Timelock & Governance
 
-> 📘 **Note**: This section summarizes the timelock layer added in Phase 6 of the post-audit improvement plan. For the full design contract — role architecture, function-level gating, migration plan, salt/predecessor policies — see [Timelock & Governance Specification](./timelock-and-governance-spec.md).
+> 📘 **Note**: This section summarizes the timelock layer. For the full specification — role architecture, function-level gating, deployment plan, salt/predecessor policies — see [Timelock & Governance](./timelock-and-governance-spec.md).
 
-After Phase 6 deployment, every UUPS upgrade and every other `_checkOwner()`-gated administrative call goes through a single **Admin Timelock** with a **3-day delay**.
+Every UUPS upgrade and every other `_checkOwner()`-gated administrative call goes through a single **Admin Timelock** with a **3-day delay**.
 
 ### Architecture
 
@@ -727,7 +727,7 @@ A single `OpenZeppelin TimelockController` instance (vendored at `src/vendor/ope
 
 ### What goes through the 3-day delay
 
-Every existing `_checkOwner()` call site, automatically — Phase 6 makes the timelock the new owner via `transferOwnership(adminTimelock)`, with **no modifications** to the contracts themselves. This includes:
+Every existing `_checkOwner()` call site, automatically — the timelock is the contract owner via `transferOwnership(adminTimelock)` at deployment time, with **no modifications** to the contracts themselves. This includes:
 
 - All UUPS `_authorizeUpgrade` overrides
 - Role grants/revokes on kRegistry (`grantAdminRole`, `grantEmergencyAdminRole`, `grantGuardianRole`, and revokes)
