@@ -11,13 +11,13 @@
 
 This specification derives its patterns and code from **OpenZeppelin Contracts v5.6.1 (MIT-licensed)**, vendored under `src/vendor/openzeppelin/`. The MIT license permits use, modification, and redistribution provided the original copyright notice is preserved (which we do — vendored files retain their original SPDX and OZ headers).
 
-KAM is proprietary code (`SPDX-License-Identifier: UNLICENSED`). We do not derive patterns, code, or architectural details from any licensed protocol other than OpenZeppelin. Architectural decisions in this document originate from the Trail of Bits audit findings, OpenZeppelin's published API and recommended practices, and KAM-specific requirements.
+KAM is proprietary code (`SPDX-License-Identifier: UNLICENSED`). We do not derive patterns, code, or architectural details from any licensed protocol other than OpenZeppelin. Architectural decisions in this document originate from the Trail of Bits audit findings, OpenZeppelin's published API and recommended practices, KAM-specific requirements, and observation of public protocol documentation (citations in §11).
 
 ---
 
 ## 1. Why this exists
 
-The Trail of Bits audit flagged the protocol as fully centralized: privileged roles can directly affect user assets, and no timelocks exist on any administrative operation. Phase 6 adds two timelocks gating governance and parameter-changing operations, while preserving instant pathways for incident response.
+The Trail of Bits audit flagged the protocol as fully centralized: privileged roles can directly affect user assets, and no timelocks exist on any administrative operation. Phase 6 adds a single timelock that gates governance and admin operations, while preserving instant pathways for incident response.
 
 This document is the design contract. Implementation must conform to it. Deviations require an updated revision of this file.
 
@@ -38,8 +38,8 @@ Role separation is enforced at the contract level (Solady `OwnableRoles` for KAM
 
 | Role | Signature requirement | Function | Timelocked? |
 |------|----------------------|----------|-------------|
-| `ADMIN` | **x-of-y MPC** (recommended 3-of-5) | Governance: propose to timelocks, hold timelock admin role, role grants/revokes, rescue ops | Yes — for governance ops only |
-| `MANAGER` | **1-of-1 MPC** | Operational: settlement proposals, batch operations, vault tuning within bounds | No — purely operational, never proposes to timelock |
+| `ADMIN` | **x-of-y MPC** (recommended 3-of-5) | Governance: propose to timelock, role grants/revokes via timelock, also instant rescue ops | Yes — for all `_checkOwner()`-gated calls (i.e. governance ops); No — for `_checkAdmin`-gated calls (rescue) |
+| `MANAGER` | **1-of-1 MPC** | Operational: settlement proposals, batch operations | No — purely operational |
 | `RELAYER` | **1-of-1 MPC** | Settlement bot, autoclaim execution, scheduled tasks | No |
 | `EMERGENCY_ADMIN` | **1-of-1 MPC** | Pause/unpause for incident response | No — instant |
 | `GUARDIAN` | **1-of-1 MPC** | Cancel queued timelock ops, cancel high-yield settlement proposals | No — instant cancel only |
@@ -47,7 +47,7 @@ Role separation is enforced at the contract level (Solady `OwnableRoles` for KAM
 
 ### 2.3 Why this split
 
-The split is derived from KAM's own role taxonomy (see [`security-design-roles-spec.md`](security-design-roles-spec.md)), which already separates incident-response (`EMERGENCY_ADMIN`, `GUARDIAN`) from operational (`MANAGER`, `RELAYER`) from governance (`ADMIN`). Phase 6 adds the timelock layer on top of that existing split — the timelock gates governance only; operational and emergency roles are unchanged.
+The split is derived from KAM's own role taxonomy (see [`security-design-roles-spec.md`](security-design-roles-spec.md)), which already separates incident-response (`EMERGENCY_ADMIN`, `GUARDIAN`) from operational (`MANAGER`, `RELAYER`) from governance (`ADMIN`). Phase 6 adds the timelock layer **only on ADMIN's `_checkOwner()`-gated calls**; operational and emergency roles are unchanged because they use role-based checks (`_checkManager`, `_checkEmergencyAdmin`, etc.), not ownership checks.
 
 Fast roles must remain instant because they exist for time-critical events (incident response, settlement throughput). Wrapping them in a timelock would defeat their purpose.
 
@@ -55,84 +55,78 @@ Fast roles must remain instant because they exist for time-critical events (inci
 
 ## 3. Timelock architecture
 
-Two `TimelockController` instances (OpenZeppelin v5.6.1, vendored — see §6).
+A **single** `TimelockController` instance (OpenZeppelin v5.6.1, vendored — see §6).
 
-### 3.1 Admin Timelock — 3 day delay
+### 3.1 The Admin Timelock — 3 day delay
 
-**Purpose**: gates upgrades and any role-grant change.
+**Purpose**: gates upgrades, role grants/revokes, and any other `_checkOwner()`-gated administrative operation.
 
 **Holds**:
-- Ownership of every UUPS contract (the `_authorizeUpgrade` authority)
-- `DEFAULT_ADMIN_ROLE` on the Operations Timelock (so role grants on it require the longer delay)
+- Ownership of every UUPS contract (via `transferOwnership(adminTimelock)` at the end of deployment — see §5)
 
 **Roles**:
 - `PROPOSER_ROLE` → `ADMIN` (Fordefi x-of-y)
-- `CANCELLER_ROLE` → `GUARDIAN` (1-of-1) **and** `ADMIN` (auto-granted via the proposer-auto-grant in the OZ constructor — see §5.2)
+- `CANCELLER_ROLE` → `GUARDIAN` (1-of-1) **and** `ADMIN` (auto-granted via the proposer-auto-grant in the OZ constructor — see §5)
 - `EXECUTOR_ROLE` → `address(0)` (anyone can execute after delay; this is a documented OZ option that decouples scheduling from execution)
-- `DEFAULT_ADMIN_ROLE` → the timelock itself (self-administered after deployer renounce)
+- `DEFAULT_ADMIN_ROLE` → the timelock itself (self-administered after deployer renounces)
 
-### 3.2 Operations Timelock — 24 hour delay
+### 3.2 Why a single timelock (not two)
 
-**Purpose**: gates routine parameter changes (treasury config, fees, MultiFacetProxy selectors).
+The Phase 6 v1 of this spec proposed two timelocks — Admin (3d) for upgrades and Operations (24h) for routine setters. We collapsed to a single tier after surveying public industry data:
 
-**Roles**: same shape as Admin Timelock (proposer, canceller, executor) with the same Fordefi mappings, except `DEFAULT_ADMIN_ROLE` is held by the **Admin Timelock** (so role grants on this contract take 3 days, not 24h).
+- **Compound**: single tier, 2 days for everything ([docs.compound.finance](https://docs.compound.finance/v2/governance/))
+- **MakerDAO / Sky**: single tier, 48 hours via GSM Pause ([developers.sky.money](https://developers.sky.money/protocol/governance/pause/))
+- **Frax**: single tier, 2 days via veFXS-controlled timelock ([docs.frax.finance](https://docs.frax.finance/governance/advanced-concepts))
+- **Aave V3**: dual tier (1d/7d) — but only because Aave executes dozens of parameter votes per month; the 7d tier is reserved for governance-of-governance changes, not routine fees
 
-### 3.3 Why two timelocks (not one)
+KAM's setter cardinality is small and changes are rare (treasury rotation, fee changes — months between events). A 24h "fast tier" wouldn't pay back its complexity cost.
 
-Single-timelock alternatives we rejected:
-- **One delay (3d) for everything**: makes routine fee changes painfully slow. Wrong tradeoff for the most-common ops.
-- **One delay (24h) for everything**: makes `_authorizeUpgrade` only 24h, which is insufficient user exit window for upgrade events.
+If KAM later discovers a setter that needs to be faster than 3d, adding a separate `OPS_TIMELOCK_ROLE` (granted to a new 24h-delay timelock) is a pure addition — non-breaking and incremental.
 
-Two tiers (one slow for upgrades/role grants, one fast for parameter setters) addresses both edges of the tradeoff without proliferating tiers further. This is a standalone design decision derived from the gating function list in §4 — three or more tiers would not improve any cell in §4.
+### 3.3 Why we use `TimelockController` directly (no Governor wrapper)
 
-### 3.4 Why we use `TimelockController` directly (no Governor wrapper)
+OZ provides `TimelockController` as a standalone contract. It can also be wrapped in a `Governor` for token-vote-driven proposals or in a custom selector-level access-control layer. KAM's gated functions are a small fixed set — 9 `_authorizeUpgrade` overrides + a handful of role-grant and config setters. Wrapping the timelock in a more granular governance layer adds complexity (more contracts, more state, harder to reason about) for no benefit at this scale.
 
-OZ provides `TimelockController` as a standalone contract. It can also be wrapped in a `Governor` for token-vote-driven proposals or in a custom selector-level access-control layer. KAM's gated functions (§4) are a small fixed set — 8 setters and 9 `_authorizeUpgrade` overrides. Wrapping the timelock in a more granular governance layer adds complexity (more contracts, more state, harder to reason about) for no benefit at this scale.
-
-We use `TimelockController` directly as the owner of UUPS contracts (via the existing Solady `Ownable` pattern) and add an `onlyOpsTimelock`-style check on setters. This is the canonical OZ usage pattern: the [OpenZeppelin governance README](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/README.adoc) (MIT-licensed) explicitly states *"In a governance system, the {TimelockController} contract is in charge of introducing a delay between a proposal and its execution. It can be used with or without a {Governor}."*
+We use `TimelockController` directly as the owner of UUPS contracts (via `transferOwnership` and the existing Solady `Ownable` pattern). This is the canonical OZ usage pattern: the [OpenZeppelin governance README](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/README.adoc) (MIT-licensed) explicitly states *"In a governance system, the {TimelockController} contract is in charge of introducing a delay between a proposal and its execution. It can be used with or without a {Governor}."*
 
 ---
 
 ## 4. Function-level gating
 
-### 4.1 Admin Timelock (3 day delay)
+### 4.1 Timelocked (3 day delay) — gated by the existing `_checkOwner()` call
+
+After `transferOwnership(adminTimelock)`, every `_checkOwner()` call site automatically becomes 3d-gated. We do not modify any existing contract code; the gating shift happens by virtue of the owner change.
 
 | Contract | Function | Reason |
 |----------|----------|--------|
-| `kRegistry` | `_authorizeUpgrade` | UUPS upgrade — highest impact |
-| `kRemoteRegistry` | `_authorizeUpgrade` | UUPS upgrade |
+| `kRegistry` | `_authorizeUpgrade` | UUPS upgrade |
+| `kRegistry` | `grantAdminRole`, `grantEmergencyAdminRole`, `grantGuardianRole`, `revokeAdminRole`, `revokeEmergencyAdminRole`, `revokeGuardianRole` | Role escalation / de-escalation |
+| `kRegistry` | `setTreasury`, `setInsurance`, `setTreasuryBps`, `setInsuranceBps` | Fee config |
+| `kRegistry` | `setSingletonContract`, other `_checkOwner()` admin sites | Misc admin |
+| `kRemoteRegistry` | `_authorizeUpgrade`, `setAllowedSelector`, `setExecutionValidator` | Cross-chain executor config |
 | `kMinter` | `_authorizeUpgrade` | UUPS upgrade |
 | `kAssetRouter` | `_authorizeUpgrade` | UUPS upgrade |
-| `kStakingVault` | `_authorizeUpgrade` | UUPS upgrade |
+| `kStakingVault` | `_authorizeUpgrade`, `setTrustedForwarder`, `_authorizeModifyFunctions` (MultiFacetProxy add/remove) | UUPS upgrade + admin config + facet management |
+| `kStakingVault` | `setManagementFee`, `setPerformanceFee` | Vault fees |
 | `VaultAdapter` | `_authorizeUpgrade` | UUPS upgrade |
-| `SmartAdapterAccount` | `_authorizeUpgrade` | Per-strategy but protocol-controlled — see open item §10.2 |
+| `SmartAdapterAccount` | `_authorizeUpgrade` | UUPS upgrade |
 | `kToken` (kToken0) | `_authorizeUpgrade` | UUPS upgrade |
 | `kTokenFactory` (kToken0) | `_authorizeUpgrade` | UUPS upgrade |
-| Operations Timelock | role grants on `PROPOSER_ROLE` / `CANCELLER_ROLE` | Role escalation must require the longer delay |
 
-### 4.2 Operations Timelock (24 hour delay)
+**Net code change required: zero on existing contracts.** All of these already use `_checkOwner()`. The migration `transferOwnership(adminTimelock)` makes the timelock the only address that can pass the check.
 
-| Contract | Function | Reason |
-|----------|----------|--------|
-| `kRegistry` | `setTreasury` | Fee recipient change |
-| `kRegistry` | `setInsurance` | Insurance fund recipient change |
-| `kRegistry` | `setTreasuryBps` | Fee split |
-| `kRegistry` | `setInsuranceBps` | Fee split |
-| `kStakingVault` | `setManagementFee` | Vault fee |
-| `kStakingVault` | `setPerformanceFee` | Vault fee |
-| `kStakingVault` (MultiFacetProxy) | `addFunction` | Adds function selector |
-| `kStakingVault` (MultiFacetProxy) | `removeFunction` | Removes function selector |
+### 4.2 Instant (no timelock — role-gated only, unchanged from current code)
 
-### 4.3 Instant (no timelock — role-gated only)
-
-| Function | Role | Why instant |
+| Function | Role check (already in code) | Why instant |
 |----------|------|-------------|
-| `setGlobalPause` | `EMERGENCY_ADMIN` | Incident response speed |
-| `setPaused` (per-contract) | `EMERGENCY_ADMIN` | Incident response speed |
-| `cancelProposal` (settlement, high-yield path) | `GUARDIAN` | Kill switch on bad yield proposal |
-| `cancel` on either Timelock | `GUARDIAN`, `ADMIN` | Cancel a bad queued op before it executes |
-| `rescueAssets`, `rescueETH` | `ADMIN` (still x-of-y) | Time-critical asset recovery; safety relies on x-of-y collusion barrier + `GUARDIAN` not being a co-signer |
-| All settlement / batch / mint / burn / claim ops | `MANAGER`, `RELAYER`, `INSTITUTION` | Operational throughput |
+| `setGlobalPause` | `_checkEmergencyAdmin` (kRegistry) | Incident response speed |
+| `setPaused` (per-contract, e.g. VaultAdapter) | `_checkEmergencyAdmin` | Incident response speed |
+| `cancelProposal` (settlement, high-yield path) | `_checkGuardian` | Kill switch on bad yield proposal |
+| `cancel` on the Timelock | OZ `CANCELLER_ROLE` (held by GUARDIAN + ADMIN) | Cancel a bad queued op before it executes |
+| `rescueAssets`, `rescueETH` | `_checkAdmin` (kBase + kRegistry) | Time-critical asset recovery |
+| All settlement / batch / mint / burn / claim ops | `_checkManager`, `_checkRelayer`, `_checkInstitution` | Operational throughput |
+
+**Net code change required: zero on existing contracts.** All of these use role-based checks that survive the ownership transfer untouched.
 
 ---
 
@@ -140,7 +134,7 @@ We use `TimelockController` directly as the owner of UUPS contracts (via the exi
 
 ### 5.1 `TimelockController` constructor
 
-The vendored OZ `TimelockController` (v5.6.1) constructor signature, as defined in `src/vendor/openzeppelin/governance/TimelockController.sol`:
+The vendored OZ `TimelockController` (v5.6.1) constructor signature:
 
 ```solidity
 constructor(
@@ -151,22 +145,20 @@ constructor(
 )
 ```
 
-`admin` is an *initial* admin used to bootstrap the role graph. After the role graph is configured, the deployer renounces `DEFAULT_ADMIN_ROLE` so the timelock is self-administered. This is the OZ-documented bootstrap pattern.
-
-**Constructor side effects to be aware of**:
+Constructor side effects:
 - `DEFAULT_ADMIN_ROLE` is granted to **both** `address(this)` (always) and the `admin` parameter.
 - Each address in `proposers` is granted `PROPOSER_ROLE` **and** `CANCELLER_ROLE` (auto-grant).
 - Each address in `executors` is granted `EXECUTOR_ROLE`. Passing `address(0)` here opens the role to anyone.
 - The constructor does **not** validate that `proposers.length > 0`. Deploying with an empty `proposers` array creates a permanently-locked timelock. The migration script must assert non-empty.
 
-### 5.2 Deploy → Grant → Renounce sequence
+### 5.2 Deploy → Configure → Transfer sequence
 
-Pseudocode for the migration script (Foundry-style):
+The migration script lives at `script/migrations/06_TimelockMigration.s.sol`. Pseudocode:
 
 ```solidity
 require(adminFordefi != address(0) && guardianFordefi != address(0), "config");
 
-// Step 1: deploy timelocks
+// Step 1: deploy the timelock
 address[] memory proposers = new address[](1);
 proposers[0] = adminFordefi;
 require(proposers.length > 0, "must have at least one proposer");
@@ -181,103 +173,71 @@ adminTimelock = new TimelockController({
     admin: deployer                  // bootstrap admin
 });
 
-opsTimelock = new TimelockController({
-    minDelay: 24 hours,
-    proposers: proposers,
-    executors: openExecutors,
-    admin: deployer
-});
-
-// Step 2: grant CANCELLER to GUARDIAN on both
+// Step 2: grant CANCELLER to GUARDIAN
 //   Note: ADMIN already has CANCELLER_ROLE because the OZ constructor auto-grants
 //   it to every PROPOSER. Only GUARDIAN needs an explicit grant.
 adminTimelock.grantRole(CANCELLER_ROLE, guardianFordefi);
-opsTimelock.grantRole(CANCELLER_ROLE, guardianFordefi);
 
-// Step 3: grant DEFAULT_ADMIN_ROLE on Operations Timelock to Admin Timelock
-opsTimelock.grantRole(DEFAULT_ADMIN_ROLE, address(adminTimelock));
-
-// Step 4: deployer renounces DEFAULT_ADMIN_ROLE on each timelock
-//         (now Admin Timelock is self-administered, Operations Timelock is admin'd by Admin Timelock)
+// Step 3: deployer renounces DEFAULT_ADMIN_ROLE on the timelock
+//         (now self-administered — only the timelock can change its own roles, via a 3d proposal)
 adminTimelock.renounceRole(DEFAULT_ADMIN_ROLE, deployer);
-opsTimelock.renounceRole(DEFAULT_ADMIN_ROLE, deployer);
 
-// Step 5: register timelock addresses on kRegistry (single source of truth for all 9 UUPS contracts)
-kRegistry.setAdminTimelock(address(adminTimelock));
-kRegistry.setOpsTimelock(address(opsTimelock));
-
-// Step 6: transfer UUPS ownership to Admin Timelock (per contract)
+// Step 4: transfer UUPS ownership to the Admin Timelock (per contract)
+//         Order: most-critical first so the script can abort early on any anomaly.
 kRegistry.transferOwnership(address(adminTimelock));
+require(kRegistry.owner() == address(adminTimelock), "kRegistry transfer failed");
+
 kMinter.transferOwnership(address(adminTimelock));
-// ...for each of the 9 UUPS contracts
+require(kMinter.owner() == address(adminTimelock), "kMinter transfer failed");
 
-// Step 7: per-step verification — script aborts on any mismatch
-require(kRegistry.owner() == address(adminTimelock), "kRegistry ownership not transferred");
-require(adminTimelock.hasRole(adminTimelock.DEFAULT_ADMIN_ROLE(), address(adminTimelock)), "self-admin lost");
-require(!adminTimelock.hasRole(adminTimelock.DEFAULT_ADMIN_ROLE(), deployer), "deployer admin not renounced");
-// ...similar checks for opsTimelock and each UUPS contract
+kAssetRouter.transferOwnership(address(adminTimelock));
+require(kAssetRouter.owner() == address(adminTimelock), "kAssetRouter transfer failed");
+
+kStakingVault.transferOwnership(address(adminTimelock));
+require(kStakingVault.owner() == address(adminTimelock), "kStakingVault transfer failed");
+
+vaultAdapter.transferOwnership(address(adminTimelock));
+require(vaultAdapter.owner() == address(adminTimelock), "vaultAdapter transfer failed");
+
+smartAdapterAccount.transferOwnership(address(adminTimelock));
+require(smartAdapterAccount.owner() == address(adminTimelock), "smartAdapterAccount transfer failed");
+
+kRemoteRegistry.transferOwnership(address(adminTimelock));
+require(kRemoteRegistry.owner() == address(adminTimelock), "kRemoteRegistry transfer failed");
+
+// kToken0 contracts (separate repo) follow the same pattern in their own migration.
 ```
 
-### 5.3 Per-UUPS-contract integration
+### 5.3 Per-step verification
 
-For each UUPS contract, change `_authorizeUpgrade` from:
+After migration, the script reads on-chain state and asserts:
+1. Each UUPS contract's `owner() == adminTimelock`
+2. `adminTimelock.hasRole(DEFAULT_ADMIN_ROLE, address(adminTimelock))` is true (self-admin preserved)
+3. `adminTimelock.hasRole(DEFAULT_ADMIN_ROLE, deployer)` is **false** (deployer renounced)
+4. `adminTimelock.hasRole(PROPOSER_ROLE, adminFordefi)` is true
+5. `adminTimelock.hasRole(CANCELLER_ROLE, adminFordefi)` is true (auto-grant)
+6. `adminTimelock.hasRole(CANCELLER_ROLE, guardianFordefi)` is true (explicit grant)
+7. `adminTimelock.hasRole(EXECUTOR_ROLE, address(0))` is true (open executor)
+8. `adminTimelock.getMinDelay() == 3 days`
 
-```solidity
-function _authorizeUpgrade(address) internal view override {
-    _checkOwner();
-}
-```
+If any assertion fails, the script reverts and the migration must be redone (with a fresh deployment if state is partially-applied).
 
-to:
-
-```solidity
-function _authorizeUpgrade(address) internal view override {
-    require(msg.sender == _registry().getAdminTimelock(), KCONTRACT_UPGRADE_NOT_TIMELOCK);
-}
-```
-
-The `adminTimelock` reference is read from `kRegistry` (`getAdminTimelock()`) so a single source of truth governs all 9 UUPS contracts. Same approach as the existing `_getKAssetRouter()` / `K_ASSET_ROUTER` pattern in this codebase.
-
-### 5.4 Per-setter integration (Operations Timelock)
-
-Two implementation options for setter gating:
-
-**Option A — `msg.sender` check** (simpler):
-```solidity
-function setTreasury(address _new) external {
-    require(msg.sender == _registry().getOpsTimelock(), KREGISTRY_NOT_OPS_TIMELOCK);
-    // ... existing setter body
-}
-```
-
-**Option B — `onlyOpsTimelock` modifier** (more readable, same gas):
-```solidity
-modifier onlyOpsTimelock() {
-    require(msg.sender == _registry().getOpsTimelock(), KREGISTRY_NOT_OPS_TIMELOCK);
-    _;
-}
-
-function setTreasury(address _new) external onlyOpsTimelock { ... }
-```
-
-**Recommendation: B.** Modifier-based for readability; consistent with existing `onlyOwner` / `_checkInstitution` patterns in this codebase.
-
-### 5.5 Cross-repo coordination
+### 5.4 Cross-repo coordination
 
 Two repos are affected:
-- **kam** — 7 UUPS contracts
+- **kam** — 7 UUPS contracts to transfer
 - **kToken0** — 2 UUPS contracts (`kToken`, `kTokenFactory`)
 
-The timelock contracts live in **kam** (vendored under `src/vendor/openzeppelin/governance/`). kToken0 references the deployed timelock address via its registry pointer or constructor arg. Sequencing: kam timelocks deployed first, addresses recorded in deployment artifacts, then kToken0's UUPS contracts upgraded to point at the kam-deployed timelock.
+The timelock contract lives in **kam** (vendored under `src/vendor/openzeppelin/governance/`). kToken0's migration calls `transferOwnership(kamAdminTimelock)` on its 2 contracts, using the address recorded in kam's deployment artifact. Sequencing: kam deploys timelock first, kToken0 references the address.
 
-### 5.6 Rollback
+### 5.5 Rollback
 
-**No rollback.** Once `transferOwnership(timelock)` is executed, the previous owner loses all authority. Only the timelock can undo it — via a timelock-gated proposal that itself takes the same delay.
+**No rollback.** Once `transferOwnership(timelock)` is executed, the deployer EOA loses all authority. Only the timelock can undo it — via a timelock-gated proposal that itself takes 3 days.
 
 Mitigation:
-1. **Testnet rehearsal**: full deploy → grant → renounce → upgrade → fee-change cycle on Sepolia (or local fork) before mainnet.
+1. **Testnet rehearsal**: full deploy → grant → renounce → upgrade cycle on Sepolia (or local fork) before mainnet.
 2. **Foundry simulation script**: the migration is a Foundry script committed to the repo, dry-run via `forge script --rpc-url <fork> --sender <deployer>` and reviewed alongside this spec.
-3. **Per-step pause-and-verify**: after each `transferOwnership`, the script reads the new owner on-chain and aborts the entire migration if any step doesn't match expectations (see §5.2 Step 7).
+3. **Per-step pause-and-verify**: after each `transferOwnership`, the script reads the new owner on-chain and aborts the entire migration if any step doesn't match expectations (see §5.3).
 
 ---
 
@@ -317,7 +277,7 @@ src/vendor/openzeppelin/
 
 If ETH or NFTs land at the timelock by accident, recovery is via a **self-scheduled transfer**:
 1. Schedule an op where `target = address(token)` and `data = abi.encodeCall(token.transfer, (recipient, amount))`, or `target = recipient` with `value = ethAmount` for raw ETH.
-2. Wait through the relevant delay.
+2. Wait through the 3-day delay.
 3. Anyone executes.
 
 Because the timelock holds funds via its own contract address, only the timelock can move them — same as any other recovery action.
@@ -339,7 +299,7 @@ Vendoring at a pinned version means **future OZ security advisories do not auto-
 
 ## 7. How to operate the timelock
 
-The OZ `TimelockController` lifecycle is `Unset → Pending → Pending+Ready → Done`, managed by `schedule()`, `execute()`, and `cancel()`. These are the OZ-documented public API. Below is the concrete usage for KAM's two timelocks.
+The OZ `TimelockController` lifecycle is `Unset → Pending → Pending+Ready → Done`, managed by `schedule()`, `execute()`, and `cancel()`. These are the OZ-documented public API.
 
 ### 7.1 Schedule a single op
 
@@ -348,25 +308,25 @@ The OZ `TimelockController` lifecycle is `Unset → Pending → Pending+Ready �
 bytes memory data = abi.encodeCall(IkRegistry.setTreasury, (newTreasury));
 
 // PROPOSER (ADMIN x-of-y Fordefi) calls schedule()
-opsTimelock.schedule({
+adminTimelock.schedule({
     target:      address(kRegistry),
     value:       0,                     // no ETH
     data:        data,
     predecessor: bytes32(0),            // no dependency on prior op
     salt:        keccak256("set-treasury-2026-05-15"),  // uniqueness — see §7.5
-    delay:       opsTimelock.getMinDelay()              // = 24 hours
+    delay:       adminTimelock.getMinDelay()            // = 3 days
 });
 ```
 
-After this call, the op is `Pending`. Anyone can read `opsTimelock.isOperationPending(id)` and the on-chain `CallScheduled` event records all params.
+After this call, the op is `Pending`. Anyone can read `adminTimelock.isOperationPending(id)` and the on-chain `CallScheduled` event records all params.
 
 ### 7.2 Execute a scheduled op
 
-After the delay elapses:
+After 3 days:
 
 ```solidity
 // EXECUTOR_ROLE is open — anyone can call this.
-opsTimelock.execute({
+adminTimelock.execute({
     target:      address(kRegistry),
     value:       0,
     data:        data,
@@ -385,8 +345,8 @@ Before the delay passes:
 
 ```solidity
 // GUARDIAN (1-of-1 Fordefi) or ADMIN can call cancel()
-bytes32 id = opsTimelock.hashOperation(target, value, data, predecessor, salt);
-opsTimelock.cancel(id);
+bytes32 id = adminTimelock.hashOperation(target, value, data, predecessor, salt);
+adminTimelock.cancel(id);
 ```
 
 Op state goes back to `Unset`. The proposer must re-schedule from scratch (with fresh salt) to retry.
@@ -412,52 +372,56 @@ Reusing salts across different intents is forbidden. The salt convention is part
 
 ---
 
-## 8. How to update a function's delay (post-deployment)
+## 8. How to update the delay (post-deployment)
 
-Each timelock has a single `minDelay`. Changing it is itself a timelock-gated operation through the same timelock — `updateDelay` on `TimelockController` is restricted to `address(this)` per the OZ source.
+The timelock has a single `minDelay`. Changing it is itself a timelock-gated operation through the same timelock — `updateDelay` on `TimelockController` is restricted to `address(this)` per the OZ source.
 
-### 8.1 The procedure (ops-timelock 24h example)
+### 8.1 The procedure
 
-To change the Operations Timelock delay from 24h to 12h:
+To change the delay from 3 days to 5 days (example):
 
 ```solidity
 // Step 1: encode the updateDelay call (target = the timelock itself)
-bytes memory data = abi.encodeCall(TimelockController.updateDelay, (12 hours));
+bytes memory data = abi.encodeCall(TimelockController.updateDelay, (5 days));
 
 // Step 2: PROPOSER (ADMIN) schedules it on the SAME timelock
-opsTimelock.schedule({
-    target:      address(opsTimelock),
+adminTimelock.schedule({
+    target:      address(adminTimelock),
     value:       0,
     data:        data,
     predecessor: bytes32(0),
-    salt:        keccak256("ops-delay-update-24h-to-12h"),
-    delay:       opsTimelock.getMinDelay()   // current = 24h
+    salt:        keccak256("delay-update-3d-to-5d"),
+    delay:       adminTimelock.getMinDelay()   // current = 3d
 });
 
-// Step 3: wait 24 hours. During this window, GUARDIAN can cancel.
+// Step 3: wait 3 days. During this window, GUARDIAN can cancel.
 
 // Step 4: anyone calls execute()
-opsTimelock.execute(address(opsTimelock), 0, data, bytes32(0), keccak256("ops-delay-update-24h-to-12h"));
+adminTimelock.execute(address(adminTimelock), 0, data, bytes32(0), keccak256("delay-update-3d-to-5d"));
 
-// New minDelay (12h) applies to operations scheduled AFTER this point.
-// Operations already in flight retain their original 24h delay.
+// New minDelay (5d) applies to operations scheduled AFTER this point.
+// Operations already in flight retain their original 3d delay.
 ```
 
 ### 8.2 Adjustability boundaries
 
 OZ `TimelockController` allows any non-negative `minDelay`. Per-protocol policy, we recommend (not enforced in code):
-- **Operations Timelock**: never less than **6 hours**, never more than **3 days**
-- **Admin Timelock**: never less than **24 hours**, never more than **14 days**
+- **Floor: 24 hours** — going below sacrifices user-exit window
+- **Ceiling: 14 days** — going above hampers operational responsiveness
 
-Going below the floor sacrifices user-exit window; going above hampers operational responsiveness. The boundaries above are documented as an operating convention; enforcement would require a custom timelock or off-chain process review.
+The boundaries above are documented as an operating convention; enforcement would require a custom timelock or off-chain process review.
 
-### 8.3 Per-function delay differentiation
+### 8.3 If a function later needs faster execution than 3 days
 
-The two-timelock split gives us two delay tiers (3d / 24h). If a future change requires a *third* delay (e.g. a 48h tier for a single specific function), the implementation path is to:
-1. Deploy a third `TimelockController` with the new delay
-2. Move the relevant function's gating from one timelock to the new one (via a timelock-gated proposal on the *current* gating timelock)
+If a specific setter eventually needs a sub-3d delay (e.g. fee changes need 24h responsiveness in a future market structure), the implementation path is non-breaking:
 
-This is intentionally heavy — each delay tier costs a deployment and a migration — to discourage proliferation. Two tiers should suffice indefinitely.
+1. Deploy a second `TimelockController` with the desired faster delay
+2. Add a new role to the relevant contract (e.g. `OPS_TIMELOCK_ROLE` — granted via the existing kRegistry role grant pattern)
+3. Refactor the specific setter from `_checkOwner` to `_checkRole(OPS_TIMELOCK_ROLE, msg.sender)`
+4. Grant `OPS_TIMELOCK_ROLE` to the second timelock
+5. The contract now allows two paths: 3d via `_checkOwner` (the Admin Timelock as owner) is no longer possible since the setter no longer uses `_checkOwner`; only the new 24h timelock can call
+
+This is intentionally heavier than just toggling a parameter — adding tiers should be a deliberate design step, not a routine tweak.
 
 ---
 
@@ -469,55 +433,43 @@ Phase 6 implementation lands in this order. Each numbered item is one or more at
 |---|------|---------|
 | 1 | ✅ Vendor OZ TimelockController v5.6.1 + dependencies | `src/vendor/openzeppelin/{governance,access,token,utils}/...` (13 files) |
 | 2 | ✅ Spec doc | `docs/timelock-and-governance-spec.md` (this file) |
-| 3 | Add `adminTimelock` and `opsTimelock` references on kRegistry | `kRegistry.sol`, `IRegistry.sol`, getter functions, registry init expanded |
-| 4 | Add error codes for timelock gating | `src/errors/Errors.sol` (e.g. `KCONTRACT_UPGRADE_NOT_TIMELOCK`, `KREGISTRY_NOT_OPS_TIMELOCK`, etc.) |
-| 5 | Wire `_authorizeUpgrade` for each UUPS contract | 9 contract-level edits (kam: 7, kToken0: 2) |
-| 6 | Add `onlyOpsTimelock` modifier and apply to gated setters | `kRegistry.setTreasury / setInsurance / setTreasuryBps / setInsuranceBps`; `kStakingVault.setManagementFee / setPerformanceFee`; `MultiFacetProxy.addFunction / removeFunction` |
-| 7 | Per-timelock unit tests | `test/unit/AdminTimelock.t.sol`, `test/unit/OperationsTimelock.t.sol` |
-| 8 | Per-gated-function integration tests | One test file per modified contract, `_viaTimelock_*` + `_directly_reverts` patterns |
-| 9 | Emergency-exemption tests | `test/unit/EmergencyExemptions.t.sol` covering pause / cancel / rescue concurrency with queued timelock ops |
-| 10 | Migration Foundry script | `script/migrations/06_TimelockMigration.s.sol`, dry-runnable on a fork |
-| 11 | Migration tests on a fork | `test/integration/TimelockMigration.t.sol` validating full deploy → grant → renounce → upgrade cycle |
-| 12 | Update `docs/architecture.md` | New § on timelock window + user exit paths |
-| 13 | kToken0 mirror PR | Wire `_authorizeUpgrade` on kToken/kTokenFactory in the kToken0 repo, referencing the kam-deployed timelock address |
+| 3 | Migration Foundry script | `script/migrations/06_TimelockMigration.s.sol`, dry-runnable on a fork |
+| 4 | Per-timelock unit tests | `test/unit/AdminTimelock.t.sol` covering `schedule` / `execute` / `cancel` / `updateDelay` |
+| 5 | Migration tests on a fork | `test/integration/TimelockMigration.t.sol` validating full deploy → grant → renounce → ownership-transfer cycle, plus post-migration upgrade-via-timelock and direct-upgrade-reverts |
+| 6 | Update `docs/architecture.md` | New § on timelock window + user exit paths |
+| 7 | kToken0 mirror PR | Migration script that calls `transferOwnership(kamAdminTimelock)` on `kToken` and `kTokenFactory` |
 
 Post-merge:
-14. Testnet deployment rehearsal (Sepolia) of full migration
-15. External audit (delta review against Phase 1-7)
-16. Mainnet migration
+8. Testnet deployment rehearsal (Sepolia) of full migration
+9. External audit (delta review against Phase 1-7)
+10. Mainnet migration
 
 ### 9.1 Estimated commits and review surface
 
-- ~3 small commits for tasks 3-4 (foundation)
-- ~9 contract-level commits for tasks 5-6 (one per UUPS / setter group)
-- ~5 test-suite commits for tasks 7-9
-- ~2 commits for task 10-11 (migration script + integration test)
-- ~1 doc commit for task 12
+- 1 commit for task 3 (script)
+- 1-2 commits for tasks 4-5 (tests)
+- 1 commit for task 6 (doc)
+- 1 commit in kToken0 repo for task 7
 
-Total: ~20 commits in the kam PR + ~3 commits in a kToken0 PR. Reviewable in 2-3 sittings.
+**Total: ~5 commits in this kam PR + ~1 commit in a kToken0 PR.** Reviewable in one sitting.
+
+**Critically: zero commits modify existing protocol contracts.** D3's design promise is that `transferOwnership` does the work the modifier-based design would have required from setter refactors. The audit team's review surface for Phase 6 is the migration script + tests + the timelock vendoring (already done).
 
 ---
 
 ## 10. Open items
 
 ### 10.1 ADMIN multisig configuration
-Recommended: **3-of-5** Fordefi MPC. Final value decided by team and committed alongside deployment script.
+Recommended: **3-of-5** Fordefi MPC. Final value decided by team and committed in the deployment config alongside the migration script.
 
 ### 10.2 SmartAdapterAccount upgrade authority
-`SmartAdapterAccount` is deployed per-strategy but the protocol controls strategy registration. Two options:
-- **(a)** Admin Timelock (treats it as protocol infrastructure)
-- **(b)** Per-strategy manager key (treats it like a user wallet)
-
-**Decision: (a) — Admin Timelock.** Strategies are protocol-managed; allowing per-strategy unilateral upgrades creates a path for a strategy manager to brick or rug their adapter.
+`SmartAdapterAccount` is deployed per-strategy but the protocol controls strategy registration. **Decision: Admin Timelock owns it via `transferOwnership`** — same as all other UUPS contracts. Strategies are protocol-managed; allowing per-strategy unilateral upgrades creates a path for a strategy manager to brick or rug their adapter.
 
 ### 10.3 OpenZeppelin Contracts version — RESOLVED
 Pinned to **v5.6.1** (released 2026-02-27). 2+ months in the wild, no post-release advisories on the governance module as of vendoring date. See §6.
 
-### 10.4 MultiFacetProxy `addFunction` / `removeFunction` granularity
-Decision: keep the simple "all selector changes go through 24h" rule. Premature optimization to relax is rejected.
-
-### 10.5 Initial Timelock proposers — single ADMIN multisig only?
-Decision: yes, only the ADMIN x-of-y multisig is `PROPOSER_ROLE`. A backup proposer in the same custody system doesn't materially help.
+### 10.4 Initial Timelock proposers — single ADMIN multisig only
+**Decision: yes**, only the ADMIN x-of-y multisig is `PROPOSER_ROLE`. A backup proposer in the same custody system doesn't materially help.
 
 ---
 
@@ -527,6 +479,7 @@ This specification cites only:
 - **OpenZeppelin Contracts v5.6.1** (MIT) — vendored under `src/vendor/openzeppelin/`. Source code, API, and the governance README are MIT-licensed and freely citable.
 - **KAM internal documents** — predecessor and companion docs in this same `docs/` directory.
 - **Fordefi documentation** — vendor docs for the MPC custody product KAM uses.
+- **Public protocol governance documentation** — for the §3.2 industry comparison only. Documentation pages, not source code repositories.
 
 | Source | Relevance |
 |--------|-----------|
@@ -536,8 +489,13 @@ This specification cites only:
 | [OpenZeppelin governance README](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/README.adoc) | Canonical statement that `TimelockController` can be used with or without a Governor |
 | [OpenZeppelin AccessControl docs](https://docs.openzeppelin.com/contracts/5.x/api/access#AccessControl) | API reference for the role-management primitives `TimelockController` inherits |
 | [Fordefi institutional MPC](https://fordefi.com/) | Custody product used for all role wallets |
+| [Compound governance docs](https://docs.compound.finance/v2/governance/) | Industry reference for single-tier 2d timelock pattern (§3.2) |
+| [MakerDAO Pause docs](https://docs.makerdao.com/smart-contract-modules/governance-module/pause-detailed-documentation) | Industry reference for GSM Pause 48h pattern (§3.2) |
+| [Sky Protocol Pause docs](https://developers.sky.money/protocol/governance/pause/) | Updated Maker/Sky pause pattern (§3.2) |
+| [Frax governance docs](https://docs.frax.finance/governance/advanced-concepts) | Industry reference for veFXS-controlled 2d timelock pattern (§3.2) |
+| [Aave governance v3 docs](https://docs.aave.com/governance/master/governance-process) | Industry reference for the dual-tier outlier (§3.2) |
 
-We do **not** derive code or patterns from any other licensed protocol's source code. Architectural decisions in this document originate from the Trail of Bits audit findings, OpenZeppelin's published API and recommended practices, and KAM-specific requirements.
+We do **not** derive code or patterns from any other licensed protocol's source code. Architectural decisions in this document originate from the Trail of Bits audit findings, OpenZeppelin's published API and recommended practices, and KAM-specific requirements. Industry citations in §3.2 are observation of public documentation pages only.
 
 ---
 
