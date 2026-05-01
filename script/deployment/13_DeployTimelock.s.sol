@@ -8,13 +8,17 @@ import { Ownable } from "solady/auth/Ownable.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
 
-/// @title 06_TimelockMigration
-/// @notice Phase 6: deploy a single Admin Timelock with a 3-day delay, configure roles,
-/// and transfer ownership of every UUPS contract to it.
-/// @dev See docs/timelock-and-governance-spec.md.
+/// @title 13_DeployTimelock
+/// @notice Phase 6 final deployment step: deploy the Admin Timelock with a 3-day delay,
+/// configure roles, and transfer ownership of every UUPS contract to it.
+/// @dev See `docs/timelock-and-governance-spec.md`.
 ///
 /// Reads existing UUPS contract addresses from the deployment output (.json)
 /// and the admin/guardian Fordefi addresses from the network config (.json).
+///
+/// Run order: this is the **last** deployment step (after `00`–`12`). It is intentionally
+/// kept out of the `deploy-all` Make target so the deployer can confirm the protocol
+/// configuration is correct before performing the irreversible ownership handover.
 ///
 /// After this script runs:
 ///  - The deployer EOA loses upgrade authority on all UUPS contracts.
@@ -23,8 +27,12 @@ import { DeploymentManager } from "../utils/DeploymentManager.sol";
 ///    mint/burn) remain instant and unaffected.
 ///
 /// **No rollback**. Once `transferOwnership` is executed, the deployer can no longer
-/// recover authority. The migration MUST be dry-run on a fork before mainnet.
-contract TimelockMigration is Script, DeploymentManager {
+/// recover authority. The script MUST be dry-run on a fork before mainnet.
+///
+/// **When adding a new UUPS contract to the protocol**, add a `_transferOwnership` call
+/// for it in this script and add a corresponding assertion to
+/// `test/integration/TimelockMigration.t.sol::test_PostMigration_AllUUPSContractsOwnedByTimelock`.
+contract DeployTimelock is Script, DeploymentManager {
     /// @notice Minimum delay enforced by the Admin Timelock for every queued operation.
     uint256 internal constant ADMIN_TIMELOCK_DELAY = 3 days;
 
@@ -33,7 +41,7 @@ contract TimelockMigration is Script, DeploymentManager {
         return run(true);
     }
 
-    /// @notice Run the migration.
+    /// @notice Run the deployment.
     /// @param writeToJson If true, write the timelock address to the deployment output JSON.
     /// @return adminTimelock The deployed `TimelockController` address.
     function run(bool writeToJson) public returns (address adminTimelock) {
@@ -42,7 +50,7 @@ contract TimelockMigration is Script, DeploymentManager {
 
         DeploymentOutput memory output = readDeploymentOutput();
 
-        logScriptHeader("06_TimelockMigration");
+        logScriptHeader("13_DeployTimelock");
         logRoles(config);
         logBroadcaster(config.roles.owner);
         logExecutionStart();
@@ -50,23 +58,20 @@ contract TimelockMigration is Script, DeploymentManager {
         // PROPOSER = ADMIN (Fordefi x-of-y); CANCELLER auto-granted to PROPOSER by the OZ constructor.
         address[] memory proposers = new address[](1);
         proposers[0] = config.roles.admin;
-        require(proposers[0] != address(0), "06_TimelockMigration: admin not configured");
-        require(proposers.length > 0, "06_TimelockMigration: must have at least one proposer");
+        require(proposers[0] != address(0), "13_DeployTimelock: admin not configured");
+        require(proposers.length > 0, "13_DeployTimelock: must have at least one proposer");
 
         // EXECUTOR = address(0) opens execute() to anyone after the delay.
         address[] memory openExecutors = new address[](1);
         openExecutors[0] = address(0);
 
-        require(config.roles.guardian != address(0), "06_TimelockMigration: guardian not configured");
+        require(config.roles.guardian != address(0), "13_DeployTimelock: guardian not configured");
 
         vm.startBroadcast(config.roles.owner);
 
         // Step 1: deploy the timelock with the deployer as bootstrap admin.
         TimelockController timelock = new TimelockController({
-            minDelay: ADMIN_TIMELOCK_DELAY,
-            proposers: proposers,
-            executors: openExecutors,
-            admin: config.roles.owner
+            minDelay: ADMIN_TIMELOCK_DELAY, proposers: proposers, executors: openExecutors, admin: config.roles.owner
         });
         adminTimelock = address(timelock);
         console.log("AdminTimelock deployed at:", adminTimelock);
@@ -107,30 +112,24 @@ contract TimelockMigration is Script, DeploymentManager {
 
         vm.stopBroadcast();
 
-        // Final assertions: verify timelock state and role graph after migration.
-        require(timelock.hasRole(defaultAdminRole, adminTimelock), "06_TimelockMigration: self-admin lost");
+        // Final assertions: verify timelock state and role graph after handover.
+        require(timelock.hasRole(defaultAdminRole, adminTimelock), "13_DeployTimelock: self-admin lost");
         require(
             !timelock.hasRole(defaultAdminRole, config.roles.owner),
-            "06_TimelockMigration: deployer DEFAULT_ADMIN_ROLE not renounced"
+            "13_DeployTimelock: deployer DEFAULT_ADMIN_ROLE not renounced"
         );
-        require(
-            timelock.hasRole(timelock.PROPOSER_ROLE(), config.roles.admin),
-            "06_TimelockMigration: admin not proposer"
-        );
-        require(timelock.hasRole(cancellerRole, config.roles.admin), "06_TimelockMigration: admin canceller missing");
-        require(
-            timelock.hasRole(cancellerRole, config.roles.guardian),
-            "06_TimelockMigration: guardian canceller missing"
-        );
-        require(timelock.hasRole(timelock.EXECUTOR_ROLE(), address(0)), "06_TimelockMigration: executor not open");
-        require(timelock.getMinDelay() == ADMIN_TIMELOCK_DELAY, "06_TimelockMigration: delay not set");
+        require(timelock.hasRole(timelock.PROPOSER_ROLE(), config.roles.admin), "13_DeployTimelock: admin not proposer");
+        require(timelock.hasRole(cancellerRole, config.roles.admin), "13_DeployTimelock: admin canceller missing");
+        require(timelock.hasRole(cancellerRole, config.roles.guardian), "13_DeployTimelock: guardian canceller missing");
+        require(timelock.hasRole(timelock.EXECUTOR_ROLE(), address(0)), "13_DeployTimelock: executor not open");
+        require(timelock.getMinDelay() == ADMIN_TIMELOCK_DELAY, "13_DeployTimelock: delay not set");
 
         if (writeToJson) {
             queueContractAddress("adminTimelock", adminTimelock);
             flushContractAddresses();
         }
 
-        console.log("=== MIGRATION COMPLETE ===");
+        console.log("=== TIMELOCK DEPLOYMENT COMPLETE ===");
         console.log("AdminTimelock:", adminTimelock);
         console.log("Delay (seconds):", ADMIN_TIMELOCK_DELAY);
         console.log("Proposer (admin):", config.roles.admin);
@@ -147,7 +146,7 @@ contract TimelockMigration is Script, DeploymentManager {
         Ownable(target).transferOwnership(newOwner);
         require(
             Ownable(target).owner() == newOwner,
-            string.concat("06_TimelockMigration: ", name, " ownership transfer failed")
+            string.concat("13_DeployTimelock: ", name, " ownership transfer failed")
         );
         console.log(string.concat("Transferred ", name, " ownership to:"), newOwner);
     }

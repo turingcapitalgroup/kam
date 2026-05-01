@@ -3,8 +3,8 @@ pragma solidity 0.8.30;
 
 import { BaseTest } from "../utils/BaseTest.sol";
 
-import { TimelockController } from "kam/src/vendor/openzeppelin/governance/TimelockController.sol";
 import { IAccessControl } from "kam/src/vendor/openzeppelin/access/IAccessControl.sol";
+import { TimelockController } from "kam/src/vendor/openzeppelin/governance/TimelockController.sol";
 
 /// @notice Phase 6 unit tests for the vendored OpenZeppelin TimelockController in the
 /// configuration KAM will deploy in production: 3-day delay, ADMIN multisig as proposer,
@@ -23,13 +23,14 @@ contract AdminTimelockTest is BaseTest {
     bytes32 internal CANCELLER_ROLE;
     bytes32 internal DEFAULT_ADMIN_ROLE;
 
-    address internal admin;       // PROPOSER (Fordefi x-of-y simulated as a single EOA in tests)
-    address internal guardian;    // additional CANCELLER (Fordefi 1-of-1)
-    address internal deployer;    // bootstrap admin, will renounce DEFAULT_ADMIN_ROLE
-    address internal alice;       // unprivileged caller for negative tests
+    address internal admin; // PROPOSER (Fordefi x-of-y simulated as a single EOA in tests)
+    address internal guardian; // additional CANCELLER (Fordefi 1-of-1)
+    address internal deployer; // bootstrap admin, will renounce DEFAULT_ADMIN_ROLE
+    address internal alice; // unprivileged caller for negative tests
 
-    /// @dev Deploys the timelock the same way `06_TimelockMigration.s.sol` does, then
-    /// drops the deployer's DEFAULT_ADMIN_ROLE so the timelock is self-administered.
+    /// @dev Deploys the timelock the same way `script/deployment/13_DeployTimelock.s.sol` does,
+    /// then drops the deployer's DEFAULT_ADMIN_ROLE so the timelock is self-administered.
+    /// **If the script changes the deployment shape, this setUp must be kept in sync.**
     function setUp() public override {
         BaseTest.setUp();
 
@@ -104,16 +105,12 @@ contract AdminTimelockTest is BaseTest {
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, PROPOSER_ROLE)
         );
-        timelock.schedule(
-            address(0xBEEF), 0, abi.encodeWithSignature("noop()"), bytes32(0), keccak256("nope"), DELAY
-        );
+        timelock.schedule(address(0xBEEF), 0, abi.encodeWithSignature("noop()"), bytes32(0), keccak256("nope"), DELAY);
     }
 
     function test_Schedule_BelowMinDelay_Reverts() public {
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(TimelockController.TimelockInsufficientDelay.selector, DELAY - 1, DELAY)
-        );
+        vm.expectRevert(abi.encodeWithSelector(TimelockController.TimelockInsufficientDelay.selector, DELAY - 1, DELAY));
         timelock.schedule(
             address(0xBEEF), 0, abi.encodeWithSignature("noop()"), bytes32(0), keccak256("short"), DELAY - 1
         );
@@ -315,5 +312,8 @@ contract AdminTimelockTest is BaseTest {
 /// @dev Small target contract for execute tests.
 contract TargetMock {
     uint256 public counter;
-    function bump() external { counter += 1; }
+
+    function bump() external {
+        counter += 1;
+    }
 }

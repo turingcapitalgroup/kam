@@ -60,6 +60,7 @@ number_underscore = "thousands"
 quote_style = "double"
 tab_width = 4
 sort_imports = true
+ignore = ["src/vendor/**"]
 
 [rpc_endpoints]
 mainnet = "${RPC_MAINNET}"

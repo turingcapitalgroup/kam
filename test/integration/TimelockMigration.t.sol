@@ -6,12 +6,12 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import { TimelockController } from "kam/src/vendor/openzeppelin/governance/TimelockController.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
 
-import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
-import { kMinter } from "kam/src/kMinter.sol";
-import { kAssetRouter } from "kam/src/kAssetRouter.sol";
-import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 import { VAULTADAPTER_WRONG_ROLE } from "kam/src/errors/Errors.sol";
+import { kAssetRouter } from "kam/src/kAssetRouter.sol";
+import { kMinter } from "kam/src/kMinter.sol";
+import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
+import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 
 /// @notice End-to-end Phase 6 migration test. Deploys the full kam protocol via
 /// `DeploymentBaseTest`, then performs the timelock migration in-memory and validates:
@@ -36,8 +36,10 @@ contract TimelockMigrationTest is DeploymentBaseTest {
         _runTimelockMigration();
     }
 
-    /// @dev Replicates the on-chain steps of `script/migrations/06_TimelockMigration.s.sol`
+    /// @dev Replicates the on-chain steps of `script/deployment/13_DeployTimelock.s.sol`
     /// against the in-memory deployment from `DeploymentBaseTest`.
+    /// **If the script changes the deployment shape (adds/removes a UUPS contract,
+    /// changes the role-grant order, etc.), this function must be kept in sync.**
     function _runTimelockMigration() internal {
         address deployer = users.owner;
         address adminFordefi = users.admin;
@@ -79,15 +81,25 @@ contract TimelockMigrationTest is DeploymentBaseTest {
                        OWNERSHIP AFTER MIGRATION
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Asserts every UUPS instance transferred in `_runTimelockMigration` ends up owned by the
+    /// timelock. **The list below MUST match `_runTimelockMigration`** — if you add a contract there,
+    /// add the corresponding assertion here.
     function test_PostMigration_AllUUPSContractsOwnedByTimelock() public view {
+        // Core protocol (3)
         assertEq(Ownable(address(registry)).owner(), address(timelock), "registry");
         assertEq(Ownable(address(minter)).owner(), address(timelock), "minter");
         assertEq(Ownable(address(assetRouter)).owner(), address(timelock), "assetRouter");
+        // kStakingVault instances (3)
         assertEq(Ownable(address(dnVault)).owner(), address(timelock), "dnVault");
         assertEq(Ownable(address(alphaVault)).owner(), address(timelock), "alphaVault");
         assertEq(Ownable(address(betaVault)).owner(), address(timelock), "betaVault");
+        // kMinter VaultAdapter instances (2)
         assertEq(Ownable(address(minterAdapterUSDC)).owner(), address(timelock), "minterAdapterUSDC");
+        assertEq(Ownable(address(minterAdapterWBTC)).owner(), address(timelock), "minterAdapterWBTC");
+        // kStakingVault VaultAdapter instances (3)
         assertEq(Ownable(address(DNVaultAdapterUSDC)).owner(), address(timelock), "DNVaultAdapterUSDC");
+        assertEq(Ownable(address(ALPHAVaultAdapterUSDC)).owner(), address(timelock), "ALPHAVaultAdapterUSDC");
+        assertEq(Ownable(address(BETHAVaultAdapterUSDC)).owner(), address(timelock), "BETHAVaultAdapterUSDC");
     }
 
     function test_PostMigration_TimelockSelfAdministered() public view {

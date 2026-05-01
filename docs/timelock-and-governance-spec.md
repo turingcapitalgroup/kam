@@ -113,6 +113,12 @@ After `transferOwnership(adminTimelock)`, every `_checkOwner()` call site automa
 | `kToken` (kToken0) | `_authorizeUpgrade` | UUPS upgrade |
 | `kTokenFactory` (kToken0) | `_authorizeUpgrade` | UUPS upgrade |
 
+**Contract types vs. proxy instances**: the table above lists 9 *contract types*. Each type is deployed as one or more proxies (e.g. `kStakingVault` has multiple instances — `dnVaultUSDC`, `dnVaultWBTC`, `alphaVault`, `betaVault`; `VaultAdapter` has one per (vault × asset) combination). The deployment script transfers ownership of every proxy *instance* — see [`script/deployment/13_DeployTimelock.s.sol`](../script/deployment/13_DeployTimelock.s.sol) for the explicit list.
+
+**Special-case notes**:
+- `SmartAdapterAccount` is the parent class of `VaultAdapter`. It is not deployed as a standalone proxy in the kam protocol; transferring ownership of each `VaultAdapter` proxy is sufficient. The row above is retained for completeness — if a future deployment introduces standalone `SmartAdapterAccount` instances, they must be added to the script.
+- `kRemoteRegistry` is deployed via the multichain script (`script/multichain/DeployRemoteRegistry.s.sol`) and is **not** in the standard `DeploymentOutput`. Its ownership transfer must be performed in the multichain repository alongside each remote chain's deployment, not from `13_DeployTimelock.s.sol`. Cross-repo coordination per §5.5.
+
 **Net code change required: zero on existing contracts.** All of these already use `_checkOwner()`. The migration `transferOwnership(adminTimelock)` makes the timelock the only address that can pass the check.
 
 ### 4.2 Instant (no timelock — role-gated only, unchanged from current code)
@@ -153,7 +159,7 @@ Constructor side effects:
 
 ### 5.2 Deploy → Configure → Transfer sequence
 
-The migration script lives at `script/migrations/06_TimelockMigration.s.sol`. Pseudocode:
+The deployment script lives at `script/deployment/13_DeployTimelock.s.sol` (the final step in the deployment sequence, kept out of `make deploy-all` so the deployer can confirm protocol configuration before the irreversible ownership handover). Pseudocode:
 
 ```solidity
 require(adminFordefi != address(0) && guardianFordefi != address(0), "config");
@@ -433,7 +439,7 @@ Phase 6 implementation lands in this order. Each numbered item is one or more at
 |---|------|---------|
 | 1 | ✅ Vendor OZ TimelockController v5.6.1 + dependencies | `src/vendor/openzeppelin/{governance,access,token,utils}/...` (13 files) |
 | 2 | ✅ Spec doc | `docs/timelock-and-governance-spec.md` (this file) |
-| 3 | Migration Foundry script | `script/migrations/06_TimelockMigration.s.sol`, dry-runnable on a fork |
+| 3 | Deployment Foundry script | `script/deployment/13_DeployTimelock.s.sol` (next in the existing 00–12 sequence), dry-runnable on a fork. Wired to Makefile via `make deploy-timelock` (deliberately NOT in `deploy-all`). |
 | 4 | Per-timelock unit tests | `test/unit/AdminTimelock.t.sol` covering `schedule` / `execute` / `cancel` / `updateDelay` |
 | 5 | Migration tests on a fork | `test/integration/TimelockMigration.t.sol` validating full deploy → grant → renounce → ownership-transfer cycle, plus post-migration upgrade-via-timelock and direct-upgrade-reverts |
 | 6 | Update `docs/architecture.md` | New § on timelock window + user exit paths |

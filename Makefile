@@ -60,6 +60,9 @@ help:
 	@echo "make configure            - Configure protocol (10)"
 	@echo "make configure-adapters   - Configure adapter permissions (11)"
 	@echo "make configure-approvals  - Configure adapter ERC20 approvals (12)"
+	@echo ""
+	@echo "=== FINAL STEP - Ownership handover (script/deployment/13) ==="
+	@echo "make deploy-timelock      - Deploy Admin Timelock + transfer UUPS ownership (13, IRREVERSIBLE)"
 
 # Network-specific deployments
 deploy-mainnet:
@@ -331,6 +334,16 @@ configure-adapters:
 configure-approvals:
 	@echo "✅ Configuring adapter ERC20 approvals..."
 	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/12_ConfigureAdapterApprovals.s.sol --sig "run()" $(FORGE_ARGS)
+
+# Timelock deployment + ownership handover (13) - FINAL step, IRREVERSIBLE.
+# Deploys the Admin Timelock (3-day delay), grants CANCELLER to GUARDIAN, deployer renounces
+# DEFAULT_ADMIN_ROLE on the timelock, and transferOwnership of every UUPS contract to the timelock.
+# Deliberately NOT included in `deploy-all` — run only after `deploy-all` + `config-all` are
+# verified, ideally with a dry-run first. See `docs/timelock-and-governance-spec.md`.
+deploy-timelock:
+	@echo "🔒 Deploying Admin Timelock and transferring UUPS ownership..."
+	@echo "⚠️  This step is IRREVERSIBLE. Confirm dry-run output before broadcasting."
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/13_DeployTimelock.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Verification
 verify:
