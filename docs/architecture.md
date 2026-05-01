@@ -710,6 +710,69 @@ Most core contracts use the UUPS pattern with proper authorization controls. Onl
 
 The kBatchReceiver contract remains immutable by design with no upgrade capability, providing maximum security and trust during redemption distribution. All other core protocol contracts are upgradeable to enable protocol evolution and critical bug fixes while maintaining strict authorization controls.
 
+## Timelock & Governance
+
+> 📘 **Note**: This section summarizes the timelock layer added in Phase 6 of the post-audit improvement plan. For the full design contract — role architecture, function-level gating, migration plan, salt/predecessor policies — see [Timelock & Governance Specification](./timelock-and-governance-spec.md).
+
+After Phase 6 deployment, every UUPS upgrade and every other `_checkOwner()`-gated administrative call goes through a single **Admin Timelock** with a **3-day delay**.
+
+### Architecture
+
+A single `OpenZeppelin TimelockController` instance (vendored at `src/vendor/openzeppelin/governance/TimelockController.sol`, MIT-licensed) is the owner of every UUPS contract:
+
+- **PROPOSER_ROLE** → ADMIN multisig (Fordefi MPC, x-of-y signatures)
+- **CANCELLER_ROLE** → GUARDIAN (Fordefi 1-of-1) **and** ADMIN (auto-granted as proposer)
+- **EXECUTOR_ROLE** → `address(0)` (open executor — anyone can execute after the delay elapses)
+- **DEFAULT_ADMIN_ROLE** → the timelock itself (self-administered after deployment)
+
+### What goes through the 3-day delay
+
+Every existing `_checkOwner()` call site, automatically — Phase 6 makes the timelock the new owner via `transferOwnership(adminTimelock)`, with **no modifications** to the contracts themselves. This includes:
+
+- All UUPS `_authorizeUpgrade` overrides
+- Role grants/revokes on kRegistry (`grantAdminRole`, `grantEmergencyAdminRole`, `grantGuardianRole`, and revokes)
+- Treasury / insurance / fee setters
+- MultiFacetProxy `addFunction` / `removeFunction` (via `_authorizeModifyFunctions`)
+- Singleton-contract registrations and other admin config
+
+### What stays instant
+
+Functions gated by **role-based checks** (not `_checkOwner`) are unaffected and remain instant:
+
+| Function | Role check | Caller |
+|---|---|---|
+| `setGlobalPause`, `setPaused` | `_checkEmergencyAdmin` | EMERGENCY_ADMIN |
+| `cancelProposal` (settlement) | `_checkGuardian` | GUARDIAN |
+| `rescueAssets`, `rescueETH` | `_checkAdmin` | ADMIN |
+| All settlement, batch, mint, burn, claim ops | `_checkManager`, `_checkRelayer`, `_checkInstitution` | MANAGER, RELAYER, INSTITUTION |
+| `cancel` on the timelock itself | `CANCELLER_ROLE` | GUARDIAN, ADMIN |
+
+### User exit window
+
+The 3-day delay between when a privileged change is proposed (visible on-chain via the `CallScheduled` event) and when it executes gives users — institutions, stakers, kToken holders — a **3-day window to exit** the protocol if they disagree with a queued change. Users can:
+
+1. Monitor `CallScheduled` events on the deployed timelock address (published in deployment artifacts).
+2. Read `timelock.getOperationState(id)` and `timelock.getTimestamp(id)` to see when an op becomes executable.
+3. If a queued change is unacceptable, redeem kTokens via `kMinter` (institutional) or `kStakingVault` (retail) before the delay elapses.
+
+### Emergency override
+
+If a queued op is malicious or buggy, the GUARDIAN can call `timelock.cancel(id)` instantly, returning the op to the `Unset` state. The proposer must re-schedule with a new salt to retry.
+
+### Operating the timelock
+
+The lifecycle is:
+
+```
+Unset → Pending → Pending+Ready (after 3 days) → Done
+```
+
+`schedule()` requires `PROPOSER_ROLE`; `execute()` is open (any address); `cancel()` requires `CANCELLER_ROLE`. Every op is identified by `hashOperation(target, value, data, predecessor, salt)`. Salt rotation policy: every salt encodes an ISO date or a monotonic counter to guarantee uniqueness. See `docs/timelock-and-governance-spec.md` §7 for full code examples.
+
+### Adjusting the delay
+
+`timelock.updateDelay(uint256 newDelay)` is callable only by the timelock itself, so changing the delay is a 3-day-gated operation through the same timelock. Recommended operating boundaries: floor 24 hours, ceiling 14 days.
+
 ## Integration Points
 
 ### For Institutions
