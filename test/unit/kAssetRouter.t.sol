@@ -256,16 +256,18 @@ contract kAssetRouterTest is DeploymentBaseTest {
         uint256 _amount = TEST_AMOUNT;
         bytes32 _batchId = TEST_BATCH_ID;
 
+        // No assets registered for alphaVault yet — virtual balance is 0, < requested.
         vm.prank(address(alphaVault));
-        vm.expectRevert();
+        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
 
         IVaultAdapter _sourceAdapter = IVaultAdapter(registry.getAdapter(address(alphaVault), USDC));
         vm.prank(address(assetRouter));
         _sourceAdapter.setTotalAssets(_amount - 1);
 
+        // Even with most of the balance, requested == _amount > _amount - 1, still insufficient.
         vm.prank(address(alphaVault));
-        vm.expectRevert();
+        vm.expectRevert(bytes(KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE));
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
     }
 

@@ -13,6 +13,7 @@ import {
 } from "kam/src/errors/Errors.sol";
 import { IkRemoteRegistry } from "kam/src/interfaces/IkRemoteRegistry.sol";
 import { kRemoteRegistry } from "kam/src/kRegistry/kRemoteRegistry.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
 
 contract kRemoteRegistryTest is Test {
     kRemoteRegistry public registry;
@@ -89,7 +90,7 @@ contract kRemoteRegistryTest is Test {
 
     function test_SetAllowedSelector_Require_Owner() public {
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(Ownable.Unauthorized.selector);
         registry.setAllowedSelector(executor, target, testSelector, true);
     }
 
@@ -154,7 +155,7 @@ contract kRemoteRegistryTest is Test {
         registry.setAllowedSelector(executor, target, testSelector, true);
 
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(Ownable.Unauthorized.selector);
         registry.setExecutionValidator(executor, target, testSelector, executionValidator);
     }
 
