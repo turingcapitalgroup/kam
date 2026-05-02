@@ -132,6 +132,21 @@ contract kMinterTest is DeploymentBaseTest {
         minter.mint(USDC, users.institution, MINT_AMOUNT);
     }
 
+    /// @notice kBase._isPaused() = local OR global. Even with local pause off, a global
+    /// pause set on the registry must block mint with KMINTER_IS_PAUSED.
+    function test_Mint_Require_Not_GloballyPaused() public {
+        // Local pause is off (default).
+        assertFalse(minter.isPaused(), "local pause should be off");
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+        assertTrue(registry.isGlobalPaused(), "global pause should be on");
+
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
+        minter.mint(USDC, users.institution, MINT_AMOUNT);
+    }
+
     function test_Mint_Require_Only_Institution() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
@@ -216,6 +231,18 @@ contract kMinterTest is DeploymentBaseTest {
         minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
     }
 
+    /// @notice Global pause must also block requestBurn even when local pause is off.
+    function test_RequestBurn_Require_Not_GloballyPaused() public {
+        assertFalse(minter.isPaused(), "local pause should be off");
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
+        minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+    }
+
     function test_RequestBurn_Require_Only_Institution() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
@@ -286,6 +313,21 @@ contract kMinterTest is DeploymentBaseTest {
 
         vm.prank(users.emergencyAdmin);
         minter.setPaused(true);
+
+        bytes32[] memory _requestIds = minter.getUserRequests(users.institution);
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
+        minter.burn(_requestIds[0]);
+    }
+
+    /// @notice Global pause must also block burn even when local pause is off.
+    function test_Burn_Require_Not_GloballyPaused() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+        _requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+        assertFalse(minter.isPaused(), "local pause should be off");
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
 
         bytes32[] memory _requestIds = minter.getUserRequests(users.institution);
         vm.prank(users.institution);
