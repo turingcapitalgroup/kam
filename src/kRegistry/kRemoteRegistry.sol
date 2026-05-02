@@ -96,7 +96,7 @@ contract kRemoteRegistry is IkRemoteRegistry, Initializable, UUPSUpgradeable, Ow
 
         // Check if trying to set to the same value
         bool _currentlyAllowed = $.executorAllowedSelectors[_executor][_target][_selector];
-        require(!(_currentlyAllowed && _allowed), KREMOTEREGISTRY_SELECTOR_ALREADY_SET);
+        require(_currentlyAllowed != _allowed, KREMOTEREGISTRY_SELECTOR_ALREADY_SET);
 
         $.executorAllowedSelectors[_executor][_target][_selector] = _allowed;
 
