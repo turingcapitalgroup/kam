@@ -167,6 +167,42 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         guardianModule.authorizeCall(testTarget, testSelector, "");
     }
 
+    /// @notice With a validator registered, authorizeCall must forward to it with the
+    /// original (executor, target, selector, params). Verified via a recording mock.
+    function test_AuthorizeCall_InvokesValidatorWithParams() public {
+        EGRecordingValidator _mockValidator = new EGRecordingValidator();
+
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, testSelector, true);
+        vm.prank(users.admin);
+        guardianModule.setExecutionValidator(testExecutor, testTarget, testSelector, address(_mockValidator));
+
+        bytes memory _params = abi.encode(uint256(7), bytes32(uint256(0xb))); // arbitrary payload
+
+        vm.prank(testExecutor);
+        guardianModule.authorizeCall(testTarget, testSelector, _params);
+
+        assertEq(_mockValidator.callCount(), 1, "validator should be invoked exactly once");
+        assertEq(_mockValidator.lastExecutor(), testExecutor, "validator should receive the executor");
+        assertEq(_mockValidator.lastTarget(), testTarget, "validator should receive the target");
+        assertEq(_mockValidator.lastSelector(), testSelector, "validator should receive the selector");
+        assertEq(_mockValidator.lastParams(), _params, "validator should receive original params");
+    }
+
+    /// @notice A validator-side revert must propagate back through authorizeCall.
+    function test_AuthorizeCall_PropagatesValidatorRevert() public {
+        EGRevertingValidator _bad = new EGRevertingValidator();
+
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, testSelector, true);
+        vm.prank(users.admin);
+        guardianModule.setExecutionValidator(testExecutor, testTarget, testSelector, address(_bad));
+
+        vm.prank(testExecutor);
+        vm.expectRevert(bytes("EGValidatorReject"));
+        guardianModule.authorizeCall(testTarget, testSelector, "");
+    }
+
     /* //////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -457,5 +493,73 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         bytes4[] memory _exec2Selectors = guardianModule.getExecutorTargetSelectors(_executor2, MOCK_METAWALLET);
         assertEq(_exec2Selectors.length, 1);
         assertEq(_exec2Selectors[0], _selector2);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                    GETEXECUTORTARGETSBYTYPE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Filters the executor's targets by target type, ignoring others.
+    function test_GetExecutorTargetsByType_FiltersCorrectly() public {
+        address _meta1 = makeAddr("Meta1");
+        address _meta2 = makeAddr("Meta2");
+        address _custodial = makeAddr("Custodial");
+        bytes4 _sel = bytes4(keccak256("foo()"));
+
+        vm.startPrank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, _meta1, METAWALLET_TARGET_TYPE, _sel, true);
+        guardianModule.setAllowedSelector(testExecutor, _meta2, METAWALLET_TARGET_TYPE, _sel, true);
+        guardianModule.setAllowedSelector(testExecutor, _custodial, TEST_TARGET_TYPE, _sel, true);
+        vm.stopPrank();
+
+        address[] memory _metas = guardianModule.getExecutorTargetsByType(testExecutor, METAWALLET_TARGET_TYPE);
+        assertEq(_metas.length, 2, "Should return only the two metawallet targets");
+
+        bool _has1;
+        bool _has2;
+        for (uint256 _i; _i < _metas.length; _i++) {
+            if (_metas[_i] == _meta1) _has1 = true;
+            if (_metas[_i] == _meta2) _has2 = true;
+        }
+        assertTrue(_has1 && _has2, "Filtered set must contain both metawallet targets");
+
+        address[] memory _custodials = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
+        assertEq(_custodials.length, 1, "Should return only the one custodial target");
+        assertEq(_custodials[0], _custodial);
+    }
+
+    function test_GetExecutorTargetsByType_ReturnsEmpty_WhenNoneMatch() public {
+        bytes4 _sel = bytes4(keccak256("foo()"));
+
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, _sel, true);
+
+        // Asking for a type that has no targets returns empty.
+        address[] memory _empty = guardianModule.getExecutorTargetsByType(testExecutor, 99);
+        assertEq(_empty.length, 0);
+    }
+}
+
+/// @dev Records the last authorizeCall arguments so tests can assert the module forwards them.
+contract EGRecordingValidator {
+    uint256 public callCount;
+    address public lastExecutor;
+    address public lastTarget;
+    bytes4 public lastSelector;
+    bytes public lastParams;
+
+    function authorizeCall(address _executor, address _target, bytes4 _selector, bytes calldata _params) external {
+        ++callCount;
+        lastExecutor = _executor;
+        lastTarget = _target;
+        lastSelector = _selector;
+        lastParams = _params;
+    }
+}
+
+/// @dev Always reverts; used to confirm validator reverts propagate through the module.
+contract EGRevertingValidator {
+    function authorizeCall(address, address, bytes4, bytes calldata) external pure {
+        revert("EGValidatorReject");
     }
 }
