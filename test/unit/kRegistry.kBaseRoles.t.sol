@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import { ADMIN_ROLE, MANAGER_ROLE, RELAYER_ROLE, VENDOR_ROLE } from "../utils/Constants.sol";
+import {
+    ADMIN_ROLE,
+    EMERGENCY_ADMIN_ROLE,
+    GUARDIAN_ROLE,
+    MANAGER_ROLE,
+    RELAYER_ROLE,
+    VENDOR_ROLE
+} from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { Ownable } from "kam/src/vendor/solady/auth/Ownable.sol";
@@ -39,6 +46,13 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
         _roles = registry.rolesOf(users.relayer);
         assertTrue(_roles & RELAYER_ROLE != 0);
         assertTrue(_roles & MANAGER_ROLE != 0);
+
+        // emergencyAdmin and guardian get exactly one role each, granted in __kBaseRoles_init.
+        _roles = registry.rolesOf(users.emergencyAdmin);
+        assertTrue(_roles & EMERGENCY_ADMIN_ROLE != 0, "emergencyAdmin should have EMERGENCY_ADMIN_ROLE");
+
+        _roles = registry.rolesOf(users.guardian);
+        assertTrue(_roles & GUARDIAN_ROLE != 0, "guardian should have GUARDIAN_ROLE");
 
         _roles = registry.rolesOf(users.alice);
         assertEq(_roles, 0);
