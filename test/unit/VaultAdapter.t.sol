@@ -6,7 +6,11 @@ import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
-import { VAULTADAPTER_WRONG_ROLE, VAULTADAPTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
+import {
+    VAULTADAPTER_IS_PAUSED,
+    VAULTADAPTER_WRONG_ROLE,
+    VAULTADAPTER_ZERO_ADDRESS
+} from "kam/src/errors/Errors.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
 
@@ -131,6 +135,22 @@ contract VaultAdapterTest is DeploymentBaseTest {
         vm.prank(users.admin);
         vm.expectRevert(bytes(VAULTADAPTER_WRONG_ROLE));
         adapter.pull(USDC, _amount);
+    }
+
+    function test_Pull_RevertsWhenPaused() public {
+        uint256 _amount = 100 * _1_USDC;
+        mockUSDC.mint(address(adapter), _amount);
+
+        vm.prank(users.emergencyAdmin);
+        adapter.setPaused(true);
+
+        // Even the router cannot pull while paused.
+        vm.prank(address(assetRouter));
+        vm.expectRevert(bytes(VAULTADAPTER_IS_PAUSED));
+        adapter.pull(USDC, _amount);
+
+        // Funds remain on the adapter.
+        assertEq(mockUSDC.balanceOf(address(adapter)), _amount);
     }
 
     /* //////////////////////////////////////////////////////////////
