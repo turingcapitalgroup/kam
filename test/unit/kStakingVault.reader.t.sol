@@ -104,14 +104,25 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
     function test_nextManagementFeeTimestamp_ReturnsEndOfMonth() public view {
         uint256 nextTimestamp = vault.nextManagementFeeTimestamp();
-        // Should be in the future or at end of current month
-        assertGt(nextTimestamp, 0);
+        uint256 lastCharged = vault.lastFeesChargedManagement();
+
+        // Management cadence is monthly. Next charge is the end of either the current month
+        // (when last charge was mid-month) or the next month (when last charge was on the
+        // last day). Either way, the gap from the last charge sits inside ~0..62 days.
+        assertGe(nextTimestamp, lastCharged, "next mgmt must be >= last charge");
+        assertLe(nextTimestamp - lastCharged, 62 days, "next mgmt should be at most ~62 days out");
     }
 
     function test_nextPerformanceFeeTimestamp_ReturnsQuarterEnd() public view {
         uint256 nextTimestamp = vault.nextPerformanceFeeTimestamp();
-        // Should be in the future (quarterly)
-        assertGt(nextTimestamp, 0);
+        uint256 lastCharged = vault.lastFeesChargedPerformance();
+        uint256 mgmtNext = vault.nextManagementFeeTimestamp();
+
+        // Performance cadence is quarterly (~2 or 3 months ahead depending on day-of-month).
+        // It must always be strictly past the management timestamp and at least one month out.
+        assertGt(nextTimestamp, mgmtNext, "next perf must be after next mgmt");
+        assertGe(nextTimestamp - lastCharged, 28 days, "next perf must be at least ~one month out");
+        assertLe(nextTimestamp - lastCharged, 100 days, "next perf must be at most ~3 months out");
     }
 
     /* //////////////////////////////////////////////////////////////
