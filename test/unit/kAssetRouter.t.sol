@@ -136,6 +136,22 @@ contract kAssetRouterTest is DeploymentBaseTest {
         assetRouter.kAssetPush(USDC, TEST_AMOUNT, TEST_BATCH_ID);
     }
 
+    /// @notice kBase._isPaused() = local OR global. Even with local pause off, a global
+    /// pause set on the registry must block kAssetRouter operations. Without this test,
+    /// dropping the global half of the OR would still pass every existing pause test.
+    function test_KAssetPush_Require_Not_GloballyPaused() public {
+        // Local pause is off (default).
+        assertFalse(assetRouter.isPaused(), "local pause should be off");
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+        assertTrue(registry.isGlobalPaused(), "global pause should be on");
+
+        vm.prank(address(minter));
+        vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
+        assetRouter.kAssetPush(USDC, TEST_AMOUNT, TEST_BATCH_ID);
+    }
+
     function test_KAssetPush_Require_Amount_Not_Zero() public {
         vm.prank(address(minter));
         vm.expectRevert(bytes(KASSETROUTER_ZERO_AMOUNT));
