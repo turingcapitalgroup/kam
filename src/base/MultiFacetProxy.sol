@@ -1,12 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+import {
+    MULTIFACETPROXY_NOT_CONTRACT,
+    MULTIFACETPROXY_SELECTOR_ALREADY_SET,
+    MULTIFACETPROXY_SELF_DELEGATION,
+    MULTIFACETPROXY_ZERO_ADDRESS
+} from "kam/src/errors/Errors.sol";
+import {
+    OptimizedBytes32EnumerableSetLib
+} from "kam/src/vendor/solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { Proxy } from "openzeppelin/Proxy.sol";
 
 /// @title MultiFacetProxy
 /// @notice A proxy contract that can route function calls to different implementation contracts
 /// @dev Inherits from Base and OpenZeppelin's Proxy contract
 abstract contract MultiFacetProxy is Proxy {
+    using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
+
     /* //////////////////////////////////////////////////////////////
                               EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -38,6 +49,8 @@ abstract contract MultiFacetProxy is Proxy {
     struct MultiFacetProxyStorage {
         /// @notice Mapping of chain method selectors to implementation contracts
         mapping(bytes4 => address) selectorToImplementation;
+        /// @notice Enumerable set of registered selectors (as bytes32 for lib compatibility)
+        OptimizedBytes32EnumerableSetLib.Bytes32Set registeredSelectorSet;
     }
 
     /// @dev Returns the MultiFacetProxy storage pointer
@@ -51,15 +64,22 @@ abstract contract MultiFacetProxy is Proxy {
     /// @param _selector The function selector to add
     /// @param _impl The implementation contract address
     /// @param _forceOverride If true, allows overwriting existing mappings
-    /// @dev Only callable by admin role
+    /// @dev Only callable by admin role. Rejects address(0), address(this), and non-contract addresses.
+    /// If `_forceOverride` is true and `_impl` is the current implementation, the call is a no-op
+    /// for the mapping but still enforces validation.
     function addFunction(bytes4 _selector, address _impl, bool _forceOverride) public {
         _authorizeModifyFunctions(msg.sender);
+        require(_impl != address(0), MULTIFACETPROXY_ZERO_ADDRESS);
+        require(_impl != address(this), MULTIFACETPROXY_SELF_DELEGATION);
+        require(_impl.code.length > 0, MULTIFACETPROXY_NOT_CONTRACT);
+
         MultiFacetProxyStorage storage $ = _getMultiFacetProxyStorage();
-        if (!_forceOverride) {
-            if ($.selectorToImplementation[_selector] != address(0)) revert();
-        }
         address _oldImplementation = $.selectorToImplementation[_selector];
+        if (!_forceOverride) {
+            require(_oldImplementation == address(0), MULTIFACETPROXY_SELECTOR_ALREADY_SET);
+        }
         $.selectorToImplementation[_selector] = _impl;
+        $.registeredSelectorSet.add(bytes32(_selector));
         emit FunctionAdded(_selector, _oldImplementation, _impl);
     }
 
@@ -82,6 +102,7 @@ abstract contract MultiFacetProxy is Proxy {
         MultiFacetProxyStorage storage $ = _getMultiFacetProxyStorage();
         address _oldImplementation = $.selectorToImplementation[_selector];
         delete $.selectorToImplementation[_selector];
+        $.registeredSelectorSet.remove(bytes32(_selector));
         emit FunctionRemoved(_selector, _oldImplementation);
     }
 
@@ -95,6 +116,33 @@ abstract contract MultiFacetProxy is Proxy {
 
     /// @dev Authorize the sender to modify functions
     function _authorizeModifyFunctions(address _sender) internal virtual;
+
+    /* //////////////////////////////////////////////////////////////
+                              VIEW
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the implementation address routed for a given selector
+    /// @param _selector Function selector to look up
+    /// @return Implementation address (address(0) if unregistered)
+    function implementationOf(bytes4 _selector) external view returns (address) {
+        return _getMultiFacetProxyStorage().selectorToImplementation[_selector];
+    }
+
+    /// @notice Returns all currently registered function selectors
+    /// @return Array of active selectors
+    function registeredSelectors() external view returns (bytes4[] memory) {
+        bytes32[] memory _raw = _getMultiFacetProxyStorage().registeredSelectorSet.values();
+        bytes4[] memory _out = new bytes4[](_raw.length);
+        for (uint256 _i = 0; _i < _raw.length; _i++) {
+            _out[_i] = bytes4(_raw[_i]);
+        }
+        return _out;
+    }
+
+    /// @notice Returns the number of registered selectors
+    function selectorCount() external view returns (uint256) {
+        return _getMultiFacetProxyStorage().registeredSelectorSet.length();
+    }
 
     /// @notice Returns the implementation address for a function selector
     /// @dev Required override from OpenZeppelin Proxy contract

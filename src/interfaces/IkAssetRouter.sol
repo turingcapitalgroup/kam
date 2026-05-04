@@ -83,16 +83,18 @@ interface IkAssetRouter is IVersioned {
     /// @dev This occurs when institutional users deposit assets through kMinter, and the router
     /// forwards these assets to the appropriate DN vault for yield farming strategies
     /// @param from The address initiating the asset push (typically kMinter)
+    /// @param batchId The batch identifier for this asset movement
     /// @param amount The quantity of assets being pushed to the vault
-    event AssetsPushed(address indexed from, uint256 amount);
+    event AssetsPushed(address indexed from, bytes32 indexed batchId, uint256 amount);
 
     /// @notice Emitted when assets are requested for pull from a vault to fulfill kMinter redemptions
     /// @dev Part of the two-phase redemption process - assets are first requested, then later pulled
     /// after batch settlement. The batchReceiver is deployed to hold assets for distribution.
     /// @param vault The vault address from which assets are being requested
     /// @param asset The underlying asset address being requested for redemption
+    /// @param batchId The batch identifier for this pull request
     /// @param amount The quantity of assets requested for redemption
-    event AssetsRequestPulled(address indexed vault, address indexed asset, uint256 amount);
+    event AssetsRequestPulled(address indexed vault, address indexed asset, bytes32 indexed batchId, uint256 amount);
 
     /// @notice Emitted when assets are transferred between kStakingVaults for optimal allocation
     /// @dev This is a virtual transfer for accounting purposes - actual assets may remain in the same
@@ -100,9 +102,10 @@ interface IkAssetRouter is IVersioned {
     /// @param sourceVault The vault transferring assets (losing virtual balance)
     /// @param targetVault The vault receiving assets (gaining virtual balance)
     /// @param asset The underlying asset address being transferred
+    /// @param batchId The batch identifier for this virtual transfer
     /// @param amount The quantity of assets being transferred between vaults
     event AssetsTransferred(
-        address indexed sourceVault, address indexed targetVault, address indexed asset, uint256 amount
+        address indexed sourceVault, address indexed targetVault, address indexed asset, bytes32 batchId, uint256 amount
     );
     /// @notice Emitted when shares are requested for push operations in kStakingVault flows
     /// @dev Part of the share-based accounting system for retail users in kStakingVaults

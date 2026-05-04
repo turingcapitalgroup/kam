@@ -1,5 +1,5 @@
 # Constants
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/errors/Errors.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/errors/Errors.sol)
 
 ### KASSETROUTER_ALREADY_REGISTERED
 KAM Protocol Error Codes - Centralized error code constants for the KAM protocol.
@@ -167,6 +167,18 @@ string constant KASSETROUTER_PROPOSAL_ALREADY_ACCEPTED = "A24"
 string constant KASSETROUTER_ASSET_MISMATCH = "A25"
 ```
 
+### KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE
+
+```solidity
+string constant KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE = "A26"
+```
+
+### KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD
+
+```solidity
+string constant KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD = "A27"
+```
+
 ### ADAPTER_ALREADY_INITIALIZED
 
 ```solidity
@@ -243,6 +255,12 @@ string constant BASEVAULT_INVALID_VAULT = "BV4"
 
 ```solidity
 string constant BASEVAULT_NOT_INITIALIZED = "BV5"
+```
+
+### BASEVAULT_INVALID_TREASURY
+
+```solidity
+string constant BASEVAULT_INVALID_TREASURY = "BV6"
 ```
 
 ### KBATCHRECEIVER_ALREADY_INITIALIZED

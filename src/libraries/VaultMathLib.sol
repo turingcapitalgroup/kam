@@ -2,11 +2,34 @@
 pragma solidity 0.8.30;
 
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
+import { VAULTMATHLIB_ZERO_ELAPSED } from "kam/src/errors/Errors.sol";
 import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 
 /// @title VaultMathLib
 /// @notice Fee calculation and share conversion math for KAM vaults
-/// @dev Uses Solady OptimizedFixedPointMathLib for precision-safe fixed-point arithmetic.
+/// @dev Single source of truth for protocol fee/share math. All callers must route through
+///      this library — no caller is permitted to reimplement these formulas. Stateless
+///      (`internal pure`) so it has no upgrade story of its own.
+///
+///      ROUNDING CONTRACT (load-bearing — do not change without protocol-wide review):
+///        - convertToShares      rounds DOWN (favors the vault on deposit)
+///        - convertToAssets      rounds DOWN (favors the vault on withdrawal)
+///        - computeManagementFee rounds DOWN (favors users)
+///        - computePerformanceFee rounds DOWN (favors users)
+///      All four use Solady's `fullMulDiv`, which rounds toward zero (== down for non-negative
+///      operands).
+///
+///      VIRTUAL OFFSETS for inflation-attack resistance:
+///        - VIRTUAL_SHARES = VIRTUAL_ASSETS = 1e6, added to both sides of every conversion.
+///        - Effect: an attacker must inflate the share price by ~1e6× the victim's deposit
+///          before rounding becomes exploitable. Sized for 6-decimal assets (USDC, WBTC).
+///
+///      CALL CONTRACT for vault integrators:
+///        - Pass POST-MANAGEMENT-FEE total assets to computePerformanceFee, so performance
+///          fee is never charged on assets already deducted as management fee.
+///        - Call _accrueFees() before mutating fee rates; otherwise pending management fees
+///          would be re-priced at the new rate.
+///
 ///      Management fees are time-prorated on total assets, charged on every interaction.
 ///      Performance fees are charged on interest gains at settlement, with hurdle rate filtering.
 library VaultMathLib {
@@ -48,6 +71,8 @@ library VaultMathLib {
     /// @dev Called at settlement when totalAssets increases (yield realization). The hurdle rate
     ///      filters whether performance fees apply: returns must exceed the hurdle threshold.
     ///      Hard hurdle: fee only on excess above hurdle. Soft hurdle: fee on all return.
+    ///      Reverts with `VAULTMATHLIB_ZERO_ELAPSED` when `_elapsed == 0` and `_interest > 0`,
+    ///      preventing the silent hurdle bypass that would otherwise occur.
     /// @param _interest The interest gained (newTotalAssets - oldTotalAssets after management fees)
     /// @param _previousTotalAssets Total assets before the yield was added
     /// @param _performanceFee Performance fee rate in basis points
@@ -68,6 +93,11 @@ library VaultMathLib {
         returns (uint256 performanceFeeAssets)
     {
         if (_interest == 0 || _performanceFee == 0 || _previousTotalAssets == 0) return 0;
+
+        // Reject zero-elapsed settlements: with elapsed = 0 the hurdle return collapses to 0,
+        // silently bypassing the hurdle filter and charging fee on the entire interest.
+        // Forces operators to never run settlement in the same block as a fee-rate change.
+        require(_elapsed != 0, VAULTMATHLIB_ZERO_ELAPSED);
 
         // Calculate hurdle return: minimum return threshold for the period
         uint256 hurdleReturn = (_previousTotalAssets * _hurdleRate).fullMulDiv(_elapsed, SECS_PER_YEAR) / MAX_BPS;

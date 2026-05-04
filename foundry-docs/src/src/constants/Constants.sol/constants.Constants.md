@@ -1,5 +1,5 @@
 # Constants
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/constants/Constants.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/constants/Constants.sol)
 
 ### K_MINTER
 Centralized constants used across the KAM protocol.

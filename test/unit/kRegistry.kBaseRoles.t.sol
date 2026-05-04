@@ -203,4 +203,30 @@ contract kRegistrykBaseRolesTest is DeploymentBaseTest {
         vm.expectRevert(Ownable.NoHandoverRequest.selector);
         registry.completeOwnershipHandover(users.bob);
     }
+
+    /* //////////////////////////////////////////////////////////////
+                    DUAL-ROLE INITIALIZATION GRANTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_Init_AdminAutoGrantedVendorRole() public view {
+        assertTrue(registry.hasAllRoles(users.admin, ADMIN_ROLE | VENDOR_ROLE));
+    }
+
+    function test_Init_RelayerAutoGrantedManagerRole() public view {
+        assertTrue(registry.hasAllRoles(users.relayer, RELAYER_ROLE | MANAGER_ROLE));
+    }
+
+    function test_Init_OwnerCanSeparateRolesAfterInit() public {
+        assertTrue(registry.hasAllRoles(users.admin, ADMIN_ROLE | VENDOR_ROLE));
+
+        vm.prank(users.owner);
+        registry.revokeRoles(users.admin, VENDOR_ROLE);
+        assertFalse(registry.hasAnyRole(users.admin, VENDOR_ROLE));
+        assertTrue(registry.hasAnyRole(users.admin, ADMIN_ROLE));
+
+        vm.prank(users.owner);
+        registry.grantRoles(users.bob, VENDOR_ROLE);
+        assertTrue(registry.hasAnyRole(users.bob, VENDOR_ROLE));
+        assertFalse(registry.hasAnyRole(users.bob, ADMIN_ROLE));
+    }
 }

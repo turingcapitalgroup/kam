@@ -12,7 +12,8 @@
     "dnVaultAdapterWBTC": "0x9ace813B1adA8a75DF6518A6d1b50f1A418CdAB7",
     "dnVaultUSDC": "0x436932D6361Db21CbDf440A39046093a1C12D2B4",
     "dnVaultWBTC": "0x235B28c74f19083a5CAce20C506513417a90BE29",
-    "erc20ExecutionValidator": "0xab16A69A5a8c12C732e0DEFF4BE56A70bb64c926",
+    "erc20ExecutionValidator": "0x8F4ec854Dd12F1fe79500a1f53D0cbB30f9b6134",
+    "erc4626ExecutionValidator": "0xC66AB83418C20A65C3f8e83B3d11c8C3a6097b6F",
     "insuranceSmartAccount": "0xc6d011391f42EBB7bE9454d549FbB170BD4Fc0e7",
     "kAssetRouter": "0x05242D4AC717Cdf38C36AF290F2b0DA99AA82c67",
     "kAssetRouterImpl": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
@@ -33,5 +34,5 @@
     "vaultAdapterImpl": "0x95401dc811bb5740090279Ba06cfA8fcF6113778"
   },
   "network": "localhost",
-  "timestamp": 1776347003
+  "timestamp": 1777462115
 }

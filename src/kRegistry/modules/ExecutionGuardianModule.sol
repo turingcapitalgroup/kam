@@ -38,8 +38,8 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         mapping(address => mapping(address => mapping(bytes4 => address))) executionValidator;
         /// @dev Tracks all allowed targets for each executor
         mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) executorTargets;
-        /// @dev Maps the type of each target
-        mapping(address => uint8 targetType) targetType;
+        /// @dev Maps the type of each target (METAWALLET / CUSTODIAL / ASSET / ...)
+        mapping(address => IExecutionGuardian.TargetType targetType) targetType;
         /// @dev Counts allowed selectors per executor-target pair for accurate target tracking
         mapping(address => mapping(address => uint256)) executorTargetSelectorCount;
         /// @dev Tracks all allowed selectors for each executor-target pair
@@ -69,7 +69,7 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
     function setAllowedSelector(
         address _executor,
         address _target,
-        uint8 _targetType,
+        IExecutionGuardian.TargetType _targetType,
         bytes4 _selector,
         bool _isAllowed
     )
@@ -89,7 +89,7 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
     function _setAllowedSelector(
         address _executor,
         address _target,
-        uint8 _targetType,
+        IExecutionGuardian.TargetType _targetType,
         bytes4 _selector,
         bool _isAllowed
     )
@@ -166,10 +166,6 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         emit ExecutionValidatorSet(_executor, _target, _selector, _executionValidator);
     }
 
-    /* //////////////////////////////////////////////////////////////
-                          VIEW FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
     /// @inheritdoc IExecutionGuardian
     function authorizeCall(address _target, bytes4 _selector, bytes calldata _params) external {
         _authorizeCall(_target, _selector, _params);
@@ -190,6 +186,10 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
 
         IExecutionValidator(_validator).authorizeCall(_executor, _target, _selector, _params);
     }
+
+    /* //////////////////////////////////////////////////////////////
+                          VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IExecutionGuardian
     function isSelectorAllowed(address _executor, address _target, bytes4 _selector) external view returns (bool) {
@@ -240,7 +240,7 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
     /// @inheritdoc IExecutionGuardian
     function getExecutorTargetsByType(
         address _executor,
-        uint8 _targetType
+        IExecutionGuardian.TargetType _targetType
     )
         external
         view
@@ -250,24 +250,25 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         address[] memory _all = $.executorTargets[_executor].values();
         uint256 _len = _all.length;
 
+        // Over-allocate to the upper bound and fill in a single pass; truncate the dynamic
+        // array length in place at the end to avoid a second pass + second allocation.
+        _filtered = new address[](_len);
         uint256 _count;
         for (uint256 _i; _i < _len; ++_i) {
-            if ($.targetType[_all[_i]] == _targetType) {
-                ++_count;
+            address _t = _all[_i];
+            if ($.targetType[_t] == _targetType) {
+                _filtered[_count++] = _t;
             }
         }
 
-        _filtered = new address[](_count);
-        uint256 _idx;
-        for (uint256 _i; _i < _len; ++_i) {
-            if ($.targetType[_all[_i]] == _targetType) {
-                _filtered[_idx++] = _all[_i];
-            }
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(_filtered, _count)
         }
     }
 
     /// @inheritdoc IExecutionGuardian
-    function getTargetType(address _target) external view returns (uint8) {
+    function getTargetType(address _target) external view returns (IExecutionGuardian.TargetType) {
         ExecutionGuardianModuleStorage storage $ = _getExecutionGuardianModuleStorage();
         return $.targetType[_target];
     }

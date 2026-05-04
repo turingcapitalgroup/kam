@@ -121,8 +121,8 @@ contract kAssetRouterTest is DeploymentBaseTest {
         IERC20(USDC).transfer(address(assetRouter), _amount);
 
         vm.prank(address(minter));
-        vm.expectEmit(true, false, false, true);
-        emit IkAssetRouter.AssetsPushed(address(minter), _amount);
+        vm.expectEmit(true, true, false, true);
+        emit IkAssetRouter.AssetsPushed(address(minter), _batchId, _amount);
 
         assetRouter.kAssetPush(USDC, _amount, _batchId);
 
@@ -169,7 +169,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(address(minter));
         vm.expectEmit(true, true, true, true);
-        emit IkAssetRouter.AssetsRequestPulled(address(minter), USDC, _amount);
+        emit IkAssetRouter.AssetsRequestPulled(address(minter), USDC, _batchId, _amount);
         assetRouter.kAssetRequestPull(USDC, _amount, _batchId);
     }
 
@@ -221,7 +221,7 @@ contract kAssetRouterTest is DeploymentBaseTest {
 
         vm.prank(address(alphaVault));
         vm.expectEmit(true, true, true, true);
-        emit IkAssetRouter.AssetsTransferred(address(alphaVault), address(betaVault), USDC, _amount);
+        emit IkAssetRouter.AssetsTransferred(address(alphaVault), address(betaVault), USDC, _batchId, _amount);
 
         assetRouter.kAssetTransfer(address(alphaVault), address(betaVault), USDC, _amount, _batchId);
     }

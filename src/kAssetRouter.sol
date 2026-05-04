@@ -15,6 +15,7 @@ import {
     KASSETROUTER_BATCH_ID_PROPOSED,
     KASSETROUTER_COOLDOWN_IS_UP,
     KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD,
+    KASSETROUTER_INSUFFICIENT_ACTIVE_ASSETS,
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_INVALID_COOLDOWN,
     KASSETROUTER_IS_PAUSED,
@@ -80,11 +81,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// Prevents excessive delays that could harm user experience while maintaining security standards
     uint256 private constant MAX_VAULT_SETTLEMENT_COOLDOWN = 1 days;
 
-    /// @notice Default yield tolerance for settlement proposals (10%)
-    /// @dev Provides initial yield deviation threshold to prevent settlements with excessive yield changes
-    /// that could indicate errors in yield calculation or potential manipulation attempts
-    uint256 private constant DEFAULT_MAX_DELTA = 1000; // 10% in basis points
-
     /* //////////////////////////////////////////////////////////////
                             STORAGE LAYOUT
     //////////////////////////////////////////////////////////////*/
@@ -144,18 +140,18 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// @dev Sets up the contract with protocol registry connection and default settlement cooldown.
     /// Must be called immediately after proxy deployment to establish connection with the protocol
     /// registry and initialize the money flow coordination system.
-    /// @param _registry Address of the kRegistry contract that manages protocol configuration
+    /// @param _registryAddr Address of the kRegistry contract that manages protocol configuration
     /// @param _owner Initial owner of the contract
-    function initialize(address _registry, address _owner) external initializer {
+    function initialize(address _registryAddr, address _owner) external initializer {
         _checkAddressNotZero(_owner);
-        __kBase_init(_registry);
+        __kBase_init(_registryAddr);
         _initializeOwner(_owner);
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         $.vaultSettlementCooldown = DEFAULT_VAULT_SETTLEMENT_COOLDOWN;
         // maxAllowedDelta is now per-vault, set via setMaxAllowedDelta(vault, delta)
 
-        emit ContractInitialized(_registry);
+        emit ContractInitialized(_registryAddr);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -174,7 +170,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         IVaultAdapter _adapter = IVaultAdapter(_registry().getAdapter(_kMinter, _asset));
         _asset.safeTransfer(address(_adapter), _amount);
 
-        emit AssetsPushed(_kMinter, _amount);
+        emit AssetsPushed(_kMinter, _batchId, _amount);
 
         _unlockReentrant();
     }
@@ -192,7 +188,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         uint256 _totalGlobalPending = $.globalPendingRequests[_kMinter][_asset] += _amount;
         _checkSufficientVirtualBalance(_kMinter, _asset, _totalGlobalPending);
 
-        emit AssetsRequestPulled(_kMinter, _asset, _amount);
+        emit AssetsRequestPulled(_kMinter, _asset, _batchId, _amount);
         _unlockReentrant();
     }
 
@@ -224,7 +220,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // Check against GLOBAL pending, not just this request amount
         _checkSufficientVirtualBalance(_sourceVault, _asset, _totalGlobalPending);
 
-        emit AssetsTransferred(_sourceVault, _targetVault, _asset, _amount);
+        emit AssetsTransferred(_sourceVault, _targetVault, _asset, _batchId, _amount);
         _unlockReentrant();
     }
 

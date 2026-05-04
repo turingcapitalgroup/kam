@@ -12,7 +12,7 @@ import { Initializable } from "solady/utils/Initializable.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
-import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
+import { ISettleBatch, IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces/IVault.sol";
@@ -20,6 +20,7 @@ import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces
 import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 import {
+    KSTAKINGVAULT_BALANCE_AUDIT_FAILED,
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
     KSTAKINGVAULT_BATCH_NOT_VALID,
     KSTAKINGVAULT_INSUFFICIENT_BALANCE,
@@ -58,7 +59,7 @@ import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 /// kAssetRouter for asset flow coordination and yield distribution. Gas optimizations include packed storage,
 /// minimal proxy deployment for batch receivers, and efficient batch settlement processing. The modular architecture
 /// enables upgrades while maintaining state integrity through UUPS pattern and ERC-7201 storage.
-contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Ownable, MultiFacetProxy {
+contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUpgradeable, Ownable, MultiFacetProxy {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
     using SafeTransferLib for address;
     using OptimizedSafeCastLib for uint256;
@@ -316,7 +317,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
         _request.status = BaseVaultTypes.RequestStatus.CLAIMED;
 
-        // Internal balance was already decreased during settlement - just transfer kTokens out
+        // Internal balance was already decreased during settlement - release reserved kTokens.
+        $.totalPendingUnstake -= _totalKTokensNet.toUint128();
 
         emit UnstakingAssetsClaimed(batchId, _requestId, user, _totalKTokensNet);
         emit KTokenUnstaked(user, stkTokenAmount, _totalKTokensNet);
@@ -353,7 +355,30 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     }
 
     /// @inheritdoc IVaultBatch
-    function settleBatch(bytes32 _batchId) external {
+    /// @dev CALL CONTRACT — DO NOT REORDER. Each step depends on state mutated by the previous
+    ///      step; reordering produces silent fee-math errors (double-charging of management fees
+    ///      as yield, stale settlement baselines) or hard reverts (zero-duration settlements).
+    ///
+    ///   1. Capture `_settlementElapsed` BEFORE `_accrueFees()` advances `_lastFeeTimestamp`.
+    ///      If this capture happens after the accrual, elapsed = 0 and `computePerformanceFee`
+    ///      reverts with `VAULTMATHLIB_ZERO_ELAPSED` (the library guard added to prevent the
+    ///      hurdle filter from being silently bypassed).
+    ///   2. `_accrueFees()` computes the management fee on pre-yield total assets and advances
+    ///      `_lastFeeTimestamp`. Returns the management-fee amount in asset terms.
+    ///   3. Compute net interest as
+    ///         `_currentBalance - _previousBalance - _mgmtFeeAssets`
+    ///      so the management fee is removed from the perf-fee base. Without this subtraction
+    ///      the management-fee charge appears as "yield" and is performance-fee'd a second time.
+    ///   4. Mint management-fee shares (`_mintManagementFees`).
+    ///   5. Compute performance fee using the captured elapsed and the net interest, against
+    ///      `_previousBalance` as the hurdle baseline.
+    ///   6. Mint performance-fee shares.
+    ///   7. Process pending stake/unstake at `_totalAssets()` / `totalSupply()`. These values
+    ///      include the just-minted fee shares — that is intentional: stakers join at the
+    ///      post-fee rate.
+    ///   8. Snapshot `_lastSettlementBalance = _totalBalance()` LAST so the next settlement's
+    ///      interest baseline is correct.
+    function settleBatch(bytes32 _batchId) external override(IVaultBatch, ISettleBatch) {
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require($.batches[_batchId].isClosed, VAULTBATCHES_NOT_CLOSED);
@@ -423,6 +448,7 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
             _burn(address(this), requestedShares);
             _decreaseBalance(_claimableKTokens.toUint128());
+            $.totalPendingUnstake += _claimableKTokens.toUint128();
 
             emit UnstakeSharesBurned(_batchId, requestedShares, _claimableKTokens);
         }
@@ -435,6 +461,8 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
         // to guarantee sum(individual claims) <= total reserved amount.
         $.batches[_batchId].totalAssets = _batchTotalAssets;
         $.batches[_batchId].totalSupply = _batchTotalSupply;
+
+        _auditKTokenBalance($);
 
         emit BatchSettled(_batchId);
     }
@@ -572,6 +600,14 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
     function decreaseBalance(uint128 _amount) external {
         _checkRouter(_msgSender());
         _decreaseBalance(_amount);
+    }
+
+    function _expectedKTokenBalance(BaseVaultStorage storage $) private view returns (uint256) {
+        return _totalAssets() + $.totalPendingStake + $.totalPendingUnstake;
+    }
+
+    function _auditKTokenBalance(BaseVaultStorage storage $) private view {
+        require($.kToken.balanceOf(address(this)) == _expectedKTokenBalance($), KSTAKINGVAULT_BALANCE_AUDIT_FAILED);
     }
 
     /// @notice Creates a unique request ID for a staking request
@@ -779,6 +815,19 @@ contract kStakingVault is IVault, BaseVault, Initializable, UUPSUpgradeable, Own
 
     function maxTotalAssets() external view returns (uint128) {
         return _getBaseVaultStorage().maxTotalAssets;
+    }
+
+    function totalPendingStake() external view returns (uint128) {
+        return _getBaseVaultStorage().totalPendingStake;
+    }
+
+    function totalPendingUnstake() external view returns (uint128) {
+        return _getBaseVaultStorage().totalPendingUnstake;
+    }
+
+    function expectedKTokenBalance() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        return _expectedKTokenBalance($);
     }
 
     function contractName() external pure returns (string memory) {

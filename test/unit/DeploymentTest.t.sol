@@ -5,7 +5,10 @@ import { ADMIN_ROLE, INSTITUTION_ROLE, MINTER_ROLE, _1_USDC, _1_WBTC } from "../
 
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
+import { IERC20 } from "forge-std/interfaces/IERC20.sol";
+import { IERC4626 } from "forge-std/interfaces/IERC4626.sol";
 import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
+import { IExecutionGuardian } from "kam/src/interfaces/modules/IExecutionGuardian.sol";
 import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
 
 contract DeploymentTest is DeploymentBaseTest {
@@ -176,5 +179,59 @@ contract DeploymentTest is DeploymentBaseTest {
             address(getVaultByType(IRegistry.VaultType.ALPHA)), address(alphaVault), "Alpha vault helper incorrect"
         );
         assertEq(address(getVaultByType(IRegistry.VaultType.BETA)), address(betaVault), "Beta vault helper incorrect");
+    }
+
+    function test_ExecutionValidatorsMatchProductionPaths() public view {
+        IExecutionGuardian guardian = IExecutionGuardian(address(registry));
+
+        address erc20Validator =
+            guardian.getExecutionValidator(address(minterAdapterUSDC), tokens.usdc, IERC20.approve.selector);
+        address erc4626Validator = guardian.getExecutionValidator(
+            address(minterAdapterUSDC), address(metawalletUSDC), IERC4626.deposit.selector
+        );
+
+        assertTrue(erc20Validator != address(0), "ERC20 validator not configured");
+        assertTrue(erc4626Validator != address(0), "ERC4626 validator not configured");
+        assertTrue(erc20Validator != erc4626Validator, "validators must be distinct");
+
+        assertEq(
+            guardian.getExecutionValidator(
+                address(minterAdapterUSDC), address(metawalletUSDC), IERC4626.deposit.selector
+            ),
+            erc4626Validator,
+            "kMinter deposit should use ERC4626 validator"
+        );
+        assertEq(
+            guardian.getExecutionValidator(
+                address(minterAdapterUSDC), address(metawalletUSDC), IERC4626.withdraw.selector
+            ),
+            erc4626Validator,
+            "kMinter withdraw should use ERC4626 validator"
+        );
+        assertFalse(
+            guardian.isSelectorAllowed(address(minterAdapterUSDC), address(metawalletUSDC), IERC4626.redeem.selector),
+            "kMinter redeem should not be allowed"
+        );
+        assertFalse(
+            guardian.isSelectorAllowed(
+                address(minterAdapterUSDC), address(metawalletUSDC), IERC20.transferFrom.selector
+            ),
+            "kMinter metawallet transferFrom should not be allowed"
+        );
+
+        assertEq(
+            guardian.getExecutionValidator(
+                address(DNVaultAdapterUSDC), address(metawalletUSDC), IERC20.transfer.selector
+            ),
+            erc20Validator,
+            "DN transfer should use ERC20 validator"
+        );
+        assertEq(
+            guardian.getExecutionValidator(
+                address(DNVaultAdapterUSDC), address(metawalletUSDC), IERC20.transferFrom.selector
+            ),
+            erc20Validator,
+            "DN transferFrom should use ERC20 validator"
+        );
     }
 }
