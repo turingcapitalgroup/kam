@@ -55,8 +55,8 @@ deployments/
     "treasury": "0x..."
   },
   "assets": {
-    "USDC": "0xA0b86a33E6d8c30c9b61aEB5eF6c5C756fA2A45F1",
-    "WBTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f"
+    "USDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "WBTC": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
   }
 }
 ```

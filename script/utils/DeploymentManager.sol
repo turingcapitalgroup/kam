@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import { Script } from "forge-std/Script.sol";
 import { stdJson } from "forge-std/StdJson.sol";
 import { console2 as console } from "forge-std/console2.sol";
+import { IERC20 } from "forge-std/interfaces/IERC20.sol";
+import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
 
 abstract contract DeploymentManager is Script {
     using stdJson for string;
@@ -23,12 +25,14 @@ abstract contract DeploymentManager is Script {
         AssetAddresses assets;
         MetawalletAddresses metawallets;
         CustodialTargets custodialTargets;
+        MinterConfig minter;
         KTokenConfig kUSD;
         KTokenConfig kBTC;
         VaultConfig dnVaultUSDC;
         VaultConfig dnVaultWBTC;
         VaultConfig alphaVault;
         VaultConfig betaVault;
+        AdapterConfigs adapters;
         RegistryConfig registry;
         AssetRouterConfig assetRouter;
         ParameterCheckerConfig parameterChecker;
@@ -69,11 +73,16 @@ abstract contract DeploymentManager is Script {
         uint256 maxRedeemPerBatch;
     }
 
+    struct MinterConfig {
+        string vaultType;
+    }
+
     struct VaultConfig {
         string name;
         string symbol;
         uint8 decimals;
         string underlyingAsset;
+        string vaultType;
         bool startPaused;
         uint128 maxTotalAssets;
         uint256 maxDepositPerBatch;
@@ -81,6 +90,20 @@ abstract contract DeploymentManager is Script {
         address trustedForwarder;
         uint16 hurdleRate;
         bool isHardHurdleRate;
+    }
+
+    struct AdapterConfig {
+        string namespace;
+        string owner;
+    }
+
+    struct AdapterConfigs {
+        AdapterConfig dnVaultAdapterUSDC;
+        AdapterConfig dnVaultAdapterWBTC;
+        AdapterConfig alphaVaultAdapter;
+        AdapterConfig betaVaultAdapter;
+        AdapterConfig kMinterAdapterUSDC;
+        AdapterConfig kMinterAdapterWBTC;
     }
 
     struct RegistryConfig {
@@ -115,6 +138,8 @@ abstract contract DeploymentManager is Script {
     }
 
     struct AllowedSources {
+        string[] USDC;
+        string[] WBTC;
         string[] metawalletUSDC;
         string[] metawalletWBTC;
     }
@@ -255,6 +280,7 @@ abstract contract DeploymentManager is Script {
     bytes32 internal constant JK_METAWALLET_USDC = keccak256("metawalletUSDC");
     bytes32 internal constant JK_METAWALLET_WBTC = keccak256("metawalletWBTC");
     bytes32 internal constant JK_WALLET_USDC = keccak256("WalletUSDC");
+    bytes32 internal constant JK_WALLET_WBTC = keccak256("WalletWBTC");
 
     // Insurance
     bytes32 internal constant JK_ERC20_EXECUTION_VALIDATOR = keccak256("erc20ExecutionValidator");
@@ -334,14 +360,14 @@ abstract contract DeploymentManager is Script {
     }
 
     function _readCustodialTargets(string memory json, NetworkConfig memory config) private pure {
-        // Parse custodial wallet addresses (for CEFFU mock / real custody)
-        // Read from mockAssets.WalletUSDC for now (will migrate to custodialTargets later)
-        config.custodialTargets.walletUSDC = json.readAddress(".mockAssets.WalletUSDC");
-        // WBTC wallet can be same or different - add to config if needed
-        config.custodialTargets.walletWBTC = config.custodialTargets.walletUSDC; // Using same wallet for now
+        config.custodialTargets.walletUSDC = json.readAddress(".custodialTargets.walletUSDC");
+        config.custodialTargets.walletWBTC = json.readAddress(".custodialTargets.walletWBTC");
     }
 
-    function _readTokensAndVaults(string memory json, NetworkConfig memory config) private pure {
+    function _readTokensAndVaults(string memory json, NetworkConfig memory config) private view {
+        // Parse minter config
+        config.minter.vaultType = json.readStringOr(".minter.vaultType", "MINTER");
+
         // Parse kToken configs
         config.kUSD = _readKTokenConfig(json, ".kTokens.kUSD");
         config.kBTC = _readKTokenConfig(json, ".kTokens.kBTC");
@@ -351,6 +377,14 @@ abstract contract DeploymentManager is Script {
         config.dnVaultWBTC = _readVaultConfig(json, ".vaults.dnVaultWBTC");
         config.alphaVault = _readVaultConfig(json, ".vaults.alphaVault");
         config.betaVault = _readVaultConfig(json, ".vaults.betaVault");
+
+        // Parse adapter configs
+        config.adapters.dnVaultAdapterUSDC = _readAdapterConfig(json, ".adapters.dnVaultAdapterUSDC");
+        config.adapters.dnVaultAdapterWBTC = _readAdapterConfig(json, ".adapters.dnVaultAdapterWBTC");
+        config.adapters.alphaVaultAdapter = _readAdapterConfig(json, ".adapters.alphaVaultAdapter");
+        config.adapters.betaVaultAdapter = _readAdapterConfig(json, ".adapters.betaVaultAdapter");
+        config.adapters.kMinterAdapterUSDC = _readAdapterConfig(json, ".adapters.kMinterAdapterUSDC");
+        config.adapters.kMinterAdapterWBTC = _readAdapterConfig(json, ".adapters.kMinterAdapterWBTC");
     }
 
     function _readRouterAndMocks(string memory json, NetworkConfig memory config) private pure {
@@ -394,13 +428,21 @@ abstract contract DeploymentManager is Script {
         config.symbol = json.readString(string.concat(path, ".symbol"));
         config.decimals = uint8(json.readUint(string.concat(path, ".decimals")));
         config.underlyingAsset = json.readString(string.concat(path, ".underlyingAsset"));
+        config.vaultType = json.readString(string.concat(path, ".vaultType"));
         config.startPaused = json.readBool(string.concat(path, ".startPaused"));
-        config.maxTotalAssets = uint128(json.readUint(string.concat(path, ".maxTotalAssets")));
-        config.maxDepositPerBatch = uint128(json.readUint(string.concat(path, ".maxDepositPerBatch")));
-        config.maxWithdrawPerBatch = uint128(json.readUint(string.concat(path, ".maxWithdrawPerBatch")));
+        config.maxTotalAssets = uint128(_parseUintString(json.readString(string.concat(path, ".maxTotalAssets"))));
+        config.maxDepositPerBatch = _parseUintString(json.readString(string.concat(path, ".maxDepositPerBatch")));
+        config.maxWithdrawPerBatch = _parseUintString(json.readString(string.concat(path, ".maxWithdrawPerBatch")));
         config.trustedForwarder = json.readAddress(string.concat(path, ".trustedForwarder"));
         config.hurdleRate = uint16(json.readUint(string.concat(path, ".hurdleRate")));
         config.isHardHurdleRate = json.readBool(string.concat(path, ".isHardHurdleRate"));
+        return config;
+    }
+
+    function _readAdapterConfig(string memory json, string memory path) private view returns (AdapterConfig memory) {
+        AdapterConfig memory config;
+        config.namespace = json.readString(string.concat(path, ".namespace"));
+        config.owner = json.readStringOr(string.concat(path, ".owner"), "config:roles.owner");
         return config;
     }
 
@@ -429,6 +471,12 @@ abstract contract DeploymentManager is Script {
         config.allowedReceivers.metawalletWBTC = abi.decode(metawalletWbtcReceivers, (string[]));
 
         // Read allowed sources arrays
+        bytes memory usdcSources = json.parseRaw(".parameterChecker.allowedSources.USDC");
+        config.allowedSources.USDC = abi.decode(usdcSources, (string[]));
+
+        bytes memory wbtcSources = json.parseRaw(".parameterChecker.allowedSources.WBTC");
+        config.allowedSources.WBTC = abi.decode(wbtcSources, (string[]));
+
         bytes memory metawalletUsdcSources = json.parseRaw(".parameterChecker.allowedSources.metawalletUSDC");
         config.allowedSources.metawalletUSDC = abi.decode(metawalletUsdcSources, (string[]));
 
@@ -453,7 +501,7 @@ abstract contract DeploymentManager is Script {
 
     function _parseUintString(string memory str) private pure returns (uint256) {
         bytes memory b = bytes(str);
-        if (b.length == 1 && b[0] == 0x30) return 0; // "0"
+        require(b.length > 0, "Empty number string");
 
         uint256 result = 0;
         for (uint256 i = 0; i < b.length; i++) {
@@ -461,7 +509,7 @@ abstract contract DeploymentManager is Script {
             require(digit <= 9, "Invalid number string");
             result = result * 10 + digit;
         }
-        return result == 0 ? type(uint256).max : result;
+        return result;
     }
 
     function getUnderlyingAssetAddress(
@@ -478,6 +526,47 @@ abstract contract DeploymentManager is Script {
             return config.assets.WBTC;
         }
         revert("Unknown asset key");
+    }
+
+    function resolveVaultType(string memory vaultType) internal pure returns (IRegistry.VaultType) {
+        bytes32 h = keccak256(bytes(vaultType));
+        if (h == keccak256("MINTER")) return IRegistry.VaultType.MINTER;
+        if (h == keccak256("DN")) return IRegistry.VaultType.DN;
+        if (h == keccak256("ALPHA")) return IRegistry.VaultType.ALPHA;
+        if (h == keccak256("BETA")) return IRegistry.VaultType.BETA;
+        if (h == keccak256("GAMMA")) return IRegistry.VaultType.GAMMA;
+        if (h == keccak256("DELTA")) return IRegistry.VaultType.DELTA;
+        if (h == keccak256("EPSILON")) return IRegistry.VaultType.EPSILON;
+        if (h == keccak256("ZETA")) return IRegistry.VaultType.ZETA;
+        if (h == keccak256("ETA")) return IRegistry.VaultType.ETA;
+        if (h == keccak256("THETA")) return IRegistry.VaultType.THETA;
+        if (h == keccak256("IOTA")) return IRegistry.VaultType.IOTA;
+        if (h == keccak256("KAPPA")) return IRegistry.VaultType.KAPPA;
+        if (h == keccak256("LAMBDA")) return IRegistry.VaultType.LAMBDA;
+        if (h == keccak256("MU")) return IRegistry.VaultType.MU;
+        if (h == keccak256("NU")) return IRegistry.VaultType.NU;
+        if (h == keccak256("XI")) return IRegistry.VaultType.XI;
+        if (h == keccak256("OMICRON")) return IRegistry.VaultType.OMICRON;
+        if (h == keccak256("PI")) return IRegistry.VaultType.PI;
+        if (h == keccak256("RHO")) return IRegistry.VaultType.RHO;
+        if (h == keccak256("SIGMA")) return IRegistry.VaultType.SIGMA;
+        revert("Unknown vault type");
+    }
+
+    function resolveAdapterOwner(
+        NetworkConfig memory config,
+        AdapterConfig memory adapter
+    )
+        internal
+        pure
+        returns (address)
+    {
+        bytes32 h = keccak256(bytes(adapter.owner));
+        if (h == keccak256("config:roles.owner")) return config.roles.owner;
+        if (h == keccak256("config:roles.admin")) return config.roles.admin;
+        if (h == keccak256("config:roles.emergencyAdmin")) return config.roles.emergencyAdmin;
+        if (h == keccak256("config:roles.relayer")) return config.roles.relayer;
+        revert("Unknown adapter owner");
     }
 
     /// @notice Resolve an address from a string key using deployed contracts and config
@@ -509,7 +598,12 @@ abstract contract DeploymentManager is Script {
         if (h == JK_METAWALLET_WBTC) return existing.contracts.metawalletWBTC;
 
         // Custodial wallets
-        if (h == JK_WALLET_USDC_ALIAS) return existing.contracts.WalletUSDC;
+        if (h == JK_WALLET_USDC_ALIAS) {
+            return existing.contracts.WalletUSDC != address(0)
+                ? existing.contracts.WalletUSDC
+                : config.custodialTargets.walletUSDC;
+        }
+        if (h == JK_WALLET_WBTC_ALIAS) return config.custodialTargets.walletWBTC;
 
         // Core contracts
         if (h == JK_REGISTRY) return existing.contracts.kRegistry;
@@ -570,6 +664,9 @@ abstract contract DeploymentManager is Script {
         output.contracts.metawalletUSDC = json.readAddress(".contracts.metawalletUSDC");
         output.contracts.metawalletWBTC = json.readAddress(".contracts.metawalletWBTC");
         output.contracts.WalletUSDC = json.readAddress(".contracts.WalletUSDC");
+        if (json.keyExists(".contracts.WalletWBTC")) {
+            output.contracts.WalletWBTC = json.readAddress(".contracts.WalletWBTC");
+        }
         output.contracts.erc20ExecutionValidator = json.readAddress(".contracts.erc20ExecutionValidator");
         if (json.keyExists(".contracts.erc4626ExecutionValidator")) {
             output.contracts.erc4626ExecutionValidator = json.readAddress(".contracts.erc4626ExecutionValidator");
@@ -618,6 +715,7 @@ abstract contract DeploymentManager is Script {
 
         // Apply all pending updates
         for (uint256 i = 0; i < _pendingWriteCount; i++) {
+            _validateAddressUpdate(output, _pendingWrites[i].key, _pendingWrites[i].addr);
             _applyAddressUpdate(output, _pendingWrites[i].key, _pendingWrites[i].addr);
         }
 
@@ -670,6 +768,7 @@ abstract contract DeploymentManager is Script {
         else if (h == JK_METAWALLET_USDC) output.contracts.metawalletUSDC = contractAddress;
         else if (h == JK_METAWALLET_WBTC) output.contracts.metawalletWBTC = contractAddress;
         else if (h == JK_WALLET_USDC) output.contracts.WalletUSDC = contractAddress;
+        else if (h == JK_WALLET_WBTC) output.contracts.WalletWBTC = contractAddress;
         else if (h == JK_ERC20_EXECUTION_VALIDATOR) output.contracts.erc20ExecutionValidator = contractAddress;
         else if (h == JK_ERC4626_EXECUTION_VALIDATOR) output.contracts.erc4626ExecutionValidator = contractAddress;
         else if (h == JK_MINIMAL_SMART_ACCOUNT_IMPL) output.contracts.minimalSmartAccountImpl = contractAddress;
@@ -709,6 +808,7 @@ abstract contract DeploymentManager is Script {
         vm.serializeAddress(c, "metawalletUSDC", output.contracts.metawalletUSDC);
         vm.serializeAddress(c, "metawalletWBTC", output.contracts.metawalletWBTC);
         vm.serializeAddress(c, "WalletUSDC", output.contracts.WalletUSDC);
+        vm.serializeAddress(c, "WalletWBTC", output.contracts.WalletWBTC);
         vm.serializeAddress(c, "erc20ExecutionValidator", output.contracts.erc20ExecutionValidator);
         vm.serializeAddress(c, "erc4626ExecutionValidator", output.contracts.erc4626ExecutionValidator);
         vm.serializeAddress(c, "minimalSmartAccountImpl", output.contracts.minimalSmartAccountImpl);
@@ -723,7 +823,10 @@ abstract contract DeploymentManager is Script {
         return vm.serializeString(root, "contracts", contractsJson);
     }
 
-    function validateConfig(NetworkConfig memory config) internal pure {
+    function validateConfig(NetworkConfig memory config) internal view {
+        require(config.chainId == block.chainid, "Config chainId mismatch");
+        require(_stringsEqual(config.network, getCurrentNetwork()), "Config network mismatch");
+
         require(config.roles.owner != address(0), "Missing owner address");
         require(config.roles.admin != address(0), "Missing admin address");
         require(config.roles.emergencyAdmin != address(0), "Missing emergencyAdmin address");
@@ -734,6 +837,106 @@ abstract contract DeploymentManager is Script {
         require(config.roles.insurance != address(0), "Missing insurance address");
         require(config.assets.USDC != address(0), "Missing USDC address");
         require(config.assets.WBTC != address(0), "Missing WBTC address");
+
+        require(!_isPlaceholderAddress(config.roles.owner), "Placeholder owner address");
+        require(!_isPlaceholderAddress(config.roles.admin), "Placeholder admin address");
+        require(!_isPlaceholderAddress(config.roles.emergencyAdmin), "Placeholder emergencyAdmin address");
+        require(!_isPlaceholderAddress(config.roles.guardian), "Placeholder guardian address");
+        require(!_isPlaceholderAddress(config.roles.relayer), "Placeholder relayer address");
+        require(!_isPlaceholderAddress(config.roles.institution), "Placeholder institution address");
+        require(!_isPlaceholderAddress(config.roles.treasury), "Placeholder treasury address");
+        require(!_isPlaceholderAddress(config.roles.insurance), "Placeholder insurance address");
+        require(!_isPlaceholderAddress(config.assets.USDC), "Placeholder USDC address");
+        require(!_isPlaceholderAddress(config.assets.WBTC), "Placeholder WBTC address");
+
+        if (_stringsEqual(config.network, "mainnet")) {
+            _validateMainnetConfig(config);
+        } else if (!_stringsEqual(config.network, "localhost")) {
+            _validateNonLocalConfig(config);
+        }
+    }
+
+    function _validateNonLocalConfig(NetworkConfig memory config) private view {
+        require(config.assetRouter.settlementCooldown >= 1 hours, "Settlement cooldown too low");
+        require(config.assets.USDC.code.length > 0, "USDC has no code");
+        require(config.assets.WBTC.code.length > 0, "WBTC has no code");
+        require(IERC20(config.assets.USDC).decimals() == 6, "USDC decimals mismatch");
+        require(IERC20(config.assets.WBTC).decimals() == 8, "WBTC decimals mismatch");
+    }
+
+    function validateConfigurationConfig(NetworkConfig memory config) internal view {
+        validateConfig(config);
+        if (_stringsEqual(config.network, "localhost")) return;
+
+        require(config.metawallets.USDC != address(0), "Missing metawalletUSDC address");
+        require(config.metawallets.WBTC != address(0), "Missing metawalletWBTC address");
+        require(config.custodialTargets.walletUSDC != address(0), "Missing walletUSDC address");
+        require(config.custodialTargets.walletWBTC != address(0), "Missing walletWBTC address");
+        require(config.metawallets.USDC.code.length > 0, "metawalletUSDC has no code");
+        require(config.metawallets.WBTC.code.length > 0, "metawalletWBTC has no code");
+    }
+
+    function _validateMainnetConfig(NetworkConfig memory config) private view {
+        _validateNonLocalConfig(config);
+        require(config.assets.USDC == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, "Invalid mainnet USDC");
+        require(config.assets.WBTC == 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599, "Invalid mainnet WBTC");
+    }
+
+    function _validateAddressUpdate(DeploymentOutput memory output, bytes32 h, address newAddress) private view {
+        if (_stringsEqual(getCurrentNetwork(), "localhost") || vm.envOr("ALLOW_REDEPLOY", false)) return;
+
+        address existingAddress = _getAddressByKey(output, h);
+        require(
+            existingAddress == address(0) || existingAddress == newAddress,
+            "Deployment output already has different address"
+        );
+    }
+
+    function _getAddressByKey(DeploymentOutput memory output, bytes32 h) private pure returns (address) {
+        if (h == JK_MINIMAL_UUPS_FACTORY) return output.contracts.MinimalUUPSFactory;
+        if (h == JK_REGISTRY_IMPL) return output.contracts.kRegistryImpl;
+        if (h == JK_REGISTRY) return output.contracts.kRegistry;
+        if (h == JK_MINTER_IMPL) return output.contracts.kMinterImpl;
+        if (h == JK_MINTER) return output.contracts.kMinter;
+        if (h == JK_ASSET_ROUTER_IMPL) return output.contracts.kAssetRouterImpl;
+        if (h == JK_ASSET_ROUTER) return output.contracts.kAssetRouter;
+        if (h == JK_USD) return output.contracts.kUSD;
+        if (h == JK_BTC) return output.contracts.kBTC;
+        if (h == JK_READER_MODULE) return output.contracts.readerModule;
+        if (h == JK_ADAPTER_GUARDIAN_MODULE || h == JK_EXECUTION_GUARDIAN_MODULE) {
+            return output.contracts.adapterGuardianModule;
+        }
+        if (h == JK_TOKEN_FACTORY) return output.contracts.kTokenFactory;
+        if (h == JK_STAKING_VAULT_IMPL) return output.contracts.kStakingVaultImpl;
+        if (h == JK_DN_VAULT_USDC) return output.contracts.dnVaultUSDC;
+        if (h == JK_DN_VAULT_WBTC) return output.contracts.dnVaultWBTC;
+        if (h == JK_ALPHA_VAULT) return output.contracts.alphaVault;
+        if (h == JK_BETA_VAULT) return output.contracts.betaVault;
+        if (h == JK_VAULT_ADAPTER_IMPL) return output.contracts.vaultAdapterImpl;
+        if (h == JK_DN_VAULT_ADAPTER_USDC) return output.contracts.dnVaultAdapterUSDC;
+        if (h == JK_DN_VAULT_ADAPTER_WBTC) return output.contracts.dnVaultAdapterWBTC;
+        if (h == JK_ALPHA_VAULT_ADAPTER) return output.contracts.alphaVaultAdapter;
+        if (h == JK_BETA_VAULT_ADAPTER) return output.contracts.betaVaultAdapter;
+        if (h == JK_MINTER_ADAPTER_USDC) return output.contracts.kMinterAdapterUSDC;
+        if (h == JK_MINTER_ADAPTER_WBTC) return output.contracts.kMinterAdapterWBTC;
+        if (h == JK_METAWALLET_USDC) return output.contracts.metawalletUSDC;
+        if (h == JK_METAWALLET_WBTC) return output.contracts.metawalletWBTC;
+        if (h == JK_WALLET_USDC) return output.contracts.WalletUSDC;
+        if (h == JK_WALLET_WBTC) return output.contracts.WalletWBTC;
+        if (h == JK_ERC20_EXECUTION_VALIDATOR) return output.contracts.erc20ExecutionValidator;
+        if (h == JK_ERC4626_EXECUTION_VALIDATOR) return output.contracts.erc4626ExecutionValidator;
+        if (h == JK_MINIMAL_SMART_ACCOUNT_IMPL) return output.contracts.minimalSmartAccountImpl;
+        if (h == JK_INSURANCE_SMART_ACCOUNT) return output.contracts.insuranceSmartAccount;
+        return address(0);
+    }
+
+    function _isPlaceholderAddress(address addr) private pure returns (bool) {
+        uint160 raw = uint160(addr);
+        return raw > 0 && raw <= 10;
+    }
+
+    function _stringsEqual(string memory a, string memory b) private pure returns (bool) {
+        return keccak256(bytes(a)) == keccak256(bytes(b));
     }
 
     function validateAdapterDeployments(DeploymentOutput memory existing) internal pure {
@@ -923,6 +1126,8 @@ abstract contract DeploymentManager is Script {
             config.parameterChecker.allowedReceivers.metawalletWBTC.length,
             "entries"
         );
+        console.log("Allowed Sources USDC:        ", config.parameterChecker.allowedSources.USDC.length, "entries");
+        console.log("Allowed Sources WBTC:        ", config.parameterChecker.allowedSources.WBTC.length, "entries");
         console.log(
             "Allowed Sources metawalletUSDC:  ", config.parameterChecker.allowedSources.metawalletUSDC.length, "entries"
         );

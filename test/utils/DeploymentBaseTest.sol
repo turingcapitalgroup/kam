@@ -23,6 +23,8 @@ import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
 // Adapters
 import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
+import { ERC20ExecutionValidator } from "kam/src/adapters/parameters/ERC20ExecutionValidator.sol";
+import { ERC4626ExecutionValidator } from "kam/src/adapters/parameters/ERC4626ExecutionValidator.sol";
 
 // Interfaces
 import { IRegistry } from "kam/src/interfaces/IkRegistry.sol";
@@ -68,6 +70,8 @@ contract DeploymentBaseTest is BaseTest {
     VaultAdapter public BETHAVaultAdapterUSDC;
     VaultAdapter public vaultAdapter6;
     VaultAdapter public vaultAdapterImpl;
+    ERC20ExecutionValidator public erc20ExecutionValidator;
+    ERC4626ExecutionValidator public erc4626ExecutionValidator;
 
     // Insurance
     address public insuranceSmartAccount;
@@ -214,21 +218,24 @@ contract DeploymentBaseTest is BaseTest {
 
         ConfigureExecutorPermissionsScript executorPermissionsScript = new ConfigureExecutorPermissionsScript();
         executorPermissionsScript.setVerbose(false);
-        executorPermissionsScript.run(
-            false,
-            _registryDeploy.registry,
-            _adaptersDeploy.kMinterAdapterUSDC,
-            _adaptersDeploy.kMinterAdapterWBTC,
-            _adaptersDeploy.dnVaultAdapterUSDC,
-            _adaptersDeploy.dnVaultAdapterWBTC,
-            _adaptersDeploy.alphaVaultAdapter,
-            _adaptersDeploy.betaVaultAdapter,
-            _mocks.metawalletUSDC,
-            _mocks.metawalletWBTC,
-            _mocks.WalletUSDC,
-            _mocks.USDC,
-            _mocks.WBTC
-        );
+        ConfigureExecutorPermissionsScript.ExecutorPermissionsDeployment memory executorPermissionsDeploy =
+            executorPermissionsScript.run(
+                false,
+                _registryDeploy.registry,
+                _adaptersDeploy.kMinterAdapterUSDC,
+                _adaptersDeploy.kMinterAdapterWBTC,
+                _adaptersDeploy.dnVaultAdapterUSDC,
+                _adaptersDeploy.dnVaultAdapterWBTC,
+                _adaptersDeploy.alphaVaultAdapter,
+                _adaptersDeploy.betaVaultAdapter,
+                _mocks.metawalletUSDC,
+                _mocks.metawalletWBTC,
+                _mocks.WalletUSDC,
+                _mocks.USDC,
+                _mocks.WBTC
+            );
+        erc20ExecutionValidator = ERC20ExecutionValidator(executorPermissionsDeploy.erc20ExecutionValidator);
+        erc4626ExecutionValidator = ERC4626ExecutionValidator(executorPermissionsDeploy.erc4626ExecutionValidator);
 
         // Note: ReaderModule is already registered to vaults in 07_DeployVaults.s.sol
 

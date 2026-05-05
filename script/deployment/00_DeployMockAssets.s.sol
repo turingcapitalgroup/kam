@@ -172,6 +172,7 @@ contract DeployMockAssetsScript is Script, DeploymentManager {
         // 3. Update the MockWallet Address (both locations for consistency)
         vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".mockAssets.WalletUSDC");
         vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".custodialTargets.walletUSDC");
+        vm.writeJson(vm.toString(mockWalletUSDC), configPath, ".custodialTargets.walletWBTC");
 
         _log("Updated config file with mock asset addresses");
     }
