@@ -123,8 +123,7 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
     /// @notice Ensures neither the local adapter pause nor the registry-wide global pause is active
     function _checkPaused(VaultAdapterStorage storage $) internal view {
         require(
-            !$.paused
-                && !IkRegistry(address(_getMinimalAccountStorage().registry)).isGlobalPaused(),
+            !$.paused && !IkRegistry(address(_getMinimalAccountStorage().registry)).isGlobalPaused(),
             VAULTADAPTER_IS_PAUSED
         );
     }

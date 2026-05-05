@@ -597,13 +597,14 @@ Before deployment, complete the KAM-side dependencies for that plan:
 kToken.balanceOf(address(vault)) == vault.totalAssets() + vault.totalPendingStake() + vault.totalPendingUnstake()
 ```
 
-- Add or finalize the registry-level idle-buffer configuration required by kSettler, such as `minIdleBps`, if the
-  idle threshold is intended to be governance-controlled from KAM.
-- Document how `minIdleBps` is configured per deployment and who can update it.
+- Treat MetaWallet idle-buffer enforcement as owned by `kam-settler`.
 - Confirm kSettler's idle requirement includes both immediate kMinter redemptions and DN vault settled-but-unclaimed
   unstake reserves.
-- Add an integration test spanning KAM + kSettler + MetaWallet where insufficient MetaWallet idle causes settlement
-  to revert before batch state is finalized, then succeeds after strategies are divested back to idle.
+- In KAM deployment runbooks, require the kSettler idle-buffer precondition to pass before KAM settlement proposals are
+  submitted or retried.
+- Add the cross-repo integration test in `kam-settler`, spanning KAM + kSettler + MetaWallet, where insufficient
+  MetaWallet idle causes settlement to revert before KAM batch state is finalized, then succeeds after strategies are
+  divested back to idle.
 
 This is a deployment blocker: if MetaWallet keeps a percentage of funds idle to fulfill redemptions, settlement
 automation must treat idle availability as an explicit precondition, not as an incidental MetaWallet redeem revert.
@@ -620,7 +621,7 @@ Create or update runbooks for:
 - Global pause and unpause.
 - Local vault/adapter pause and unpause.
 - Failed settlement due to vault balance audit.
-- Failed settlement due to insufficient MetaWallet idle buffer.
+- Failed settlement due to kSettler idle-buffer precondition failure.
 - Failed settlement due to insufficient active assets for a negative-yield burn.
 - Adapter rescue and batch receiver rescue policy.
 - Upgrade proposal, timelock queue, execution, and post-upgrade validation.
