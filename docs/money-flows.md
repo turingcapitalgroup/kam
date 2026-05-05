@@ -56,7 +56,8 @@ Think of KAM like a bank connecting two groups:
 - Tracks all virtual balances
 - Calculates yield and profit/loss
 - Updates balance ledgers during settlement
-- **Does NOT physically move money** (just updates numbers!)
+- Transiently receives and forwards underlying assets during deposits (kAssetPush) and kMinter settlements (pull from adapter, send to BatchReceiver)
+- Also tracks virtual balances and calculates yield
 
 ### 4. **Adapters** - The Smart Wallets
 
@@ -80,6 +81,7 @@ Think of KAM like a bank connecting two groups:
 
 **RELAYER_ROLE**:
 
+- Create new batches for kMinter and kStakingVaults
 - Propose and coordinate batch settlements
 - Close batches to prepare for settlement
 - Submit totalAssets values from external strategies
@@ -90,12 +92,13 @@ Think of KAM like a bank connecting two groups:
 - Deploy assets to shared DN strategies
 - Move USDC between shared strategy and CEFFU (for Alpha/Beta)
 - Retrieve yields from external strategies
-- ALL physical movements go through kMinterAdapter.execute()
+- External strategy deployments and withdrawals go through kMinterAdapter.execute()
+- Deposit routing uses kAssetPush (safeTransfer), settlement withdrawals use adapter.pull()
 
 ### 6. **BatchReceiver** - Withdrawal Desk
 
 - Temporary holding for institutional withdrawals
-- One created per batch
+- Lazily created per batch (deployed as minimal proxy clone only when first burn request is made)
 - Institutions claim their USDC from here
 
 ---
@@ -124,7 +127,7 @@ Virtual Accounting:
 
 Day 0 or 1 - Deployment (separate step):
 4. Manager sees 10M sitting in kMinter adapter
-5. Manager calls: kMinterAdapter.execute(target, data, value)
+5. Manager calls: kMinterAdapter.execute(mode, executionCalldata) -- ERC-7579 encoded
    - Requires MANAGER_ROLE
    - Target/selector must be whitelisted in registry
    
@@ -308,7 +311,7 @@ The manager (MANAGER_ROLE) must separately use kMinter Adapter:
 ```
 Institution Action:
 1. Has 1M kUSDC tokens
-2. Calls kMinter.requestBurn(1M)
+2. Calls kMinter.requestBurn(USDC, recipient, 1M)
 
 Physical:
    1M kUSDC → kMinter (escrowed, not burned yet)
@@ -333,7 +336,7 @@ Step 2: Transfer to BatchReceiver
 Virtual Updates:
    kMinter adapter totalAssets reduced
 
-Note: If kMinter adapter doesn't have 1M, relayer must first:
+Note: If kMinter adapter doesn't have 1M, manager must first:
    - Withdraw from DN strategy → kMinter adapter
    - Then settlement can pull from adapter → BatchReceiver
 
@@ -366,7 +369,7 @@ kMinter → Institution: 10M kUSDC (instant!)
 Physical: 10M USDC in kMinter adapter
 Virtual: kMinter owns 10M
 
-Relayer deploys:
+Manager deploys:
    kMinter adapter → DN external strategy: 10M USDC
    
 State:
@@ -394,8 +397,10 @@ Settlement (Day 6):
    Yield: 10.2M - 10M = +200K
    Mint 200K kUSDC to DN Vault USDC
    
-   Share price: 1.002
-   Alice claims: 100K / 1.002 ≈ 99,800 stkTokens
+   Share price: ~1.002
+   Alice claims: ~99,800 stkTokens
+   (Simplified — actual conversion uses ERC4626-style virtual share/asset
+    offsets and deducts accumulated fees, so real numbers differ slightly)
 
 ═══════════════════════════════════════════════════════════
 DAY 10: BOB STAKES IN ALPHA
@@ -460,19 +465,19 @@ Share prices increased:
 
 ### 1. Settlement Updates Virtual Balances ONLY
 
-From `kAssetRouter.sol` line 477-481:
+From `kAssetRouter.sol`:
 ```
 When settling a staking vault:
-   kMinterAdapter.setTotalAssets(oldAmount - netted)
-   vaultAdapter.setTotalAssets(newAmount)
+   kMinterAdapter.setTotalAssets(kMinterAdapter.totalAssets() - netted)
+   vaultAdapter.setTotalAssets(totalAssetsAdjusted)
 ```
 
-These are just number updates! No `safeTransfer` calls in settlement.
+These are virtual balance updates. Note: during kMinter settlement, physical transfers DO occur (pull from adapter, transfer to BatchReceiver).
 
 ### 2. Physical Transfers via Adapter.execute()
 
-Adapters inherit from `MinimalSmartAccount` which has an `execute()` function.
-Relayers call this to:
+Adapters inherit from `SmartAdapterAccount` (which extends `MinimalSmartAccount`) providing an ERC-7579 `execute()` function.
+Managers (MANAGER_ROLE) call this to:
 
 - Deploy to strategies
 - Transfer between adapters
@@ -485,23 +490,23 @@ Relayers call this to:
 - Both invest in same external strategy (per asset)
 - Transfer shares, not USDC/WBTC
 - More efficient (no physical moves)
-- Code: `vaultRequestedShares` mapping
+- Code: `BatchInfo.requestedSharesInBatch` and `globalPendingRequests` in kAssetRouter
 
 **Asset Accounting** (kMinter ↔ Alpha/Beta):
 
 - Different strategies require USDC movement
 - Track actual USDC amounts
 - Physical movement via kMinter Adapter
-- Code: `vaultBatchBalances.deposited/requested`
+- Code: `BatchInfo.depositedInBatch` / `BatchInfo.requestedSharesInBatch`
 
-### 4. kAssetRouter Never Holds USDC
+### 4. kAssetRouter Transiently Handles USDC
 
-The router just updates numbers! It:
+The router transiently holds USDC within the same transaction during deposit routing and kMinter settlement withdrawals, but does not hold assets persistently. It:
 
-- Tracks virtual balances
-- Calculates yield
+- Transiently receives assets during minting (safeTransferFrom) and forwards to adapters (kAssetPush)
+- Pulls from adapters and forwards to BatchReceivers during kMinter settlement
+- Tracks virtual balances and calculates yield
 - Tells adapters to update their totalAssets
-- Does NOT hold or transfer USDC itself
 
 Physical USDC/WBTC is always in:
 
@@ -518,7 +523,7 @@ Only kMinter Adapter physically holds and moves assets!
 ## FAQ - Common Questions
 
 **Q: So settlement doesn't move money?**  
-A: Correct! Settlement only updates the bookkeeping (virtual balances). Physical money moves separately when relayers call adapter.execute().
+A: For kStakingVault settlements, mostly correct — only virtual balances and kToken minting/burning happen. For kMinter settlements, physical USDC IS moved (pulled from adapter to BatchReceiver for redemptions). External strategy deployment happens separately when managers call adapter.execute().
 
 **Q: Why have virtual balances at all?**  
 A: Efficiency! Users can stake/unstake instantly. Physical deployment happens in batches to save gas and keep money earning yield continuously.
@@ -548,8 +553,8 @@ A: NO! They only track virtual balances. All physical USDC stays in kMinter adap
 **Q: Is my money safe during all this?**  
 A: Yes! Multiple protections:
 
-- 1 hour settlement cooldown (guardians can cancel)
-- Yield tolerance checks (max 10% deviation)
+- 1 hour settlement cooldown (guardians or emergency admins can cancel)
+- Yield tolerance checks (configurable per vault via `setMaxAllowedDelta` — must be set explicitly; defaults to 0, meaning any yield requires guardian approval until configured)
 - Strict adapter permissions
 - All movements are auditable on-chain
 
@@ -564,7 +569,7 @@ INSTITUTIONAL FLOW (kMinter):
    kMinter (instant kUSDC)
        ↓ physical deployment
    kMinter Adapter
-       ↓ relayer execute()
+       ↓ manager execute()
    Delta Neutral Strategy
        ↓ earns yield
    Settlement: mint/burn kUSDC
@@ -584,7 +589,7 @@ USER FLOW - ALPHA/BETA (assets):
    User
        ↓ kUSDC
    Alpha/Beta Vault
-       ↓ relayer withdraws from DN to kMinter adapter
+       ↓ manager withdraws from DN to kMinter adapter
    DN Strategy → kMinter Adapter
        ↓ kMinterAdapter.execute()
    CEFFU Custody (Alpha/Beta)
@@ -602,7 +607,7 @@ USER FLOW - ALPHA/BETA (assets):
 2. Alpha/Beta = DIFFERENT strategies = Asset accounting
 3. **kMinter Adapter = Central hub** - ALL physical USDC/WBTC flows through it
 4. DN/Alpha/Beta adapters = Virtual tracking only (never physically hold assets)
-5. Settlement = Virtual bookkeeping ONLY
+5. Settlement = Virtual bookkeeping (kStakingVault) or virtual + physical transfer to BatchReceiver (kMinter)
 6. Managers = Physical money movers via kMinterAdapter.execute() (MANAGER_ROLE)
 7. Relayers = Propose settlements (RELAYER_ROLE)
 8. Always 1:1 backing maintained!

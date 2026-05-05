@@ -34,7 +34,7 @@ The project uses Soldeer for dependency management. To install all dependencies:
 forge soldeer install
 ```
 
-This will install all dependencies specified in `soldeer.toml` and `soldeer.lock`.
+This will install all dependencies specified in `foundry.toml` and `soldeer.lock`.
 
 ## Building
 
@@ -110,8 +110,7 @@ Institutions can mint kTokens 1:1 with underlying assets and request redemptions
 
 - `kMinter.mint()` - Creates new kTokens by accepting underlying asset deposits
 - `kMinter.requestBurn()` - Requests the burn of X shares for Y kTokens
-- `kMinter.burn()` - Burns the requested shares amount and transfer the kTokens
-- `kMinter.cancelBurnRequest()` - Cancels pending burn requests before batch settlement
+- `kMinter.burn()` - Burns escrowed kTokens and pulls underlying assets from BatchReceiver
 
 ### Retail Operations
 
@@ -139,16 +138,18 @@ Requests are grouped into time-based batches for gas-efficient settlement:
 
 ## Role Hierarchy
 
-| Role                 | Permissions                | Contracts                  |
-| -------------------- | -------------------------- | -------------------------  |
-| OWNER                | Ultimate control, upgrades | All                        |
-| ADMIN_ROLE           | Operational management     | All                        |
-| EMERGENCY_ADMIN_ROLE | Emergency pause            | All                        |
-| MINTER_ROLE          | Mint/burn tokens           | kToken                     |
-| INSTITUTION_ROLE     | Mint/redeem kTokens        | kMinter                    |
-| RELAYER_ROLE         | Settle batches             | kAssetRouter, VaultBatches |
-| VENDOR_ROLE          | Adds Institutions          | kRegistry                  |
-| MANAGER_ROLE         | Manages the Adapter        | kVaultAdapter              |
+| Role                 | Permissions                          | Contracts                             |
+| -------------------- | ------------------------------------ | ------------------------------------- |
+| OWNER                | Ultimate control, upgrades           | All                                   |
+| ADMIN_ROLE           | Operational management               | All                                   |
+| EMERGENCY_ADMIN_ROLE | Emergency pause                      | All                                   |
+| GUARDIAN_ROLE         | Cancel/accept settlement proposals   | kAssetRouter                          |
+| INSTITUTION_ROLE     | Mint/redeem kTokens                  | kMinter                               |
+| RELAYER_ROLE         | Settle batches                       | kAssetRouter, kMinter, kStakingVault  |
+| VENDOR_ROLE          | Grant institution roles              | kRegistry                             |
+| MANAGER_ROLE         | Manages the Adapter                  | VaultAdapter (via SmartAdapterAccount)|
+
+> **Note:** `MINTER_ROLE` is a kToken-specific role (from the kToken0 dependency), not a core KAM protocol role in `kBaseRoles`.
 
 ## Safety
 

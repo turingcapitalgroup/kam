@@ -30,20 +30,20 @@
          │YES
          ▼
 ┌─────────────────┐    ┌─────────────────┐
-│Active batch     │NO  │Create new batch │
-│exists for asset?├───▶│for asset        │
-└────────┬────────┘    └────────┬────────┘
-         │YES                   │
-         ▼                      ▼
-┌─────────────────┐    ┌─────────────────┐
-│safeTransferFrom │◀───┤Transfer to      │
-│to kAssetRouter  │    │kAssetRouter     │
+│Active batch     │NO  │Transaction      │
+│exists for asset?├───▶│Reverts          │
 └────────┬────────┘    └─────────────────┘
+         │YES
+         ▼
+┌─────────────────┐
+│safeTransferFrom │
+│to kAssetRouter  │
+└────────┬────────┘
          │
          ▼
 ┌─────────────────┐
 │kAssetRouter.    │
-│kAssetPush()     │ ── Track virtual balance
+│kAssetPush()     │ ── Transfer assets to adapter
 └────────┬────────┘
          │
          ▼
@@ -76,7 +76,7 @@
          ▼
 ┌─────────────────┐
 │Generate unique  │
-│request ID       │ ── Uses hash(counter, user, asset, time)
+│request ID       │ ── Uses hash(contract, user, amount, time, counter)
 └────────┬────────┘
          │
          ▼
@@ -128,8 +128,8 @@
          ▼
 ┌─────────────────-┐
 │Relayer calls     │
-│proposeSettleBatch│ ── Only provides totalAssets parameter
-│with totalAssets  │
+│proposeSettleBatch│ ── Provides: asset, vault, batchId, totalAssets,
+│                  │    lastFeesChargedManagement, lastFeesChargedPerformance
 └────────┬────────-┘
          │
          ▼
@@ -137,14 +137,14 @@
 │kAssetRouter     │
 │calculates:      │ ── Contract automatically computes:
 │• netted amount  │    • netted = deposited - requested
-│• yield amount   │    • yield = totalAssets - netted - lastTotal
+│• yield amount   │    • yield = totalAssets - lastTotalAssets
 │• profit/loss    │    • profit = yield > 0
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
 │Cooldown Period  │
-│(Default 1 hour) │ ── Guards can cancel during cooldown
+│(Default 1 hour) │ ── Guardians or Emergency Admins can cancel
 └────────┬────────┘
          │
          ▼
@@ -182,8 +182,9 @@
          │YES
          ▼
 ┌─────────────────┐
-│Validate request │
-│status           │ ── Check request exists and is PENDING
+│Validate caller  │
+│is request       │ ── Check msg.sender == burnRequest.user
+│creator          │    and request exists in user's set
 └────────┬────────┘
          │
          ▼
@@ -223,15 +224,15 @@ Request Status Flow:
 │PENDING      │ ── Initial state when requestBurn() is called
 └──────┬──────┘
        │
+       │  (batch settles, then institution calls burn())
        ▼
 ┌─────────────┐
-│SETTLED      │ ── After batch settlement completes
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│REDEEMED     │ ── After burn() successfully pulls assets
+│REDEEMED     │ ── Set when burn() is called (before assets pulled)
 └─────────────┘
+
+Note: There is no intermediate SETTLED status for individual requests.
+Batch settlement is tracked separately via BatchInfo.isSettled.
+The request goes directly from PENDING to REDEEMED.
 ```
 
 ## Key Functions by Contract
@@ -260,7 +261,7 @@ Request Status Flow:
 │  ┌─────────────────────────────────────────────────────────────┐ │
 │  │• createNewBatch() - Create new batch for asset              │ │
 │  │• closeBatch() - Stop accepting new requests                 │ │
-│  │• settleBatch() - Mark batch as settled after processing     │ │
+│  │• settleBatch() - Called by kAssetRouter only (internal)     │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────-─┘
 ```

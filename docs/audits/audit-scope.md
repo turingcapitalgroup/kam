@@ -36,7 +36,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 │   │   └── VaultAdapter.sol                ✅ External protocol adapter
 │   ├── base/
 │   │   ├── ERC2771Context.sol             ✅ Meta-transaction support
-│   │   ├── ERC3009.sol                    ✅ ERC-3009 transfer with auth
+│   │   ├── (ERC3009.sol is in kToken0 dep) ❌ Not in src/
 │   │   ├── kBase.sol                      ✅ Protocol foundation contract
 │   │   ├── kBaseRoles.sol                 ✅ Role-based access control
 │   │   └── MultiFacetProxy.sol            ✅ Modular vault architecture
@@ -55,15 +55,20 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 │   ├── kAssetRouter.sol                   ✅ Virtual balance coordinator
 │   ├── kBatchReceiver.sol                 ✅ Batch settlement distribution
 │   ├── kMinter.sol                        ✅ Institutional gateway
-│   ├── kToken.sol                         ✅ Asset-backed ERC20 token
-│   └── kTokenFactory.sol                  ✅ kToken deployment factory
+│   ├── constants/
+│   │   └── Constants.sol                  ✅ Protocol-wide constants
+│   ├── libraries/
+│   │   └── VaultMathLib.sol               ✅ Fee calculation & share math
+│   ├── errors/
+│   │   └── Errors.sol                     ✅ Error code definitions
 ```
 
 ### Out of Scope - Supporting Components
 
 ```
 ├── src
-│   ├── errors/                       ❌ Error definitions only
+│   ├── (kToken.sol & kTokenFactory    ❌ External dependency (kToken0)
+│   │    in dependencies/kToken0-1.0/)
 │   ├── interfaces/                   ❌ Interface definitions (as requested)
 │   ├── kRegistry/
 │   │   └── kRemoteRegistry.sol       ❌ Cross-chain registry (separate deployment)
@@ -256,7 +261,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Execution Workflow**:
 
-1. **Permission Validation**: Manager (MANAGER_ROLE) calls `execute(target, data, value)` on adapter
+1. **Permission Validation**: Manager (MANAGER_ROLE) calls `execute(ModeCode mode, bytes calldata executionCalldata)` on adapter (ERC-7579)
 2. **Registry Check**: SmartAdapterAccount validates via `registry.authorizeCall(target, selector, params)` which checks executor permissions
 3. **External Call**: If approved, adapter executes call to external protocol
 4. **Virtual Balance Update**: During settlement, kAssetRouter calls `setTotalAssets()` to update accounting
@@ -274,7 +279,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Deployment & Initialization Workflow**:
 
-1. **Creation**: kMinter calls `createBatchReceiver(batchId)` when batch ready for settlement
+1. **Creation**: kMinter internally calls `_createBatchReceiver(_batchId)` during the first `requestBurn()` for a batch
    - Uses OptimizedLibClone.clone() for gas-efficient EIP-1167 minimal proxy deployment
    - Each receiver is a separate contract instance with unique address
 2. **Initialization**: Newly deployed receiver calls `initialize(batchId, asset)`
@@ -333,7 +338,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Security Architecture**:
 
-- **Immutable Implementation**: No proxy pattern ensures token contract cannot be upgraded or modified
+- **Upgradeable via UUPS**: Uses UUPS proxy pattern with ERC-7201 namespaced storage and atomic initialization
 - **Role-Based Access Control**: Uses OptimizedOwnableRoles for efficient permission management
 - **Emergency Controls**: EMERGENCY_ADMIN_ROLE can pause all transfers during crisis situations
 - **Supply Validation**: Total supply always equals underlying assets held across protocol vaults

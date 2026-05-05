@@ -199,9 +199,9 @@
          ▼
 ┌─────────────────┐
 │Calculate        │
-│stkTokens Based  │ ── stkTokens = kTokens * (10^decimals) / netSharePrice
-│on Net Share     │    (using batch settlement snapshot values)
-│Price            │
+│stkTokens owed   │ ── stkTokens = kTokens * (totalSupply + 1e6) /
+│                 │    (totalNetAssets + 1e6)
+│                 │    (using batch snapshot values + virtual offsets)
 └────────┬────────┘
          │
          ▼
@@ -243,33 +243,16 @@
          ▼
 ┌─────────────────┐
 │Calculate kTokens│
-│Net Amount       │ ── netKTokens = stkTokens * netSharePrice / (10^decimals)
-│                 │ 
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│Calculate Fees   │
-│                 │ ── grossKTokens = stkTokens * sharePrice / (10^decimals)
-│                 │ ── fees = grossKTokens - netKTokens
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│Burn stkTokens   │
-│from Vault       │ ── Burns from address(this) - already transferred
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│Transfer Fees to │
-│Treasury         │ ── $.kToken.safeTransfer(getTreasury(), fees)
+│Net Amount       │ ── netKTokens = stkTokens * (totalNetAssets + 1e6) /
+│                 │    (totalSupply + 1e6)
+│                 │    (using batch snapshot values + virtual offsets)
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
 │Transfer Net     │
-│kTokens to User  │ ── $.kToken.safeTransfer(user, netKTokens)
+│kTokens to User  │ ── $.kToken.safeTransfer(recipient, netKTokens)
+│                 │    (fees already deducted during settleBatch)
 └────────┬────────┘
          │
          ▼
@@ -347,7 +330,8 @@
 │  ┌─────────────────┐                                                │
 │  │Total Assets =   │                                                │
 │  │Balance -        │                                                │
-│  │PendingStakes    │                                                │
+│  │PendingStakes -  │                                                │
+│  │PendingUnstakes  │                                                │
 │  └────────┬────────┘                                                │
 │           │                                                         │
 │  Components that reduce to Net Assets:                              │
@@ -375,13 +359,18 @@
 │        ┌─────────────────────────────────┐                          │
 │        │Formulas:                        │                          │
 │        │                                 │                          │
+│        │VIRTUAL_ASSETS = 1e6             │                          │
+│        │VIRTUAL_SHARES = 1e6             │                          │
+│        │                                 │                          │
 │        │grossSharePrice =                │                          │
-│        │  totalAssets * (10^decimals)    │                          │
-│        │  / totalSupply                  │                          │
+│        │  (10^decimals) *                │                          │
+│        │  (totalAssets + 1e6) /          │                          │
+│        │  (totalSupply + 1e6)            │                          │
 │        │                                 │                          │
 │        │netSharePrice =                  │                          │
-│        │  totalNetAssets * (10^decimals) │                          │
-│        │  / totalSupply                  │                          │
+│        │  (10^decimals) *                │                          │
+│        │  (totalNetAssets + 1e6) /       │                          │
+│        │  (totalSupply + 1e6)            │                          │
 │        └─────────────────────────────────┘                          │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -477,7 +466,8 @@ Request Status Flow:
 │  │  Net after fees           │      └───────────────────────────┘   │
 │  │                           │                                      │
 │  │• _totalAssets()           │      Fee Functions:                  │
-│  │  Balance - pending stakes │      ┌───────────────────────────┐   │
+│  │  Balance - pending stakes │                                      │
+│  │  - pending unstakes       │      ┌───────────────────────────┐   │
 │  │                           │      │• setManagementFee()       │   │
 │  │• _totalNetAssets()        │      │• setPerformanceFee()      │   │
 │  │  Assets - fees            │      │• setHardHurdleRate()      │   │
@@ -604,7 +594,7 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │  ┌─────────────────┐                                                                            │
 │  │Increases Share  │                                                                            │
 │  │Price            │                                                                            │
-│  │                 │ ── sharePrice = totalAssets * 1e18 / totalSupply                           │
+│  │                 │ ── sharePrice = (10^decimals) * (totalAssets + 1e6) / (totalSupply + 1e6)  │
 │  └─────────┬───────┘                                                                            │
 │            │                                                                                    │
 │            ▼                                                                                    │

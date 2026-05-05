@@ -66,7 +66,7 @@ Each kToken instance maintains strict peg enforcement through a sophisticated vi
 **Virtual Balance Implementation**: The virtual accounting system works as follows:
 
 - Each vault has a VaultAdapter that maintains `totalAssets()` representing virtual balance
-- kAssetRouter tracks pending deposits/withdrawals per vault per batch via `getBatchIdBalances(vault, batchId)`
+- kAssetRouter queries batch balances via `getBatchIdBalances(vault, batchId)` which delegates to the vault's own batch storage (kMinter or kStakingVault)
 - Virtual balance = `adapter.totalAssets()` which is updated during settlement via `adapter.setTotalAssets()`
 - Settlement reconciles virtual balances with actual asset movements from external strategies
 
@@ -115,7 +115,7 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
 1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, lastFeesChargedManagement, lastFeesChargedPerformance)` providing the current total assets from external strategies and fee charge timestamps (`uint64`, 0 = no fees to charge). The kAssetRouter contract automatically calculates:
    - `netted` = deposited - requested amounts from batch balances
    - `lastTotalAssets` = current virtual balance via `adapter.totalAssets()`
-   - `yield` = totalAssets_ - lastTotalAssets
+   - `yield` = totalAssets_ - lastTotalAssets (netted is NOT subtracted from yield)
    - `totalAssetsAdjusted` = totalAssets_ + netted (stored as proposal's totalAssets for settlement execution)
    - `profit` = whether yield is positive or negative
    - Emits `YieldExceedsMaxDeltaWarning` if yield exceeds configured threshold (warning only, does not revert)
@@ -178,7 +178,7 @@ The kMinter contract maintains separate batch cycles for each supported asset:
 │  └────────┘   └────────┘   └────────┘                         │
 │                                                               │
 │  Batch ID Generation:                                         │
-│  hash(vault_address, assetBatchCounter, chain_id, time, asset)│
+│  hash(contract_address, batchCounter, chain_id, time, asset)  │
 │                                                               │
 │  • Independent lifecycles per asset                           │
 │  • No cross-asset blocking                                    │
@@ -274,7 +274,7 @@ The kAssetRouter serves as the central coordinator for all asset movements withi
 │                                                             │
 │  Admin Configuration:                                       │
 │  • setSettlementCooldown() - Configure cooldown period      │
-│  • setMaxAllowedDelta() - Configure yield limits            │
+│  • setMaxAllowedDelta(vault, delta) - Per-vault yield limits │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -286,11 +286,11 @@ KAM is split into the following main contracts:
 
 #### kToken
 
-The fundamental ERC20 implementation representing tokenized real-world assets. Each kToken maintains a 1:1 peg with its underlying asset (e.g., kUSD:USDC, kBTC:WBTC).
+The fundamental ERC20 implementation representing tokenized real-world assets. Each kToken maintains a 1:1 peg with its underlying asset (e.g., kUSDC:USDC, kWBTC:WBTC).
 
 The kToken contract is the foundational building block of the KAM protocol, implementing a role-restricted ERC20 token with advanced security features. **kToken contracts are upgradeable using the UUPS proxy pattern** with ERC-7201 namespaced storage to prevent storage collisions. Deployment uses atomic initialization via `deployAndCall()` to prevent frontrunning attacks where an attacker could initialize the proxy before the legitimate deployer. All kTokens share a single implementation contract deployed by kTokenFactory, providing gas efficiency while maintaining independent storage per token instance.
 
-Role-based access control integrates Solady's OptimizedOwnableRoles for gas-efficient permission management, with MINTER_ROLE for token operations, ADMIN_ROLE for configuration, and EMERGENCY_ADMIN_ROLE for crisis response. Upgrades are restricted to the contract owner (typically kRegistry owner) through the `_authorizeUpgrade()` function.
+Role-based access control integrates Solady's OptimizedOwnableRoles for gas-efficient permission management, with ADMIN_ROLE for configuration and EMERGENCY_ADMIN_ROLE for crisis response. Minting permissions are managed at the individual kToken contract level (not through a protocol-wide MINTER_ROLE in kBaseRoles). Upgrades are restricted to the contract owner through the `_authorizeUpgrade()` function.
 
 All core functions respect a global pause state, allowing immediate shutdown if security issues are detected. 
 
@@ -302,7 +302,7 @@ The kMinter contract implements a "push-pull" model for institutional operations
 
 Burns use an asynchronous request-response pattern. Institutions call requestBurn() which transfers kTokens to the kMinter contract for escrow (not burning immediately). A unique request ID is generated and stored with request details, and the request is added to the current batch for settlement processing. During settlement, assets are retrieved from strategies, and institutions later call burn() which burns the escrowed kTokens and claims underlying assets from the batch receiver.
 
-The contract utilizes Solady's EnumerableSet for O(1) addition/removal of user requests, allowing efficient iteration over pending requests with automatic cleanup when processed. Request states track the lifecycle from PENDING to REDEEMED.
+The contract utilizes Solady's OptimizedBytes32EnumerableSetLib for O(1) addition/removal of user requests, allowing efficient iteration over pending requests with automatic cleanup when processed. Request states track the lifecycle from PENDING to REDEEMED.
 
 ### Settlement and Routing Infrastructure
 
@@ -351,9 +351,9 @@ During settlement execution, the system handles kMinter versus regular vault set
 
 Single vault contract implementation deployed per asset type, enabling retail users to stake kTokens for yield-bearing stkTokens.
 
-The kStakingVault is implemented as a unified contract that inherits from multiple base contracts to provide comprehensive staking functionality. The contract combines BaseVault, Initializable, UUPSUpgradeable, Ownable, and MultiFacetProxy to create a complete staking solution.
+The kStakingVault is implemented as a unified contract that inherits from multiple base contracts to provide comprehensive staking functionality. The contract combines IVault, BaseVault, Initializable, UUPSUpgradeable, Ownable, and MultiFacetProxy to create a complete staking solution. Note that kStakingVault is itself an ERC20 token (stkToken) via BaseVault's inheritance from Solady's ERC20.
 
-**Core Architecture**: The vault implements all staking functionality directly within the main contract, including batch processing, fee management, and claim processing. It uses ERC-7201 namespaced storage for upgrade safety, integrates with kRegistry for system-wide configuration, implements role-based permissions, and uses OptimizedReentrancyGuardTransient for gas-efficient protection.
+**Core Architecture**: The vault implements all staking functionality directly within the main contract, including batch processing, fee management, and claim processing. It uses ERC-7201 namespaced storage for upgrade safety, integrates with kRegistry via BaseVault's own registry reference (not via kBase), implements role-based permissions, and uses OptimizedReentrancyGuardTransient for gas-efficient protection.
 
 **BaseVault Integration**: Provides foundational vault logic including ERC20 token functionality for stkTokens. These tokens represent staked positions and automatically accrue yield through share price appreciation. The BaseVault handles core mathematical operations for asset-to-share conversions and fee calculations.
 
@@ -367,11 +367,11 @@ The kStakingVault is implemented as a unified contract that inherits from multip
 
 #### kBatchReceiver
 
-Lightweight, immutable contracts deployed per batch to handle redemption distributions.
+Lightweight, non-upgradeable contracts deployed per batch to handle redemption distributions.
 
-The kBatchReceiver serves as a secure escrow mechanism for institutional redemptions, providing a trustless way for institutions to claim their underlying assets after batch settlement. These contracts are deployed using the EIP-1167 minimal proxy pattern for gas-efficient deployment, with immutable kMinter references set at construction.
+The kBatchReceiver serves as a secure escrow mechanism for institutional redemptions, providing a trustless way for institutions to claim their underlying assets after batch settlement. These contracts are deployed using the EIP-1167 minimal proxy pattern for gas-efficient deployment, with immutable kMinter references set at construction. BatchReceivers are lazily created — one is deployed only when the first `requestBurn()` is called for that batch.
 
-Once deployed, batch receivers cannot be modified, having no upgrade capability for maximum security. The single-purpose functionality reduces attack surface, and the direct implementation enables gas-efficient operations. Asset distribution implements simple but secure asset claiming, with only the authorized kMinter able to trigger asset distribution and no administrator override capabilities.
+Once deployed, batch receivers cannot be upgraded, having no UUPS capability for maximum security. The single-purpose functionality reduces attack surface, and the direct implementation enables gas-efficient operations. Asset distribution implements simple but secure asset claiming, with only the authorized kMinter able to trigger asset distribution. A `rescueAssets()` function exists for recovering non-batch assets (ERC20 tokens other than the batch asset, and ETH), callable only by kMinter.
 
 ### External Integration Layer
 
@@ -423,7 +423,7 @@ The above contracts depend on base contracts and libraries:
 
 **kBase**: Common functionality inherited by core protocol contracts, providing registry integration helpers, role management utilities, pause functionality, and standardized storage access patterns.
 
-**Extsload**: Allows external contracts to read storage slots efficiently, implementing EIP-2930 access list optimization for off-chain monitoring and verification.
+**Extsload**: Used by kMinter (and ReaderModule for kStakingVault) to allow external contracts to read storage slots efficiently via `extsload()` for off-chain monitoring and verification.
 
 **MultiFacetProxy**: Proxy pattern for modular vault architecture, enabling delegatecall routing to facet implementations, selector-based function dispatch, and admin-controlled facet management.
 
@@ -452,7 +452,7 @@ Institution                kMinter              kAssetRouter            kToken
 
 ### Institutional Redemption Flow
 
-The burn process implements a secure request-queue system that protects both the protocol and institutions. The process begins with request creation where institutions call requestBurn() with their kToken amount. A unique ID is created from user data, amount, and timestamp, and kTokens are transferred to kMinter for holding (not burned immediately). Virtual balances are updated in kAssetRouter to mark assets as requested for withdrawal.
+The burn process implements a secure request-queue system that protects both the protocol and institutions. The process begins with request creation where institutions call requestBurn() with their kToken amount. A unique ID is created from the kMinter address, user address, amount, timestamp, and an incrementing counter, and kTokens are transferred to kMinter for holding (not burned immediately). Virtual balances are updated in kAssetRouter to mark assets as requested for withdrawal.
 
 During batch settlement, assets are retrieved from strategies and transferred to kBatchReceiver for distribution. Finally, institutions call burn() to burn the escrowed kTokens and receive underlying assets from the batch receiver, ensuring atomic exchange of tokens for assets.
 
@@ -477,7 +477,7 @@ Institution            kMinter            kAssetRouter         BatchReceiver
 
 ### Retail Staking Flow
 
-Retail users interact through kStakingVault to earn yield on their kTokens. Users first acquire kTokens via DEX or other means, then call requestStake() with their desired amount. kTokens are moved to the vault via safeTransferFrom, and kAssetRouter transfers virtual balance from kMinter to vault. Requests are queued for the current batch, and after settlement, users can claim stkTokens representing their staked position. These stkTokens automatically accrue yield from external strategies.
+Retail users interact through kStakingVault to earn yield on their kTokens. Users first acquire kTokens via DEX or other means, then call requestStake() with their desired amount. kTokens are moved to the vault via safeTransferFrom, and kAssetRouter validates and tracks the pending transfer from kMinter to vault (to be settled during batch settlement). Requests are queued for the current batch, and after settlement, users can claim stkTokens representing their staked position. These stkTokens automatically accrue yield from external strategies.
 
 ```
 Retail User          kStakingVault         kAssetRouter           Batch
@@ -499,7 +499,7 @@ Retail User          kStakingVault         kAssetRouter           Batch
 
 ### Settlement Process
 
-Settlement is the critical synchronization point between virtual and actual balances, implemented through a secure three-phase process. During the proposal phase, relayers query external strategies to obtain current totalAssets values and submit them via `proposeSettleBatch()`. The kAssetRouter contract automatically calculates all other parameters: netted amounts (deposited minus requested), yield amounts (totalAssets minus netted minus lastTotalAssets), and profit/loss determination.
+Settlement is the critical synchronization point between virtual and actual balances, implemented through a secure three-phase process. During the proposal phase, relayers query external strategies to obtain current totalAssets values and submit them via `proposeSettleBatch()`. The kAssetRouter contract automatically calculates all other parameters: netted amounts (deposited minus requested), yield amounts (totalAssets minus lastTotalAssets), and profit/loss determination.
 
 The cooldown phase provides a mandatory waiting period (default 1 hour, configurable up to 1 day) where proposals can be reviewed and cancelled if errors are detected.
 
@@ -524,9 +524,8 @@ The protocol implements granular permissions via Solady's OptimizedOwnableRoles 
 | OWNER                | Protocol    | Upgrades, critical changes      |
 | ADMIN_ROLE           | Operational | Configuration, registry updates |
 | EMERGENCY_ADMIN_ROLE | Crisis      | Pause, emergency withdrawals    |
-| MINTER_ROLE          | Tokens      | Mint/burn kTokens               |
 | INSTITUTION_ROLE     | Access      | Use kMinter functions           |
-| VENDOR_ROLE          | Adapters    | Register adapters, manage assets|
+| VENDOR_ROLE          | kRegistry   | Grant institution roles          |
 | RELAYER_ROLE         | Settlement  | Propose batch settlements       |
 | MANAGER_ROLE         | Adapters    | Adapter execution and management|
 | GUARDIAN_ROLE        | Settlement  | Cancel/approve settlement proposals |
@@ -538,14 +537,14 @@ The two-phase commit system provides multiple safeguards:
 ### Timelock Protection ###
 
 - Mandatory cooldown period (1hr default, max 1 day)
-- Guardian-only proposal cancellation during cooldown
+- Guardian or emergency admin proposal cancellation
 - High-yield-delta approval system: Proposals exceeding yield tolerance require explicit guardian approval via `acceptProposal()` before execution
-- `canExecuteProposal()` returns specific reasons for blocked proposals (cooldown pending, requires approval, cancelled, already executed)
+- `canExecuteProposal()` returns `ProposalStatus` enum: NOT_FOUND, ALREADY_EXECUTED, CANCELLED, COOLDOWN_NOT_PASSED, REQUIRES_APPROVAL, EXECUTABLE
 - On-chain validation of all settlement parameters
 
 ### Emergency Controls
 
-The protocol implements a multi-layered emergency response system with global pause across all contracts, per-vault pause for isolated issues, emergency fund withdrawal by admin, proposal cancellation mechanisms, and upgrade capability via UUPS for critical fixes.
+The protocol implements a multi-layered emergency response system with global pause across all contracts, per-vault pause for isolated issues, emergency fund withdrawal by admin (limited to non-protocol, non-kToken assets), proposal cancellation mechanisms, and upgrade capability via UUPS for critical fixes.
 
 ## Batch Processing Architecture
 
@@ -574,7 +573,7 @@ The protocol implements a multi-layered emergency response system with global pa
 
 **Key Difference**: kStakingVault does not create BatchReceiver contracts or unstake from them.
 
-**Per-Vault Limits**: Unlike kMinter which uses per-asset limits, kStakingVault uses per-vault limits configured via `setBatchLimits(vaultAddress, maxDepositPerBatch, maxWithdrawPerBatch)`.
+**Per-Vault Limits**: Unlike kMinter which uses per-asset limits, kStakingVault uses per-vault limits configured via `setBatchLimits(vaultAddress, maxMintPerBatch, maxBurnPerBatch)`.
 
 ## Fee Structure
 
@@ -597,8 +596,8 @@ Performance fees are charged only on positive yield generation, calculated as a 
 - **Rate**: Configurable per vault in basis points (initialized to 0, set operationally e.g. 1000 bp = 10%)
 - **Hurdle Rate**: Configurable threshold per asset (default 0%) - fees only charged above this minimum return
 - **Watermark**: High watermark system ensures fees only charged on net new profits
-- **Hard Hurdle** (default): `(positiveYield - hurdleAmount) * performanceFee / 10000` — fees only on excess above hurdle
-- **Soft Hurdle**: `positiveYield * performanceFee / 10000` when yield exceeds hurdle — fees on all profits once hurdle is met
+- **Soft Hurdle** (default): `totalReturn * performanceFee / 10000` when yield exceeds hurdle — fees on all profits (after management fee deduction) once hurdle is met
+- **Hard Hurdle** (opt-in via `setHardHurdleRate(true)`): `(positiveYield - hurdleAmount) * performanceFee / 10000` — fees only on excess above hurdle
 - **Mode**: Configurable via `setHardHurdleRate(bool)` per vault
 
 ### Fee Calculation
@@ -673,15 +672,13 @@ The protocol implements multiple optimization strategies for cost efficiency:
 
 **Virtual Balances**: Minimize actual token transfers through net settlement only
 
-**Storage Packing**: Multiple values in single slots (uint128 pairs)
+**Storage Packing**: Multiple values in single slots (uint128 pairs for pending amounts, bit-packed config field for decimals/fees/timestamps/flags)
 
 **Transient Reentrancy Protection**: Leveraging Solidity 0.8.30's TSTORE/TLOAD
 
 **Proxy Patterns**: Minimal proxies for receivers, UUPS for upgradeability
 
-**CREATE2**: Deterministic deployment without initialization transactions
-
-**Multicall**: Batching multiple operations with reduced overhead
+**EIP-1167 Minimal Proxies**: Gas-efficient clone deployment for BatchReceiver contracts
 
 ## Upgrade Mechanism
 

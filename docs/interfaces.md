@@ -49,13 +49,13 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 
 - `kAssetPush(address asset, uint256 amount, bytes32 batchId)` - Records incoming asset flows from caller to virtual balance
 - `kAssetRequestPull(address asset, uint256 amount, bytes32 batchId)` - Stages outgoing asset requests from caller's virtual balance
-- `kSharesRequestPush(address vault, uint256 amount, bytes32 batchId)` - Records incoming share flows for unstaking
+- `kSharesRequestPush(address sourceVault, uint256 amount, bytes32 batchId)` - Records incoming share flows for unstaking
 
 **Settlement Operations**
 
-- `proposeSettleBatch(address asset, address vault, bytes32 batchId, uint256 totalAssets, uint64 lastFeesChargedManagement, uint64 lastFeesChargedPerformance)` - Creates timelock settlement proposal with automatic yield calculations (RELAYER_ROLE required)
+- `proposeSettleBatch(address asset, address vault, bytes32 batchId, uint256 totalAssets, uint64 lastFeesChargedManagement, uint64 lastFeesChargedPerformance) returns (bytes32 proposalId)` - Creates timelock settlement proposal with automatic yield calculations (RELAYER_ROLE required)
 - `executeSettleBatch(bytes32 proposalId)` - Executes approved settlement after cooldown using proposal ID (anyone can call after cooldown)
-- `cancelProposal(bytes32 proposalId)` - Cancels settlement proposals during cooldown period (GUARDIAN_ROLE required)
+- `cancelProposal(bytes32 proposalId)` - Cancels settlement proposals during cooldown period (GUARDIAN_ROLE or EMERGENCY_ADMIN_ROLE)
 - `acceptProposal(bytes32 proposalId)` - Approves high-yield-delta proposals that exceed the yield tolerance threshold (GUARDIAN_ROLE required)
 
 **Asset Transfer**
@@ -72,11 +72,11 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 - `getRequestedShares(address vault, bytes32 batchId)` - Returns total shares requested for redemption in kStakingVault batch
 - `isPaused()` - Checks if kAssetRouter contract is currently paused
 - `getSettlementProposal(bytes32 proposalId)` - Retrieves complete VaultSettlementProposal struct with all details
-- `canExecuteProposal(bytes32 proposalId)` - Checks execution readiness and returns boolean result with descriptive reason
+- `canExecuteProposal(bytes32 proposalId) returns (bool canExecute, ProposalStatus status)` - Checks execution readiness and returns ProposalStatus enum
 - `isProposalPending(bytes32 proposalId)` - Simple boolean check if proposal is still pending (not cancelled or executed)
 - `isProposalAccepted(bytes32 proposalId)` - Checks if a high-yield-delta proposal has been approved by a guardian
 - `getSettlementCooldown()` - Gets current cooldown period in seconds before proposals can be executed
-- `getMaxAllowedDelta()` - Gets current yield tolerance threshold in basis points (exceeding emits warning event)
+- `getMaxAllowedDelta(address vault_)` - Gets per-vault yield tolerance threshold in basis points (exceeding requires guardian approval)
 - `virtualBalance(address vault, address asset)` - Returns virtual asset balance from vault's adapter
 - `isProposalExecuted(bytes32 proposalId)` - Checks if a settlement proposal has been executed
 - `isBatchIdRegistered(bytes32 batchId)` - Checks if a batch ID has been registered in the router
@@ -86,7 +86,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 **Admin Functions**
 
 - `setSettlementCooldown(uint256 cooldown)` - Sets the security cooldown period in seconds for settlement proposals (ADMIN_ROLE required)
-- `setMaxAllowedDelta(uint256 tolerance_)` - Updates yield tolerance threshold in basis points (ADMIN_ROLE required)
+- `setMaxAllowedDelta(address vault_, uint256 tolerance_)` - Updates per-vault yield tolerance threshold in basis points (ADMIN_ROLE required)
 
 ### IkRegistry
 
@@ -102,7 +102,7 @@ Central registry managing protocol contracts, supported assets, vault registrati
 
 **Asset Management**
 
-- `registerAsset(string name, string symbol, address asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch, address emergencyAdmin)` - Deploys new kToken and establishes asset support with batch limits
+- `registerAsset(string name, string symbol, address asset, uint256 maxMintPerBatch, uint256 maxBurnPerBatch, address emergencyAdmin) returns (address)` - Deploys new kToken and establishes asset support with batch limits, returns kToken address
 - `removeAsset(address asset)` - Removes asset from protocol (requires no vaults using the asset, ADMIN_ROLE required)
 - `assetToKToken(address asset)` - Maps underlying assets to their kToken representations
 - `getAllAssets()` - Returns all protocol-supported assets
@@ -232,11 +232,11 @@ Interface for vault fee management including performance and management fees.
 
 **Fee Management**
 
-- `setManagementFee(uint16 fee)` - Sets management fee in basis points (ADMIN_ROLE required, max 10000 bp)
-- `setPerformanceFee(uint16 fee)` - Sets performance fee in basis points (ADMIN_ROLE required, max 10000 bp)
-- `setHardHurdleRate(bool isHard)` - Configures hurdle rate mechanism (ADMIN_ROLE required)
-- `notifyManagementFeesCharged(uint64 timestamp)` - Updates management fee timestamp (kAssetRouter only)
-- `notifyPerformanceFeesCharged(uint64 timestamp)` - Updates performance fee timestamp (kAssetRouter only)
+- `setManagementFee(uint16 _managementFee)` - Sets management fee in basis points (ADMIN_ROLE required, max 10000 bp)
+- `setPerformanceFee(uint16 _performanceFee)` - Sets performance fee in basis points (ADMIN_ROLE required, max 10000 bp)
+- `setHardHurdleRate(bool _isHard)` - Configures hurdle rate mechanism (ADMIN_ROLE required)
+- `notifyManagementFeesCharged(uint64 _timestamp)` - Updates management fee timestamp (kAssetRouter only)
+- `notifyPerformanceFeesCharged(uint64 _timestamp)` - Updates performance fee timestamp (kAssetRouter only)
 
 ### IVaultReader
 
@@ -255,8 +255,8 @@ Read-only interface for querying vault state, calculations, and metrics without 
 - `totalAssets()` - Total assets under management
 - `totalNetAssets()` - Net assets after fee deductions
 - `computeLastBatchFees()` - Calculates accumulated fees (management, performance, total)
-- `convertToShares(uint256 shares)` - Converts shares to equivalent asset amount
-- `convertToAssets(uint256 assets)` - Converts assets to equivalent share amount
+- `convertToShares(uint256 assets)` - Converts assets to equivalent share amount
+- `convertToAssets(uint256 shares)` - Converts shares to equivalent asset amount
 - `convertToAssetsWithTotals(uint256 shares, uint256 totalAssets, uint256 totalSupply)` - Converts shares to assets with specified totals
 - `convertToSharesWithTotals(uint256 assets, uint256 totalAssets, uint256 totalSupply)` - Converts assets to shares with specified totals
 
