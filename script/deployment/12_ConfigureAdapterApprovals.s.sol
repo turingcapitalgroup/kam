@@ -43,6 +43,7 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        validateConfigurationConfig(config);
         DeploymentOutput memory existing;
 
         // Read deployment output for contract addresses
@@ -109,9 +110,11 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
 
         IkRegistry registry = IkRegistry(payable(registryAddr));
 
-        // Grant MANAGER_ROLE to admin so we can execute adapter calls
-        _log("Granting MANAGER_ROLE to admin for adapter execution...");
-        registry.grantManagerRole(config.roles.admin);
+        bool adminWasManager = registry.isManager(config.roles.admin);
+        if (!adminWasManager) {
+            _log("Granting temporary MANAGER_ROLE to admin for adapter execution...");
+            registry.grantManagerRole(config.roles.admin);
+        }
 
         _log("");
         _log("1. Approving metawallets to spend underlying assets from kMinter adapters...");
@@ -145,6 +148,12 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         if (betaVaultAdapterAddr != address(0)) {
             _executeApproval(kMinterAdapterUSDCAddr, metawalletUSDCAddr, betaVaultAdapterAddr, maxApproval);
             _log("   - kMinterAdapterUSDC approved betaVaultAdapter to spend metawallet shares");
+        }
+
+        if (!adminWasManager) {
+            _log("");
+            _log("Revoking temporary MANAGER_ROLE from admin...");
+            registry.revokeManagerRole(config.roles.admin);
         }
 
         vm.stopBroadcast();

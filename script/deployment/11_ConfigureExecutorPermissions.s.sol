@@ -159,6 +159,7 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        validateConfigurationConfig(config);
         DeploymentOutput memory existing;
 
         // Use provided asset addresses or fall back to config
@@ -176,7 +177,11 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         if (dnVaultAdapterWBTCAddr == address(0)) dnVaultAdapterWBTCAddr = existing.contracts.dnVaultAdapterWBTC;
         if (alphaVaultAdapterAddr == address(0)) alphaVaultAdapterAddr = existing.contracts.alphaVaultAdapter;
         if (betaVaultAdapterAddr == address(0)) betaVaultAdapterAddr = existing.contracts.betaVaultAdapter;
-        if (walletUSDCAddr == address(0)) walletUSDCAddr = existing.contracts.WalletUSDC;
+        if (walletUSDCAddr == address(0)) {
+            walletUSDCAddr = config.custodialTargets.walletUSDC != address(0)
+                ? config.custodialTargets.walletUSDC
+                : existing.contracts.WalletUSDC;
+        }
 
         // For metawallet addresses: prefer config file (production), fallback to addresses.json (mocks)
         if (metawalletUSDCAddr == address(0)) {
@@ -295,7 +300,9 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         _configureAllowedReceivers(erc20ExecutionValidator, config, existing, usdc, metawalletUSDCAddr, walletUSDCAddr);
 
         // Set allowed sources from config
-        _configureAllowedSources(erc20ExecutionValidator, config, existing, metawalletUSDCAddr, metawalletWBTCAddr);
+        _configureAllowedSources(
+            erc20ExecutionValidator, config, existing, usdc, wbtc, metawalletUSDCAddr, metawalletWBTCAddr
+        );
 
         // Set allowed spenders from config
         _configureAllowedSpenders(
@@ -323,8 +330,9 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
 
         // Write to JSON only if requested (for real deployments)
         if (writeToJson) {
-            writeContractAddress("erc20ExecutionValidator", address(erc20ExecutionValidator));
-            writeContractAddress("erc4626ExecutionValidator", address(erc4626ExecutionValidator));
+            queueContractAddress("erc20ExecutionValidator", address(erc20ExecutionValidator));
+            queueContractAddress("erc4626ExecutionValidator", address(erc4626ExecutionValidator));
+            flushContractAddresses();
         }
 
         _log("");
@@ -438,12 +446,30 @@ contract ConfigureExecutorPermissionsScript is Script, DeploymentManager {
         ERC20ExecutionValidator validator,
         NetworkConfig memory config,
         DeploymentOutput memory existing,
+        address usdc,
+        address wbtc,
         address usdcVault,
         address wbtcVault
     )
         internal
     {
         _log("   - Set allowed sources from config");
+
+        // USDC sources
+        for (uint256 i = 0; i < config.parameterChecker.allowedSources.USDC.length; i++) {
+            address source = _resolveAddress(config.parameterChecker.allowedSources.USDC[i], config, existing);
+            if (source != address(0)) {
+                validator.setAllowedSource(usdc, source, true);
+            }
+        }
+
+        // WBTC sources
+        for (uint256 i = 0; i < config.parameterChecker.allowedSources.WBTC.length; i++) {
+            address source = _resolveAddress(config.parameterChecker.allowedSources.WBTC[i], config, existing);
+            if (source != address(0)) {
+                validator.setAllowedSource(wbtc, source, true);
+            }
+        }
 
         // metawalletUSDC sources
         for (uint256 i = 0; i < config.parameterChecker.allowedSources.metawalletUSDC.length; i++) {
