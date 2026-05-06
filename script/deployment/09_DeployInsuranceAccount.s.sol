@@ -40,6 +40,7 @@ contract DeployInsuranceAccountScript is Script, DeploymentManager {
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        validateConfig(config);
         DeploymentOutput memory existing;
 
         // If addresses not provided, read from JSON (for real deployments)

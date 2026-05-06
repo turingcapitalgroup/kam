@@ -3,6 +3,7 @@
   "contracts": {
     "MinimalUUPSFactory": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
     "WalletUSDC": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+    "WalletWBTC": "0x0000000000000000000000000000000000000000",
     "adapterGuardianModule": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
     "alphaVault": "0x46A9cF43B44f5CEb06747aF10955A02fD6671783",
     "alphaVaultAdapter": "0xc72500B2CA87DF8f964662A6bd3E4D94fA6Cf90d",
@@ -12,8 +13,8 @@
     "dnVaultAdapterWBTC": "0x9ace813B1adA8a75DF6518A6d1b50f1A418CdAB7",
     "dnVaultUSDC": "0x436932D6361Db21CbDf440A39046093a1C12D2B4",
     "dnVaultWBTC": "0x235B28c74f19083a5CAce20C506513417a90BE29",
-    "erc20ExecutionValidator": "0x8F4ec854Dd12F1fe79500a1f53D0cbB30f9b6134",
-    "erc4626ExecutionValidator": "0xC66AB83418C20A65C3f8e83B3d11c8C3a6097b6F",
+    "erc20ExecutionValidator": "0x2B0d36FACD61B71CC05ab8F3D2355ec3631C0dd5",
+    "erc4626ExecutionValidator": "0xfbC22278A96299D91d41C453234d97b4F5Eb9B2d",
     "insuranceSmartAccount": "0xc6d011391f42EBB7bE9454d549FbB170BD4Fc0e7",
     "kAssetRouter": "0x05242D4AC717Cdf38C36AF290F2b0DA99AA82c67",
     "kAssetRouterImpl": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
@@ -34,5 +35,5 @@
     "vaultAdapterImpl": "0x95401dc811bb5740090279Ba06cfA8fcF6113778"
   },
   "network": "localhost",
-  "timestamp": 1777462115
+  "timestamp": 1777975255
 }

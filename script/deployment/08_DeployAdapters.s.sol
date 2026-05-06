@@ -35,6 +35,7 @@ contract DeployAdaptersScript is Script, DeploymentManager {
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        validateConfig(config);
         DeploymentOutput memory existing;
 
         // If addresses not provided, read from JSON (for real deployments)
@@ -68,46 +69,22 @@ contract DeployAdaptersScript is Script, DeploymentManager {
         // Deploy VaultAdapter implementation (shared by all adapters)
         VaultAdapter vaultAdapterImpl = new VaultAdapter();
 
-        // Deploy DN Vault USDC Adapter
-        bytes memory adapterInitDataUSDC = abi.encodeCall(
-            MinimalSmartAccount.initialize,
-            (
-                config.roles.owner, // owner (zero address = no specific owner, inherits from registry)
-                IRegistry(registryAddr),
-                "kam.dnVault.usdc"
-            )
+        address dnVaultAdapterUSDC = _deployAdapter(
+            factory, address(vaultAdapterImpl), registryAddr, config, config.adapters.dnVaultAdapterUSDC
         );
-        address dnVaultAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataUSDC);
-
-        // Deploy DN Vault WBTC Adapter
-        bytes memory adapterInitDataWBTC = abi.encodeCall(
-            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.dnVault.wbtc")
+        address dnVaultAdapterWBTC = _deployAdapter(
+            factory, address(vaultAdapterImpl), registryAddr, config, config.adapters.dnVaultAdapterWBTC
         );
-        address dnVaultAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataWBTC);
-
-        // Deploy Alpha Vault Adapter
-        bytes memory adapterInitDataAlpha = abi.encodeCall(
-            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.alphaVault.usdc")
+        address alphaVaultAdapter =
+            _deployAdapter(factory, address(vaultAdapterImpl), registryAddr, config, config.adapters.alphaVaultAdapter);
+        address betaVaultAdapter =
+            _deployAdapter(factory, address(vaultAdapterImpl), registryAddr, config, config.adapters.betaVaultAdapter);
+        address kMinterAdapterUSDC = _deployAdapter(
+            factory, address(vaultAdapterImpl), registryAddr, config, config.adapters.kMinterAdapterUSDC
         );
-        address alphaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataAlpha);
-
-        // Deploy Beta Vault Adapter
-        bytes memory adapterInitDataBeta = abi.encodeCall(
-            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.betaVault.usdc")
+        address kMinterAdapterWBTC = _deployAdapter(
+            factory, address(vaultAdapterImpl), registryAddr, config, config.adapters.kMinterAdapterWBTC
         );
-        address betaVaultAdapter = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataBeta);
-
-        // Deploy kMinter USDC Adapter
-        bytes memory adapterInitDataMinterUSDC = abi.encodeCall(
-            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.minter.usdc")
-        );
-        address kMinterAdapterUSDC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataMinterUSDC);
-
-        // Deploy kMinter WBTC Adapter
-        bytes memory adapterInitDataMinterWBTC = abi.encodeCall(
-            MinimalSmartAccount.initialize, (config.roles.owner, IRegistry(registryAddr), "kam.minter.wbtc")
-        );
-        address kMinterAdapterWBTC = factory.deployAndCall(address(vaultAdapterImpl), adapterInitDataMinterWBTC);
 
         vm.stopBroadcast();
 
@@ -154,5 +131,22 @@ contract DeployAdaptersScript is Script, DeploymentManager {
     /// @notice Convenience wrapper for real deployments (writes to JSON, reads dependencies from JSON)
     function run() public returns (AdaptersDeployment memory) {
         return run(true, address(0), address(0));
+    }
+
+    function _deployAdapter(
+        MinimalUUPSFactory factory,
+        address vaultAdapterImpl,
+        address registryAddr,
+        NetworkConfig memory config,
+        AdapterConfig memory adapterConfig
+    )
+        private
+        returns (address)
+    {
+        bytes memory initData = abi.encodeCall(
+            MinimalSmartAccount.initialize,
+            (resolveAdapterOwner(config, adapterConfig), IRegistry(registryAddr), adapterConfig.namespace)
+        );
+        return factory.deployAndCall(vaultAdapterImpl, initData);
     }
 }

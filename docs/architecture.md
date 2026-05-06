@@ -365,6 +365,18 @@ The kStakingVault is implemented as a unified contract that inherits from multip
 
 **Module Integration**: The vault includes a ReaderModule for external state queries and vault metrics, providing a clean interface for off-chain monitoring and integration while keeping core logic within the main contract.
 
+#### Vault Accounting Invariants
+
+Each kStakingVault separates active strategy assets from kToken reserves that are already committed to pending user flows. The raw kToken balance held by the vault must equal:
+
+```solidity
+kToken.balanceOf(address(vault)) == vault.totalAssets() + vault.totalPendingStake() + vault.totalPendingUnstake()
+```
+
+`totalAssets()` is the active asset base that can absorb strategy gains and losses. `totalPendingStake()` is kToken collateral already transferred into the vault but not converted into stkTokens until settlement. `totalPendingUnstake()` is kToken collateral reserved for settled-but-unclaimed unstake requests.
+
+Router negative-yield burns must be limited to `vault.totalAssets()` and must not consume pending stake or pending unstake reserves. `kStakingVault.settleBatch()` audits the raw kToken balance against the invariant before finalizing settlement state.
+
 #### kBatchReceiver
 
 Lightweight, immutable contracts deployed per batch to handle redemption distributions.

@@ -6,7 +6,7 @@ export
 # Foundry profile for deployments (uses optimizer settings)
 DEPLOY_PROFILE = deploy
 
-.PHONY: help deploy-mainnet deploy-mainnet-dry-run deploy-sepolia deploy-sepolia-dry-run deploy-localhost deploy-localhost-dry-run config-mainnet config-mainnet-dry-run config-sepolia config-sepolia-dry-run config-localhost config-localhost-dry-run deploy-all config-all deploy-mock-assets verify-mainnet verify-sepolia verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage gas-estimations deploy-phase1-sepolia deploy-phase1-sepolia-dry-run deploy-phase1-mainnet deploy-phase1-mainnet-dry-run config-phase2-sepolia config-phase2-sepolia-dry-run config-phase2-mainnet config-phase2-mainnet-dry-run
+.PHONY: help anvil-localhost deploy-mainnet deploy-mainnet-dry-run deploy-sepolia deploy-sepolia-dry-run deploy-localhost deploy-localhost-dry-run config-mainnet config-mainnet-dry-run config-sepolia config-sepolia-dry-run config-localhost config-localhost-dry-run deploy-all config-all deploy-mock-assets verify-mainnet verify-sepolia verify clean clean-all configure-adapters register-modules format-output test test-parallel coverage gas-estimations deploy-phase1-sepolia deploy-phase1-sepolia-dry-run deploy-phase1-mainnet deploy-phase1-mainnet-dry-run config-phase2-sepolia config-phase2-sepolia-dry-run config-phase2-mainnet config-phase2-mainnet-dry-run
 
 # Default target
 help:
@@ -15,6 +15,7 @@ help:
 	@echo ""
 	@echo "=== LOCALHOST (Full deployment with mocks) ==="
 	@echo "make deploy-localhost        - Deploy everything to localhost (includes mocks)"
+	@echo "make anvil-localhost         - Start Anvil with the flags required by localhost deploy"
 	@echo "make deploy-localhost-dry-run- Simulate deployment (no broadcast)"
 	@echo "make config-localhost        - Configure protocol on localhost"
 	@echo "make config-localhost-dry-run- Simulate configuration (no broadcast)"
@@ -64,6 +65,10 @@ help:
 	@echo "=== FINAL STEP - Ownership handover (script/deployment/13) ==="
 	@echo "make deploy-timelock      - Deploy Admin Timelock + transfer UUPS ownership (13, IRREVERSIBLE)"
 
+anvil-localhost:
+	@echo "Starting localhost Anvil with deployment-compatible settings..."
+	anvil --host 127.0.0.1 --port 8545 --chain-id 31337 --disable-code-size-limit
+
 # Network-specific deployments
 deploy-mainnet:
 	@echo "🔴 Deploying to MAINNET..."
@@ -85,13 +90,13 @@ deploy-sepolia-dry-run:
 
 deploy-localhost:
 	@echo "🟢 Deploying to LOCALHOST..."
-	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
-	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
+	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow --disable-code-size-limit"
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow --disable-code-size-limit"
 
 deploy-localhost-dry-run:
 	@echo "🟢 [DRY-RUN] Simulating deployment to LOCALHOST..."
-	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
-	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow"
+	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow --disable-code-size-limit"
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow --disable-code-size-limit"
 
 # ========================================
 # TWO-PHASE DEPLOYMENT (Sepolia/Mainnet)

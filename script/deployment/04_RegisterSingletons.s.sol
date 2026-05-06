@@ -16,6 +16,7 @@ contract RegisterSingletonsScript is Script, DeploymentManager {
     function run(address registryAddr, address assetRouterAddr, address minterAddr, address factoryAddr) public {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        validateConfig(config);
         DeploymentOutput memory existing;
 
         // If addresses not provided, read from JSON (for real deployments)

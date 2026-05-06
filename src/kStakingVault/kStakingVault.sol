@@ -675,44 +675,79 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
                           ESSENTIAL VAULT GETTERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the protocol registry address used for configuration and role checks
+    /// @dev Reverts before initialization so integrations do not read an unset registry.
+    /// @return The kRegistry address configured during initialization
     function registry() external view returns (address) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require(_getInitialized($), KSTAKINGVAULT_NOT_INITIALIZED);
         return $.registry;
     }
 
+    /// @notice Returns the vault's kToken address
+    /// @dev This is the share accounting asset held by the vault, not the underlying settlement asset.
+    /// @return The kToken associated with the vault's underlying asset
     function asset() external view returns (address) {
         return _getBaseVaultStorage().kToken;
     }
 
+    /// @notice Returns the underlying settlement asset address
+    /// @return The asset address used by the router and strategies for settlement
     function underlyingAsset() external view returns (address) {
         return _getBaseVaultStorage().underlyingAsset;
     }
 
+    /// @notice Returns active accounted vault assets
+    /// @dev Excludes pending stake collateral and kTokens reserved for settled-but-unclaimed unstake requests.
+    /// @return The active asset base that can absorb strategy gains and losses
     function totalAssets() external view returns (uint256) {
         return _totalAssets();
     }
 
+    /// @notice Returns net active accounted vault assets after fee accounting
+    /// @dev Currently equals totalAssets because fees are accrued and minted through the canonical fee path.
+    /// @return The net active asset base
     function totalNetAssets() external view returns (uint256) {
         return _totalAssets();
     }
 
+    /// @notice Returns the current gross share price
+    /// @dev Uses one whole share unit based on the vault decimals and current active assets.
+    /// @return The amount of active assets represented by one whole share unit
     function sharePrice() external view returns (uint256) {
         return _sharePrice();
     }
 
+    /// @notice Returns the current net share price after fee accounting
+    /// @dev Currently equals sharePrice because pending fee effects are reflected through settlement/accrual paths.
+    /// @return The net amount of active assets represented by one whole share unit
     function netSharePrice() external view returns (uint256) {
         return _sharePrice();
     }
 
+    /// @notice Converts an asset amount to shares using current totals
+    /// @dev Rounds down in favor of the vault.
+    /// @param _assets The active asset amount to convert
+    /// @return The share amount for the provided assets
     function convertToShares(uint256 _assets) external view returns (uint256) {
         return _convertToSharesWithTotals(_assets, _totalAssets(), totalSupply());
     }
 
+    /// @notice Converts a share amount to assets using current totals
+    /// @dev Rounds down in favor of the vault.
+    /// @param _shares The share amount to convert
+    /// @return The active asset amount for the provided shares
     function convertToAssets(uint256 _shares) external view returns (uint256) {
         return _convertToAssetsWithTotals(_shares, _totalAssets(), totalSupply());
     }
 
+    /// @notice Converts an asset amount to shares using caller-provided totals
+    /// @dev Pure helper for integrations that need deterministic conversions against historical or simulated totals.
+    /// Rounds down in favor of the vault.
+    /// @param _assets The active asset amount to convert
+    /// @param _totalAssetsVal The total active assets to use for the conversion
+    /// @param _totalSupplyVal The total share supply to use for the conversion
+    /// @return The share amount for the provided assets and totals
     function convertToSharesWithTotals(
         uint256 _assets,
         uint256 _totalAssetsVal,
@@ -725,6 +760,13 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         return _convertToSharesWithTotals(_assets, _totalAssetsVal, _totalSupplyVal);
     }
 
+    /// @notice Converts a share amount to assets using caller-provided totals
+    /// @dev Pure helper for integrations that need deterministic conversions against historical or simulated totals.
+    /// Rounds down in favor of the vault.
+    /// @param _shares The share amount to convert
+    /// @param _totalAssetsVal The total active assets to use for the conversion
+    /// @param _totalSupplyVal The total share supply to use for the conversion
+    /// @return The active asset amount for the provided shares and totals
     function convertToAssetsWithTotals(
         uint256 _shares,
         uint256 _totalAssetsVal,
@@ -737,10 +779,15 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         return _convertToAssetsWithTotals(_shares, _totalAssetsVal, _totalSupplyVal);
     }
 
+    /// @notice Returns the current active batch ID
+    /// @return The current batch identifier
     function getBatchId() public view returns (bytes32) {
         return _getBaseVaultStorage().currentBatchId;
     }
 
+    /// @notice Returns the current active batch ID if it is open and unsettled
+    /// @dev Reverts when the current batch is closed or already settled.
+    /// @return The current batch identifier
     function getSafeBatchId() external view returns (bytes32) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         bytes32 _batchId = getBatchId();
@@ -749,18 +796,30 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         return _batchId;
     }
 
+    /// @notice Returns whether a specific batch is closed
+    /// @param _batchId The batch identifier to inspect
+    /// @return isClosed_ True if the batch is closed
     function isClosed(bytes32 _batchId) external view returns (bool isClosed_) {
         isClosed_ = _getBaseVaultStorage().batches[_batchId].isClosed;
     }
 
+    /// @notice Returns whether the current batch is closed
+    /// @return True if the current batch is closed
     function isBatchClosed() external view returns (bool) {
         return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed;
     }
 
+    /// @notice Returns whether the current batch is settled
+    /// @return True if the current batch is settled
     function isBatchSettled() external view returns (bool) {
         return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled;
     }
 
+    /// @notice Returns core state for the current batch
+    /// @return batchId The current batch identifier
+    /// @return batchReceiver The receiver holding settlement assets for the batch
+    /// @return isClosed_ True if the current batch is closed
+    /// @return isSettled True if the current batch is settled
     function getCurrentBatchInfo()
         external
         view
@@ -774,6 +833,18 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         );
     }
 
+    /// @notice Returns accounting and lifecycle data for a specific batch
+    /// @param _batchId The batch identifier to inspect
+    /// @return batchReceiver The receiver holding settlement assets for the batch
+    /// @return isClosed_ True if the batch is closed
+    /// @return isSettled True if the batch is settled
+    /// @return sharePrice_ The settled or stored gross share price for the batch
+    /// @return netSharePrice_ The settled or stored net share price for the batch
+    /// @return totalAssets_ The active assets recorded for the batch
+    /// @return totalNetAssets_ The net active assets recorded for the batch
+    /// @return totalSupply_ The share supply recorded for the batch
+    /// @return depositedInBatch The kToken amount pending stake in the batch
+    /// @return requestedSharesInBatch The share amount pending unstake in the batch
     function getBatchIdInfo(bytes32 _batchId)
         external
         view
@@ -813,27 +884,42 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         );
     }
 
+    /// @notice Returns the vault TVL cap in active assets plus pending stake collateral
+    /// @return The maximum total assets configured for the vault
     function maxTotalAssets() external view returns (uint128) {
         return _getBaseVaultStorage().maxTotalAssets;
     }
 
+    /// @notice Returns kTokens reserved for pending stake requests
+    /// @dev These kTokens are held by the vault but not yet converted into active assets.
+    /// @return The pending stake reserve amount
     function totalPendingStake() external view returns (uint128) {
         return _getBaseVaultStorage().totalPendingStake;
     }
 
+    /// @notice Returns kTokens reserved for settled-but-unclaimed unstake requests
+    /// @dev These kTokens are not active assets and must not be consumed by strategy losses.
+    /// @return The pending unstake reserve amount
     function totalPendingUnstake() external view returns (uint128) {
         return _getBaseVaultStorage().totalPendingUnstake;
     }
 
+    /// @notice Returns the raw kToken balance expected to be held by the vault
+    /// @dev Equals totalAssets() + totalPendingStake() + totalPendingUnstake().
+    /// @return The expected kToken balance for invariant audits
     function expectedKTokenBalance() public view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _expectedKTokenBalance($);
     }
 
+    /// @notice Returns the human-readable contract name
+    /// @return The contract name
     function contractName() external pure returns (string memory) {
         return "kStakingVault";
     }
 
+    /// @notice Returns the contract version
+    /// @return The semantic version string
     function contractVersion() external pure returns (string memory) {
         return "1.0.0";
     }
