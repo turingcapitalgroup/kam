@@ -14,8 +14,13 @@ interface IkMinter is IVersioned {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Represents the lifecycle status of a redemption request
-    /// @dev Used to track the progression of redemption requests through the batch system
+    /// @dev Used to track the progression of redemption requests through the batch system.
+    ///      `UNDEFINED = 0` is the zero-initialized sentinel — a fresh storage slot reads as
+    ///      `UNDEFINED`, not as a valid `PENDING` request, so callers can distinguish
+    ///      "request does not exist" from "request is in flight".
     enum RequestStatus {
+        /// @dev Zero-initialized sentinel — request does not exist
+        UNDEFINED,
         /// @dev Request has been created and tokens are held in escrow, awaiting batch settlement
         PENDING,
         /// @dev Request has been successfully executed and underlying assets have been distributed
@@ -33,7 +38,7 @@ interface IkMinter is IVersioned {
         address asset;
         /// @dev Timestamp when the request was created, used for tracking and auditing
         uint64 requestTimestamp;
-        /// @dev Current status in the redemption lifecycle (PENDING, REDEEMED, or CANCELLED)
+        /// @dev Current status in the redemption lifecycle (PENDING or REDEEMED)
         RequestStatus status;
         /// @dev The batch identifier this request belongs to for settlement processing
         bytes32 batchId;
@@ -75,12 +80,13 @@ interface IkMinter is IVersioned {
 
     /// @notice Emitted when a new redemption request is created and enters the batch queue
     /// @param requestId The unique identifier assigned to this redemption request
-    /// @param user The address that initiated the redemption request
+    /// @param recipient The address that will receive the underlying assets at settlement
+    ///                  (passed as `_to` in `requestBurn`, not necessarily the caller)
     /// @param kToken The kToken contract address being burned
     /// @param amount The amount of kTokens being burned
     /// @param batchId The batch identifier this request is associated with
     event BurnRequestCreated(
-        bytes32 indexed requestId, address indexed user, address indexed kToken, uint256 amount, bytes32 batchId
+        bytes32 indexed requestId, address indexed recipient, address indexed kToken, uint256 amount, bytes32 batchId
     );
 
     /// @notice Emitted when a redemption request is successfully executed after batch settlement
@@ -139,32 +145,23 @@ interface IkMinter is IVersioned {
     /// withdrawal
     /// @dev This function implements the first phase of the redemption process for qualified institutions. The workflow
     /// consists of: (1) transferring kTokens from the caller to this contract for escrow (not burned yet), (2)
-    /// generating
-    /// a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4) registering the
-    /// request with kAssetRouter for batch processing. The kTokens remain in escrow until the batch is settled and the
-    /// user calls burn() to complete the process. This two-phase approach is necessary because redemptions are
-    /// processed
-    /// in batches through the DN vault system, which requires waiting for batch settlement to ensure proper asset
-    /// availability and yield distribution. The request can be cancelled before batch closure/settlement.
+    /// generating a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4)
+    /// registering the request with kAssetRouter for batch processing. The kTokens remain in escrow until the
+    /// batch is settled (when they are burned in bulk by settleBatch()) and the user calls burn() to claim assets.
+    /// This two-phase approach is necessary because redemptions are processed in batches through the DN vault system,
+    /// which requires waiting for batch settlement to ensure proper asset availability and yield distribution.
     /// @param asset The underlying asset address to burn (must match the kToken's underlying asset)
     /// @param to The recipient address that will receive the underlying assets after batch settlement
     /// @param amount The amount of kTokens to burn (will receive equivalent underlying assets)
     /// @return requestId A unique bytes32 identifier for tracking and executing this redemption request
     function requestBurn(address asset, address to, uint256 amount) external payable returns (bytes32 requestId);
 
-    /// @notice Completes the second phase of institutional redemption by executing a settled batch request
+    /// @notice Completes the second phase of institutional redemption by claiming assets from a settled batch
     /// @dev This function finalizes the redemption process initiated by requestBurn(). It can only be called after
-    /// the batch containing this request has been settled through the kAssetRouter settlement process. The execution
-    /// involves: (1) validating the request exists and is in PENDING status, (2) updating the request status to
-    /// REDEEMED,
-    /// (3) removing the request from tracking, (4) burning the escrowed kTokens permanently, (5) instructing the
-    /// kBatchReceiver contract to transfer the underlying assets to the recipient. The kBatchReceiver is a minimal
-    /// proxy
-    /// deployed per batch that holds the settled assets and ensures isolated distribution. This function will revert if
-    /// the batch is not yet settled, ensuring assets are only distributed when available. The separation between
-    /// request
-    /// and redemption phases allows for efficient batch processing of multiple redemptions while maintaining asset
-    /// safety.
+    /// the batch containing this request has been settled through the kAssetRouter settlement process. The kTokens
+    /// have already been burned during settleBatch(). The execution involves: (1) validating the request exists and
+    /// is in PENDING status, (2) updating the request status to REDEEMED, (3) removing the request from tracking,
+    /// (4) instructing the kBatchReceiver contract to transfer the underlying assets to the recipient.
     /// @param requestId The unique identifier of the redemption request to execute (obtained from requestBurn)
     function burn(bytes32 requestId) external payable;
 
@@ -178,7 +175,8 @@ interface IkMinter is IVersioned {
     /// @param _create Whether to create a new batch for the same asset
     function closeBatch(bytes32 _batchId, bool _create) external;
 
-    /// @notice Marks a batch as settled after processing
+    /// @notice Marks a batch as settled after processing and burns all escrowed kTokens for the batch
+    /// @dev Burns all `requestedSharesInBatch` kTokens at once and decrements `totalLockedAssets`
     /// @param _batchId The batch ID to settle
     function settleBatch(bytes32 _batchId) external;
 

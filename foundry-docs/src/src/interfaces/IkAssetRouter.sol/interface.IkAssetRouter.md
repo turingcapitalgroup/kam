@@ -1,8 +1,8 @@
 # IkAssetRouter
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IkAssetRouter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IkAssetRouter.sol)
 
 **Inherits:**
-[IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Central money flow coordinator for the KAM protocol managing all asset movements and settlements
 
@@ -44,12 +44,12 @@ function kAssetPush(address _asset, uint256 amount, bytes32 batchId) external pa
 
 Requests asset withdrawal from vault to fulfill institutional redemption through kMinter
 
-This function initiates the first phase of the institutional redemption process. The workflow
-involves: (1) registering the redemption request with the vault, (2) creating a kBatchReceiver minimal
-proxy to hold assets for distribution, (3) updating virtual balance accounting, (4) preparing for
-batch settlement. The actual asset transfer occurs later during batch settlement when the vault
-processes all pending requests together. This two-phase approach optimizes gas costs and ensures
-fair settlement across all institutional redemption requests in the batch.
+This function records a pending redemption request from kMinter. The workflow involves:
+(1) incrementing globalPendingRequests to track cumulative pending withdrawals,
+(2) validating that the effective virtual balance remains sufficient after this request,
+(3) emitting an event for off-chain tracking. The kBatchReceiver is created separately by kMinter
+during requestBurn(). The actual asset transfer occurs later during batch settlement when the
+router processes all pending requests together.
 
 
 ```solidity
@@ -130,7 +130,9 @@ process involves: (1) calculating final yields after a batch period, (2) determi
 redemptions, (3) creating a proposal with cooldown period for security verification, (4) preparing for
 kToken supply adjustment to maintain 1:1 backing. Positive yields result in kToken minting (distributing
 gains to all holders), while losses result in kToken burning (socializing losses). The cooldown period
-allows guardians to verify calculations before execution, ensuring protocol integrity.
+allows guardians to verify calculations before execution, ensuring protocol integrity. On a vault's first
+settlement (no prior virtual balance), non-zero yields revert with KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD
+to prevent unverified bootstrapping.
 
 
 ```solidity
@@ -138,9 +140,7 @@ function proposeSettleBatch(
     address asset,
     address vault,
     bytes32 batchId,
-    uint256 totalAssets,
-    uint64 lastFeesChargedManagement,
-    uint64 lastFeesChargedPerformance
+    uint256 totalAssets
 )
     external
     payable
@@ -154,8 +154,6 @@ function proposeSettleBatch(
 |`vault`|`address`|The DN vault address where yield was generated|
 |`batchId`|`bytes32`|The batch identifier for this settlement period|
 |`totalAssets`|`uint256`|Total asset value in the vault after yield generation/loss|
-|`lastFeesChargedManagement`|`uint64`|Timestamp when management fees were last charged (0 = no fees)|
-|`lastFeesChargedPerformance`|`uint64`|Timestamp when performance fees were last charged (0 = no fees)|
 
 
 ### executeSettleBatch
@@ -246,20 +244,21 @@ function setSettlementCooldown(uint256 cooldown) external;
 Updates the yield tolerance threshold for settlement proposals
 
 This function allows protocol governance to adjust the maximum acceptable yield deviation before
-settlement proposals are rejected. The yield tolerance acts as a safety mechanism to prevent settlement
-proposals with extremely high or low yield values that could indicate calculation errors, data corruption,
-or potential manipulation attempts. Setting an appropriate tolerance balances protocol safety with
-operational flexibility, allowing normal yield fluctuations while blocking suspicious proposals.
+settlement proposals require guardian approval. The yield tolerance acts as a safety mechanism: proposals
+with yield exceeding this threshold are flagged with `requiresApproval = true` and emit a
+`YieldExceedsMaxDeltaWarning` event, requiring explicit guardian approval via `acceptProposal()` before
+execution. Setting an appropriate tolerance balances protocol safety with operational flexibility.
 Only admin roles can modify this parameter as it affects protocol safety.
 
 
 ```solidity
-function setMaxAllowedDelta(uint256 tolerance_) external;
+function setMaxAllowedDelta(address vault_, uint256 tolerance_) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
+|`vault_`|`address`||
 |`tolerance_`|`uint256`|The new yield tolerance in basis points (e.g., 1000 = 10%)|
 
 
@@ -429,7 +428,7 @@ human-readable reason for failures, enabling better error handling and user feed
 
 
 ```solidity
-function canExecuteProposal(bytes32 proposalId) external view returns (bool canExecute, string memory reason);
+function canExecuteProposal(bytes32 proposalId) external view returns (bool canExecute, ProposalStatus status);
 ```
 **Parameters**
 
@@ -442,7 +441,7 @@ function canExecuteProposal(bytes32 proposalId) external view returns (bool canE
 |Name|Type|Description|
 |----|----|-----------|
 |`canExecute`|`bool`|True if the proposal can be executed immediately|
-|`reason`|`string`|Descriptive message explaining why execution is blocked (if applicable)|
+|`status`|`ProposalStatus`|The proposal status code indicating the current state|
 
 
 ### isProposalPending
@@ -518,13 +517,13 @@ function getSettlementCooldown() external view returns (uint256 cooldown);
 Gets the current yield tolerance threshold for settlement proposals
 
 The yield tolerance determines the maximum acceptable yield deviation before settlement proposals
-are automatically rejected. This acts as a safety mechanism to prevent processing of settlement proposals
-with excessive yield values that could indicate calculation errors or potential manipulation. The tolerance
+require guardian approval. Proposals exceeding this threshold are flagged with `requiresApproval = true`
+rather than rejected, requiring explicit guardian acceptance via `acceptProposal()`. The tolerance
 is expressed in basis points where 10000 equals 100%.
 
 
 ```solidity
-function getMaxAllowedDelta() external view returns (uint256 tolerance);
+function getMaxAllowedDelta(address vault_) external view returns (uint256 tolerance);
 ```
 **Returns**
 
@@ -656,7 +655,7 @@ function getGlobalPendingRequests(address sourceVault, address asset) external v
 
 ## Events
 ### TotalAssetsSet
-Emitted when the kAssetRouter contract is initialized with registry configuration
+Emitted when an adapter's total assets are updated during settlement execution
 
 
 ```solidity
@@ -692,7 +691,7 @@ forwards these assets to the appropriate DN vault for yield farming strategies
 
 
 ```solidity
-event AssetsPushed(address indexed from, uint256 amount);
+event AssetsPushed(address indexed from, bytes32 indexed batchId, uint256 amount);
 ```
 
 **Parameters**
@@ -700,6 +699,7 @@ event AssetsPushed(address indexed from, uint256 amount);
 |Name|Type|Description|
 |----|----|-----------|
 |`from`|`address`|The address initiating the asset push (typically kMinter)|
+|`batchId`|`bytes32`|The batch identifier for this asset movement|
 |`amount`|`uint256`|The quantity of assets being pushed to the vault|
 
 ### AssetsRequestPulled
@@ -710,7 +710,7 @@ after batch settlement. The batchReceiver is deployed to hold assets for distrib
 
 
 ```solidity
-event AssetsRequestPulled(address indexed vault, address indexed asset, uint256 amount);
+event AssetsRequestPulled(address indexed vault, address indexed asset, bytes32 indexed batchId, uint256 amount);
 ```
 
 **Parameters**
@@ -719,6 +719,7 @@ event AssetsRequestPulled(address indexed vault, address indexed asset, uint256 
 |----|----|-----------|
 |`vault`|`address`|The vault address from which assets are being requested|
 |`asset`|`address`|The underlying asset address being requested for redemption|
+|`batchId`|`bytes32`|The batch identifier for this pull request|
 |`amount`|`uint256`|The quantity of assets requested for redemption|
 
 ### AssetsTransferred
@@ -730,7 +731,7 @@ physical location while vault balances are updated to reflect the new allocation
 
 ```solidity
 event AssetsTransferred(
-    address indexed sourceVault, address indexed targetVault, address indexed asset, uint256 amount
+    address indexed sourceVault, address indexed targetVault, address indexed asset, bytes32 batchId, uint256 amount
 );
 ```
 
@@ -741,6 +742,7 @@ event AssetsTransferred(
 |`sourceVault`|`address`|The vault transferring assets (losing virtual balance)|
 |`targetVault`|`address`|The vault receiving assets (gaining virtual balance)|
 |`asset`|`address`|The underlying asset address being transferred|
+|`batchId`|`bytes32`|The batch identifier for this virtual transfer|
 |`amount`|`uint256`|The quantity of assets being transferred between vaults|
 
 ### SharesRequestedPushed
@@ -847,9 +849,7 @@ event SettlementProposed(
     uint256 totalAssets,
     int256 netted,
     int256 yield,
-    uint256 executeAfter,
-    uint64 lastFeesChargedManagement,
-    uint64 lastFeesChargedPerformance
+    uint256 executeAfter
 );
 ```
 
@@ -864,8 +864,6 @@ event SettlementProposed(
 |`netted`|`int256`|Net amount of new deposits/redemptions in this batch|
 |`yield`|`int256`|Absolute yield amount generated in this batch|
 |`executeAfter`|`uint256`|Timestamp after which the proposal can be executed|
-|`lastFeesChargedManagement`|`uint64`|Timestamp when management fees were last charged (0 = no fees)|
-|`lastFeesChargedPerformance`|`uint64`|Timestamp when performance fees were last charged (0 = no fees)|
 
 ### SettlementExecuted
 Emitted when a settlement proposal is successfully executed
@@ -942,20 +940,21 @@ event SettlementCooldownUpdated(uint256 oldCooldown, uint256 newCooldown);
 |`newCooldown`|`uint256`|The new cooldown period in seconds|
 
 ### MaxAllowedDeltaUpdated
-Emitted when the yield tolerance threshold is updated by protocol governance
+Emitted when the yield tolerance threshold for a vault is updated by protocol governance
 
 Yield tolerance acts as a safety mechanism to prevent settlement proposals with excessive
 yield deviations that could indicate calculation errors or potential manipulation attempts
 
 
 ```solidity
-event MaxAllowedDeltaUpdated(uint256 oldTolerance, uint256 newTolerance);
+event MaxAllowedDeltaUpdated(address indexed vault, uint256 oldTolerance, uint256 newTolerance);
 ```
 
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
+|`vault`|`address`|The vault address for which the tolerance was updated|
 |`oldTolerance`|`uint256`|The previous yield tolerance in basis points|
 |`newTolerance`|`uint256`|The new yield tolerance in basis points|
 
@@ -1006,12 +1005,24 @@ struct VaultSettlementProposal {
     int256 yield;
     /// @dev Timestamp after which this proposal can be executed (cooldown protection)
     uint64 executeAfter;
-    /// @dev Timestamp when management fees were last charged (0 means no fees to charge)
-    uint64 lastFeesChargedManagement;
-    /// @dev Timestamp when performance fees were last charged (0 means no fees to charge)
-    uint64 lastFeesChargedPerformance;
     /// @dev True if yield delta exceeded threshold, requires guardian approval before execution
     bool requiresApproval;
+}
+```
+
+## Enums
+### ProposalStatus
+Status codes for proposal execution readiness checks
+
+
+```solidity
+enum ProposalStatus {
+    EXECUTABLE,
+    NOT_FOUND,
+    ALREADY_EXECUTED,
+    CANCELLED,
+    COOLDOWN_NOT_PASSED,
+    REQUIRES_APPROVAL
 }
 ```
 

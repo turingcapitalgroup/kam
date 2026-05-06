@@ -25,7 +25,7 @@ contract SmartAdapterAccount is MinimalSmartAccount {
     ///////////////////////////////////////////////////////////////*/
 
     /// @notice Internal authorization check for UUPS upgrades
-    /// @dev Overrides parent to use registry.isAdmin instead of owner check
+    /// @dev Only callable by contract owner
     /// @param _newImplementation the address of new implementation
     function _authorizeUpgrade(address _newImplementation) internal virtual override {
         _checkOwner();

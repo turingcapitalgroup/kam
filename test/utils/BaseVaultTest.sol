@@ -56,13 +56,10 @@ contract BaseVaultTest is DeploymentBaseTest {
             batchId,
             // casting to 'uint256' is safe because we're doing arithmetic on int256 values
             // forge-lint: disable-next-line(unsafe-typecast)
-            profit > 0 ? lastTotalAssets + uint256(profit) : lastTotalAssets - uint256(profit),
-            0,
-            0
+            profit > 0 ? lastTotalAssets + uint256(profit) : lastTotalAssets - uint256(profit)
         );
 
-        vm.prank(users.relayer);
-        assetRouter.executeSettleBatch(proposalId);
+        _acceptAndExecuteSettlement(proposalId);
 
         vm.prank(user);
         vault.claimStakedShares(stakeRequestId);
@@ -74,10 +71,10 @@ contract BaseVaultTest is DeploymentBaseTest {
         vm.startPrank(users.admin);
         vault.setManagementFee(TEST_MANAGEMENT_FEE);
         vault.setPerformanceFee(TEST_PERFORMANCE_FEE);
-        vault.setHardHurdleRate(false); // Soft hurdle by default
+        registry.setIsHardHurdleRate(address(vault), false); // Soft hurdle by default
         vm.stopPrank();
 
-        assertEq(registry.getHurdleRate(tokens.usdc), TEST_HURDLE_RATE);
+        assertEq(registry.getHurdleRate(address(vault)), TEST_HURDLE_RATE);
     }
 
     function _mintKTokensToUsers() internal {
@@ -116,16 +113,7 @@ contract BaseVaultTest is DeploymentBaseTest {
 
     function _executeBatchSettlement(address vaultAddress, bytes32 batchId, uint256 totalAssets) internal {
         vm.prank(users.relayer);
-        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, vaultAddress, batchId, totalAssets, 0, 0);
-
-        // Accept proposal if it requires guardian approval (high delta)
-        (bool canExecute,) = assetRouter.canExecuteProposal(proposalId);
-        if (!canExecute) {
-            vm.prank(users.guardian);
-            assetRouter.acceptProposal(proposalId);
-        }
-
-        // Wait for cooldown period(0 for testing)
-        assetRouter.executeSettleBatch(proposalId);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, vaultAddress, batchId, totalAssets);
+        _acceptAndExecuteSettlement(proposalId);
     }
 }

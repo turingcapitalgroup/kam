@@ -2,15 +2,36 @@
 pragma solidity 0.8.30;
 
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
-import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
+import { VAULTMATHLIB_ZERO_ELAPSED } from "kam/src/errors/Errors.sol";
 import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 
 /// @title VaultMathLib
 /// @notice Fee calculation and share conversion math for KAM vaults
-/// @dev Uses Solady OptimizedFixedPointMathLib for precision-safe fixed-point arithmetic.
-///      Computes management fees (time-prorated) and performance fees (hurdle-aware).
-///      Provides both a raw-parameter core function (for internal vault use) and a
-///      convenience wrapper over IkStakingVault (for external consumers like kSettler).
+/// @dev Single source of truth for protocol fee/share math. All callers must route through
+///      this library — no caller is permitted to reimplement these formulas. Stateless
+///      (`internal pure`) so it has no upgrade story of its own.
+///
+///      ROUNDING CONTRACT (load-bearing — do not change without protocol-wide review):
+///        - convertToShares      rounds DOWN (favors the vault on deposit)
+///        - convertToAssets      rounds DOWN (favors the vault on withdrawal)
+///        - computeManagementFee rounds DOWN (favors users)
+///        - computePerformanceFee rounds DOWN (favors users)
+///      All four use Solady's `fullMulDiv`, which rounds toward zero (== down for non-negative
+///      operands).
+///
+///      VIRTUAL OFFSETS for inflation-attack resistance:
+///        - VIRTUAL_SHARES = VIRTUAL_ASSETS = 1e6, added to both sides of every conversion.
+///        - Effect: an attacker must inflate the share price by ~1e6× the victim's deposit
+///          before rounding becomes exploitable. Sized for 6-decimal assets (USDC, WBTC).
+///
+///      CALL CONTRACT for vault integrators:
+///        - Pass POST-MANAGEMENT-FEE total assets to computePerformanceFee, so performance
+///          fee is never charged on assets already deducted as management fee.
+///        - Call _accrueFees() before mutating fee rates; otherwise pending management fees
+///          would be re-priced at the new rate.
+///
+///      Management fees are time-prorated on total assets, charged on every interaction.
+///      Performance fees are charged on interest gains at settlement, with hurdle rate filtering.
 library VaultMathLib {
     using OptimizedFixedPointMathLib for uint256;
 
@@ -23,135 +44,82 @@ library VaultMathLib {
     /// @notice Virtual assets offset for ERC4626 inflation attack protection
     uint256 constant VIRTUAL_ASSETS = 1e6;
 
-    /// @notice Computes management and performance fees from raw parameters
-    /// @dev Core function used by the vault's ReaderModule with direct storage values.
-    ///      Management fees are time-prorated on total assets. Performance fees are
-    ///      charged only on profit above the hurdle rate (hard or soft mode).
+    /// @notice Computes the management fee in asset terms based on time elapsed
+    /// @dev Time-prorated annual fee on total assets. Called by _accrueFees at settlement.
     /// @param _totalAssets Current total assets in the vault
-    /// @param _totalSupply Current total supply of vault shares
-    /// @param _sharePriceWatermark High-watermark share price for performance fee tracking
-    /// @param _vaultDecimals Scaled vault decimals (10 ** decimals)
     /// @param _managementFee Annual management fee in basis points
-    /// @param _hurdleRate Minimum annualised return in basis points before performance fees apply
-    /// @param _performanceFee Performance fee rate in basis points
-    /// @param _isHardHurdleRate If true, fees only on excess above hurdle; if false, fees on all profit
-    /// @param _lastFeesChargedManagement Timestamp of last management fee charge
-    /// @param _lastFeesChargedPerformance Timestamp of last performance fee charge
-    /// @param _endOfPeriod Timestamp to use as end of fee period (e.g. block.timestamp for current, or a past timestamp)
-    /// @return managementFees Management fees in asset terms
-    /// @return performanceFees Performance fees in asset terms
-    /// @return totalFees Total fees (management + performance) in asset terms
-    function computeFees(
+    /// @param _lastFeeTimestamp Timestamp of last fee accrual
+    /// @param _currentTime Current timestamp (typically block.timestamp)
+    /// @return managementFeeAssets Management fee in asset terms
+    function computeManagementFee(
         uint256 _totalAssets,
-        uint256 _totalSupply,
-        uint256 _sharePriceWatermark,
-        uint256 _vaultDecimals,
         uint256 _managementFee,
-        uint256 _hurdleRate,
-        uint256 _performanceFee,
-        bool _isHardHurdleRate,
-        uint256 _lastFeesChargedManagement,
-        uint256 _lastFeesChargedPerformance,
-        uint256 _endOfPeriod
+        uint256 _lastFeeTimestamp,
+        uint256 _currentTime
     )
         internal
         pure
-        returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
+        returns (uint256 managementFeeAssets)
     {
-        uint256 durationManagement = _endOfPeriod - _lastFeesChargedManagement;
-        uint256 durationPerformance = _endOfPeriod - _lastFeesChargedPerformance;
-        uint256 currentTotalAssets = _totalAssets;
-        uint256 lastTotalAssets = _totalSupply.fullMulDiv(_sharePriceWatermark, _vaultDecimals);
+        uint256 elapsed = _currentTime - _lastFeeTimestamp;
+        if (elapsed == 0 || _managementFee == 0) return 0;
 
-        // Calculate time-based fees (management)
-        // These are charged on total assets, prorated for the time period
-        managementFees = (currentTotalAssets * durationManagement).fullMulDiv(_managementFee, SECS_PER_YEAR) / MAX_BPS;
-        currentTotalAssets -= managementFees;
-        totalFees = managementFees;
-
-        // Calculate the asset's value change since entry
-        // This gives us the raw profit/loss in asset terms after management fees
-        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
-        // forge-lint: disable-next-line(unsafe-typecast)
-        int256 assetsDelta = int256(currentTotalAssets) - int256(lastTotalAssets);
-
-        // Only calculate fees if there's a profit
-        if (assetsDelta > 0) {
-            uint256 excessReturn;
-
-            // Calculate returns relative to hurdle rate
-            uint256 hurdleReturn =
-                (lastTotalAssets * _hurdleRate).fullMulDiv(durationPerformance, SECS_PER_YEAR) / MAX_BPS;
-
-            // Calculate returns relative to hurdle rate
-            // casting to 'uint256' is safe because assetsDelta is positive in this branch
-            // forge-lint: disable-next-line(unsafe-typecast)
-            uint256 totalReturn = uint256(assetsDelta);
-
-            // Only charge performance fees if:
-            // 1. Current share price is not below
-            // 2. Returns exceed hurdle rate
-            if (totalReturn > hurdleReturn) {
-                // Only charge performance fees on returns above hurdle rate
-                excessReturn = totalReturn - hurdleReturn;
-
-                // If its a hard hurdle rate, only charge fees above the hurdle performance
-                // Otherwise, charge fees to all return if its above hurdle return
-                if (_isHardHurdleRate) {
-                    performanceFees = (excessReturn * _performanceFee) / MAX_BPS;
-                } else {
-                    performanceFees = (totalReturn * _performanceFee) / MAX_BPS;
-                }
-            }
-
-            // Calculate total fees
-            totalFees += performanceFees;
-        }
-
-        return (managementFees, performanceFees, totalFees);
+        managementFeeAssets = (_totalAssets * elapsed).fullMulDiv(_managementFee, SECS_PER_YEAR) / MAX_BPS;
     }
 
-    /// @notice Computes fees by reading parameters from a vault interface
-    /// @dev Convenience wrapper for external consumers (e.g. kSettler) that reads all
-    ///      required parameters from IkStakingVault and delegates to computeFees.
-    /// @param vault The staking vault to compute fees for
-    /// @param _totalAssets Current total assets in the vault
-    /// @param _totalSupply Current total supply of vault shares
-    /// @param _endOfPeriod Timestamp to use as end of fee period
-    /// @return managementFees Management fees in asset terms
-    /// @return performanceFees Performance fees in asset terms
-    /// @return totalFees Total fees (management + performance) in asset terms
-    function computeLastBatchFeesWithAssetsAndSupply(
-        IkStakingVault vault,
-        uint256 _totalAssets,
-        uint256 _totalSupply,
-        uint256 _endOfPeriod
+    /// @notice Computes the performance fee in asset terms based on interest gains
+    /// @dev Called at settlement when totalAssets increases (yield realization). The hurdle rate
+    ///      filters whether performance fees apply: returns must exceed the hurdle threshold.
+    ///      Hard hurdle: fee only on excess above hurdle. Soft hurdle: fee on all return.
+    ///      Reverts with `VAULTMATHLIB_ZERO_ELAPSED` when `_elapsed == 0` and `_interest > 0`,
+    ///      preventing the silent hurdle bypass that would otherwise occur.
+    /// @param _interest The interest gained (newTotalAssets - oldTotalAssets after management fees)
+    /// @param _previousTotalAssets Total assets before the yield was added
+    /// @param _performanceFee Performance fee rate in basis points
+    /// @param _hurdleRate Minimum annualised return in basis points before performance fees apply
+    /// @param _isHardHurdleRate If true, fees only on excess above hurdle; if false, fees on all profit
+    /// @param _elapsed Time elapsed since last settlement (for hurdle rate annualization)
+    /// @return performanceFeeAssets Performance fee in asset terms
+    function computePerformanceFee(
+        uint256 _interest,
+        uint256 _previousTotalAssets,
+        uint256 _performanceFee,
+        uint256 _hurdleRate,
+        bool _isHardHurdleRate,
+        uint256 _elapsed
     )
         internal
-        view
-        returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
+        pure
+        returns (uint256 performanceFeeAssets)
     {
-        return computeFees(
-            _totalAssets,
-            _totalSupply,
-            vault.sharePriceWatermark(),
-            10 ** vault.decimals(),
-            vault.managementFee(),
-            vault.hurdleRate(),
-            vault.performanceFee(),
-            vault.isHardHurdleRate(),
-            vault.lastFeesChargedManagement(),
-            vault.lastFeesChargedPerformance(),
-            _endOfPeriod
-        );
+        if (_interest == 0 || _performanceFee == 0 || _previousTotalAssets == 0) return 0;
+
+        // Reject zero-elapsed settlements: with elapsed = 0 the hurdle return collapses to 0,
+        // silently bypassing the hurdle filter and charging fee on the entire interest.
+        // Forces operators to never run settlement in the same block as a fee-rate change.
+        require(_elapsed != 0, VAULTMATHLIB_ZERO_ELAPSED);
+
+        // Calculate hurdle return: minimum return threshold for the period
+        uint256 hurdleReturn = (_previousTotalAssets * _hurdleRate).fullMulDiv(_elapsed, SECS_PER_YEAR) / MAX_BPS;
+
+        if (_interest <= hurdleReturn) return 0;
+
+        uint256 excessReturn = _interest - hurdleReturn;
+
+        if (_isHardHurdleRate) {
+            // Only charge on the excess above hurdle
+            performanceFeeAssets = (excessReturn * _performanceFee) / MAX_BPS;
+        } else {
+            // Charge on entire interest if above hurdle
+            performanceFeeAssets = (_interest * _performanceFee) / MAX_BPS;
+        }
     }
 
     /// @notice Converts shares to assets with virtual offset for inflation attack protection
-    /// @dev Mirrors BaseVault._convertToAssetsWithTotals using ERC4626 virtual shares/assets pattern
-    /// @param _shares Amount of shares to convert
-    /// @param _totalAssets Total assets in the vault
-    /// @param _totalSupply Total supply of shares
-    /// @return Equivalent asset amount
+    /// @param _shares Number of shares to convert
+    /// @param _totalAssets Current total assets in the vault
+    /// @param _totalSupply Current total share supply
+    /// @return Asset amount equivalent to the provided shares
     function convertToAssets(
         uint256 _shares,
         uint256 _totalAssets,
@@ -165,11 +133,10 @@ library VaultMathLib {
     }
 
     /// @notice Converts assets to shares with virtual offset for inflation attack protection
-    /// @dev Mirrors BaseVault._convertToSharesWithTotals using ERC4626 virtual shares/assets pattern
-    /// @param _assets Amount of assets to convert
-    /// @param _totalAssets Total assets in the vault
-    /// @param _totalSupply Total supply of shares
-    /// @return Equivalent share amount
+    /// @param _assets Number of assets to convert
+    /// @param _totalAssets Current total assets in the vault
+    /// @param _totalSupply Current total share supply
+    /// @return Share amount equivalent to the provided assets
     function convertToShares(
         uint256 _assets,
         uint256 _totalAssets,
@@ -180,41 +147,5 @@ library VaultMathLib {
         returns (uint256)
     {
         return _assets.fullMulDiv(_totalSupply + VIRTUAL_SHARES, _totalAssets + VIRTUAL_ASSETS);
-    }
-
-    /// @notice Converts shares to assets given explicit totals (no virtual offset)
-    /// @param _shares Amount of shares to convert
-    /// @param _totalAssets Total assets in the vault
-    /// @param _totalSupply Total supply of shares
-    /// @return Equivalent asset amount
-    function convertToAssetsWithAssetsAndSupply(
-        uint256 _shares,
-        uint256 _totalAssets,
-        uint256 _totalSupply
-    )
-        internal
-        pure
-        returns (uint256)
-    {
-        if (_totalSupply == 0) return _shares;
-        return _shares.fullMulDiv(_totalAssets, _totalSupply);
-    }
-
-    /// @notice Converts assets to shares given explicit totals (no virtual offset)
-    /// @param _assets Amount of assets to convert
-    /// @param _totalAssets Total assets in the vault
-    /// @param _totalSupply Total supply of shares
-    /// @return Equivalent share amount
-    function convertToSharesWithAssetsAndSupply(
-        uint256 _assets,
-        uint256 _totalAssets,
-        uint256 _totalSupply
-    )
-        internal
-        pure
-        returns (uint256)
-    {
-        if (_totalSupply == 0) return _assets;
-        return _assets.fullMulDiv(_totalSupply, _totalAssets);
     }
 }

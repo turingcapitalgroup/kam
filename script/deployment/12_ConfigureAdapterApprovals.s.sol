@@ -28,6 +28,8 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
     /// @param betaVaultAdapterAddr Address of betaVaultAdapter
     /// @param metawalletUSDCAddr Address of metawalletUSDC (metawallet)
     /// @param metawalletWBTCAddr Address of metawalletWBTC (metawallet)
+    /// @param usdcAddr Address of USDC asset (if zero, reads from config JSON)
+    /// @param wbtcAddr Address of WBTC asset (if zero, reads from config JSON)
     function run(
         address registryAddr,
         address kMinterAdapterUSDCAddr,
@@ -37,12 +39,15 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         address alphaVaultAdapterAddr,
         address betaVaultAdapterAddr,
         address metawalletUSDCAddr,
-        address metawalletWBTCAddr
+        address metawalletWBTCAddr,
+        address usdcAddr,
+        address wbtcAddr
     )
         public
     {
         // Read network configuration
         NetworkConfig memory config = readNetworkConfig();
+        validateConfigurationConfig(config);
         DeploymentOutput memory existing;
 
         // Read deployment output for contract addresses
@@ -100,18 +105,20 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
 
         logExecutionStart();
 
-        // Get asset addresses from config
-        address usdc = config.assets.USDC;
-        address wbtc = config.assets.WBTC;
+        // Get asset addresses: prefer provided, fallback to config
+        address usdc = usdcAddr != address(0) ? usdcAddr : config.assets.USDC;
+        address wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
         uint256 maxApproval = type(uint256).max;
 
         vm.startBroadcast(config.roles.admin);
 
         IkRegistry registry = IkRegistry(payable(registryAddr));
 
-        // Grant MANAGER_ROLE to admin so we can execute adapter calls
-        _log("Granting MANAGER_ROLE to admin for adapter execution...");
-        registry.grantManagerRole(config.roles.admin);
+        bool adminWasManager = registry.isManager(config.roles.admin);
+        if (!adminWasManager) {
+            _log("Granting temporary MANAGER_ROLE to admin for adapter execution...");
+            registry.grantManagerRole(config.roles.admin);
+        }
 
         _log("");
         _log("1. Approving metawallets to spend underlying assets from kMinter adapters...");
@@ -147,6 +154,12 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
             _log("   - kMinterAdapterUSDC approved betaVaultAdapter to spend metawallet shares");
         }
 
+        if (!adminWasManager) {
+            _log("");
+            _log("Revoking temporary MANAGER_ROLE from admin...");
+            registry.revokeManagerRole(config.roles.admin);
+        }
+
         vm.stopBroadcast();
 
         _log("");
@@ -166,9 +179,50 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         }
     }
 
+    /// @notice Backward-compatible wrapper (9 params, no asset overrides)
+    function run(
+        address registryAddr,
+        address kMinterAdapterUSDCAddr,
+        address kMinterAdapterWBTCAddr,
+        address dnVaultAdapterUSDCAddr,
+        address dnVaultAdapterWBTCAddr,
+        address alphaVaultAdapterAddr,
+        address betaVaultAdapterAddr,
+        address metawalletUSDCAddr,
+        address metawalletWBTCAddr
+    )
+        public
+    {
+        run(
+            registryAddr,
+            kMinterAdapterUSDCAddr,
+            kMinterAdapterWBTCAddr,
+            dnVaultAdapterUSDCAddr,
+            dnVaultAdapterWBTCAddr,
+            alphaVaultAdapterAddr,
+            betaVaultAdapterAddr,
+            metawalletUSDCAddr,
+            metawalletWBTCAddr,
+            address(0),
+            address(0)
+        );
+    }
+
     /// @notice Convenience wrapper for real deployments (reads addresses from JSON/config)
     function run() public {
-        run(address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0));
+        run(
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0)
+        );
     }
 
     /// @notice Execute an ERC20 approval from within an adapter

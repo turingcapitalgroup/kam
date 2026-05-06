@@ -25,6 +25,7 @@ contract DeployRemoteRegistryScript is Script, DeploymentManager {
     function run(bool writeToJson) public returns (RemoteRegistryDeployment memory deployment) {
         // Read network configuration from JSON
         NetworkConfig memory config = readNetworkConfig();
+        validateConfig(config);
 
         // Log script header and configuration
         logScriptHeader("DeployRemoteRegistry");

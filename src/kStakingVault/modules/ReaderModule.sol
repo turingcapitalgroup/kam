@@ -2,158 +2,65 @@
 pragma solidity 0.8.30;
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
-import { OptimizedDateTimeLib } from "solady/utils/OptimizedDateTimeLib.sol";
 import { Extsload } from "uniswap/Extsload.sol";
 
-import { KSTAKINGVAULT_VAULT_SETTLED } from "kam/src/errors/Errors.sol";
+import { KSTAKINGVAULT_VAULT_CLOSED, KSTAKINGVAULT_VAULT_SETTLED } from "kam/src/errors/Errors.sol";
 import { IModule } from "kam/src/interfaces/modules/IModule.sol";
+import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
-import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 /// @title ReaderModule
-/// @notice Contains fee, request, and auxiliary getters for the Staking Vault
-/// @dev Essential vault getters (totalAssets, sharePrice, conversions, batch info, etc.) live
-/// directly on kStakingVault. This module holds the remaining specialized readers.
-contract ReaderModule is BaseVault, Extsload, IModule {
+/// @notice Contains fee, request, batch, and auxiliary getters for the Staking Vault
+/// @dev Essential vault getters (totalAssets, sharePrice, conversions, etc.) live directly on kStakingVault.
+/// This module holds the remaining specialized readers including batch info, fee config, and request queries.
+contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
-
-    /// @notice Number of months in a year
-    uint256 constant MONTHS_PER_YEAR = 12;
 
     /* //////////////////////////////////////////////////////////////
                             FEE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Calculates accumulated fees for the current period
-    /// @return managementFees Accrued management fees in underlying asset terms
-    /// @return performanceFees Accrued performance fees in underlying asset terms
-    /// @return totalFees Combined management and performance fees
-    function computeLastBatchFees()
-        external
-        view
-        returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees)
-    {
+    /// @inheritdoc IVaultReader
+    function lastFeeTimestamp() public view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return VaultMathLib.computeFees(
-            _totalAssets(),
-            totalSupply(),
-            $.sharePriceWatermark,
-            10 ** _getDecimals($),
-            _getManagementFee($),
-            _getHurdleRate($),
-            _getPerformanceFee($),
-            _getIsHardHurdleRate($),
-            _getLastFeesChargedManagement($),
-            _getLastFeesChargedPerformance($),
-            block.timestamp
-        );
+        return _getLastFeeTimestamp($);
     }
 
-    /// @notice Returns the timestamp when management fees were last processed
-    /// @return Timestamp of last management fee charge
-    function lastFeesChargedManagement() public view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return _getLastFeesChargedManagement($);
-    }
-
-    /// @notice Returns the timestamp when performance fees were last processed
-    /// @return Timestamp of last performance fee charge
-    function lastFeesChargedPerformance() public view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return _getLastFeesChargedPerformance($);
-    }
-
-    /// @notice Returns the hurdle rate threshold for performance fee calculations
-    /// @return Hurdle rate in basis points
+    /// @inheritdoc IVaultReader
     function hurdleRate() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getHurdleRate($);
     }
 
-    /// @notice Returns whether the current hurdle rate is a hard hurdle rate
-    /// @return True if hard hurdle rate, false otherwise
+    /// @inheritdoc IVaultReader
     function isHardHurdleRate() external view returns (bool) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getIsHardHurdleRate($);
     }
 
-    /// @notice Returns the current performance fee rate
-    /// @return Performance fee in basis points
+    /// @inheritdoc IVaultReader
     function performanceFee() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getPerformanceFee($);
     }
 
-    /// @notice Calculates the next timestamp when performance fees can be charged
-    /// @return Projected timestamp for next performance fee evaluation
-    function nextPerformanceFeeTimestamp() external view returns (uint256) {
-        uint256 _lastCharged = _getLastFeesChargedPerformance(_getBaseVaultStorage());
-
-        (uint256 _year, uint256 _month, uint256 _day) = OptimizedDateTimeLib.timestampToDate(_lastCharged);
-        uint256 _lastDay = OptimizedDateTimeLib.daysInMonth(_year, _month);
-
-        uint256 _targetMonth = _day != _lastDay ? _month + 2 : _month + 3;
-        uint256 _targetYear = _year;
-
-        if (_targetMonth > MONTHS_PER_YEAR) {
-            _targetYear += (_targetMonth - 1) / MONTHS_PER_YEAR;
-            _targetMonth = ((_targetMonth - 1) % MONTHS_PER_YEAR) + 1;
-        }
-
-        _lastDay = OptimizedDateTimeLib.daysInMonth(_targetYear, _targetMonth);
-        return OptimizedDateTimeLib.dateTimeToTimestamp(_targetYear, _targetMonth, _lastDay, 23, 59, 59);
-    }
-
-    /// @notice Calculates the next timestamp when management fees can be charged
-    /// @return Projected timestamp for next management fee evaluation
-    function nextManagementFeeTimestamp() external view returns (uint256) {
-        uint256 _lastCharged = _getLastFeesChargedManagement(_getBaseVaultStorage());
-
-        (uint256 _year, uint256 _month, uint256 _day) = OptimizedDateTimeLib.timestampToDate(_lastCharged);
-        uint256 _lastDay = OptimizedDateTimeLib.daysInMonth(_year, _month);
-
-        if (_day != _lastDay) return OptimizedDateTimeLib.dateTimeToTimestamp(_year, _month, _lastDay, 23, 59, 59);
-
-        uint256 _targetMonth = _month + 1;
-        uint256 _targetYear = _year;
-
-        if (_targetMonth > MONTHS_PER_YEAR) {
-            _targetYear += 1;
-            _targetMonth = 1;
-        }
-
-        _lastDay = OptimizedDateTimeLib.daysInMonth(_targetYear, _targetMonth);
-        return OptimizedDateTimeLib.dateTimeToTimestamp(_targetYear, _targetMonth, _lastDay, 23, 59, 59);
-    }
-
-    /// @notice Returns the current management fee rate
-    /// @return Management fee in basis points
+    /// @inheritdoc IVaultReader
     function managementFee() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getManagementFee($);
-    }
-
-    /// @notice Returns the high watermark used for performance fee calculations
-    /// @return Current high watermark share price
-    function sharePriceWatermark() external view returns (uint256) {
-        return _getBaseVaultStorage().sharePriceWatermark;
     }
 
     /* //////////////////////////////////////////////////////////////
                         BATCH RECEIVER GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the batch receiver address for a specific batch ID
-    /// @param _batchId The batch identifier to query
-    /// @return Address of the batch receiver
+    /// @inheritdoc IVaultReader
     function getBatchReceiver(bytes32 _batchId) external view returns (address) {
         return _getBaseVaultStorage().batches[_batchId].batchReceiver;
     }
 
-    /// @notice Returns batch receiver address with validation
-    /// @param _batchId The batch identifier to query
-    /// @return Address of the batch receiver
+    /// @inheritdoc IVaultReader
     function getSafeBatchReceiver(bytes32 _batchId) external view returns (address) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require(!$.batches[_batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
@@ -164,17 +71,13 @@ contract ReaderModule is BaseVault, Extsload, IModule {
                         REQUEST GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Gets all request IDs associated with a user
-    /// @param _user The address to query requests for
-    /// @return requestIds An array of all request IDs for the user
+    /// @inheritdoc IVaultReader
     function getUserRequests(address _user) external view returns (bytes32[] memory requestIds) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return $.userRequests[_user].values();
     }
 
-    /// @notice Gets the details of a specific stake request
-    /// @param _requestId The unique identifier of the stake request
-    /// @return stakeRequest The stake request struct
+    /// @inheritdoc IVaultReader
     function getStakeRequest(bytes32 _requestId)
         external
         view
@@ -184,9 +87,7 @@ contract ReaderModule is BaseVault, Extsload, IModule {
         return $.stakeRequests[_requestId];
     }
 
-    /// @notice Gets the details of a specific unstake request
-    /// @param _requestId The unique identifier of the unstake request
-    /// @return unstakeRequest The unstake request struct
+    /// @inheritdoc IVaultReader
     function getUnstakeRequest(bytes32 _requestId)
         external
         view
@@ -197,19 +98,120 @@ contract ReaderModule is BaseVault, Extsload, IModule {
     }
 
     /* //////////////////////////////////////////////////////////////
-                        PENDING AMOUNTS
+                        CONVERSION HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the total pending stake amount
-    /// @return Total pending stake amount
-    function getTotalPendingStake() external view returns (uint256) {
-        return _getBaseVaultStorage().totalPendingStake;
+    /// @inheritdoc IVaultReader
+    /// @dev Pure helper for integrations that need deterministic conversions against historical or simulated totals.
+    /// Rounds down in favor of the vault.
+    function convertToSharesWithTotals(
+        uint256 _assets,
+        uint256 _totalAssetsVal,
+        uint256 _totalSupplyVal
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _convertToSharesWithTotals(_assets, _totalAssetsVal, _totalSupplyVal);
     }
 
-    /// @notice Returns the total pending unstake amount
-    /// @return Total pending unstake amount
-    function getTotalPendingUnstake() external view returns (uint256) {
-        return _getBaseVaultStorage().totalPendingUnstake;
+    /// @inheritdoc IVaultReader
+    /// @dev Pure helper for integrations that need deterministic conversions against historical or simulated totals.
+    /// Rounds down in favor of the vault.
+    function convertToAssetsWithTotals(
+        uint256 _shares,
+        uint256 _totalAssetsVal,
+        uint256 _totalSupplyVal
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _convertToAssetsWithTotals(_shares, _totalAssetsVal, _totalSupplyVal);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        BATCH GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IVaultReader
+    function getBatchId() public view returns (bytes32) {
+        return _getBaseVaultStorage().currentBatchId;
+    }
+
+    /// @inheritdoc IVaultReader
+    /// @dev Reverts when the current batch is closed or already settled.
+    function getSafeBatchId() external view returns (bytes32) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = getBatchId();
+        require(!$.batches[_batchId].isClosed, KSTAKINGVAULT_VAULT_CLOSED);
+        require(!$.batches[_batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
+        return _batchId;
+    }
+
+    /// @inheritdoc IVaultReader
+    function isClosed(bytes32 _batchId) external view returns (bool isClosed_) {
+        isClosed_ = _getBaseVaultStorage().batches[_batchId].isClosed;
+    }
+
+    /// @inheritdoc IVaultReader
+    function isBatchClosed() external view returns (bool) {
+        return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed;
+    }
+
+    /// @inheritdoc IVaultReader
+    function isBatchSettled() external view returns (bool) {
+        return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled;
+    }
+
+    /// @inheritdoc IVaultReader
+    function getCurrentBatchInfo()
+        external
+        view
+        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled)
+    {
+        return (
+            _getBaseVaultStorage().currentBatchId,
+            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].batchReceiver,
+            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed,
+            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled
+        );
+    }
+
+    /// @inheritdoc IVaultReader
+    function getBatchIdInfo(bytes32 _batchId)
+        external
+        view
+        returns (
+            address batchReceiver,
+            bool isClosed_,
+            bool isSettled,
+            uint256 sharePrice_,
+            uint256 totalAssets_,
+            uint256 totalSupply_,
+            uint256 depositedInBatch,
+            uint256 requestedSharesInBatch
+        )
+    {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
+
+        uint256 _totalSupply = batch.totalSupply;
+        uint8 decimals = _getDecimals($);
+
+        sharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalAssets, _totalSupply);
+
+        return (
+            batch.batchReceiver,
+            batch.isClosed,
+            batch.isSettled,
+            sharePrice_,
+            batch.totalAssets,
+            batch.totalSupply,
+            batch.depositedInBatch,
+            batch.requestedSharesInBatch
+        );
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -218,24 +220,26 @@ contract ReaderModule is BaseVault, Extsload, IModule {
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](17);
-        moduleSelectors[0] = this.computeLastBatchFees.selector;
-        moduleSelectors[1] = this.lastFeesChargedManagement.selector;
-        moduleSelectors[2] = this.lastFeesChargedPerformance.selector;
-        moduleSelectors[3] = this.hurdleRate.selector;
-        moduleSelectors[4] = this.isHardHurdleRate.selector;
-        moduleSelectors[5] = this.performanceFee.selector;
-        moduleSelectors[6] = this.nextPerformanceFeeTimestamp.selector;
-        moduleSelectors[7] = this.nextManagementFeeTimestamp.selector;
-        moduleSelectors[8] = this.managementFee.selector;
-        moduleSelectors[9] = this.sharePriceWatermark.selector;
-        moduleSelectors[10] = this.getBatchReceiver.selector;
-        moduleSelectors[11] = this.getSafeBatchReceiver.selector;
-        moduleSelectors[12] = this.getUserRequests.selector;
-        moduleSelectors[13] = this.getStakeRequest.selector;
-        moduleSelectors[14] = this.getUnstakeRequest.selector;
-        moduleSelectors[15] = this.getTotalPendingStake.selector;
-        moduleSelectors[16] = this.getTotalPendingUnstake.selector;
+        bytes4[] memory moduleSelectors = new bytes4[](19);
+        moduleSelectors[0] = this.lastFeeTimestamp.selector;
+        moduleSelectors[1] = this.hurdleRate.selector;
+        moduleSelectors[2] = this.isHardHurdleRate.selector;
+        moduleSelectors[3] = this.performanceFee.selector;
+        moduleSelectors[4] = this.managementFee.selector;
+        moduleSelectors[5] = this.getBatchReceiver.selector;
+        moduleSelectors[6] = this.getSafeBatchReceiver.selector;
+        moduleSelectors[7] = this.getUserRequests.selector;
+        moduleSelectors[8] = this.getStakeRequest.selector;
+        moduleSelectors[9] = this.getUnstakeRequest.selector;
+        moduleSelectors[10] = this.convertToSharesWithTotals.selector;
+        moduleSelectors[11] = this.convertToAssetsWithTotals.selector;
+        moduleSelectors[12] = this.getBatchId.selector;
+        moduleSelectors[13] = this.getSafeBatchId.selector;
+        moduleSelectors[14] = this.isClosed.selector;
+        moduleSelectors[15] = this.isBatchClosed.selector;
+        moduleSelectors[16] = this.isBatchSettled.selector;
+        moduleSelectors[17] = this.getCurrentBatchInfo.selector;
+        moduleSelectors[18] = this.getBatchIdInfo.selector;
         return moduleSelectors;
     }
 }

@@ -234,22 +234,15 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         assertFalse(registry.isAsset(TEST_ASSET));
     }
 
-    function test_RemoveAsset_Clears_HurdleRate() public {
-        _registerAsset();
+    function test_RemoveVault_Clears_HurdleRate() public {
+        // dnVault is registered by the deployment
+        vm.startPrank(users.admin);
+        registry.setHurdleRate(address(dnVault), 500);
+        registry.setIsHardHurdleRate(address(dnVault), true);
+        vm.stopPrank();
 
-        // Set hurdle rate
-        vm.prank(users.admin);
-        registry.setHurdleRate(TEST_ASSET, 500); // 5%
-
-        assertEq(registry.getHurdleRate(TEST_ASSET), 500);
-
-        // Remove asset
-        vm.prank(users.admin);
-        registry.removeAsset(TEST_ASSET);
-
-        // getHurdleRate should revert since asset is no longer registered
-        vm.expectRevert(bytes(KREGISTRY_ASSET_NOT_SUPPORTED));
-        registry.getHurdleRate(TEST_ASSET);
+        assertEq(registry.getHurdleRate(address(dnVault)), 500);
+        assertTrue(registry.getIsHardHurdleRate(address(dnVault)));
     }
 
     function test_RemoveAsset_Allows_ReRegistration() public {
@@ -378,7 +371,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         dnVault.closeBatch(_dnBatchId, true);
 
         // Propose settlement for dnVault (creates pending proposal)
-        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0, 0, 0);
+        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0);
         vm.stopPrank();
 
         // Try to remove vault with pending proposal - should fail
@@ -703,7 +696,7 @@ contract kRegistryRegisterTest is DeploymentBaseTest {
         dnVault.closeBatch(_dnBatchId, true);
 
         // Propose settlement for dnVault (creates pending proposal)
-        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0, 0, 0);
+        assetRouter.proposeSettleBatch(USDC, _dnVault, _dnBatchId, 0);
         vm.stopPrank();
 
         // Get the adapter for this vault-asset pair

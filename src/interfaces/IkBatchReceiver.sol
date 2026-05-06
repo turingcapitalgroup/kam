@@ -99,6 +99,6 @@ interface IkBatchReceiver {
     /// preventing accidental asset loss during the receiver contract's operational lifecycle.
     /// @param asset The contract address of the asset to rescue (use address(0) for native ETH recovery)
     /// @param to The address that will receive the recovered assets
-    /// @param amount the amount of assets to be recovered to.
+    /// @param amount The quantity of assets to be recovered
     function rescueAssets(address asset, address to, uint256 amount) external payable;
 }

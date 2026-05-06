@@ -7,6 +7,7 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
+import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { kBase } from "kam/src/base/kBase.sol";
@@ -425,8 +426,11 @@ contract kMinterTest is DeploymentBaseTest {
     }
 
     function test_AuthorizeUpgrade_Require_Implementation_Not_Zero_Address() public {
+        // Solady's UUPSUpgradeable rejects a zero implementation via the proxiableUUID
+        // staticcall in upgradeToAndCall, reverting with `UpgradeFailed()` instead of a
+        // contract-specific zero-address message.
         vm.prank(users.admin);
-        vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
+        vm.expectRevert(UUPSUpgradeable.UpgradeFailed.selector);
         minter.upgradeToAndCall(ZERO_ADDRESS, "");
     }
 
@@ -624,7 +628,8 @@ contract kMinterTest is DeploymentBaseTest {
         assetRouter.setSettlementCooldown(0);
 
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, 0, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, 0);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_proposalId);
     }
 
@@ -645,7 +650,8 @@ contract kMinterTest is DeploymentBaseTest {
 
         uint256 _totalAssets = IkToken(_kToken).totalSupply();
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, _totalAssets, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, _totalAssets);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_proposalId);
     }
 }

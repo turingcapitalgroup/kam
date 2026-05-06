@@ -292,7 +292,8 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         vm.prank(users.admin);
         assetRouter.setSettlementCooldown(0);
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _initialBatchId, 0, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _initialBatchId, 0);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_proposalId);
 
         // Now request burn - this creates the batch receiver
@@ -309,5 +310,4 @@ contract kBatchReceiverTest is DeploymentBaseTest {
 
 // Helper used to exercise the rescueAssets ETH-transfer-failure branch.
 // No payable receive/fallback — any value-bearing call returns success=false.
-contract ETHRejector {
-}
+contract ETHRejector { }

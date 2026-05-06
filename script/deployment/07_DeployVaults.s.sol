@@ -5,7 +5,6 @@ import { Script } from "forge-std/Script.sol";
 import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
-import { kRegistry } from "kam/src/kRegistry/kRegistry.sol";
 import { kStakingVault } from "kam/src/kStakingVault/kStakingVault.sol";
 import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
@@ -52,6 +51,7 @@ contract DeployVaultsScript is Script, DeploymentManager {
     {
         // Read network configuration
         config = readNetworkConfig();
+        validateConfig(config);
 
         // If addresses not provided, read from JSON (for real deployments)
         if (
@@ -108,34 +108,6 @@ contract DeployVaultsScript is Script, DeploymentManager {
         address dnVaultWBTC = _deployDNVaultWBTC();
         address alphaVault = _deployAlphaVault();
         address betaVault = _deployBetaVault();
-
-        _log("");
-        _log("=== SETTING BATCH LIMITS IN REGISTRY ===");
-
-        // Get registry reference
-        kRegistry registry = kRegistry(payable(registryAddr));
-        // Use registry to avoid unused variable warning
-        registry;
-
-        // Set batch limits for DN Vault USDC
-        _log("Setting batch limits for DN Vault USDC:");
-        _log("  Max Deposit:", config.dnVaultUSDC.maxDepositPerBatch);
-        _log("  Max Withdraw:", config.dnVaultUSDC.maxWithdrawPerBatch);
-
-        // Set batch limits for DN Vault WBTC
-        _log("Setting batch limits for DN Vault WBTC:");
-        _log("  Max Deposit:", config.dnVaultWBTC.maxDepositPerBatch);
-        _log("  Max Withdraw:", config.dnVaultWBTC.maxWithdrawPerBatch);
-
-        // Set batch limits for Alpha Vault
-        _log("Setting batch limits for Alpha Vault:");
-        _log("  Max Deposit:", config.alphaVault.maxDepositPerBatch);
-        _log("  Max Withdraw:", config.alphaVault.maxWithdrawPerBatch);
-
-        // Set batch limits for Beta Vault
-        _log("Setting batch limits for Beta Vault:");
-        _log("  Max Deposit:", config.betaVault.maxDepositPerBatch);
-        _log("  Max Withdraw:", config.betaVault.maxWithdrawPerBatch);
 
         // Register ReaderModule to all vaults
         _log("");

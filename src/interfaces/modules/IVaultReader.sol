@@ -5,26 +5,13 @@ import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 
 /// @title IVaultReader
 /// @notice Read-only interface for querying specialized vault metrics via the ReaderModule
-/// @dev This interface covers fee calculations, request queries, batch receiver lookups, and pending amounts.
+/// @dev This interface covers fee configuration, request queries, batch receiver lookups, and other readers.
 /// Essential vault getters (totalAssets, sharePrice, conversions, batch info, etc.) are declared in IVault
 /// and implemented directly on kStakingVault.
 interface IVaultReader {
-    /// @notice Calculates accumulated fees for the current period
-    /// @return managementFees Accrued management fees in underlying asset terms
-    /// @return performanceFees Accrued performance fees in underlying asset terms
-    /// @return totalFees Combined management and performance fees
-    function computeLastBatchFees()
-        external
-        view
-        returns (uint256 managementFees, uint256 performanceFees, uint256 totalFees);
-
-    /// @notice Returns the timestamp when management fees were last processed
-    /// @return Timestamp of last management fee charge
-    function lastFeesChargedManagement() external view returns (uint256);
-
-    /// @notice Returns the timestamp when performance fees were last processed
-    /// @return Timestamp of last performance fee charge
-    function lastFeesChargedPerformance() external view returns (uint256);
+    /// @notice Returns the timestamp when fees were last accrued
+    /// @return Timestamp of last fee accrual
+    function lastFeeTimestamp() external view returns (uint256);
 
     /// @notice Returns the hurdle rate threshold for performance fee calculations
     /// @return Hurdle rate in basis points
@@ -38,21 +25,9 @@ interface IVaultReader {
     /// @return Performance fee in basis points
     function performanceFee() external view returns (uint16);
 
-    /// @notice Calculates the next timestamp when performance fees can be charged
-    /// @return Projected timestamp for next performance fee evaluation
-    function nextPerformanceFeeTimestamp() external view returns (uint256);
-
-    /// @notice Calculates the next timestamp when management fees can be charged
-    /// @return Projected timestamp for next management fee evaluation
-    function nextManagementFeeTimestamp() external view returns (uint256);
-
     /// @notice Returns the current management fee rate
     /// @return Management fee in basis points
     function managementFee() external view returns (uint16);
-
-    /// @notice Returns the high watermark used for performance fee calculations
-    /// @return Current high watermark share price
-    function sharePriceWatermark() external view returns (uint256);
 
     /// @notice Returns the batch receiver address for a specific batch ID
     /// @param batchId The batch identifier to query
@@ -82,11 +57,94 @@ interface IVaultReader {
         view
         returns (BaseVaultTypes.UnstakeRequest memory unstakeRequest);
 
-    /// @notice Returns the total pending stake amount
-    /// @return Total pending stake amount
-    function getTotalPendingStake() external view returns (uint256);
+    /* //////////////////////////////////////////////////////////////
+                        CONVERSION HELPERS
+    //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the total pending unstake amount
-    /// @return Total pending unstake amount
-    function getTotalPendingUnstake() external view returns (uint256);
+    /// @notice Converts assets to shares with specified totals, rounding down
+    /// @param assets The asset amount to convert
+    /// @param totalAssets_ The total assets to use for the conversion
+    /// @param totalSupply_ The total share supply to use for the conversion
+    /// @return The share amount for the provided assets and totals
+    function convertToSharesWithTotals(
+        uint256 assets,
+        uint256 totalAssets_,
+        uint256 totalSupply_
+    )
+        external
+        pure
+        returns (uint256);
+
+    /// @notice Converts shares to assets with specified totals, rounding down
+    /// @param shares The share amount to convert
+    /// @param totalAssets_ The total assets to use for the conversion
+    /// @param totalSupply_ The total share supply to use for the conversion
+    /// @return The asset amount for the provided shares and totals
+    function convertToAssetsWithTotals(
+        uint256 shares,
+        uint256 totalAssets_,
+        uint256 totalSupply_
+    )
+        external
+        pure
+        returns (uint256);
+
+    /* //////////////////////////////////////////////////////////////
+                        BATCH GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the current active batch ID
+    /// @return The current batch identifier
+    function getBatchId() external view returns (bytes32);
+
+    /// @notice Returns current batch ID with safety validation
+    /// @return The current batch identifier if open and unsettled
+    function getSafeBatchId() external view returns (bytes32);
+
+    /// @notice Returns the close state of a given batch
+    /// @param batchId_ The batch identifier to inspect
+    /// @return isClosed_ True if the batch is closed
+    function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
+
+    /// @notice Returns whether the current batch is closed
+    /// @return True if the current batch is closed
+    function isBatchClosed() external view returns (bool);
+
+    /// @notice Returns whether the current batch is settled
+    /// @return True if the current batch is settled
+    function isBatchSettled() external view returns (bool);
+
+    /// @notice Returns core state for the current batch
+    /// @return batchId The current batch identifier
+    /// @return batchReceiver The receiver holding settlement assets for the batch
+    /// @return isClosed_ True if the current batch is closed
+    /// @return isSettled True if the current batch is settled
+    function getCurrentBatchInfo()
+        external
+        view
+        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
+
+    /// @notice Returns accounting and lifecycle data for a specific batch
+    /// @param batchId The batch identifier to inspect
+    /// @return batchReceiver The receiver holding settlement assets for the batch
+    /// @return isClosed_ True if the batch is closed
+    /// @return isSettled True if the batch is settled
+    /// @return sharePrice_ The settled share price for the batch
+    /// @return totalAssets_ The active assets recorded for the batch
+    /// @return totalSupply_ The share supply recorded for the batch
+    /// @return depositedInBatch The kToken amount pending stake in the batch
+    /// @return requestedSharesInBatch The share amount pending unstake in the batch
+    function getBatchIdInfo(bytes32 batchId)
+        external
+        view
+        returns (
+            address batchReceiver,
+            bool isClosed_,
+            bool isSettled,
+            uint256 sharePrice_,
+            uint256 totalAssets_,
+            uint256 totalSupply_,
+            uint256 depositedInBatch,
+            uint256 requestedSharesInBatch
+        );
 }

@@ -5,12 +5,12 @@
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │Institution  │───▶│Step1: Mint  │───▶│Hold kTokens │───▶│Step2:Request│
-│has Assets   │    │kTokens 1:1  │    │& Earn Yield │    │Redemption   │
+│has Assets   │    │kTokens 1:1  │    │(use in DeFi)│    │Redemption   │
 └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-                                                                 │
+                                                                │
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐            │
 │Receive      │◀───│Step3:Execute│◀───│Wait for     │◀───────────┘
-│Assets+Yield │    │Redemption   │    │Settlement   │
+│Assets (1:1) │    │Redemption   │    │Settlement   │
 └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
@@ -43,7 +43,7 @@
          ▼
 ┌─────────────────┐
 │kAssetRouter.    │
-│kAssetPush()     │ ── Transfer assets to adapter
+│kAssetPush()     │ ── Track virtual balance
 └────────┬────────┘
          │
          ▼
@@ -128,8 +128,8 @@
          ▼
 ┌─────────────────-┐
 │Relayer calls     │
-│proposeSettleBatch│ ── Provides: asset, vault, batchId, totalAssets,
-│                  │    lastFeesChargedManagement, lastFeesChargedPerformance
+│proposeSettleBatch│ ── Provides totalAssets + identifying params
+│with totalAssets  │    (asset, vault, batchId)
 └────────┬────────-┘
          │
          ▼
@@ -144,13 +144,13 @@
          ▼
 ┌─────────────────┐
 │Cooldown Period  │
-│(Default 1 hour) │ ── Guardians or Emergency Admins can cancel
+│(Default 1 hour) │ ── Guards can cancel during cooldown
 └────────┬────────┘
          │
          ▼
 ┌─────────────────-┐
-│Anyone calls      │
-│executeSettleBatch│ ── After cooldown expires
+│Relayer calls     │
+│executeSettleBatch│ ── After cooldown expires (RELAYER_ROLE required)
 └────────┬────────-┘
          │
          ▼
@@ -182,22 +182,14 @@
          │YES
          ▼
 ┌─────────────────┐
-│Validate caller  │
-│is request       │ ── Check msg.sender == burnRequest.user
-│creator          │    and request exists in user's set
+│Validate request │
+│status           │ ── Check request exists and is PENDING
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
 │Mark request as  │
-│REDEEMED         │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│Burn escrowed    │
-│kTokens          │ ── IkToken(kToken).burn(address(this), amount)
-│permanently      │
+│REDEEMED         │ ── kTokens were already burned in bulk during settleBatch()
 └────────┬────────┘
          │
          ▼
@@ -223,16 +215,14 @@ Request Status Flow:
 ┌─────────────┐
 │PENDING      │ ── Initial state when requestBurn() is called
 └──────┬──────┘
-       │
-       │  (batch settles, then institution calls burn())
+       │  (batch must be settled before burn() can be called)
        ▼
 ┌─────────────┐
-│REDEEMED     │ ── Set when burn() is called (before assets pulled)
+│REDEEMED     │ ── After burn() successfully pulls assets
 └─────────────┘
 
-Note: There is no intermediate SETTLED status for individual requests.
-Batch settlement is tracked separately via BatchInfo.isSettled.
-The request goes directly from PENDING to REDEEMED.
+Note: The request itself has only two states (PENDING, REDEEMED).
+The batch settlement is tracked separately via batches[batchId].isSettled.
 ```
 
 ## Key Functions by Contract
@@ -261,7 +251,7 @@ The request goes directly from PENDING to REDEEMED.
 │  ┌─────────────────────────────────────────────────────────────┐ │
 │  │• createNewBatch() - Create new batch for asset              │ │
 │  │• closeBatch() - Stop accepting new requests                 │ │
-│  │• settleBatch() - Called by kAssetRouter only (internal)     │ │
+│  │• settleBatch() - Mark batch as settled after processing     │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────-─┘
 ```
@@ -282,7 +272,7 @@ Day N+3:                                 Day N+3:                   │
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐             │
 │Redeem Assets│◀────│Settlement   │◀────│Cooldown     │◀────────────┘
 │(institution)│     │Executed     │     │Period (1hr) │
-│             │     │(anyone)     │     │             │
+│             │     │(relayer)    │     │             │
 └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
@@ -345,38 +335,36 @@ Day N+3:                                 Day N+3:                   │
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Virtual Balance State Machine                │
+│                    Virtual Balance Accounting                    │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  Virtual Balances Tracked by kAssetRouter:                      │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │Deposited    │    │Requested    │    │Settled      │          │
-│  │Balance      │    │Balance      │    │Balance      │          │
-│  └──────┬──────┘    └──────┬──────┘    └──────┬──────┘          │
-│         │                  │                  │                 │
-│         ▲                  ▲                  ▲                 │
-│         │                  │                  │                 │
-│  ┌──────┴──────┐    ┌──────┴──────┐    ┌──────┴──────┐          │
-│  │kAssetPush() │    │kAssetRequest│    │Settlement   │          │
-│  │             │    │Pull()       │    │Execution    │          │
-│  │Mint         │    │             │    │             │          │
-│  │Operations   │    │Redeem       │    │Batch        │          │
-│  └─────────────┘    │Requests     │    │Processing   │          │
-│                     └─────────────┘    └─────────────┘          │
-│                                               │                 │
-│                                               ▼                 │
-│                                        ┌─────────────┐          │
-│                                        │Claim        │          │
-│                                        │Operations   │          │
-│                                        │             │          │
-│                                        │Decrease     │          │
-│                                        │Settled      │          │
-│                                        └─────────────┘          │
+│  Two tracking layers in kAssetRouter:                           │
+│                                                                 │
+│  1. Per-Batch Balances (batches[batchId] in kMinter storage):   │
+│     ┌─────────────┐    ┌─────────────┐                          │
+│     │Deposited    │    │Requested    │                          │
+│     │(per batch)  │    │(per batch)  │                          │
+│     └──────┬──────┘    └──────┬──────┘                          │
+│            ▲                  ▲                                 │
+│     ┌──────┴──────┐    ┌──────┴──────┐                          │
+│     │kAssetPush() │    │kAssetRequest│                          │
+│     │Mint ops     │    │Pull()       │                          │
+│     └─────────────┘    │Redeem reqs  │                          │
+│                        └─────────────┘                          │
+│                                                                 │
+│  2. Virtual Balance (adapter.totalAssets()):                    │
+│     ┌──────────────────────────────────────────────────┐        │
+│     │ Updated by kAssetRouter during settlement via    │        │
+│     │ adapter.setTotalAssets(totalAssetsAdjusted)       │        │
+│     │                                                  │        │
+│     │ totalAssetsAdjusted = totalAssets + netted        │        │
+│     │ where netted = deposited - requested              │        │
+│     └──────────────────────────────────────────────────┘        │
 │                                                                 │
 │  Flow Summary:                                                  │
-│  Mint → Increase Deposited                                      │
-│  Request Redeem → Increase Requested                            │
-│  Settlement → Move D,R to Settled                               │
-│  Claim → Decrease Settled                                       │
+│  Mint → Increase batch deposited                                │
+│  Request Redeem → Increase batch requested                      │
+│  Settlement → Update adapter.totalAssets, clear batch balances  │
+│  Claim → Institution calls burn(), assets from BatchReceiver    │
 └─────────────────────────────────────────────────────────────────┘
 ```

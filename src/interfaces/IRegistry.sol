@@ -100,10 +100,15 @@ interface IRegistry is IVersioned {
     /// @param paused The new global pause state
     event GlobalPauseSet(bool paused);
 
-    /// @notice Emitted when a hurdle rate is set for an asset
-    /// @param asset The asset receiving the hurdle rate
+    /// @notice Emitted when a hurdle rate is set for a vault
+    /// @param vault The vault receiving the hurdle rate
     /// @param hurdleRate The hurdle rate in basis points
-    event HurdleRateSet(address indexed asset, uint16 hurdleRate);
+    event HurdleRateSet(address indexed vault, uint16 hurdleRate);
+
+    /// @notice Emitted when the hard hurdle rate mode is set for a vault
+    /// @param vault The vault receiving the mode change
+    /// @param isHard Whether the hurdle rate is hard (true) or soft (false)
+    event IsHardHurdleRateSet(address indexed vault, bool isHard);
 
     /// @notice Emitted when a vault-target-selector permission is registered
     /// @param vault The vault receiving the permission
@@ -166,7 +171,7 @@ interface IRegistry is IVersioned {
     /// @dev This function deregisters an asset and cleans up all associated storage mappings. Critical safety checks
     /// ensure the asset cannot be removed if any vaults still reference it (vaultsByAsset must be empty).
     /// This prevents orphaned state where vaults reference a non-existent asset. Clears: supportedAssets set,
-    /// maxMintPerBatch, maxBurnPerBatch, assetToKToken mapping, and assetHurdleRate. Note that the kToken contract
+    /// maxMintPerBatch, maxBurnPerBatch, and assetToKToken mapping. Note that the kToken contract
     /// remains deployed but becomes orphaned - this is intentional as existing kToken holders should retain their
     /// tokens. Only callable by ADMIN_ROLE.
     /// @param asset The asset address to remove from the protocol
@@ -220,11 +225,58 @@ interface IRegistry is IVersioned {
     /// @param manager_ The address to grant manager privileges
     function grantManagerRole(address manager_) external payable;
 
-    /// @notice Revokes the specific role of a given user
-    /// @dev Only callable by ADMIN_ROLE.
-    /// @param user the address to revoke acess to
-    /// @param role the role of the address that we want to revoke
-    function revokeGivenRoles(address user, uint256 role) external payable;
+    /// @notice Grants ADMIN_ROLE to an address
+    /// @dev Only callable by contract owner
+    /// @param admin_ Admin role recipient
+    function grantAdminRole(address admin_) external;
+
+    /// @notice Grants EMERGENCY_ADMIN_ROLE to an address
+    /// @dev Only callable by contract owner
+    /// @param emergencyAdmin_ Emergency admin role recipient
+    function grantEmergencyAdminRole(address emergencyAdmin_) external;
+
+    /// @notice Grants GUARDIAN_ROLE to an address
+    /// @dev Only callable by contract owner
+    /// @param guardian_ Guardian role recipient
+    function grantGuardianRole(address guardian_) external;
+
+    /// @notice Revokes ADMIN_ROLE from an address
+    /// @dev Only callable by contract owner
+    /// @param admin_ Address to strip of admin privileges
+    function revokeAdminRole(address admin_) external;
+
+    /// @notice Revokes EMERGENCY_ADMIN_ROLE from an address
+    /// @dev Only callable by contract owner
+    /// @param emergencyAdmin_ Address to strip of emergency admin privileges
+    function revokeEmergencyAdminRole(address emergencyAdmin_) external;
+
+    /// @notice Revokes GUARDIAN_ROLE from an address
+    /// @dev Only callable by contract owner
+    /// @param guardian_ Address to strip of guardian privileges
+    function revokeGuardianRole(address guardian_) external;
+
+    /// @notice Revokes VENDOR_ROLE from an address
+    /// @dev Only callable by addresses holding ADMIN_ROLE
+    /// @param vendor_ Address to strip of vendor privileges
+    function revokeVendorRole(address vendor_) external payable;
+
+    /// @notice Revokes RELAYER_ROLE from an address
+    /// @dev Only callable by addresses holding ADMIN_ROLE
+    /// @param relayer_ Address to strip of relayer privileges
+    function revokeRelayerRole(address relayer_) external payable;
+
+    /// @notice Revokes MANAGER_ROLE from an address
+    /// @dev Only callable by addresses holding ADMIN_ROLE
+    /// @param manager_ Address to strip of manager privileges
+    function revokeManagerRole(address manager_) external payable;
+
+    /// @notice Revokes INSTITUTION_ROLE from an address
+    /// @dev Callable by VENDOR_ROLE (primary KYC lifecycle owner) or ADMIN_ROLE
+    /// (documented backstop for compliance-team unavailability, erroneous grants,
+    /// or urgent sanctions action). This is the one documented exception to strict
+    /// grant/revoke authority symmetry in kRegistry.
+    /// @param institution_ Address to strip of institution privileges
+    function revokeInstitutionRole(address institution_) external payable;
 
     /// @notice Retrieves a singleton contract address by identifier
     /// @dev Reverts if contract not registered. Used for protocol contract discovery.
@@ -360,21 +412,36 @@ interface IRegistry is IVersioned {
     /// @return The treasury address
     function getTreasury() external view returns (address);
 
-    /// @notice Sets the hurdle rate for a specific asset
+    /// @notice Sets the hurdle rate for a specific vault
     /// @dev Only admin can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
-    /// Asset must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
+    /// Vault must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
     /// A hurdle rate of 0 is valid and means performance fees will be charged on all positive yield with no minimum
     /// threshold.
-    /// @param asset The asset address to set hurdle rate for
+    /// @param vault The vault address to set hurdle rate for
     /// @param hurdleRate The hurdle rate in basis points (100 = 1%), 0 means no minimum threshold
-    function setHurdleRate(address asset, uint16 hurdleRate) external payable;
+    function setHurdleRate(address vault, uint16 hurdleRate) external payable;
 
-    /// @notice Gets the hurdle rate for a specific asset
+    /// @notice Sets the hard hurdle rate mode for a specific vault
+    /// @dev Only admin can set hurdle rate modes. Vault must be registered.
+    /// Hard hurdle (true): performance fees charged only on excess return above hurdle rate.
+    /// Soft hurdle (false): performance fees charged on all profits when returns exceed hurdle rate.
+    /// @param vault The vault address to set mode for
+    /// @param isHard True for hard hurdle, false for soft hurdle
+    function setIsHardHurdleRate(address vault, bool isHard) external payable;
+
+    /// @notice Gets the hurdle rate for a specific vault
     /// @dev Returns minimum performance threshold in basis points for yield distribution.
-    /// Asset must be registered to query hurdle rate.
-    /// @param asset The asset address to query
+    /// Vault must be registered to query hurdle rate.
+    /// @param vault The vault address to query
     /// @return The hurdle rate in basis points
-    function getHurdleRate(address asset) external view returns (uint16);
+    function getHurdleRate(address vault) external view returns (uint16);
+
+    /// @notice Gets the hard hurdle rate mode for a specific vault
+    /// @dev Returns whether the vault uses hard or soft hurdle rate mode.
+    /// Vault must be registered to query.
+    /// @param vault The vault address to query
+    /// @return True if hard hurdle rate, false if soft hurdle rate
+    function getIsHardHurdleRate(address vault) external view returns (bool);
 
     /// @notice Removes a vault from the protocol registry with safety checks
     /// @dev This function deregisters a vault. Only callable by ADMIN_ROLE.

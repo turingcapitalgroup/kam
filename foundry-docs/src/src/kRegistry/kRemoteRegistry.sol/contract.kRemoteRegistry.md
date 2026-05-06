@@ -1,40 +1,17 @@
 # kRemoteRegistry
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kRegistry/kRemoteRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kRegistry/kRemoteRegistry.sol)
 
 **Inherits:**
-[IkRemoteRegistry](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkRemoteRegistry.sol/interface.IkRemoteRegistry.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
+[IkRemoteRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkRemoteRegistry.sol/interface.IkRemoteRegistry.md), [ExecutionGuardianModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kRegistry/modules/ExecutionGuardianModule.sol/contract.ExecutionGuardianModule.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md)
 
 Lightweight registry for cross-chain metaWallet adapter validation
 
 Simplified version of kRegistry for deployment on chains where the full KAM protocol is not deployed.
 Provides adapter permission management and call validation for SmartAdapterAccount contracts.
-
-
-## State Variables
-### KREMOTEREGISTRY_STORAGE_LOCATION
-
-```solidity
-bytes32 private constant KREMOTEREGISTRY_STORAGE_LOCATION =
-    0x5d8ebd8f1fb26a20d7fa1193e66eb27e5baad0de2f7a4be3a9e2aa2a868ccf00
-```
+Inherits executor permission logic from ExecutionGuardianModule, wrapping it with Ownable access control.
 
 
 ## Functions
-### _getkRemoteRegistryStorage
-
-Retrieves the kRemoteRegistry storage struct from its designated storage slot
-
-
-```solidity
-function _getkRemoteRegistryStorage() private pure returns (kRemoteRegistryStorage storage $);
-```
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`$`|`kRemoteRegistryStorage`|The kRemoteRegistryStorage struct reference|
-
-
 ### constructor
 
 Disables initializers to prevent implementation contract initialization
@@ -63,18 +40,19 @@ function initialize(address _owner) external initializer;
 
 Sets whether an executor can call a specific selector on a target
 
-Only callable by owner
+Only callable by owner. Overrides ExecutionGuardianModule to use Ownable access control.
 
 
 ```solidity
 function setAllowedSelector(
     address _executor,
     address _target,
+    IExecutionGuardian.TargetType _targetType,
     bytes4 _selector,
-    bool _allowed
+    bool _isAllowed
 )
     external
-    onlyOwner;
+    override(ExecutionGuardianModule, IExecutionGuardian);
 ```
 **Parameters**
 
@@ -82,8 +60,9 @@ function setAllowedSelector(
 |----|----|-----------|
 |`_executor`|`address`|The executor address|
 |`_target`|`address`|The target contract address|
+|`_targetType`|`IExecutionGuardian.TargetType`|The target type classification|
 |`_selector`|`bytes4`|The function selector|
-|`_allowed`|`bool`|Whether the selector should be allowed|
+|`_isAllowed`|`bool`|Whether the selector should be allowed|
 
 
 ### setExecutionValidator
@@ -98,10 +77,10 @@ function setExecutionValidator(
     address _executor,
     address _target,
     bytes4 _selector,
-    address _validator
+    address _executionValidator
 )
     external
-    onlyOwner;
+    override(ExecutionGuardianModule, IExecutionGuardian);
 ```
 **Parameters**
 
@@ -110,117 +89,7 @@ function setExecutionValidator(
 |`_executor`|`address`|The executor address|
 |`_target`|`address`|The target contract address|
 |`_selector`|`bytes4`|The function selector|
-|`_validator`|`address`|The execution validator contract address (address(0) to remove)|
-
-
-### authorizeCall
-
-Validates if an executor can call a specific function on a target, reverting if not allowed
-
-Called by executors before executing external calls. Reverts if not allowed.
-
-
-```solidity
-function authorizeCall(address _target, bytes4 _selector, bytes calldata _params) external;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_target`|`address`|The target contract address|
-|`_selector`|`bytes4`|The function selector|
-|`_params`|`bytes`|The function parameters|
-
-
-### _authorizeCall
-
-Internal function to validate if an executor can call a specific function on a target
-
-
-```solidity
-function _authorizeCall(address _target, bytes4 _selector, bytes calldata _params) internal;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_target`|`address`|The target contract address|
-|`_selector`|`bytes4`|The function selector|
-|`_params`|`bytes`|The function parameters|
-
-
-### isSelectorAllowed
-
-Checks if a selector is allowed for an executor on a target
-
-
-```solidity
-function isSelectorAllowed(address _executor, address _target, bytes4 _selector) external view returns (bool);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_executor`|`address`|The executor address|
-|`_target`|`address`|The target contract address|
-|`_selector`|`bytes4`|The function selector|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`bool`|Whether the selector is allowed|
-
-
-### getExecutionValidator
-
-Gets the execution validator for an executor-target-selector combination
-
-
-```solidity
-function getExecutionValidator(
-    address _executor,
-    address _target,
-    bytes4 _selector
-)
-    external
-    view
-    returns (address);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_executor`|`address`|The executor address|
-|`_target`|`address`|The target contract address|
-|`_selector`|`bytes4`|The function selector|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`address`|The execution validator address (address(0) if none set)|
-
-
-### getExecutorTargets
-
-Gets all targets that an executor has permissions for
-
-
-```solidity
-function getExecutorTargets(address _executor) external view returns (address[] memory);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_executor`|`address`|The executor address|
-
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`address[]`|An array of target addresses|
+|`_executionValidator`|`address`|The execution validator contract address (address(0) to remove)|
 
 
 ### _authorizeUpgrade
@@ -278,27 +147,4 @@ function contractVersion() external pure returns (string memory);
 |----|----|-----------|
 |`<none>`|`string`|The contract version as a string following semantic versioning (e.g., "1.0.0")|
 
-
-## Structs
-### kRemoteRegistryStorage
-Storage structure for kRemoteRegistry using ERC-7201 namespaced storage pattern
-
-This structure maintains executor permissions
-
-**Note:**
-storage-location: erc7201:kam.storage.kRemoteRegistry
-
-
-```solidity
-struct kRemoteRegistryStorage {
-    /// @dev Maps executor => target => selector => allowed
-    mapping(address => mapping(address => mapping(bytes4 => bool))) executorAllowedSelectors;
-    /// @dev Maps executor => target => selector => execution validator
-    mapping(address => mapping(address => mapping(bytes4 => address))) executionValidator;
-    /// @dev Tracks all targets for each executor for enumeration
-    mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) executorTargets;
-    /// @dev Counts allowed selectors per executor-target pair for accurate target tracking
-    mapping(address => mapping(address => uint256)) executorTargetSelectorCount;
-}
-```
 

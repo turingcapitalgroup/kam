@@ -1,8 +1,8 @@
 # ERC2771Context
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/base/ERC2771Context.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/base/ERC2771Context.sol)
 
 **Inherits:**
-[IERC2771](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md)
+[IERC2771](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md)
 
 Context variant with ERC-2771 support for meta-transactions.
 
@@ -13,7 +13,7 @@ specification adding the address size in bytes (20) to the calldata size. An exa
 behavior could be an unintended fallback (or another function) invocation while trying to invoke the `receive`
 function only accessible if `msg.data.length == 0`.
 WARNING: The usage of `delegatecall` in this contract is dangerous and may result in context corruption.
-Any forwarded request to this contract triggering a `delegatecall` to itself will result in an invalid [_msgSender](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md#_msgsender)
+Any forwarded request to this contract triggering a `delegatecall` to itself will result in an invalid [_msgSender](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md#_msgsender)
 recovery
 
 
@@ -22,7 +22,7 @@ recovery
 
 ```solidity
 bytes32 internal constant ERC2771_CONTEXT_STORAGE_LOCATION =
-    0x4b8f1be850ba8944bb65aafc52e97e45326b89aafdae45bf4d91f44bccce2a00
+    0xba2f0ae948a4eb908f5f0547b704687724ea5adcc0786d0931a59ceee5c5ce00
 ```
 
 
@@ -38,7 +38,7 @@ function _getERC2771ContextStorage() private pure returns (ERC2771ContextStorage
 
 Initializes the contract with a trusted forwarder, which will be able to
 invoke functions on this contract on behalf of other accounts.
-NOTE: The trusted forwarder can be replaced by overriding [trustedForwarder](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md#trustedforwarder).
+NOTE: The trusted forwarder can be replaced by overriding [trustedForwarder](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md#trustedforwarder).
 
 
 ```solidity

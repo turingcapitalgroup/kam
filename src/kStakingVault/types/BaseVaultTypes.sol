@@ -5,8 +5,12 @@ pragma solidity 0.8.30;
 /// @notice Library containing all data structures used in the ModuleBase
 /// @dev Defines standardized data types for cross-contract communication and storage
 library BaseVaultTypes {
-    /// @notice Request status
+    /// @notice Lifecycle status of a stake / unstake request
+    /// @dev `UNDEFINED = 0` is the zero-initialized sentinel — a fresh storage slot reads as
+    ///      `UNDEFINED`, not as a valid `PENDING` request, so callers can distinguish
+    ///      "request does not exist" from "request is in flight".
     enum RequestStatus {
+        UNDEFINED,
         PENDING,
         CLAIMED
     }
@@ -57,10 +61,8 @@ library BaseVaultTypes {
         uint128 depositedInBatch;
         /// @notice Amount of shares requested for unstaking in a batch
         uint128 requestedSharesInBatch;
-        /// @notice Total assets at settlement time (gross, including fees)
+        /// @notice Total assets at settlement time
         uint256 totalAssets;
-        /// @notice Total net assets at settlement time (after fees)
-        uint256 totalNetAssets;
         /// @notice Total supply of stkTokens at settlement time
         uint256 totalSupply;
     }

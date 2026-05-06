@@ -6,7 +6,7 @@ The KAM protocol is an institutional-grade tokenization system that bridges trad
 
 KAM implements a **hub-and-spoke model** where kAssetRouter serves as the central coordinator managing asset flows between institutional operations (kMinter) and retail yield generation (kStakingVault). The system uses **virtual balance accounting** to enable capital efficiency—assets remain productively deployed in yield strategies while maintaining instant liquidity for institutional operations.
 
-The protocol's **two-phase settlement system** with mandatory cooldown periods provides security through guardian oversight while maintaining operational efficiency through batch processing. This enables the protocol to maintain 1:1 backing guarantees while supporting complex multi-vault yield distribution.
+The protocol's **multi-phase settlement system** (proposal, cooldown, optional approval, execution) with mandatory cooldown periods provides security through guardian oversight while maintaining operational efficiency through batch processing. This enables the protocol to maintain 1:1 backing guarantees while supporting complex multi-vault yield distribution.
 
 **Security-First Design**: Every component implements defense-in-depth principles with role-based access control, transient reentrancy protection, ERC-7201 upgrade-safe storage, and explicit approval patterns for external integrations.
 
@@ -36,7 +36,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 │   │   └── VaultAdapter.sol                ✅ External protocol adapter
 │   ├── base/
 │   │   ├── ERC2771Context.sol             ✅ Meta-transaction support
-│   │   ├── (ERC3009.sol is in kToken0 dep) ❌ Not in src/
+│   │   ├── ERC3009.sol                    ✅ ERC-3009 transfer with auth
 │   │   ├── kBase.sol                      ✅ Protocol foundation contract
 │   │   ├── kBaseRoles.sol                 ✅ Role-based access control
 │   │   └── MultiFacetProxy.sol            ✅ Modular vault architecture
@@ -55,20 +55,15 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 │   ├── kAssetRouter.sol                   ✅ Virtual balance coordinator
 │   ├── kBatchReceiver.sol                 ✅ Batch settlement distribution
 │   ├── kMinter.sol                        ✅ Institutional gateway
-│   ├── constants/
-│   │   └── Constants.sol                  ✅ Protocol-wide constants
-│   ├── libraries/
-│   │   └── VaultMathLib.sol               ✅ Fee calculation & share math
-│   ├── errors/
-│   │   └── Errors.sol                     ✅ Error code definitions
+│   ├── kToken.sol                         ✅ Asset-backed ERC20 token
+│   └── kTokenFactory.sol                  ✅ kToken deployment factory
 ```
 
 ### Out of Scope - Supporting Components
 
 ```
 ├── src
-│   ├── (kToken.sol & kTokenFactory    ❌ External dependency (kToken0)
-│   │    in dependencies/kToken0-1.0/)
+│   ├── errors/                       ❌ Error definitions only
 │   ├── interfaces/                   ❌ Interface definitions (as requested)
 │   ├── kRegistry/
 │   │   └── kRemoteRegistry.sol       ❌ Cross-chain registry (separate deployment)
@@ -139,11 +134,10 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Settlement Workflow**:
 
-1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets, lastFeesChargedManagement, lastFeesChargedPerformance)`
-   - Contract automatically calculates: `netted = deposited - requested`, then `yield = totalAssets - netted - lastTotalAssets`
+1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets)`
+   - Contract automatically calculates: `netted = deposited - requested`, then `yield = totalAssets - lastTotalAssets`
    - Validates yield against configurable tolerance limits
    - Creates proposal with mandatory cooldown period (default 1 hour, max 1 day)
-   - Records fee timestamps for vault fee tracking synchronization
 2. **Cooldown Phase**: Guardian oversight period
    - GUARDIAN_ROLE can call `cancelProposal()` if irregularities detected
    - Proposal remains pending until cooldown expires
@@ -205,10 +199,10 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 2. **Batch Settlement**: When batch closes and settles via kAssetRouter:
    - Yield distributed automatically through kToken minting/burning to vault
    - Virtual balances updated to reflect new asset positions
-   - Batch share prices captured at settlement time (totalAssets, totalNetAssets, totalSupply)
+   - Batch share prices captured at settlement time (totalAssets, totalSupply)
 3. **Claim Phase**: User calls `claimStakedShares(requestId)`
    - Retrieves settlement-time values from batch storage
-   - Calculates stkTokens owed: `stkTokens = kTokensStaked * totalSupply / totalNetAssets`
+   - Calculates stkTokens owed: `stkTokens = kTokensStaked * totalSupply / totalAssets`
    - Mints stkTokens directly to recipient address
    - Updates vault accounting and removes request from user tracking
 
@@ -221,17 +215,16 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 2. **Settlement & Claim**: After batch processing:
    - User calls `claimUnstakedAssets(requestId)`
    - Retrieves settlement-time values from batch storage
-   - Calculates net payout: `kTokensNet = stkTokensUnstaked * totalNetAssets / totalSupply`
-   - Calculates net shares to burn (accounting for fees): `netSharesToBurn = stkTokens * totalNetAssets / totalAssets`
-   - Burns net stkTokens and transfers kTokens to recipient
-   - Fees captured by vault through share/asset difference
+   - Calculates net payout: `kTokensNet = stkTokensUnstaked * totalAssets / totalSupply`
+   - Burns all requested stkTokens and transfers net kTokens to recipient
+   - Fees already collected via `_accrueFees()` share dilution (shares minted to treasury on every interaction)
 
 **Architecture Features**:
 
 - **MultiFacetProxy Pattern**: Core staking logic in main contract, state queries routed to ReaderModule
 - **Internal Batch System**: No separate BatchReceiver contracts needed, simplified claim process
 - **Share Price Appreciation**: Yield distributed through increasing token value rather than token quantity
-- **Fee Structure**: Management fees (time-based) and performance fees (yield-based) with high-watermark protection
+- **Fee Structure**: Management fees (time-based) and performance fees (yield-based) with high-watermark protection, collected via `_accrueFees()` share dilution to treasury on every interaction
 
 **Yield Distribution**: Automatic compounding through share price increases, proportional yield distribution to all stkToken holders.
 
@@ -261,7 +254,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Execution Workflow**:
 
-1. **Permission Validation**: Manager (MANAGER_ROLE) calls `execute(ModeCode mode, bytes calldata executionCalldata)` on adapter (ERC-7579)
+1. **Permission Validation**: Manager (MANAGER_ROLE) calls `execute(target, data, value)` on adapter
 2. **Registry Check**: SmartAdapterAccount validates via `registry.authorizeCall(target, selector, params)` which checks executor permissions
 3. **External Call**: If approved, adapter executes call to external protocol
 4. **Virtual Balance Update**: During settlement, kAssetRouter calls `setTotalAssets()` to update accounting
@@ -279,7 +272,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Deployment & Initialization Workflow**:
 
-1. **Creation**: kMinter internally calls `_createBatchReceiver(_batchId)` during the first `requestBurn()` for a batch
+1. **Creation**: kMinter calls `createBatchReceiver(batchId)` when batch ready for settlement
    - Uses OptimizedLibClone.clone() for gas-efficient EIP-1167 minimal proxy deployment
    - Each receiver is a separate contract instance with unique address
 2. **Initialization**: Newly deployed receiver calls `initialize(batchId, asset)`
@@ -338,7 +331,7 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 
 **Security Architecture**:
 
-- **Upgradeable via UUPS**: Uses UUPS proxy pattern with ERC-7201 namespaced storage and atomic initialization
+- **UUPS Upgradeable**: kToken uses UUPS proxy pattern with ERC-7201 namespaced storage and atomic initialization
 - **Role-Based Access Control**: Uses OptimizedOwnableRoles for efficient permission management
 - **Emergency Controls**: EMERGENCY_ADMIN_ROLE can pause all transfers during crisis situations
 - **Supply Validation**: Total supply always equals underlying assets held across protocol vaults
@@ -397,4 +390,4 @@ The scope of audit involves the complete KAM protocol implementation in `src/`, 
 - **Economic Security**: Attack costs must exceed potential profits under all market conditions
 - **Adapter Isolation**: Physical assets must ONLY move through kMinter Adapter (central hub validation)
 - **Share/Asset Accounting Integrity**: Share transfers between kMinter↔DN must maintain correct ownership proportions; asset movements for Alpha/Beta must properly reconcile with kMinter Adapter
-- **Virtual Balance Consistency**: Sum of all adapter virtual balances must equal total kToken supply minus fees
+- **Virtual Balance Consistency**: Sum of all adapter virtual balances must equal total kToken supply

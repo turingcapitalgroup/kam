@@ -4,25 +4,10 @@ pragma solidity 0.8.30;
 import { BaseVaultTest, DeploymentBaseTest } from "../utils/BaseVaultTest.sol";
 import { _1_USDC } from "../utils/Constants.sol";
 
-import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
-import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
-
-import { OptimizedDateTimeLib } from "solady/utils/OptimizedDateTimeLib.sol";
-
+import { KSTAKINGVAULT_WRONG_ROLE, VAULTFEES_FEE_EXCEEDS_MAXIMUM } from "kam/src/errors/Errors.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 
-import {
-    KSTAKINGVAULT_WRONG_ROLE,
-    VAULTFEES_FEE_EXCEEDS_MAXIMUM,
-    VAULTFEES_INVALID_TIMESTAMP
-} from "kam/src/errors/Errors.sol";
-
 contract kStakingVaultFeesTest is BaseVaultTest {
-    using OptimizedFixedPointMathLib for uint256;
-    using SafeTransferLib for address;
-
-    uint256 constant SECS_PER_YEAR = 31_556_952;
-    uint256 constant TEST_TIMESTAMP = 1_760_022_175; // Oct 9, 2025
     uint256 constant MAX_BPS = 10_000;
 
     function setUp() public override {
@@ -43,10 +28,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         assertEq(vault.performanceFee(), 0);
         assertEq(vault.hurdleRate(), TEST_HURDLE_RATE);
 
-        assertEq(vault.sharePriceWatermark(), 1e6);
-
-        assertTrue(vault.lastFeesChargedManagement() > 0);
-        assertTrue(vault.lastFeesChargedPerformance() > 0);
+        assertTrue(vault.lastFeeTimestamp() > 0);
     }
 
     function test_SetManagementFee() public {
@@ -87,556 +69,58 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
     function test_SetHardHurdleRate() public {
         vm.prank(users.admin);
-        vault.setHardHurdleRate(true);
+        registry.setIsHardHurdleRate(address(vault), true);
 
-        // No direct getter, but we can test behavior in fee calculation
+        assertTrue(vault.isHardHurdleRate());
     }
 
     /* //////////////////////////////////////////////////////////////
-                        MANAGEMENT FEE TESTS
+                        SHARE-MINTED FEE ACCOUNTING
     //////////////////////////////////////////////////////////////*/
 
-    function test_ManagementFee_NoTimeElapsed() public {
+    function test_ManagementFees_MintTreasurySharesWithoutReducingTotalAssets() public {
         _setupTestFees();
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 
-        (uint256 managementFees,,) = vault.computeLastBatchFees();
+        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 sharePriceBefore = vault.sharePrice();
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
 
-        // No time elapsed, should be minimal fees
-        assertEq(managementFees, 0);
-    }
-
-    function test_ManagementFee_OneYear() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Fast forward one year
         vm.warp(block.timestamp + 365 days);
 
-        (uint256 managementFees,,) = vault.computeLastBatchFees();
-
-        // Should be approximately 1% of total assets
-        uint256 expectedFee = (INITIAL_DEPOSIT * TEST_MANAGEMENT_FEE) / MAX_BPS;
-        assertApproxEqRel(managementFees, expectedFee, 0.01e18); // 1% tolerance for time precision
-    }
-
-    function test_ManagementFee_PartialYear() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Fast forward 6 months
-        uint256 sixMonths = 180 days;
-        vm.warp(block.timestamp + sixMonths);
-
-        (uint256 managementFees,,) = vault.computeLastBatchFees();
-
-        // Should be approximately 0.5% of total assets
-        uint256 expectedFee = (INITIAL_DEPOSIT * TEST_MANAGEMENT_FEE * sixMonths) / (365 days * MAX_BPS);
-        assertApproxEqRel(managementFees, expectedFee, 0.02e18); // 2% tolerance
-    }
-
-    function test_ManagementFee_IncreasedAssets() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Add yield to increase total assets
-        uint256 yieldAmount = 200_000 * _1_USDC; // 20% yield
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), yieldAmount);
-
-        // Fast forward one year
-        vm.warp(block.timestamp + 365 days);
-
-        (uint256 managementFees,,) = vault.computeLastBatchFees();
-
-        // Management fee should be based on current total assets (including yield)
-        uint256 expectedFee = ((INITIAL_DEPOSIT + yieldAmount) * TEST_MANAGEMENT_FEE) / MAX_BPS;
-        assertApproxEqRel(managementFees, expectedFee, 0.01e18);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        PERFORMANCE FEE TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_PerformanceFee_NoProfit() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Fast forward time but no profit
-        vm.warp(block.timestamp + 365 days);
-
-        (, uint256 performanceFees,) = vault.computeLastBatchFees();
-
-        // No profit, no performance fees
-        assertEq(performanceFees, 0);
-    }
-
-    function test_PerformanceFee_WithProfit_SoftHurdle() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Set soft hurdle (default)
-        vm.prank(users.admin);
-        vault.setHardHurdleRate(false);
-
-        // Add significant yield (20%)
-        uint256 yieldAmount = 200_000 * _1_USDC;
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), yieldAmount);
-
-        // Fast forward one year
-        vm.warp(block.timestamp + 365 days);
-
-        (uint256 managementFees, uint256 performanceFees,) = vault.computeLastBatchFees();
-
-        // NOTE: we deduct management fees first
-        // Expected: hurdle return = INITIAL_DEPOSIT * 5% = 50K USDC
-        // Total return = 200K USDC (exceeds hurdle)
-        // With soft hurdle: performance fee on entire return (200K * 20% = 40K USDC)
-        uint256 expectedFee = ((yieldAmount - managementFees) * TEST_PERFORMANCE_FEE) / MAX_BPS;
-        assertApproxEqRel(performanceFees, expectedFee, 0.02e18); // 2% tolerance
-    }
-
-    function test_PerformanceFee_WithProfit_HardHurdle() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Set hard hurdle
-        vm.prank(users.admin);
-        vault.setHardHurdleRate(true);
-
-        // Add significant yield (20%)
-        uint256 yieldAmount = 200_000 * _1_USDC;
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), yieldAmount);
-
-        // Fast forward one year
-        vm.warp(block.timestamp + 365 days);
-
-        (uint256 managementFees, uint256 performanceFees,) = vault.computeLastBatchFees();
-
-        // NOTE: we deduct management fees first
-        yieldAmount -= managementFees;
-
-        // Expected: hurdle return = INITIAL_DEPOSIT * 5% = 50K USDC
-        // Excess return = 200K - 50K = 150K USDC
-        // With hard hurdle: performance fee only on excess (150K * 20% = 30K USDC)
-        uint256 hurdleReturn = (INITIAL_DEPOSIT * TEST_HURDLE_RATE) / MAX_BPS;
-        uint256 excessReturn = yieldAmount - hurdleReturn;
-        uint256 expectedFee = (excessReturn * TEST_PERFORMANCE_FEE) / MAX_BPS;
-        assertApproxEqRel(performanceFees, expectedFee, 0.02e18);
-    }
-
-    function test_PerformanceFee_BelowHurdle() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Add small yield (2% - below 5% hurdle)
-        uint256 smallYield = 20_000 * _1_USDC;
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), smallYield);
-
-        // Fast forward one year
-        vm.warp(block.timestamp + 365 days);
-
-        (, uint256 performanceFees,) = vault.computeLastBatchFees();
-
-        // Return below hurdle rate, no performance fees
-        assertEq(performanceFees, 0);
-    }
-
-    function test_PerformanceFee_Loss() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Simulate loss by reducing vault's kToken balance
-        uint256 lossAmount = 100_000 * _1_USDC;
-        vm.prank(address(vault));
-        // forge-lint: disable-next-line(erc20-unchecked-transfer)
-        kUSD.transfer(users.treasury, lossAmount);
-
-        // Fast forward time
-        vm.warp(block.timestamp + 365 days);
-
-        (, uint256 performanceFees,) = vault.computeLastBatchFees();
-
-        // Loss scenario, no performance fees
-        assertEq(performanceFees, 0);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        SHARE PRICE WATERMARK TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_SharePriceWatermark_InitialValue() public view {
-        // Initial watermark should be 1e6 (1:1 share price)
-        assertEq(vault.sharePriceWatermark(), 1e6);
-    }
-
-    function test_SharePriceWatermark_UpdateAfterProfit() public {
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        uint256 initialWatermark = vault.sharePriceWatermark();
-
-        vm.warp(block.timestamp + 2);
-
-        // Add yield to increase share price
-        uint256 yieldAmount = 200_000 * _1_USDC;
-
-        // Trigger watermark update by notifying fee charge
-        vm.startPrank(users.relayer);
         bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
 
-        bytes32 proposalId = assetRouter.proposeSettleBatch(
-            tokens.usdc,
-            address(vault),
-            batchId,
-            vault.totalAssets() + yieldAmount,
-            uint64(block.timestamp),
-            uint64(block.timestamp)
-        );
-        vm.stopPrank();
+        _executeBatchSettlement(address(vault), batchId, totalAssetsBefore);
 
-        // Accept proposal (high delta requires guardian approval)
-        vm.prank(users.guardian);
-        assetRouter.acceptProposal(proposalId);
-
-        assetRouter.executeSettleBatch(proposalId);
-
-        uint256 newWatermark = vault.sharePriceWatermark();
-
-        // Watermark should have increased
-        assertGt(newWatermark, initialWatermark);
-        assertEq(newWatermark, vault.netSharePrice());
+        assertEq(vault.totalAssets(), totalAssetsBefore);
+        assertGt(vault.balanceOf(users.treasury), treasurySharesBefore);
+        assertLt(vault.sharePrice(), sharePriceBefore);
     }
 
-    function test_SharePriceWatermark_NoUpdateAfterLoss() public {
+    function test_PerformanceFees_MintTreasurySharesWithoutReducingTotalAssets() public {
+        _setupTestFees();
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 
-        // Now simulate loss
-        uint256 lossAmount = 300_000 * _1_USDC; // Bigger than yield
+        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 supplyBefore = vault.totalSupply();
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
+        uint256 yieldAmount = 200_000 * _1_USDC;
+
+        vm.warp(block.timestamp + 365 days);
+
         bytes32 batchId = vault.getBatchId();
-
-        // Trigger watermark update by notifying fee charge
-        vm.startPrank(users.relayer);
+        vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
-        bytes32 proposalId = assetRouter.proposeSettleBatch(
-            tokens.usdc,
-            address(vault),
-            batchId,
-            vault.totalAssets() - lossAmount,
-            uint64(block.timestamp),
-            uint64(block.timestamp)
-        );
-        vm.stopPrank();
 
-        // Accept proposal (high delta requires guardian approval)
-        vm.prank(users.guardian);
-        assetRouter.acceptProposal(proposalId);
+        _executeBatchSettlement(address(vault), batchId, totalAssetsBefore + yieldAmount);
 
-        assetRouter.executeSettleBatch(proposalId);
+        uint256 noFeeSharePrice = (totalAssetsBefore + yieldAmount) * 10 ** vault.decimals() / supplyBefore;
 
-        uint256 highWatermark = vault.sharePriceWatermark();
-
-        // Watermark should not decrease
-        assertEq(vault.sharePriceWatermark(), highWatermark);
-        assertGt(vault.sharePriceWatermark(), vault.netSharePrice());
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        FEE NOTIFICATION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_NotifyManagementFeesCharged() public {
-        uint64 timestamp = uint64(block.timestamp);
-
-        vm.expectEmit(true, false, false, true);
-        emit ManagementFeesCharged(timestamp);
-
-        vm.prank(address(assetRouter));
-        vault.notifyManagementFeesCharged(timestamp);
-
-        assertEq(vault.lastFeesChargedManagement(), timestamp);
-    }
-
-    function test_NotifyManagementFeesCharged_InvalidTimestamp() public {
-        // set a management fee timestamp
-        // we warped so we can go back in time
-        vm.warp(5000);
-        address router = address(assetRouter);
-        vm.prank(router);
-        vault.notifyManagementFeesCharged(uint64(block.timestamp));
-
-        // set timestamp in the past (before the last timestamp)
-        uint64 pastTimestamp = uint64(block.timestamp - 1000);
-
-        vm.expectRevert(bytes(VAULTFEES_INVALID_TIMESTAMP));
-        vm.prank(router);
-        vault.notifyManagementFeesCharged(pastTimestamp);
-    }
-
-    function test_NotifyManagementFeesCharged_FutureTimestamp() public {
-        // Try to set timestamp in the future
-        uint64 futureTimestamp = uint64(block.timestamp + 1000);
-
-        vm.expectRevert(bytes(VAULTFEES_INVALID_TIMESTAMP));
-        vm.prank(address(assetRouter));
-        vault.notifyManagementFeesCharged(futureTimestamp);
-    }
-
-    function test_NotifyPerformanceFeesCharged() public {
-        uint64 timestamp = uint64(block.timestamp);
-
-        vm.expectEmit(true, false, false, true);
-        emit PerformanceFeesCharged(timestamp);
-
-        vm.prank(address(assetRouter));
-        vault.notifyPerformanceFeesCharged(timestamp);
-
-        assertEq(vault.lastFeesChargedPerformance(), timestamp);
-    }
-
-    function test_NotifyPerformanceFeesCharged_OnlyAdmin() public {
-        vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vm.prank(users.alice);
-        vault.notifyPerformanceFeesCharged(uint64(block.timestamp));
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        COMBINED FEE TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_ComputeLastBatchFees_BothFees() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Add yield
-        uint256 yieldAmount = 300_000 * _1_USDC; // 30% yield
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), yieldAmount);
-
-        // Fast forward one year
-        vm.warp(block.timestamp + 365 days);
-
-        (uint256 managementFees, uint256 performanceFees, uint256 totalFees) = vault.computeLastBatchFees();
-
-        // Both fees should be positive
-        assertGt(managementFees, 0);
-        assertGt(performanceFees, 0);
-        assertEq(totalFees, managementFees + performanceFees);
-
-        // Management fee should be ~1% of total assets
-        uint256 totalAssets = INITIAL_DEPOSIT + yieldAmount;
-        uint256 expectedManagementFee = (totalAssets * TEST_MANAGEMENT_FEE) / MAX_BPS;
-        assertApproxEqRel(managementFees, expectedManagementFee, 0.02e18);
-
-        // Performance fee calculation (after management fees)
-        uint256 assetsAfterManagementFee = totalAssets - managementFees;
-        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
-        // forge-lint: disable-next-line(unsafe-typecast)
-        int256 assetsDelta = int256(assetsAfterManagementFee) - int256(INITIAL_DEPOSIT);
-        // If the hurdle rate is soft apply fees to all return
-        // casting to 'uint256' is safe because assetsDelta is positive in this test
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint256 expectedPerformanceFee = (uint256(assetsDelta) * TEST_PERFORMANCE_FEE) / MAX_BPS;
-        assertApproxEqRel(performanceFees, expectedPerformanceFee, 0.05e18); // 5% tolerance
-    }
-
-    function test_NextFeeTimestamps() public {
-        vm.warp(TEST_TIMESTAMP);
-        address router = address(assetRouter);
-        vm.prank(router);
-        // casting to 'uint64' is safe because TEST_TIMESTAMP fits in uint64
-        // forge-lint: disable-next-line(unsafe-typecast)
-        vault.notifyManagementFeesCharged(uint64(TEST_TIMESTAMP));
-        vm.prank(router);
-        // casting to 'uint64' is safe because TEST_TIMESTAMP fits in uint64
-        // forge-lint: disable-next-line(unsafe-typecast)
-        vault.notifyPerformanceFeesCharged(uint64(TEST_TIMESTAMP));
-
-        uint256 nextManagement = vault.nextManagementFeeTimestamp();
-        uint256 nextPerformance = vault.nextPerformanceFeeTimestamp();
-
-        (
-            uint256 yearManagement,
-            uint256 monthManagement,
-            uint256 dayManagement,
-            uint256 hourManagement,
-            uint256 minuteManagement,
-            uint256 secondManagement
-        ) = OptimizedDateTimeLib.timestampToDateTime(nextManagement);
-        (
-            uint256 yearPerformance,
-            uint256 monthPerformance,
-            uint256 dayPerformance,
-            uint256 hourPerformance,
-            uint256 minutePerformance,
-            uint256 secondPerformance
-        ) = OptimizedDateTimeLib.timestampToDateTime(nextPerformance);
-
-        assertEq(yearManagement, 2025);
-        assertEq(monthManagement, 10);
-        assertEq(dayManagement, 31);
-        assertEq(hourManagement, 23);
-        assertEq(minuteManagement, 59);
-        assertEq(secondManagement, 59);
-
-        assertEq(yearPerformance, 2025);
-        assertEq(monthPerformance, 12);
-        assertEq(dayPerformance, 31);
-        assertEq(hourPerformance, 23);
-        assertEq(minutePerformance, 59);
-        assertEq(secondPerformance, 59);
-
-        uint256 newTimestamp = TEST_TIMESTAMP + 22 days;
-
-        vm.warp(newTimestamp); // Go to end of month
-        vm.prank(router);
-        // casting to 'uint64' is safe because newTimestamp fits in uint64
-        // forge-lint: disable-next-line(unsafe-typecast)
-        vault.notifyManagementFeesCharged(uint64(newTimestamp));
-        vm.prank(router);
-        // casting to 'uint64' is safe because newTimestamp fits in uint64
-        // forge-lint: disable-next-line(unsafe-typecast)
-        vault.notifyPerformanceFeesCharged(uint64(newTimestamp));
-
-        nextManagement = vault.nextManagementFeeTimestamp();
-        nextPerformance = vault.nextPerformanceFeeTimestamp();
-
-        (yearManagement, monthManagement, dayManagement, hourManagement, minuteManagement, secondManagement) =
-            OptimizedDateTimeLib.timestampToDateTime(nextManagement);
-        (yearPerformance, monthPerformance, dayPerformance, hourPerformance, minutePerformance, secondPerformance) =
-            OptimizedDateTimeLib.timestampToDateTime(nextPerformance);
-
-        assertEq(yearManagement, 2025);
-        assertEq(monthManagement, 11);
-        assertEq(dayManagement, 30);
-        assertEq(hourManagement, 23);
-        assertEq(minuteManagement, 59);
-        assertEq(secondManagement, 59);
-
-        assertEq(yearPerformance, 2026);
-        assertEq(monthPerformance, 1);
-        assertEq(dayPerformance, 31);
-        assertEq(hourPerformance, 23);
-        assertEq(minutePerformance, 59);
-        assertEq(secondPerformance, 59);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        NET ASSETS CALCULATION TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_TotalNetAssets_WithAccruedFees() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Add yield
-        uint256 yieldAmount = 200_000 * _1_USDC;
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), yieldAmount);
-
-        // Fast forward time to accrue fees
-        vm.warp(block.timestamp + 365 days);
-
-        uint256 totalAssets = vault.totalAssets();
-        uint256 totalNetAssets = vault.totalNetAssets();
-
-        (,, uint256 accruedFees) = vault.computeLastBatchFees();
-
-        // Net assets should equal total assets minus accrued fees
-        assertEq(totalNetAssets, totalAssets - accruedFees);
-        assertLt(totalNetAssets, totalAssets);
-    }
-
-    function test_SharePrice_vs_NetSharePrice() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Add yield
-        uint256 yieldAmount = 200_000 * _1_USDC;
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), yieldAmount);
-
-        // Fast forward time
-        vm.warp(block.timestamp + 365 days);
-
-        uint256 totalSupply = vault.totalSupply();
-        uint256 totalAssets = vault.totalAssets();
-
-        uint256 netSharePrice = vault.netSharePrice();
-        uint256 sharePrice = (totalAssets * 1e6) / totalSupply;
-
-        // Net share price should be lower than gross share price
-        assertLt(netSharePrice, sharePrice);
-
-        // The difference should be the accrued fees per share
-        (,, uint256 accruedFees) = vault.computeLastBatchFees();
-        uint256 feesPerShare = (accruedFees * 1e6) / totalSupply;
-        assertApproxEqAbs(sharePrice - netSharePrice, feesPerShare, 10);
-    }
-
-    /* //////////////////////////////////////////////////////////////
-                        EDGE CASES AND ERROR HANDLING
-    //////////////////////////////////////////////////////////////*/
-
-    function test_ZeroHurdleRate() public {
-        vm.prank(users.admin);
-        vault.setPerformanceFee(TEST_PERFORMANCE_FEE);
-
-        vm.prank(users.admin);
-        registry.setHurdleRate(tokens.usdc, 0); // No hurdle
-
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Add small yield
-        uint256 smallYield = 10_000 * _1_USDC; //1%
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), smallYield);
-
-        vm.warp(block.timestamp + 365 days);
-
-        (, uint256 performanceFees,) = vault.computeLastBatchFees();
-
-        // With zero hurdle, any profit should generate performance fees
-        uint256 expectedFee = (smallYield * TEST_PERFORMANCE_FEE) / MAX_BPS;
-        assertApproxEqRel(performanceFees, expectedFee, 0.02e18);
-    }
-
-    function test_ZeroPerformanceFee() public {
-        vm.startPrank(users.admin);
-        vault.setManagementFee(TEST_MANAGEMENT_FEE);
-        vault.setPerformanceFee(0); // No performance fee
-        vm.stopPrank();
-
-        assertEq(registry.getHurdleRate(tokens.usdc), TEST_HURDLE_RATE);
-
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Add significant yield
-        uint256 yieldAmount = 500_000 * _1_USDC;
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), yieldAmount);
-
-        vm.warp(block.timestamp + 365 days);
-
-        (uint256 managementFees, uint256 performanceFees, uint256 totalFees) = vault.computeLastBatchFees();
-
-        // Should have management fees but no performance fees
-        assertGt(managementFees, 0);
-        assertEq(performanceFees, 0);
-        assertEq(totalFees, managementFees);
-    }
-
-    function test_ComputeFeesWithZeroAssets() public view {
-        // Vault with no deposits
-        (uint256 managementFees, uint256 performanceFees, uint256 totalFees) = vault.computeLastBatchFees();
-
-        // All fees should be zero
-        assertEq(managementFees, 0);
-        assertEq(performanceFees, 0);
-        assertEq(totalFees, 0);
+        assertEq(vault.totalAssets(), totalAssetsBefore + yieldAmount);
+        assertGt(vault.balanceOf(users.treasury), treasurySharesBefore);
+        assertLt(vault.sharePrice(), noFeeSharePrice);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -645,10 +129,7 @@ contract kStakingVaultFeesTest is BaseVaultTest {
 
     event ManagementFeeSet(uint16 oldFee, uint16 newFee);
     event PerformanceFeeSet(uint16 oldFee, uint16 newFee);
-    event HardHurdleRateSet(bool isHard);
-    event SharePriceWatermarkUpdated(uint256 newWatermark);
-    event ManagementFeesCharged(uint256 timestamp);
-    event PerformanceFeesCharged(uint256 timestamp);
+    event IsHardHurdleRateSet(address indexed vault, bool isHard);
 
     function test_ManagementFeeSet_Event() public {
         uint16 oldFee = vault.managementFee();
@@ -670,45 +151,11 @@ contract kStakingVaultFeesTest is BaseVaultTest {
         vault.setPerformanceFee(TEST_PERFORMANCE_FEE);
     }
 
-    function test_HardHurdleRateSet_Event() public {
-        vm.expectEmit(false, false, false, true);
-        emit HardHurdleRateSet(true);
+    function test_IsHardHurdleRateSet_Event() public {
+        vm.expectEmit(true, false, false, true);
+        emit IsHardHurdleRateSet(address(vault), true);
 
         vm.prank(users.admin);
-        vault.setHardHurdleRate(true);
-    }
-
-    function test_SharePriceWatermarkUpdated_Event() public {
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        vm.warp(block.timestamp + 2);
-
-        // Add yield to increase share price
-        uint256 yieldAmount = 200_000 * _1_USDC;
-
-        vm.startPrank(users.relayer);
-        bytes32 batchId = vault.getBatchId();
-        vault.closeBatch(batchId, true);
-
-        bytes32 proposalId = assetRouter.proposeSettleBatch(
-            tokens.usdc,
-            address(vault),
-            batchId,
-            vault.totalAssets() + yieldAmount,
-            uint64(block.timestamp),
-            uint64(block.timestamp)
-        );
-        vm.stopPrank();
-
-        // Accept proposal (high delta requires guardian approval)
-        vm.prank(users.guardian);
-        assetRouter.acceptProposal(proposalId);
-
-        // The watermark update happens during settlement when notifyFeesCharged is called
-        // We need to calculate what the expected new watermark will be
-        assetRouter.executeSettleBatch(proposalId);
-
-        // Verify watermark was updated
-        assertGt(vault.sharePriceWatermark(), 1e6);
+        registry.setIsHardHurdleRate(address(vault), true);
     }
 }

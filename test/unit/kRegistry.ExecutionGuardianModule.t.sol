@@ -14,8 +14,8 @@ import { IExecutionGuardian } from "kam/src/interfaces/modules/IExecutionGuardia
 
 contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
     address internal constant ZERO_ADDRESS = address(0);
-    uint8 internal constant TEST_TARGET_TYPE = 1;
-    uint8 internal constant METAWALLET_TARGET_TYPE = 0;
+    IExecutionGuardian.TargetType internal constant TEST_TARGET_TYPE = IExecutionGuardian.TargetType.CUSTODIAL;
+    IExecutionGuardian.TargetType internal constant METAWALLET_TARGET_TYPE = IExecutionGuardian.TargetType.METAWALLET;
     address internal constant MOCK_METAWALLET = 0x1A008E7a5b1DFf54Ec91D11757fe58f2AA18aA09;
 
     IExecutionGuardian internal guardianModule;
@@ -47,7 +47,7 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, testSelector, true);
 
         assertTrue(guardianModule.isSelectorAllowed(testExecutor, testTarget, testSelector));
-        assertEq(guardianModule.getTargetType(testTarget), TEST_TARGET_TYPE);
+        assertEq(uint8(guardianModule.getTargetType(testTarget)), uint8(TEST_TARGET_TYPE));
     }
 
     function test_SetAllowedSelector_Disallow_Success() public {
@@ -241,12 +241,12 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
     }
 
     function test_GetTargetType() public {
-        assertEq(guardianModule.getTargetType(testTarget), 0);
+        assertEq(uint8(guardianModule.getTargetType(testTarget)), 0);
 
         vm.prank(users.admin);
         guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, testSelector, true);
 
-        assertEq(guardianModule.getTargetType(testTarget), TEST_TARGET_TYPE);
+        assertEq(uint8(guardianModule.getTargetType(testTarget)), uint8(TEST_TARGET_TYPE));
     }
 
     function test_GetExecutorTargets_Multiple() public {
@@ -355,7 +355,11 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         vm.prank(users.admin);
         guardianModule.setAllowedSelector(testExecutor, MOCK_METAWALLET, METAWALLET_TARGET_TYPE, _selector, true);
 
-        assertEq(guardianModule.getTargetType(MOCK_METAWALLET), METAWALLET_TARGET_TYPE, "Should be METAWALLET type (0)");
+        assertEq(
+            uint8(guardianModule.getTargetType(MOCK_METAWALLET)),
+            uint8(METAWALLET_TARGET_TYPE),
+            "Should be METAWALLET type (0)"
+        );
     }
 
     function test_GetExecutorTargetSelectors_AddAndRemove() public {
@@ -452,9 +456,15 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
 
         // Step 2: getTargetType - verify types
         assertEq(
-            guardianModule.getTargetType(MOCK_METAWALLET), METAWALLET_TARGET_TYPE, "Metawallet should be METAWALLET (0)"
+            uint8(guardianModule.getTargetType(MOCK_METAWALLET)),
+            uint8(METAWALLET_TARGET_TYPE),
+            "Metawallet should be METAWALLET (0)"
         );
-        assertEq(guardianModule.getTargetType(_custodialTarget), TEST_TARGET_TYPE, "Custodial should be CUSTODIAL (1)");
+        assertEq(
+            uint8(guardianModule.getTargetType(_custodialTarget)),
+            uint8(TEST_TARGET_TYPE),
+            "Custodial should be CUSTODIAL (1)"
+        );
 
         // Step 3: getExecutorTargetSelectors - verify metawallet selectors
         bytes4[] memory _metawalletSelectors = guardianModule.getExecutorTargetSelectors(testExecutor, MOCK_METAWALLET);
@@ -496,47 +506,70 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                    GETEXECUTORTARGETSBYTYPE
+                     GETEXECUTORTARGETSBYTYPE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Filters the executor's targets by target type, ignoring others.
-    function test_GetExecutorTargetsByType_FiltersCorrectly() public {
-        address _meta1 = makeAddr("Meta1");
-        address _meta2 = makeAddr("Meta2");
-        address _custodial = makeAddr("Custodial");
-        bytes4 _sel = bytes4(keccak256("foo()"));
-
-        vm.startPrank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, _meta1, METAWALLET_TARGET_TYPE, _sel, true);
-        guardianModule.setAllowedSelector(testExecutor, _meta2, METAWALLET_TARGET_TYPE, _sel, true);
-        guardianModule.setAllowedSelector(testExecutor, _custodial, TEST_TARGET_TYPE, _sel, true);
-        vm.stopPrank();
-
-        address[] memory _metas = guardianModule.getExecutorTargetsByType(testExecutor, METAWALLET_TARGET_TYPE);
-        assertEq(_metas.length, 2, "Should return only the two metawallet targets");
-
-        bool _has1;
-        bool _has2;
-        for (uint256 _i; _i < _metas.length; _i++) {
-            if (_metas[_i] == _meta1) _has1 = true;
-            if (_metas[_i] == _meta2) _has2 = true;
-        }
-        assertTrue(_has1 && _has2, "Filtered set must contain both metawallet targets");
-
-        address[] memory _custodials = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
-        assertEq(_custodials.length, 1, "Should return only the one custodial target");
-        assertEq(_custodials[0], _custodial);
+    function test_GetExecutorTargetsByType_Empty_Returns_Empty() public view {
+        address[] memory _result = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
+        assertEq(_result.length, 0, "Empty executor should return empty array");
     }
 
-    function test_GetExecutorTargetsByType_ReturnsEmpty_WhenNoneMatch() public {
-        bytes4 _sel = bytes4(keccak256("foo()"));
+    function test_GetExecutorTargetsByType_AllMatch() public {
+        address _t1 = makeAddr("T1");
+        address _t2 = makeAddr("T2");
+        bytes4 _s = bytes4(keccak256("f()"));
+
+        vm.startPrank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, _t1, TEST_TARGET_TYPE, _s, true);
+        guardianModule.setAllowedSelector(testExecutor, _t2, TEST_TARGET_TYPE, _s, true);
+        vm.stopPrank();
+
+        address[] memory _result = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
+        assertEq(_result.length, 2, "Both targets should be included");
+
+        bool _hasT1;
+        bool _hasT2;
+        for (uint256 _i; _i < _result.length; _i++) {
+            if (_result[_i] == _t1) _hasT1 = true;
+            if (_result[_i] == _t2) _hasT2 = true;
+        }
+        assertTrue(_hasT1 && _hasT2, "Result should include both T1 and T2");
+    }
+
+    function test_GetExecutorTargetsByType_NoneMatch_Returns_Empty() public {
+        address _t1 = makeAddr("T1");
+        bytes4 _s = bytes4(keccak256("f()"));
 
         vm.prank(users.admin);
-        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, _sel, true);
+        guardianModule.setAllowedSelector(testExecutor, _t1, METAWALLET_TARGET_TYPE, _s, true);
 
-        // Asking for a type that has no targets returns empty.
-        address[] memory _empty = guardianModule.getExecutorTargetsByType(testExecutor, 99);
-        assertEq(_empty.length, 0);
+        address[] memory _result = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
+        assertEq(_result.length, 0, "No targets of TEST_TARGET_TYPE registered");
+    }
+
+    function test_GetExecutorTargetsByType_Mixed_FiltersCorrectly() public {
+        address _custodial1 = makeAddr("Custodial1");
+        address _custodial2 = makeAddr("Custodial2");
+        address _metawallet = makeAddr("Metawallet1");
+        bytes4 _s = bytes4(keccak256("f()"));
+
+        vm.startPrank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, _custodial1, TEST_TARGET_TYPE, _s, true);
+        guardianModule.setAllowedSelector(testExecutor, _metawallet, METAWALLET_TARGET_TYPE, _s, true);
+        guardianModule.setAllowedSelector(testExecutor, _custodial2, TEST_TARGET_TYPE, _s, true);
+        vm.stopPrank();
+
+        address[] memory _result = guardianModule.getExecutorTargetsByType(testExecutor, TEST_TARGET_TYPE);
+        assertEq(_result.length, 2, "Should include only TEST_TARGET_TYPE targets");
+
+        bool _hasC1;
+        bool _hasC2;
+        for (uint256 _i; _i < _result.length; _i++) {
+            assertTrue(_result[_i] != _metawallet, "Result must not include metawallet");
+            if (_result[_i] == _custodial1) _hasC1 = true;
+            if (_result[_i] == _custodial2) _hasC2 = true;
+        }
+        assertTrue(_hasC1 && _hasC2, "Result should include both custodial targets");
     }
 }
 

@@ -69,22 +69,6 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /// @param newFee New performance fee in basis points
     event PerformanceFeeSet(uint16 oldFee, uint16 newFee);
 
-    /// @notice Emitted when the hard hurdle rate is set
-    /// @param isHard True for hard hurdle, false for soft hurdle
-    event HardHurdleRateSet(bool isHard);
-
-    /// @notice Emitted when management fees are charged
-    /// @param timestamp Timestamp of the fee charge
-    event ManagementFeesCharged(uint256 timestamp);
-
-    /// @notice Emitted when performance fees are charged
-    /// @param timestamp Timestamp of the fee charge
-    event PerformanceFeesCharged(uint256 timestamp);
-
-    /// @notice Emitted when share price watermark is updated
-    /// @param newWatermark The new share price watermark value
-    event SharePriceWatermarkUpdated(uint256 newWatermark);
-
     /// @notice Emitted when max total assets is updated
     /// @param oldMaxTotalAssets The previous max total assets value
     /// @param newMaxTotalAssets The new max total assets value
@@ -176,7 +160,6 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /// (3) Maintaining read-only access to vault data and view functions during pause periods for transparency,
     /// (4) Allowing authorized emergency admins to resume operations once issues are resolved or maintenance completed.
     /// When paused, all state-changing functions (requestStake, requestUnstake,
-    /// cancelUnstakeRequest,
     /// claimStakedShares, claimUnstakedAssets) will revert with KSTAKINGVAULT_IS_PAUSED error. The pause mechanism
     /// serves as a circuit breaker protecting user funds during unexpected events while maintaining protocol integrity.
     /// Only emergency admins have permission to toggle this state, ensuring rapid response capabilities during critical
@@ -197,91 +180,50 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
                           ESSENTIAL VAULT GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the protocol registry address
+    /// @notice Returns the protocol registry address used for configuration and role checks
     function registry() external view returns (address);
 
-    /// @notice Returns the vault's kToken address
+    /// @notice Returns the vault's kToken address, not the underlying settlement asset
     function asset() external view returns (address);
 
-    /// @notice Returns the underlying asset address
+    /// @notice Returns the underlying settlement asset address
     function underlyingAsset() external view returns (address);
 
-    /// @notice Returns total assets under management
+    /// @notice Returns active accounted vault assets
+    /// @dev Excludes pending stake collateral and kTokens reserved for settled-but-unclaimed unstake requests.
     function totalAssets() external view returns (uint256);
 
-    /// @notice Returns net assets after fees
-    function totalNetAssets() external view returns (uint256);
-
-    /// @notice Returns gross share price
+    /// @notice Returns gross share price based on active accounted vault assets
     function sharePrice() external view returns (uint256);
 
-    /// @notice Returns net share price after fees
-    function netSharePrice() external view returns (uint256);
+    /// @notice Converts assets to shares at current price, rounding down
+    function convertToShares(uint256 assets) external view returns (uint256);
 
-    /// @notice Converts assets to shares at current price
-    function convertToShares(uint256 shares) external view returns (uint256);
+    /// @notice Converts shares to assets at current price, rounding down
+    function convertToAssets(uint256 shares) external view returns (uint256);
 
-    /// @notice Converts shares to assets at current price
-    function convertToAssets(uint256 assets) external view returns (uint256);
-
-    /// @notice Converts shares to assets with specified totals
-    function convertToAssetsWithTotals(
-        uint256 shares,
-        uint256 totalAssets_,
-        uint256 totalSupply_
-    )
-        external
-        pure
-        returns (uint256);
-
-    /// @notice Converts assets to shares with specified totals
-    function convertToSharesWithTotals(
-        uint256 assets,
-        uint256 totalAssets_,
-        uint256 totalSupply_
-    )
-        external
-        pure
-        returns (uint256);
-
-    /// @notice Returns the current active batch ID
-    function getBatchId() external view returns (bytes32);
-
-    /// @notice Returns current batch ID with safety validation
-    function getSafeBatchId() external view returns (bytes32);
-
-    /// @notice Returns the close state of a given batch
-    function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
-
-    /// @notice Returns whether the current batch is closed
-    function isBatchClosed() external view returns (bool);
-
-    /// @notice Returns whether the current batch is settled
-    function isBatchSettled() external view returns (bool);
-
-    /// @notice Returns comprehensive info about the current batch
-    function getCurrentBatchInfo()
-        external
-        view
-        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
-
-    /// @notice Returns comprehensive info about a specific batch
-    function getBatchIdInfo(bytes32 batchId)
-        external
-        view
-        returns (
-            address batchReceiver,
-            bool isClosed_,
-            bool isSettled,
-            uint256 sharePrice_,
-            uint256 netSharePrice_,
-            uint256 totalAssets_,
-            uint256 totalNetAssets_,
-            uint256 totalSupply_,
-            uint256 depositedInBatch,
-            uint256 requestedSharesInBatch
-        );
-
-    /// @notice Returns the maximum total assets (TVL cap)
+    /// @notice Returns the maximum active assets plus pending stake collateral allowed in the vault
     function maxTotalAssets() external view returns (uint128);
+
+    /// @notice Returns kTokens reserved for pending stake requests
+    /// @dev These kTokens are held by the vault but not yet converted into active assets.
+    function totalPendingStake() external view returns (uint128);
+
+    /// @notice Returns kTokens reserved for settled-but-unclaimed unstake requests
+    /// @dev These kTokens are not active assets and must not be consumed by strategy losses.
+    function totalPendingUnstake() external view returns (uint128);
+
+    /// @notice Returns active assets plus pending kToken reserves expected in the vault
+    /// @dev Equals totalAssets() + totalPendingStake() + totalPendingUnstake().
+    function expectedKTokenBalance() external view returns (uint256);
+
+    /// @notice Increases the vault's internal balance
+    /// @dev Only callable by authorized addresses (router)
+    /// @param amount The amount to increase the balance by
+    function increaseBalance(uint128 amount) external;
+
+    /// @notice Decreases the vault's internal balance
+    /// @dev Only callable by authorized addresses (router)
+    /// @param amount The amount to decrease the balance by
+    function decreaseBalance(uint128 amount) external;
 }

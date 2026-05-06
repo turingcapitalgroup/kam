@@ -16,6 +16,7 @@ contract DeployVaultModulesScript is Script, DeploymentManager {
     /// @return deployment Struct containing deployed module addresses
     function run(bool writeToJson) public returns (VaultModulesDeployment memory deployment) {
         NetworkConfig memory config = readNetworkConfig();
+        validateConfig(config);
 
         // Log script header and configuration
         logScriptHeader("06_DeployVaultModules");
