@@ -42,7 +42,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         // Vault should start with zero assets and shares
         assertEq(vault.totalAssets(), 0);
         assertEq(vault.totalSupply(), 0);
-        assertEq(vault.totalNetAssets(), 0);
+        assertEq(vault.totalAssets(), 0);
 
         // Share price should be 1:1 initially (1e6 for 6 decimals)
         assertEq(vault.netSharePrice(), 1e6);
@@ -345,27 +345,19 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
                         NET ASSETS WITH FEES TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_TotalNetAssets_WithoutFees() public {
-        // Setup: Alice deposits 1M USDC
+    function test_TotalAssets_WithoutFees() public {
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Without any time passing, net assets should equal total assets
-        assertEq(vault.totalNetAssets(), vault.totalAssets());
+        assertEq(vault.totalAssets(), INITIAL_DEPOSIT);
     }
 
-    function test_TotalNetAssets_WithAccruedManagementFees() public {
-        // Setup vault with fees
+    function test_TotalAssets_WithAccruedManagementFees() public {
         _setupTestFees();
-
-        // Alice deposits 1M USDC
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 
-        // Fast forward time to accrue management fees
         vm.warp(block.timestamp + 365 days);
 
-        // With continuous fee accrual, totalNetAssets equals totalAssets
-        // (fees are collected as shares, not subtracted from assets)
-        assertEq(vault.totalNetAssets(), vault.totalAssets());
+        // Fees are collected as shares, not subtracted from assets
+        assertEq(vault.totalAssets(), INITIAL_DEPOSIT);
     }
 
     /* //////////////////////////////////////////////////////////////

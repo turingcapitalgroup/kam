@@ -28,8 +28,6 @@ import {
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
     KSTAKINGVAULT_NOT_INITIALIZED,
     KSTAKINGVAULT_REQUEST_NOT_FOUND,
-    KSTAKINGVAULT_VAULT_CLOSED,
-    KSTAKINGVAULT_VAULT_SETTLED,
     KSTAKINGVAULT_WRONG_ROLE,
     KSTAKINGVAULT_ZERO_ADDRESS,
     KSTAKINGVAULT_ZERO_AMOUNT,
@@ -704,13 +702,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         return _totalAssets();
     }
 
-    /// @notice Returns net active accounted vault assets after fee accounting
-    /// @dev Currently equals totalAssets because fees are accrued and minted through the canonical fee path.
-    /// @return The net active asset base
-    function totalNetAssets() external view returns (uint256) {
-        return _totalAssets();
-    }
-
     /// @notice Returns the current gross share price
     /// @dev Uses one whole share unit based on the vault decimals and current active assets.
     /// @return The amount of active assets represented by one whole share unit
@@ -739,149 +730,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     /// @return The active asset amount for the provided shares
     function convertToAssets(uint256 _shares) external view returns (uint256) {
         return _convertToAssetsWithTotals(_shares, _totalAssets(), totalSupply());
-    }
-
-    /// @notice Converts an asset amount to shares using caller-provided totals
-    /// @dev Pure helper for integrations that need deterministic conversions against historical or simulated totals.
-    /// Rounds down in favor of the vault.
-    /// @param _assets The active asset amount to convert
-    /// @param _totalAssetsVal The total active assets to use for the conversion
-    /// @param _totalSupplyVal The total share supply to use for the conversion
-    /// @return The share amount for the provided assets and totals
-    function convertToSharesWithTotals(
-        uint256 _assets,
-        uint256 _totalAssetsVal,
-        uint256 _totalSupplyVal
-    )
-        external
-        pure
-        returns (uint256)
-    {
-        return _convertToSharesWithTotals(_assets, _totalAssetsVal, _totalSupplyVal);
-    }
-
-    /// @notice Converts a share amount to assets using caller-provided totals
-    /// @dev Pure helper for integrations that need deterministic conversions against historical or simulated totals.
-    /// Rounds down in favor of the vault.
-    /// @param _shares The share amount to convert
-    /// @param _totalAssetsVal The total active assets to use for the conversion
-    /// @param _totalSupplyVal The total share supply to use for the conversion
-    /// @return The active asset amount for the provided shares and totals
-    function convertToAssetsWithTotals(
-        uint256 _shares,
-        uint256 _totalAssetsVal,
-        uint256 _totalSupplyVal
-    )
-        external
-        pure
-        returns (uint256)
-    {
-        return _convertToAssetsWithTotals(_shares, _totalAssetsVal, _totalSupplyVal);
-    }
-
-    /// @notice Returns the current active batch ID
-    /// @return The current batch identifier
-    function getBatchId() public view returns (bytes32) {
-        return _getBaseVaultStorage().currentBatchId;
-    }
-
-    /// @notice Returns the current active batch ID if it is open and unsettled
-    /// @dev Reverts when the current batch is closed or already settled.
-    /// @return The current batch identifier
-    function getSafeBatchId() external view returns (bytes32) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        bytes32 _batchId = getBatchId();
-        require(!$.batches[_batchId].isClosed, KSTAKINGVAULT_VAULT_CLOSED);
-        require(!$.batches[_batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
-        return _batchId;
-    }
-
-    /// @notice Returns whether a specific batch is closed
-    /// @param _batchId The batch identifier to inspect
-    /// @return isClosed_ True if the batch is closed
-    function isClosed(bytes32 _batchId) external view returns (bool isClosed_) {
-        isClosed_ = _getBaseVaultStorage().batches[_batchId].isClosed;
-    }
-
-    /// @notice Returns whether the current batch is closed
-    /// @return True if the current batch is closed
-    function isBatchClosed() external view returns (bool) {
-        return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed;
-    }
-
-    /// @notice Returns whether the current batch is settled
-    /// @return True if the current batch is settled
-    function isBatchSettled() external view returns (bool) {
-        return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled;
-    }
-
-    /// @notice Returns core state for the current batch
-    /// @return batchId The current batch identifier
-    /// @return batchReceiver The receiver holding settlement assets for the batch
-    /// @return isClosed_ True if the current batch is closed
-    /// @return isSettled True if the current batch is settled
-    function getCurrentBatchInfo()
-        external
-        view
-        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled)
-    {
-        return (
-            _getBaseVaultStorage().currentBatchId,
-            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].batchReceiver,
-            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed,
-            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled
-        );
-    }
-
-    /// @notice Returns accounting and lifecycle data for a specific batch
-    /// @param _batchId The batch identifier to inspect
-    /// @return batchReceiver The receiver holding settlement assets for the batch
-    /// @return isClosed_ True if the batch is closed
-    /// @return isSettled True if the batch is settled
-    /// @return sharePrice_ The settled or stored gross share price for the batch
-    /// @return netSharePrice_ The settled or stored net share price for the batch
-    /// @return totalAssets_ The active assets recorded for the batch
-    /// @return totalNetAssets_ The net active assets recorded for the batch
-    /// @return totalSupply_ The share supply recorded for the batch
-    /// @return depositedInBatch The kToken amount pending stake in the batch
-    /// @return requestedSharesInBatch The share amount pending unstake in the batch
-    function getBatchIdInfo(bytes32 _batchId)
-        external
-        view
-        returns (
-            address batchReceiver,
-            bool isClosed_,
-            bool isSettled,
-            uint256 sharePrice_,
-            uint256 netSharePrice_,
-            uint256 totalAssets_,
-            uint256 totalNetAssets_,
-            uint256 totalSupply_,
-            uint256 depositedInBatch,
-            uint256 requestedSharesInBatch
-        )
-    {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
-
-        uint256 _totalSupply = batch.totalSupply;
-        uint8 decimals = _getDecimals($);
-
-        sharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalAssets, _totalSupply);
-        netSharePrice_ = sharePrice_;
-
-        return (
-            batch.batchReceiver,
-            batch.isClosed,
-            batch.isSettled,
-            sharePrice_,
-            netSharePrice_,
-            batch.totalAssets,
-            batch.totalAssets,
-            batch.totalSupply,
-            batch.depositedInBatch,
-            batch.requestedSharesInBatch
-        );
     }
 
     /// @notice Returns the vault TVL cap in active assets plus pending stake collateral

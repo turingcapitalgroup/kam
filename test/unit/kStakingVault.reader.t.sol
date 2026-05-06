@@ -154,7 +154,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         // Check the settled batch
         // Note: getCurrentBatchInfo returns info about the CURRENT batch (which is new after settlement)
         // We need to check the old batch
-        (, bool oldClosed, bool oldSettled,,,,,,,) = vault.getBatchIdInfo(batchId);
+        (, bool oldClosed, bool oldSettled,,,,,,) = vault.getBatchIdInfo(batchId);
         assertTrue(oldClosed);
         assertTrue(oldSettled);
     }
@@ -194,7 +194,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
             bool isSettled,
             uint256 sharePrice_,
             uint256 netSharePrice_,
-            uint256 totalAssets_,,
+            uint256 totalAssets_,
             uint256 totalSupply_,,
         ) = vault.getBatchIdInfo(batchId);
 
@@ -474,7 +474,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         vault.sharePrice();
         vault.netSharePrice();
         vault.totalAssets();
-        vault.totalNetAssets();
 
         // Conversions
         vault.convertToShares(1000);

@@ -7,8 +7,8 @@ import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol"
 import { TimelockController } from "kam/src/vendor/openzeppelin/governance/TimelockController.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
 
-import { kRemoteRegistry } from "kam/src/kRegistry/kRemoteRegistry.sol";
 import { IExecutionGuardian } from "kam/src/interfaces/modules/IExecutionGuardian.sol";
+import { kRemoteRegistry } from "kam/src/kRegistry/kRemoteRegistry.sol";
 
 /// @notice Phase 6 closes Gap 2 from the implementation review: `kRemoteRegistry` is a UUPS
 /// contract listed in the spec section 4.1 as needing the timelock as owner, but it is deployed
@@ -178,8 +178,7 @@ contract TimelockRemoteRegistryTest is Test {
         bytes32 id = timelock.hashOperation(address(remoteRegistry), 0, data, bytes32(0), salt);
         assertTrue(timelock.isOperationDone(id), "timelock op not Done");
         assertTrue(
-            remoteRegistry.isSelectorAllowed(executor, target, selector),
-            "selector not allowed after timelock execute"
+            remoteRegistry.isSelectorAllowed(executor, target, selector), "selector not allowed after timelock execute"
         );
     }
 

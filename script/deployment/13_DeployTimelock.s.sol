@@ -41,14 +41,60 @@ contract DeployTimelockScript is Script, DeploymentManager {
         return run(true);
     }
 
-    /// @notice Run the deployment.
+    /// @notice Run the deployment reading contract addresses from the deployment output JSON.
     /// @param writeToJson If true, write the timelock address to the deployment output JSON.
     /// @return adminTimelock The deployed `TimelockController` address.
     function run(bool writeToJson) public returns (address adminTimelock) {
+        DeploymentOutput memory output = readDeploymentOutput();
+        return _deploy(writeToJson, output);
+    }
+
+    /// @notice Run the deployment with explicitly-provided contract addresses.
+    /// @dev Used by tests where contracts are deployed in-memory (no JSON I/O).
+    function run(
+        bool writeToJson,
+        address registryAddr,
+        address minterAddr,
+        address assetRouterAddr,
+        address dnVaultUSDCAddr,
+        address dnVaultWBTCAddr,
+        address alphaVaultAddr,
+        address betaVaultAddr,
+        address dnVaultAdapterUSDCAddr,
+        address dnVaultAdapterWBTCAddr,
+        address alphaVaultAdapterAddr,
+        address betaVaultAdapterAddr,
+        address kMinterAdapterUSDCAddr,
+        address kMinterAdapterWBTCAddr,
+        address kUSDAddr,
+        address kBTCAddr
+    )
+        public
+        returns (address adminTimelock)
+    {
+        DeploymentOutput memory output;
+        output.contracts.kRegistry = registryAddr;
+        output.contracts.kMinter = minterAddr;
+        output.contracts.kAssetRouter = assetRouterAddr;
+        output.contracts.dnVaultUSDC = dnVaultUSDCAddr;
+        output.contracts.dnVaultWBTC = dnVaultWBTCAddr;
+        output.contracts.alphaVault = alphaVaultAddr;
+        output.contracts.betaVault = betaVaultAddr;
+        output.contracts.dnVaultAdapterUSDC = dnVaultAdapterUSDCAddr;
+        output.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
+        output.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
+        output.contracts.betaVaultAdapter = betaVaultAdapterAddr;
+        output.contracts.kMinterAdapterUSDC = kMinterAdapterUSDCAddr;
+        output.contracts.kMinterAdapterWBTC = kMinterAdapterWBTCAddr;
+        output.contracts.kUSD = kUSDAddr;
+        output.contracts.kBTC = kBTCAddr;
+        return _deploy(writeToJson, output);
+    }
+
+    /// @dev Shared deployment logic used by both `run` overloads.
+    function _deploy(bool writeToJson, DeploymentOutput memory output) internal returns (address adminTimelock) {
         NetworkConfig memory config = readNetworkConfig();
         validateConfig(config);
-
-        DeploymentOutput memory output = readDeploymentOutput();
 
         logScriptHeader("13_DeployTimelock");
         logRoles(config);

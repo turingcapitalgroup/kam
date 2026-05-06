@@ -1,5 +1,5 @@
 # BaseVaultTypes
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/kStakingVault/types/BaseVaultTypes.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kStakingVault/types/BaseVaultTypes.sol)
 
 Library containing all data structures used in the ModuleBase
 
@@ -78,11 +78,16 @@ struct BatchInfo {
 
 ## Enums
 ### RequestStatus
-Request status
+Lifecycle status of a stake / unstake request
+
+`UNDEFINED = 0` is the zero-initialized sentinel — a fresh storage slot reads as
+`UNDEFINED`, not as a valid `PENDING` request, so callers can distinguish
+"request does not exist" from "request is in flight".
 
 
 ```solidity
 enum RequestStatus {
+    UNDEFINED,
     PENDING,
     CLAIMED
 }

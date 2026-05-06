@@ -1,8 +1,8 @@
 # kBaseRoles
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/base/kBaseRoles.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/base/kBaseRoles.sol)
 
 **Inherits:**
-[OptimizedOwnableRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md)
+[OptimizedOwnableRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md)
 
 Foundation contract providing role-based access control for the KAM protocol.
 
@@ -98,6 +98,15 @@ function _getkBaseRolesStorage() internal pure returns (kBaseRolesStorage storag
 
 
 ### __kBaseRoles_init
+
+Initializes role assignments for the protocol.
+
+Dual-role grants are convenience defaults for testnet deployments:
+- `_admin` is granted both `ADMIN_ROLE` and `VENDOR_ROLE`.
+- `_relayer` is granted both `RELAYER_ROLE` and `MANAGER_ROLE`.
+Production deployments should use separate addresses for each role.
+The owner can revoke and re-grant roles to dedicated addresses after
+initialization via `revokeRoles` and `grantRoles`.
 
 
 ```solidity

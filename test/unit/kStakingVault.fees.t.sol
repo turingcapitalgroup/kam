@@ -86,24 +86,6 @@ contract kStakingVaultFeesTest is BaseVaultTest {
                         TOTAL NET ASSETS / SHARE PRICE COMPAT
     //////////////////////////////////////////////////////////////*/
 
-    function test_TotalNetAssets_EqualsTotalAssets() public {
-        _setupTestFees();
-        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Add yield
-        uint256 yieldAmount = 200_000 * _1_USDC;
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), yieldAmount);
-        vm.prank(address(assetRouter));
-        vault.increaseBalance(uint128(yieldAmount));
-
-        // Fast forward time to accrue fees
-        vm.warp(block.timestamp + 365 days);
-
-        // Fees are now minted as shares, so totalNetAssets == totalAssets
-        assertEq(vault.totalNetAssets(), vault.totalAssets());
-    }
-
     function test_NetSharePrice_EqualsSharePrice() public {
         _setupTestFees();
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);

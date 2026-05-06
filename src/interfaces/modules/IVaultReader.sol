@@ -56,4 +56,69 @@ interface IVaultReader {
         external
         view
         returns (BaseVaultTypes.UnstakeRequest memory unstakeRequest);
+
+    /* //////////////////////////////////////////////////////////////
+                        CONVERSION HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Converts assets to shares with specified totals, rounding down
+    function convertToSharesWithTotals(
+        uint256 assets,
+        uint256 totalAssets_,
+        uint256 totalSupply_
+    )
+        external
+        pure
+        returns (uint256);
+
+    /// @notice Converts shares to assets with specified totals, rounding down
+    function convertToAssetsWithTotals(
+        uint256 shares,
+        uint256 totalAssets_,
+        uint256 totalSupply_
+    )
+        external
+        pure
+        returns (uint256);
+
+    /* //////////////////////////////////////////////////////////////
+                        BATCH GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the current active batch ID
+    function getBatchId() external view returns (bytes32);
+
+    /// @notice Returns current batch ID with safety validation
+    function getSafeBatchId() external view returns (bytes32);
+
+    /// @notice Returns the close state of a given batch
+    function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
+
+    /// @notice Returns whether the current batch is closed
+    function isBatchClosed() external view returns (bool);
+
+    /// @notice Returns whether the current batch is settled
+    function isBatchSettled() external view returns (bool);
+
+    /// @notice Returns core state for the current batch
+    function getCurrentBatchInfo()
+        external
+        view
+        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
+
+    /// @notice Returns accounting and lifecycle data for a specific batch
+    function getBatchIdInfo(bytes32 batchId)
+        external
+        view
+        returns (
+            address batchReceiver,
+            bool isClosed_,
+            bool isSettled,
+            uint256 sharePrice_,
+            uint256 netSharePrice_,
+            uint256 totalAssets_,
+            uint256 totalSupply_,
+            uint256 depositedInBatch,
+            uint256 requestedSharesInBatch
+        );
 }
