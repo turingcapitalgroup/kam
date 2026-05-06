@@ -62,6 +62,10 @@ interface IVaultReader {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Converts assets to shares with specified totals, rounding down
+    /// @param assets The asset amount to convert
+    /// @param totalAssets_ The total assets to use for the conversion
+    /// @param totalSupply_ The total share supply to use for the conversion
+    /// @return The share amount for the provided assets and totals
     function convertToSharesWithTotals(
         uint256 assets,
         uint256 totalAssets_,
@@ -72,6 +76,10 @@ interface IVaultReader {
         returns (uint256);
 
     /// @notice Converts shares to assets with specified totals, rounding down
+    /// @param shares The share amount to convert
+    /// @param totalAssets_ The total assets to use for the conversion
+    /// @param totalSupply_ The total share supply to use for the conversion
+    /// @return The asset amount for the provided shares and totals
     function convertToAssetsWithTotals(
         uint256 shares,
         uint256 totalAssets_,
@@ -86,27 +94,46 @@ interface IVaultReader {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Returns the current active batch ID
+    /// @return The current batch identifier
     function getBatchId() external view returns (bytes32);
 
     /// @notice Returns current batch ID with safety validation
+    /// @return The current batch identifier if open and unsettled
     function getSafeBatchId() external view returns (bytes32);
 
     /// @notice Returns the close state of a given batch
+    /// @param batchId_ The batch identifier to inspect
+    /// @return isClosed_ True if the batch is closed
     function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
 
     /// @notice Returns whether the current batch is closed
+    /// @return True if the current batch is closed
     function isBatchClosed() external view returns (bool);
 
     /// @notice Returns whether the current batch is settled
+    /// @return True if the current batch is settled
     function isBatchSettled() external view returns (bool);
 
     /// @notice Returns core state for the current batch
+    /// @return batchId The current batch identifier
+    /// @return batchReceiver The receiver holding settlement assets for the batch
+    /// @return isClosed_ True if the current batch is closed
+    /// @return isSettled True if the current batch is settled
     function getCurrentBatchInfo()
         external
         view
         returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
 
     /// @notice Returns accounting and lifecycle data for a specific batch
+    /// @param batchId The batch identifier to inspect
+    /// @return batchReceiver The receiver holding settlement assets for the batch
+    /// @return isClosed_ True if the batch is closed
+    /// @return isSettled True if the batch is settled
+    /// @return sharePrice_ The settled share price for the batch
+    /// @return totalAssets_ The active assets recorded for the batch
+    /// @return totalSupply_ The share supply recorded for the batch
+    /// @return depositedInBatch The kToken amount pending stake in the batch
+    /// @return requestedSharesInBatch The share amount pending unstake in the batch
     function getBatchIdInfo(bytes32 batchId)
         external
         view

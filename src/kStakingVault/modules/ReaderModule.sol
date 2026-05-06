@@ -21,36 +21,31 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
                             FEE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the timestamp when fees were last accrued
-    /// @return Timestamp of last fee accrual
+    /// @inheritdoc IVaultReader
     function lastFeeTimestamp() public view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getLastFeeTimestamp($);
     }
 
-    /// @notice Returns the hurdle rate threshold for performance fee calculations
-    /// @return Hurdle rate in basis points
+    /// @inheritdoc IVaultReader
     function hurdleRate() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getHurdleRate($);
     }
 
-    /// @notice Returns whether the current hurdle rate is a hard hurdle rate
-    /// @return True if hard hurdle rate, false otherwise
+    /// @inheritdoc IVaultReader
     function isHardHurdleRate() external view returns (bool) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getIsHardHurdleRate($);
     }
 
-    /// @notice Returns the current performance fee rate
-    /// @return Performance fee in basis points
+    /// @inheritdoc IVaultReader
     function performanceFee() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getPerformanceFee($);
     }
 
-    /// @notice Returns the current management fee rate
-    /// @return Management fee in basis points
+    /// @inheritdoc IVaultReader
     function managementFee() external view returns (uint16) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _getManagementFee($);
@@ -60,16 +55,12 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
                         BATCH RECEIVER GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the batch receiver address for a specific batch ID
-    /// @param _batchId The batch identifier to query
-    /// @return Address of the batch receiver
+    /// @inheritdoc IVaultReader
     function getBatchReceiver(bytes32 _batchId) external view returns (address) {
         return _getBaseVaultStorage().batches[_batchId].batchReceiver;
     }
 
-    /// @notice Returns batch receiver address with validation
-    /// @param _batchId The batch identifier to query
-    /// @return Address of the batch receiver
+    /// @inheritdoc IVaultReader
     function getSafeBatchReceiver(bytes32 _batchId) external view returns (address) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require(!$.batches[_batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
@@ -80,17 +71,13 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
                         REQUEST GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Gets all request IDs associated with a user
-    /// @param _user The address to query requests for
-    /// @return requestIds An array of all request IDs for the user
+    /// @inheritdoc IVaultReader
     function getUserRequests(address _user) external view returns (bytes32[] memory requestIds) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return $.userRequests[_user].values();
     }
 
-    /// @notice Gets the details of a specific stake request
-    /// @param _requestId The unique identifier of the stake request
-    /// @return stakeRequest The stake request struct
+    /// @inheritdoc IVaultReader
     function getStakeRequest(bytes32 _requestId)
         external
         view
@@ -100,9 +87,7 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         return $.stakeRequests[_requestId];
     }
 
-    /// @notice Gets the details of a specific unstake request
-    /// @param _requestId The unique identifier of the unstake request
-    /// @return unstakeRequest The unstake request struct
+    /// @inheritdoc IVaultReader
     function getUnstakeRequest(bytes32 _requestId)
         external
         view
@@ -116,13 +101,9 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
                         CONVERSION HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Converts an asset amount to shares using caller-provided totals
+    /// @inheritdoc IVaultReader
     /// @dev Pure helper for integrations that need deterministic conversions against historical or simulated totals.
     /// Rounds down in favor of the vault.
-    /// @param _assets The active asset amount to convert
-    /// @param _totalAssetsVal The total active assets to use for the conversion
-    /// @param _totalSupplyVal The total share supply to use for the conversion
-    /// @return The share amount for the provided assets and totals
     function convertToSharesWithTotals(
         uint256 _assets,
         uint256 _totalAssetsVal,
@@ -135,13 +116,9 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         return _convertToSharesWithTotals(_assets, _totalAssetsVal, _totalSupplyVal);
     }
 
-    /// @notice Converts a share amount to assets using caller-provided totals
+    /// @inheritdoc IVaultReader
     /// @dev Pure helper for integrations that need deterministic conversions against historical or simulated totals.
     /// Rounds down in favor of the vault.
-    /// @param _shares The share amount to convert
-    /// @param _totalAssetsVal The total active assets to use for the conversion
-    /// @param _totalSupplyVal The total share supply to use for the conversion
-    /// @return The active asset amount for the provided shares and totals
     function convertToAssetsWithTotals(
         uint256 _shares,
         uint256 _totalAssetsVal,
@@ -158,15 +135,13 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
                         BATCH GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the current active batch ID
-    /// @return The current batch identifier
+    /// @inheritdoc IVaultReader
     function getBatchId() public view returns (bytes32) {
         return _getBaseVaultStorage().currentBatchId;
     }
 
-    /// @notice Returns the current active batch ID if it is open and unsettled
+    /// @inheritdoc IVaultReader
     /// @dev Reverts when the current batch is closed or already settled.
-    /// @return The current batch identifier
     function getSafeBatchId() external view returns (bytes32) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         bytes32 _batchId = getBatchId();
@@ -175,30 +150,22 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         return _batchId;
     }
 
-    /// @notice Returns whether a specific batch is closed
-    /// @param _batchId The batch identifier to inspect
-    /// @return isClosed_ True if the batch is closed
+    /// @inheritdoc IVaultReader
     function isClosed(bytes32 _batchId) external view returns (bool isClosed_) {
         isClosed_ = _getBaseVaultStorage().batches[_batchId].isClosed;
     }
 
-    /// @notice Returns whether the current batch is closed
-    /// @return True if the current batch is closed
+    /// @inheritdoc IVaultReader
     function isBatchClosed() external view returns (bool) {
         return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed;
     }
 
-    /// @notice Returns whether the current batch is settled
-    /// @return True if the current batch is settled
+    /// @inheritdoc IVaultReader
     function isBatchSettled() external view returns (bool) {
         return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled;
     }
 
-    /// @notice Returns core state for the current batch
-    /// @return batchId The current batch identifier
-    /// @return batchReceiver The receiver holding settlement assets for the batch
-    /// @return isClosed_ True if the current batch is closed
-    /// @return isSettled True if the current batch is settled
+    /// @inheritdoc IVaultReader
     function getCurrentBatchInfo()
         external
         view
@@ -212,16 +179,7 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         );
     }
 
-    /// @notice Returns accounting and lifecycle data for a specific batch
-    /// @param _batchId The batch identifier to inspect
-    /// @return batchReceiver The receiver holding settlement assets for the batch
-    /// @return isClosed_ True if the batch is closed
-    /// @return isSettled True if the batch is settled
-    /// @return sharePrice_ The settled or stored share price for the batch
-    /// @return totalAssets_ The active assets recorded for the batch
-    /// @return totalSupply_ The share supply recorded for the batch
-    /// @return depositedInBatch The kToken amount pending stake in the batch
-    /// @return requestedSharesInBatch The share amount pending unstake in the batch
+    /// @inheritdoc IVaultReader
     function getBatchIdInfo(bytes32 _batchId)
         external
         view

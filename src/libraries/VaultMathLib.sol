@@ -116,6 +116,10 @@ library VaultMathLib {
     }
 
     /// @notice Converts shares to assets with virtual offset for inflation attack protection
+    /// @param _shares Number of shares to convert
+    /// @param _totalAssets Current total assets in the vault
+    /// @param _totalSupply Current total share supply
+    /// @return Asset amount equivalent to the provided shares
     function convertToAssets(
         uint256 _shares,
         uint256 _totalAssets,
@@ -129,6 +133,10 @@ library VaultMathLib {
     }
 
     /// @notice Converts assets to shares with virtual offset for inflation attack protection
+    /// @param _assets Number of assets to convert
+    /// @param _totalAssets Current total assets in the vault
+    /// @param _totalSupply Current total share supply
+    /// @return Share amount equivalent to the provided assets
     function convertToShares(
         uint256 _assets,
         uint256 _totalAssets,
