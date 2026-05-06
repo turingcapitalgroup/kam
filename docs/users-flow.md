@@ -348,12 +348,6 @@
 │  │sharePrice =                     │                                │
 │  │  totalAssets * (10^decimals)    │                                │
 │  │  / totalSupply                  │                                │
-│  │                                 │                                │
-│  │netSharePrice() = sharePrice()   │                                │
-│  │  (backward compatibility alias) │                                │
-│  │                                 │                                │
-│  │totalNetAssets() = totalAssets() │                                │
-│  │  (backward compatibility alias) │                                │
 │  └─────────────────────────────────┘                                │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘

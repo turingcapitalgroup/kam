@@ -115,7 +115,6 @@ interface IVaultReader {
             bool isClosed_,
             bool isSettled,
             uint256 sharePrice_,
-            uint256 netSharePrice_,
             uint256 totalAssets_,
             uint256 totalSupply_,
             uint256 depositedInBatch,

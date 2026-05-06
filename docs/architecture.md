@@ -623,7 +623,7 @@ Performance fees are charged on net interest per settlement batch — only when 
 
 **Performance fee**: computed once per settlement inside `settleBatch()`. Interest is `currentBalance − lastSettlementBalance − managementFeeAssets`. If interest exceeds the time-weighted hurdle (`previousBalance * hurdleRate * elapsed / SECS_PER_YEAR / 10000`), performance fee shares are minted directly to the treasury. `lastSettlementBalance` is then updated to the post-settlement balance.
 
-Because all fees are collected via share dilution, `totalNetAssets()` equals `totalAssets()` and `netSharePrice()` equals `sharePrice()` — both are backward-compatibility aliases.
+Because all fees are collected via share dilution, `totalAssets()` and `sharePrice()` are the canonical accounting getters.
 
 ## VaultAdapter Integration Pattern
 

@@ -154,7 +154,7 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         // Check the settled batch
         // Note: getCurrentBatchInfo returns info about the CURRENT batch (which is new after settlement)
         // We need to check the old batch
-        (, bool oldClosed, bool oldSettled,,,,,,) = vault.getBatchIdInfo(batchId);
+        (, bool oldClosed, bool oldSettled,,,,,) = vault.getBatchIdInfo(batchId);
         assertTrue(oldClosed);
         assertTrue(oldSettled);
     }
@@ -188,22 +188,14 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         uint256 totalAssetsVal = vault.totalAssets();
         _executeBatchSettlement(address(vault), batchId, totalAssetsVal);
 
-        (
-            ,
-            bool isClosed,
-            bool isSettled,
-            uint256 sharePrice_,
-            uint256 netSharePrice_,
-            uint256 totalAssets_,
-            uint256 totalSupply_,,
-        ) = vault.getBatchIdInfo(batchId);
+        (, bool isClosed, bool isSettled, uint256 sharePrice_, uint256 totalAssets_, uint256 totalSupply_,,) =
+            vault.getBatchIdInfo(batchId);
 
         assertTrue(isClosed);
         assertTrue(isSettled);
         assertGt(totalAssets_, 0);
         assertGt(totalSupply_, 0);
         assertGt(sharePrice_, 0);
-        assertGt(netSharePrice_, 0);
     }
 
     function test_isClosed_ReturnsFalse_ForOpenBatch() public view {
@@ -263,12 +255,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
     function test_sharePrice_ReturnsGrossSharePrice() public view {
         uint256 price = vault.sharePrice();
         // Initial share price should be 1:1 (1e6 for 6 decimals)
-        assertEq(price, 1e6);
-    }
-
-    function test_netSharePrice_ReturnsNetSharePrice() public view {
-        uint256 price = vault.netSharePrice();
-        // Initially should be same as gross price
         assertEq(price, 1e6);
     }
 
@@ -472,7 +458,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
 
         // Share price
         vault.sharePrice();
-        vault.netSharePrice();
         vault.totalAssets();
 
         // Conversions
@@ -508,7 +493,6 @@ contract kStakingVaultReaderTest is BaseVaultTest {
             v.underlyingAsset();
             v.getBatchId();
             v.sharePrice();
-            v.netSharePrice();
             v.totalAssets();
             v.contractName();
             v.contractVersion();

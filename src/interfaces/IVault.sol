@@ -196,10 +196,6 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /// @notice Returns gross share price based on active accounted vault assets
     function sharePrice() external view returns (uint256);
 
-    /// @notice Returns net share price after fee accounting
-    /// @dev Currently equals sharePrice because pending fee effects are reflected through settlement/accrual paths.
-    function netSharePrice() external view returns (uint256);
-
     /// @notice Converts assets to shares at current price, rounding down
     function convertToShares(uint256 assets) external view returns (uint256);
 

@@ -217,8 +217,7 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
     /// @return batchReceiver The receiver holding settlement assets for the batch
     /// @return isClosed_ True if the batch is closed
     /// @return isSettled True if the batch is settled
-    /// @return sharePrice_ The settled or stored gross share price for the batch
-    /// @return netSharePrice_ The settled or stored net share price for the batch
+    /// @return sharePrice_ The settled or stored share price for the batch
     /// @return totalAssets_ The active assets recorded for the batch
     /// @return totalSupply_ The share supply recorded for the batch
     /// @return depositedInBatch The kToken amount pending stake in the batch
@@ -231,7 +230,6 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
             bool isClosed_,
             bool isSettled,
             uint256 sharePrice_,
-            uint256 netSharePrice_,
             uint256 totalAssets_,
             uint256 totalSupply_,
             uint256 depositedInBatch,
@@ -245,14 +243,12 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         uint8 decimals = _getDecimals($);
 
         sharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalAssets, _totalSupply);
-        netSharePrice_ = sharePrice_;
 
         return (
             batch.batchReceiver,
             batch.isClosed,
             batch.isSettled,
             sharePrice_,
-            netSharePrice_,
             batch.totalAssets,
             batch.totalSupply,
             batch.depositedInBatch,

@@ -488,9 +488,7 @@ registry
 asset
 underlyingAsset
 totalAssets
-totalNetAssets
 sharePrice
-netSharePrice
 convertToShares
 convertToAssets
 convertToSharesWithTotals
@@ -515,7 +513,6 @@ Also synchronize `IVault` NatSpec with implementation behavior:
 - `asset()` returns the vault's **kToken**, not the underlying asset.
 - `underlyingAsset()` returns the underlying settlement asset.
 - `totalAssets()` returns active accounted vault assets, excluding pending stake and settled unstake reserves.
-- `totalNetAssets()` currently equals `totalAssets()` after fee-accounting consolidation.
 - `expectedKTokenBalance()` returns `totalAssets + totalPendingStake + totalPendingUnstake`.
 
 ### Vault accounting invariants

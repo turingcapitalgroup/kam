@@ -4,18 +4,10 @@ pragma solidity 0.8.30;
 import { BaseVaultTest, DeploymentBaseTest } from "../utils/BaseVaultTest.sol";
 import { _1_USDC } from "../utils/Constants.sol";
 
-import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
-import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
-
 import { KSTAKINGVAULT_WRONG_ROLE, VAULTFEES_FEE_EXCEEDS_MAXIMUM } from "kam/src/errors/Errors.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 
 contract kStakingVaultFeesTest is BaseVaultTest {
-    using OptimizedFixedPointMathLib for uint256;
-    using SafeTransferLib for address;
-
-    uint256 constant SECS_PER_YEAR = 31_556_952;
-    uint256 constant TEST_TIMESTAMP = 1_760_022_175; // Oct 9, 2025
     uint256 constant MAX_BPS = 10_000;
 
     function setUp() public override {
@@ -83,25 +75,52 @@ contract kStakingVaultFeesTest is BaseVaultTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                        TOTAL NET ASSETS / SHARE PRICE COMPAT
+                        SHARE-MINTED FEE ACCOUNTING
     //////////////////////////////////////////////////////////////*/
 
-    function test_NetSharePrice_EqualsSharePrice() public {
+    function test_ManagementFees_MintTreasurySharesWithoutReducingTotalAssets() public {
         _setupTestFees();
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 
-        // Add yield
-        uint256 yieldAmount = 200_000 * _1_USDC;
-        vm.prank(address(minter));
-        kUSD.mint(address(vault), yieldAmount);
-        vm.prank(address(assetRouter));
-        vault.increaseBalance(uint128(yieldAmount));
+        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 sharePriceBefore = vault.sharePrice();
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
 
-        // Fast forward time
         vm.warp(block.timestamp + 365 days);
 
-        // Fees are now minted as shares, so netSharePrice == sharePrice
-        assertEq(vault.netSharePrice(), vault.sharePrice());
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        _executeBatchSettlement(address(vault), batchId, totalAssetsBefore);
+
+        assertEq(vault.totalAssets(), totalAssetsBefore);
+        assertGt(vault.balanceOf(users.treasury), treasurySharesBefore);
+        assertLt(vault.sharePrice(), sharePriceBefore);
+    }
+
+    function test_PerformanceFees_MintTreasurySharesWithoutReducingTotalAssets() public {
+        _setupTestFees();
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 supplyBefore = vault.totalSupply();
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
+        uint256 yieldAmount = 200_000 * _1_USDC;
+
+        vm.warp(block.timestamp + 365 days);
+
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        _executeBatchSettlement(address(vault), batchId, totalAssetsBefore + yieldAmount);
+
+        uint256 noFeeSharePrice = (totalAssetsBefore + yieldAmount) * 10 ** vault.decimals() / supplyBefore;
+
+        assertEq(vault.totalAssets(), totalAssetsBefore + yieldAmount);
+        assertGt(vault.balanceOf(users.treasury), treasurySharesBefore);
+        assertLt(vault.sharePrice(), noFeeSharePrice);
     }
 
     /* //////////////////////////////////////////////////////////////

@@ -709,13 +709,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         return _sharePrice();
     }
 
-    /// @notice Returns the current net share price after fee accounting
-    /// @dev Currently equals sharePrice because pending fee effects are reflected through settlement/accrual paths.
-    /// @return The net amount of active assets represented by one whole share unit
-    function netSharePrice() external view returns (uint256) {
-        return _sharePrice();
-    }
-
     /// @notice Converts an asset amount to shares using current totals
     /// @dev Rounds down in favor of the vault.
     /// @param _assets The active asset amount to convert

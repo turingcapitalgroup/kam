@@ -302,7 +302,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _netted = int256(uint256(_batchInfo.depositedInBatch)) - int256(uint256(_batchInfo.requestedSharesInBatch));
         } else {
             require(_asset == IkStakingVault(_vault).underlyingAsset(), KASSETROUTER_ASSET_MISMATCH);
-            (,,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
+            (,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
             _requestedInBatch = _requestedSharesInBatch;
             uint256 _totalSupply = IkStakingVault(_vault).totalSupply();
@@ -558,7 +558,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
             // After successful settlement, reduce global pending requests for kMinter
             // depositedInBatch represents the stake requests that called kAssetTransfer
-            (,,,,,,, uint256 _depositedInBatch,) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
+            (,,,,,, uint256 _depositedInBatch,) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
             kAssetRouterStorage storage $ = _getkAssetRouterStorage();
             $.globalPendingRequests[_kMinter][_asset] -= _depositedInBatch;
         }
@@ -794,7 +794,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             IkMinter.BatchInfo memory _batchInfo = IkMinter(_vault).getBatchInfo(_batchId);
             return (_batchInfo.depositedInBatch, _batchInfo.requestedSharesInBatch);
         } else {
-            (,,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
+            (,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
             return (_depositedInBatch, _requestedSharesInBatch);
         }
@@ -802,7 +802,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
     /// @inheritdoc IkAssetRouter
     function getRequestedShares(address _vault, bytes32 _batchId) external view returns (uint256) {
-        (,,,,,,,, uint256 _requestedSharesInBatch) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
+        (,,,,,,, uint256 _requestedSharesInBatch) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
         return _requestedSharesInBatch;
     }
 

@@ -46,8 +46,8 @@ interface IVaultBatch {
     /// `lastSettlementBalance` to snapshot current vault balance as the baseline for the next batch's interest
     /// calculation, (4) Snapshots total assets and total supply at settlement time from which share price is
     /// derived for stake and unstake calculations, (5) Mints stkTokens for all pending stakers in this batch
-    /// to the vault itself at the settlement net share price, (6) Burns all requested unstake stkTokens and
-    /// calculates claimable kTokens at net price, decreasing internal balance accordingly, (7) Marks batch as
+    /// to the vault itself at the settlement share price, (6) Burns all requested unstake stkTokens and
+    /// calculates claimable kTokens at the settled price, decreasing internal balance accordingly, (7) Marks batch as
     /// settled enabling users to claim their staked shares or unstaked assets. Only kAssetRouter can settle batches
     /// as it coordinates yield calculations across DN vaults and manages cross-vault asset flows. The pre-minting
     /// approach ensures share prices are locked at settlement and users receive shares via transfer (not mint) when
