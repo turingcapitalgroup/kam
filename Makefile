@@ -69,6 +69,10 @@ anvil-localhost:
 	@echo "Starting localhost Anvil with deployment-compatible settings..."
 	anvil --host 127.0.0.1 --port 8545 --chain-id 31337 --disable-code-size-limit
 
+anvil-localhost:
+	@echo "Starting localhost Anvil with deployment-compatible settings..."
+	anvil --host 127.0.0.1 --port 8545 --chain-id 31337 --disable-code-size-limit
+
 # Network-specific deployments
 deploy-mainnet:
 	@echo "🔴 Deploying to MAINNET..."
