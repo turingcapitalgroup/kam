@@ -605,7 +605,7 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     }
 
     function _auditKTokenBalance(BaseVaultStorage storage $) private view {
-        require($.kToken.balanceOf(address(this)) == _expectedKTokenBalance($), KSTAKINGVAULT_BALANCE_AUDIT_FAILED);
+        require($.kToken.balanceOf(address(this)) >= _expectedKTokenBalance($), KSTAKINGVAULT_BALANCE_AUDIT_FAILED);
     }
 
     /// @notice Creates a unique request ID for a staking request
