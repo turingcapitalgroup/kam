@@ -121,6 +121,12 @@ contract kRemoteRegistryTest is Test {
         registry.setAllowedSelector(executor, target, testSelector, true);
     }
 
+    function test_SetAllowedSelector_Require_Not_Already_Disallowed() public {
+        vm.prank(owner);
+        vm.expectRevert(bytes(KREMOTEREGISTRY_SELECTOR_ALREADY_SET));
+        registry.setAllowedSelector(executor, target, testSelector, false);
+    }
+
     /* //////////////////////////////////////////////////////////////
                     EXECUTION VALIDATOR
     //////////////////////////////////////////////////////////////*/
