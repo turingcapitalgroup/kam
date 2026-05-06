@@ -8,13 +8,13 @@
 
 ## Summary
 
-| Severity     | Total | Fixed in `kam` | Fixed in other repos | Unclear / Not fixed |
-|-------------|-------|---------------|---------------------|--------------------|
-| High        | 3     | 2             | 1                   | 0                  |
-| Medium      | 14    | 9             | 5                   | 0                  |
-| Low         | 7     | 5             | 1                   | 1                  |
-| Informational | 14 | 7             | 6                   | 1                  |
-| **Total**   | **38** | **23**       | **13**              | **2**              |
+| Severity     | Total | Fixed (targeted) | Obsoleted by redesign | Fixed in other repos | Not fixed |
+|-------------|-------|-------------------|-----------------------|---------------------|-----------|
+| High        | 3     | 1                 | 0                     | 2                   | 0         |
+| Medium      | 14    | 5                 | 4                     | 5                   | 0         |
+| Low         | 7     | 3                 | 1                     | 1                   | 2         |
+| Informational | 14 | 5                 | 0                     | 6                   | 3         |
+| **Total**   | **38** | **14**            | **5**                 | **14**              | **5**     |
 
 ---
 
@@ -31,8 +31,7 @@
 
 ### 3. Watermark update computes fees with zero performance duration and stale management duration
 - **Severity**: Medium
-- **Fixed**: `8026b03` — `fix: global watermark + mathematical verification`
-- **Also**: `3e70f4b` — `fix: [Medium] double fees discovery in watermark` (finding #17)
+- **Obsoleted by redesign**: `f020291` — `Feat/per batch fees accruing (#246)` completely replaced the old watermark fee system (settlement-only accrual, net interest calc, vesting removal). The old watermark/fee code this finding refers to no longer exists. Targeted reorder in `8026b03` is also on the branch.
 
 ### 4. kAssetRequestPull checks virtual balance against a single batch, ignoring unsettled batches for the same asset
 - **Severity**: Medium
@@ -60,7 +59,7 @@
 
 ### 10. No upper or lower bound validation on setMaxAllowedDelta
 - **Severity**: Informational
-- **Fixed**: `0567bd0` — Post audit phase 3 (#250) — added input validation
+- **Not fixed**: `setMaxAllowedDelta` still accepts any `uint256` without bounds checks. The post-audit plan tracked this under Phase 3 but the Phase 3 merge (`0567bd0`) did not include input validation for this setter.
 
 ### 11. Frozen accounts can unfreeze themselves by renouncing the blacklist role
 - **Severity**: High
@@ -68,11 +67,11 @@
 
 ### 12. Deposits that enter above the watermark price are considered as yield during performance fee calculation
 - **Severity**: Medium
-- **Fixed**: `8026b03` — `fix: global watermark + mathematical verification`
+- **Obsoleted by redesign**: `f020291` — `Feat/per batch fees accruing (#246)` replaced the fee system entirely. The watermark-based performance fee logic this finding describes was removed.
 
 ### 13. Performance fees undercharged because fee computation uses pre-yield kToken balance
 - **Severity**: Low
-- **Fixed**: `8026b03` — `fix: global watermark + mathematical verification`
+- **Obsoleted by redesign**: `f020291` — `Feat/per batch fees accruing (#246)` replaced the fee system. Net interest is now computed after management fees at settlement time, resolving the undercharge.
 
 ### 14. Non-idempotent executeWithHookExecution allows accidental double-execution
 - **Severity**: Medium
@@ -100,11 +99,11 @@
 
 ### 20. Unclaimed unstake kTokens artificially reduce max staking capacity
 - **Severity**: Low
-- **Fixed**: `6beceef` — `improve: kminter burns ktokens on settleBatch instead of each burn` — batch-level burn reduces the accounting distortion
+- **Not fixed**: `6beceef` changed kMinter to burn kTokens on `settleBatch` instead of per-burn, which reduces the accounting window but does not fully address the finding. The post-audit plan noted this for follow-up.
 
 ### 21. Relayer can open a new batch before closing the current batch
 - **Severity**: Informational
-- **Fixed**: `0567bd0` — Post audit phase 3 (#250) — added `closeCurrentBatch` enforcement in `createNewBatch`
+- **Not fixed**: `_createNewBatch` still unconditionally overwrites `currentBatchIds[_asset]` without checking whether the previous batch is closed. The Phase 3 merge (`0567bd0`) simplified `registerVault` but did not add this guard.
 
 ### 22. kSettler and kAssetRouter use different formulas for DN netting
 - **Severity**: Informational
@@ -116,7 +115,7 @@
 
 ### 24. Yield tolerance check bypassed on a vault's first settlement
 - **Severity**: Low
-- **Fixed**: `8026b03` — `fix: global watermark + mathematical verification` — first-settlement yield now enforced via the watermark baseline
+- **Not fixed**: The `KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD` guard exists in `proposeSettleBatch` (enforces `_yield == 0` when `_lastTotalAssets == 0`), but this was present before the audit fix commits. The finding appears to describe a different bypass path. No targeted fix commit was found.
 
 ### 25. MultiFacetProxy.addFunction does not validate the implementation address
 - **Severity**: Informational
@@ -152,7 +151,7 @@
 
 ### 33. Strategy yield is stranded on the kMinter adapter when a DN vault has zero supply
 - **Severity**: Medium
-- **Fixed**: `8026b03` — `fix: global watermark + mathematical verification` — zero-supply settlement path now correctly handles yield routing
+- **Obsoleted by redesign**: `f020291` — `Feat/per batch fees accruing (#246)` changed the settlement flow so that DN vault yield is now distributed via `increaseBalance`/`decreaseBalance` and kToken mint/burn directly on the vault, routing through the vault rather than being stranded on the kMinter adapter.
 
 ### 34. Pending unstake claims on DN staking vaults remain exposed to strategy losses
 - **Severity**: Medium
@@ -194,7 +193,7 @@
 | `c2891f0` | fix: [Medium] Pending unstake claims exposed to strategy losses |
 | `0a9b8b7` | Fix/audit fixes to b — role management + MultiFacetProxy validation (#247) |
 | `9638287` | fix: [Info] kSettler and kAssetRouter use different formulas for DN netting |
-| `f020291` | Feat/per batch fees accruing (#246) |
+| `f020291` | Feat/per batch fees accruing — complete fee system redesign (#246) |
 | `3e70f4b` | fix: [Medium] double fees discovery in watermark |
 | `247e770` | fix: [Low] _getPaused does not check the global pause state |
 | `e4d52a8` | fix: [Low] Incorrect storage location hashes |
