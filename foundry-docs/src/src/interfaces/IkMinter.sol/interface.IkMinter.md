@@ -1,8 +1,8 @@
 # IkMinter
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/interfaces/IkMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IkMinter.sol)
 
 **Inherits:**
-[IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Interface for institutional minting and redemption operations in the KAM protocol
 
@@ -449,7 +449,7 @@ Emitted when a new redemption request is created and enters the batch queue
 
 ```solidity
 event BurnRequestCreated(
-    bytes32 indexed requestId, address indexed user, address indexed kToken, uint256 amount, bytes32 batchId
+    bytes32 indexed requestId, address indexed recipient, address indexed kToken, uint256 amount, bytes32 batchId
 );
 ```
 
@@ -458,7 +458,7 @@ event BurnRequestCreated(
 |Name|Type|Description|
 |----|----|-----------|
 |`requestId`|`bytes32`|The unique identifier assigned to this redemption request|
-|`user`|`address`|The address that initiated the redemption request|
+|`recipient`|`address`|The address that will receive the underlying assets at settlement (passed as `_to` in `requestBurn`, not necessarily the caller)|
 |`kToken`|`address`|The kToken contract address being burned|
 |`amount`|`uint256`|The amount of kTokens being burned|
 |`batchId`|`bytes32`|The batch identifier this request is associated with|
@@ -591,11 +591,16 @@ struct BatchInfo {
 ### RequestStatus
 Represents the lifecycle status of a redemption request
 
-Used to track the progression of redemption requests through the batch system
+Used to track the progression of redemption requests through the batch system.
+`UNDEFINED = 0` is the zero-initialized sentinel — a fresh storage slot reads as
+`UNDEFINED`, not as a valid `PENDING` request, so callers can distinguish
+"request does not exist" from "request is in flight".
 
 
 ```solidity
 enum RequestStatus {
+    /// @dev Zero-initialized sentinel — request does not exist
+    UNDEFINED,
     /// @dev Request has been created and tokens are held in escrow, awaiting batch settlement
     PENDING,
     /// @dev Request has been successfully executed and underlying assets have been distributed

@@ -1,8 +1,8 @@
 # kStakingVault
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/kStakingVault/kStakingVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kStakingVault/kStakingVault.sol)
 
 **Inherits:**
-[IVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [BaseVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
+[IVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [ISettleBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.ISettleBatch.md), [BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
 
 Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
 
@@ -244,24 +244,32 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 Marks a batch as settled after yield distribution, accrues fees, mints shares for pending stakers, and enables claiming
 
-This function finalizes batch settlement by computing and accruing fees, recording final asset values, minting shares, and enabling claims.
-Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Accrues
-time-prorated management fees via `_accrueFees()` and computes per-batch performance fees via
-`VaultMathLib.computePerformanceFee()` on net interest above the hurdle rate — both fee types are minted
-as shares directly to the treasury inside this function (no separate notify step), (3) Updates
-`lastSettlementBalance` to snapshot current vault balance as the baseline for the next batch's interest
-calculation, (4) Snapshots total assets and total supply at settlement time from which share price is
-derived for stake and unstake calculations, (5) Mints stkTokens for all pending stakers in this batch
-to the vault itself at the settlement net share price, (6) Burns all requested unstake stkTokens and
-calculates claimable kTokens at net price, decreasing internal balance accordingly, (7) Marks batch as
-settled enabling users to claim their staked shares or unstaked assets. Only kAssetRouter can settle batches
-as it coordinates yield calculations across DN vaults and manages cross-vault asset flows. The pre-minting
-approach ensures share prices are locked at settlement and users receive shares via transfer (not mint) when
-they claim.
+CALL CONTRACT — DO NOT REORDER. Each step depends on state mutated by the previous
+step; reordering produces silent fee-math errors (double-charging of management fees
+as yield, stale settlement baselines) or hard reverts (zero-duration settlements).
+1. Capture `_settlementElapsed` BEFORE `_accrueFees()` advances `_lastFeeTimestamp`.
+If this capture happens after the accrual, elapsed = 0 and `computePerformanceFee`
+reverts with `VAULTMATHLIB_ZERO_ELAPSED` (the library guard added to prevent the
+hurdle filter from being silently bypassed).
+2. `_accrueFees()` computes the management fee on pre-yield total assets and advances
+`_lastFeeTimestamp`. Returns the management-fee amount in asset terms.
+3. Compute net interest as
+`_currentBalance - _previousBalance - _mgmtFeeAssets`
+so the management fee is removed from the perf-fee base. Without this subtraction
+the management-fee charge appears as "yield" and is performance-fee'd a second time.
+4. Mint management-fee shares (`_mintManagementFees`).
+5. Compute performance fee using the captured elapsed and the net interest, against
+`_previousBalance` as the hurdle baseline.
+6. Mint performance-fee shares.
+7. Process pending stake/unstake at `_totalAssets()` / `totalSupply()`. These values
+include the just-minted fee shares — that is intentional: stakers join at the
+post-fee rate.
+8. Snapshot `_lastSettlementBalance = _totalBalance()` LAST so the next settlement's
+interest baseline is correct.
 
 
 ```solidity
-function settleBatch(bytes32 _batchId) external;
+function settleBatch(bytes32 _batchId) external override(IVaultBatch, ISettleBatch);
 ```
 **Parameters**
 
@@ -478,6 +486,20 @@ function decreaseBalance(uint128 _amount) external;
 |`_amount`|`uint128`||
 
 
+### _expectedKTokenBalance
+
+
+```solidity
+function _expectedKTokenBalance(BaseVaultStorage storage $) private view returns (uint256);
+```
+
+### _auditKTokenBalance
+
+
+```solidity
+function _auditKTokenBalance(BaseVaultStorage storage $) private view;
+```
+
 ### _createStakeRequestId
 
 Creates a unique request ID for a staking request
@@ -588,181 +610,245 @@ function _authorizeModifyFunctions(
 
 ### registry
 
+Returns the protocol registry address used for configuration and role checks
+
+Reverts before initialization so integrations do not read an unset registry.
+
 
 ```solidity
 function registry() external view returns (address);
 ```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The kRegistry address configured during initialization|
+
 
 ### asset
+
+Returns the vault's kToken address
+
+This is the share accounting asset held by the vault, not the underlying settlement asset.
 
 
 ```solidity
 function asset() external view returns (address);
 ```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The kToken associated with the vault's underlying asset|
+
 
 ### underlyingAsset
+
+Returns the underlying settlement asset address
 
 
 ```solidity
 function underlyingAsset() external view returns (address);
 ```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The asset address used by the router and strategies for settlement|
+
 
 ### totalAssets
+
+Returns active accounted vault assets
+
+Excludes pending stake collateral and kTokens reserved for settled-but-unclaimed unstake requests.
 
 
 ```solidity
 function totalAssets() external view returns (uint256);
 ```
+**Returns**
 
-### totalNetAssets
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The active asset base that can absorb strategy gains and losses|
 
-
-```solidity
-function totalNetAssets() external view returns (uint256);
-```
 
 ### sharePrice
+
+Returns the current gross share price
+
+Uses one whole share unit based on the vault decimals and current active assets.
 
 
 ```solidity
 function sharePrice() external view returns (uint256);
 ```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The amount of active assets represented by one whole share unit|
+
 
 ### netSharePrice
+
+Returns the current net share price after fee accounting
+
+Currently equals sharePrice because pending fee effects are reflected through settlement/accrual paths.
 
 
 ```solidity
 function netSharePrice() external view returns (uint256);
 ```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The net amount of active assets represented by one whole share unit|
+
 
 ### convertToShares
+
+Converts an asset amount to shares using current totals
+
+Rounds down in favor of the vault.
 
 
 ```solidity
 function convertToShares(uint256 _assets) external view returns (uint256);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_assets`|`uint256`|The active asset amount to convert|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The share amount for the provided assets|
+
 
 ### convertToAssets
+
+Converts a share amount to assets using current totals
+
+Rounds down in favor of the vault.
 
 
 ```solidity
 function convertToAssets(uint256 _shares) external view returns (uint256);
 ```
+**Parameters**
 
-### convertToSharesWithTotals
+|Name|Type|Description|
+|----|----|-----------|
+|`_shares`|`uint256`|The share amount to convert|
 
+**Returns**
 
-```solidity
-function convertToSharesWithTotals(
-    uint256 _assets,
-    uint256 _totalAssetsVal,
-    uint256 _totalSupplyVal
-)
-    external
-    pure
-    returns (uint256);
-```
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The active asset amount for the provided shares|
 
-### convertToAssetsWithTotals
-
-
-```solidity
-function convertToAssetsWithTotals(
-    uint256 _shares,
-    uint256 _totalAssetsVal,
-    uint256 _totalSupplyVal
-)
-    external
-    pure
-    returns (uint256);
-```
-
-### getBatchId
-
-
-```solidity
-function getBatchId() public view returns (bytes32);
-```
-
-### getSafeBatchId
-
-
-```solidity
-function getSafeBatchId() external view returns (bytes32);
-```
-
-### isClosed
-
-
-```solidity
-function isClosed(bytes32 _batchId) external view returns (bool isClosed_);
-```
-
-### isBatchClosed
-
-
-```solidity
-function isBatchClosed() external view returns (bool);
-```
-
-### isBatchSettled
-
-
-```solidity
-function isBatchSettled() external view returns (bool);
-```
-
-### getCurrentBatchInfo
-
-
-```solidity
-function getCurrentBatchInfo()
-    external
-    view
-    returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
-```
-
-### getBatchIdInfo
-
-
-```solidity
-function getBatchIdInfo(bytes32 _batchId)
-    external
-    view
-    returns (
-        address batchReceiver,
-        bool isClosed_,
-        bool isSettled,
-        uint256 sharePrice_,
-        uint256 netSharePrice_,
-        uint256 totalAssets_,
-        uint256 totalNetAssets_,
-        uint256 totalSupply_,
-        uint256 depositedInBatch,
-        uint256 requestedSharesInBatch
-    );
-```
 
 ### maxTotalAssets
+
+Returns the vault TVL cap in active assets plus pending stake collateral
 
 
 ```solidity
 function maxTotalAssets() external view returns (uint128);
 ```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint128`|The maximum total assets configured for the vault|
+
+
+### totalPendingStake
+
+Returns kTokens reserved for pending stake requests
+
+These kTokens are held by the vault but not yet converted into active assets.
+
+
+```solidity
+function totalPendingStake() external view returns (uint128);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint128`|The pending stake reserve amount|
+
+
+### totalPendingUnstake
+
+Returns kTokens reserved for settled-but-unclaimed unstake requests
+
+These kTokens are not active assets and must not be consumed by strategy losses.
+
+
+```solidity
+function totalPendingUnstake() external view returns (uint128);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint128`|The pending unstake reserve amount|
+
+
+### expectedKTokenBalance
+
+Returns the raw kToken balance expected to be held by the vault
+
+Equals totalAssets() + totalPendingStake() + totalPendingUnstake().
+
+
+```solidity
+function expectedKTokenBalance() public view returns (uint256);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The expected kToken balance for invariant audits|
+
 
 ### contractName
+
+Returns the human-readable contract name
 
 
 ```solidity
 function contractName() external pure returns (string memory);
 ```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`string`|The contract name|
+
 
 ### contractVersion
+
+Returns the contract version
 
 
 ```solidity
 function contractVersion() external pure returns (string memory);
 ```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`string`|The semantic version string|
+
 
 ### receive
 

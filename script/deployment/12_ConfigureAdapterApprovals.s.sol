@@ -28,6 +28,8 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
     /// @param betaVaultAdapterAddr Address of betaVaultAdapter
     /// @param metawalletUSDCAddr Address of metawalletUSDC (metawallet)
     /// @param metawalletWBTCAddr Address of metawalletWBTC (metawallet)
+    /// @param usdcAddr Address of USDC asset (if zero, reads from config JSON)
+    /// @param wbtcAddr Address of WBTC asset (if zero, reads from config JSON)
     function run(
         address registryAddr,
         address kMinterAdapterUSDCAddr,
@@ -37,7 +39,9 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         address alphaVaultAdapterAddr,
         address betaVaultAdapterAddr,
         address metawalletUSDCAddr,
-        address metawalletWBTCAddr
+        address metawalletWBTCAddr,
+        address usdcAddr,
+        address wbtcAddr
     )
         public
     {
@@ -101,9 +105,9 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
 
         logExecutionStart();
 
-        // Get asset addresses from config
-        address usdc = config.assets.USDC;
-        address wbtc = config.assets.WBTC;
+        // Get asset addresses: prefer provided, fallback to config
+        address usdc = usdcAddr != address(0) ? usdcAddr : config.assets.USDC;
+        address wbtc = wbtcAddr != address(0) ? wbtcAddr : config.assets.WBTC;
         uint256 maxApproval = type(uint256).max;
 
         vm.startBroadcast(config.roles.admin);
@@ -175,9 +179,50 @@ contract ConfigureAdapterApprovalsScript is Script, DeploymentManager {
         }
     }
 
+    /// @notice Backward-compatible wrapper (9 params, no asset overrides)
+    function run(
+        address registryAddr,
+        address kMinterAdapterUSDCAddr,
+        address kMinterAdapterWBTCAddr,
+        address dnVaultAdapterUSDCAddr,
+        address dnVaultAdapterWBTCAddr,
+        address alphaVaultAdapterAddr,
+        address betaVaultAdapterAddr,
+        address metawalletUSDCAddr,
+        address metawalletWBTCAddr
+    )
+        public
+    {
+        run(
+            registryAddr,
+            kMinterAdapterUSDCAddr,
+            kMinterAdapterWBTCAddr,
+            dnVaultAdapterUSDCAddr,
+            dnVaultAdapterWBTCAddr,
+            alphaVaultAdapterAddr,
+            betaVaultAdapterAddr,
+            metawalletUSDCAddr,
+            metawalletWBTCAddr,
+            address(0),
+            address(0)
+        );
+    }
+
     /// @notice Convenience wrapper for real deployments (reads addresses from JSON/config)
     function run() public {
-        run(address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0), address(0));
+        run(
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0),
+            address(0)
+        );
     }
 
     /// @notice Execute an ERC20 approval from within an adapter

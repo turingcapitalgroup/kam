@@ -1,8 +1,8 @@
 # IVault
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/interfaces/IVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IVault.sol)
 
 **Inherits:**
-[IERC2771](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md), [IVaultBatch](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
+[IERC2771](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md), [IVaultBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
 
 Core interface for retail staking operations enabling kToken holders to earn yield through vault strategies
 
@@ -153,7 +153,7 @@ function setTrustedForwarder(address trustedForwarder_) external;
 
 ### registry
 
-Returns the protocol registry address
+Returns the protocol registry address used for configuration and role checks
 
 
 ```solidity
@@ -162,7 +162,7 @@ function registry() external view returns (address);
 
 ### asset
 
-Returns the vault's kToken address
+Returns the vault's kToken address, not the underlying settlement asset
 
 
 ```solidity
@@ -171,7 +171,7 @@ function asset() external view returns (address);
 
 ### underlyingAsset
 
-Returns the underlying asset address
+Returns the underlying settlement asset address
 
 
 ```solidity
@@ -180,25 +180,18 @@ function underlyingAsset() external view returns (address);
 
 ### totalAssets
 
-Returns total assets under management
+Returns active accounted vault assets
+
+Excludes pending stake collateral and kTokens reserved for settled-but-unclaimed unstake requests.
 
 
 ```solidity
 function totalAssets() external view returns (uint256);
 ```
 
-### totalNetAssets
-
-Returns net assets after fees
-
-
-```solidity
-function totalNetAssets() external view returns (uint256);
-```
-
 ### sharePrice
 
-Returns gross share price
+Returns gross share price based on active accounted vault assets
 
 
 ```solidity
@@ -207,7 +200,9 @@ function sharePrice() external view returns (uint256);
 
 ### netSharePrice
 
-Returns net share price after fees
+Returns net share price after fee accounting
+
+Currently equals sharePrice because pending fee effects are reflected through settlement/accrual paths.
 
 
 ```solidity
@@ -216,7 +211,7 @@ function netSharePrice() external view returns (uint256);
 
 ### convertToShares
 
-Converts assets to shares at current price
+Converts assets to shares at current price, rounding down
 
 
 ```solidity
@@ -225,132 +220,53 @@ function convertToShares(uint256 assets) external view returns (uint256);
 
 ### convertToAssets
 
-Converts shares to assets at current price
+Converts shares to assets at current price, rounding down
 
 
 ```solidity
 function convertToAssets(uint256 shares) external view returns (uint256);
 ```
 
-### convertToAssetsWithTotals
-
-Converts shares to assets with specified totals
-
-
-```solidity
-function convertToAssetsWithTotals(
-    uint256 shares,
-    uint256 totalAssets_,
-    uint256 totalSupply_
-)
-    external
-    pure
-    returns (uint256);
-```
-
-### convertToSharesWithTotals
-
-Converts assets to shares with specified totals
-
-
-```solidity
-function convertToSharesWithTotals(
-    uint256 assets,
-    uint256 totalAssets_,
-    uint256 totalSupply_
-)
-    external
-    pure
-    returns (uint256);
-```
-
-### getBatchId
-
-Returns the current active batch ID
-
-
-```solidity
-function getBatchId() external view returns (bytes32);
-```
-
-### getSafeBatchId
-
-Returns current batch ID with safety validation
-
-
-```solidity
-function getSafeBatchId() external view returns (bytes32);
-```
-
-### isClosed
-
-Returns the close state of a given batch
-
-
-```solidity
-function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
-```
-
-### isBatchClosed
-
-Returns whether the current batch is closed
-
-
-```solidity
-function isBatchClosed() external view returns (bool);
-```
-
-### isBatchSettled
-
-Returns whether the current batch is settled
-
-
-```solidity
-function isBatchSettled() external view returns (bool);
-```
-
-### getCurrentBatchInfo
-
-Returns comprehensive info about the current batch
-
-
-```solidity
-function getCurrentBatchInfo()
-    external
-    view
-    returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
-```
-
-### getBatchIdInfo
-
-Returns comprehensive info about a specific batch
-
-
-```solidity
-function getBatchIdInfo(bytes32 batchId)
-    external
-    view
-    returns (
-        address batchReceiver,
-        bool isClosed_,
-        bool isSettled,
-        uint256 sharePrice_,
-        uint256 netSharePrice_,
-        uint256 totalAssets_,
-        uint256 totalNetAssets_,
-        uint256 totalSupply_,
-        uint256 depositedInBatch,
-        uint256 requestedSharesInBatch
-    );
-```
-
 ### maxTotalAssets
 
-Returns the maximum total assets (TVL cap)
+Returns the maximum active assets plus pending stake collateral allowed in the vault
 
 
 ```solidity
 function maxTotalAssets() external view returns (uint128);
+```
+
+### totalPendingStake
+
+Returns kTokens reserved for pending stake requests
+
+These kTokens are held by the vault but not yet converted into active assets.
+
+
+```solidity
+function totalPendingStake() external view returns (uint128);
+```
+
+### totalPendingUnstake
+
+Returns kTokens reserved for settled-but-unclaimed unstake requests
+
+These kTokens are not active assets and must not be consumed by strategy losses.
+
+
+```solidity
+function totalPendingUnstake() external view returns (uint128);
+```
+
+### expectedKTokenBalance
+
+Returns active assets plus pending kToken reserves expected in the vault
+
+Equals totalAssets() + totalPendingStake() + totalPendingUnstake().
+
+
+```solidity
+function expectedKTokenBalance() external view returns (uint256);
 ```
 
 ### increaseBalance

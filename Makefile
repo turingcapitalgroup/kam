@@ -61,6 +61,13 @@ help:
 	@echo "make configure            - Configure protocol (10)"
 	@echo "make configure-adapters   - Configure adapter permissions (11)"
 	@echo "make configure-approvals  - Configure adapter ERC20 approvals (12)"
+	@echo ""
+	@echo "=== FINAL STEP - Ownership handover (script/deployment/13) ==="
+	@echo "make deploy-timelock      - Deploy Admin Timelock + transfer UUPS ownership (13, IRREVERSIBLE)"
+
+anvil-localhost:
+	@echo "Starting localhost Anvil with deployment-compatible settings..."
+	anvil --host 127.0.0.1 --port 8545 --chain-id 31337 --disable-code-size-limit
 
 anvil-localhost:
 	@echo "Starting localhost Anvil with deployment-compatible settings..."
@@ -87,8 +94,8 @@ deploy-sepolia-dry-run:
 
 deploy-localhost:
 	@echo "🟢 Deploying to LOCALHOST..."
-	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow --disable-code-size-limit"
-	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow --disable-code-size-limit"
+	@$(MAKE) deploy-mock-assets FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow "
+	@$(MAKE) deploy-all FORGE_ARGS="--rpc-url http://localhost:8545 --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --slow "
 
 deploy-localhost-dry-run:
 	@echo "🟢 [DRY-RUN] Simulating deployment to LOCALHOST..."
@@ -336,6 +343,16 @@ configure-adapters:
 configure-approvals:
 	@echo "✅ Configuring adapter ERC20 approvals..."
 	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/12_ConfigureAdapterApprovals.s.sol --sig "run()" $(FORGE_ARGS)
+
+# Timelock deployment + ownership handover (13) - FINAL step, IRREVERSIBLE.
+# Deploys the Admin Timelock (3-day delay), grants CANCELLER to GUARDIAN, deployer renounces
+# DEFAULT_ADMIN_ROLE on the timelock, and transferOwnership of every UUPS contract to the timelock.
+# Deliberately NOT included in `deploy-all` — run only after `deploy-all` + `config-all` are
+# verified, ideally with a dry-run first. See `docs/timelock-and-governance-spec.md`.
+deploy-timelock:
+	@echo "🔒 Deploying Admin Timelock and transferring UUPS ownership..."
+	@echo "⚠️  This step is IRREVERSIBLE. Confirm dry-run output before broadcasting."
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge script script/deployment/13_DeployTimelock.s.sol --sig "run()" $(FORGE_ARGS)
 
 # Verification
 verify:

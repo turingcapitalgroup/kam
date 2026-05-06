@@ -1,8 +1,8 @@
 # IRegistry
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/interfaces/IRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IRegistry.sol)
 
 **Inherits:**
-[IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Core protocol registry interface for managing assets, vaults, adapters, and access control.
 
@@ -248,22 +248,177 @@ function grantManagerRole(address manager_) external payable;
 |`manager_`|`address`|The address to grant manager privileges|
 
 
-### revokeGivenRoles
+### grantAdminRole
 
-Revokes the specific role of a given user
+Grants ADMIN_ROLE to an address
 
-Only callable by ADMIN_ROLE.
+Only callable by contract owner
 
 
 ```solidity
-function revokeGivenRoles(address user, uint256 role) external payable;
+function grantAdminRole(address admin_) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`user`|`address`|the address to revoke acess to|
-|`role`|`uint256`|the role of the address that we want to revoke|
+|`admin_`|`address`|Admin role recipient|
+
+
+### grantEmergencyAdminRole
+
+Grants EMERGENCY_ADMIN_ROLE to an address
+
+Only callable by contract owner
+
+
+```solidity
+function grantEmergencyAdminRole(address emergencyAdmin_) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`emergencyAdmin_`|`address`|Emergency admin role recipient|
+
+
+### grantGuardianRole
+
+Grants GUARDIAN_ROLE to an address
+
+Only callable by contract owner
+
+
+```solidity
+function grantGuardianRole(address guardian_) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`guardian_`|`address`|Guardian role recipient|
+
+
+### revokeAdminRole
+
+Revokes ADMIN_ROLE from an address
+
+Only callable by contract owner
+
+
+```solidity
+function revokeAdminRole(address admin_) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`admin_`|`address`|Address to strip of admin privileges|
+
+
+### revokeEmergencyAdminRole
+
+Revokes EMERGENCY_ADMIN_ROLE from an address
+
+Only callable by contract owner
+
+
+```solidity
+function revokeEmergencyAdminRole(address emergencyAdmin_) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`emergencyAdmin_`|`address`|Address to strip of emergency admin privileges|
+
+
+### revokeGuardianRole
+
+Revokes GUARDIAN_ROLE from an address
+
+Only callable by contract owner
+
+
+```solidity
+function revokeGuardianRole(address guardian_) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`guardian_`|`address`|Address to strip of guardian privileges|
+
+
+### revokeVendorRole
+
+Revokes VENDOR_ROLE from an address
+
+Only callable by addresses holding ADMIN_ROLE
+
+
+```solidity
+function revokeVendorRole(address vendor_) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`vendor_`|`address`|Address to strip of vendor privileges|
+
+
+### revokeRelayerRole
+
+Revokes RELAYER_ROLE from an address
+
+Only callable by addresses holding ADMIN_ROLE
+
+
+```solidity
+function revokeRelayerRole(address relayer_) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`relayer_`|`address`|Address to strip of relayer privileges|
+
+
+### revokeManagerRole
+
+Revokes MANAGER_ROLE from an address
+
+Only callable by addresses holding ADMIN_ROLE
+
+
+```solidity
+function revokeManagerRole(address manager_) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`manager_`|`address`|Address to strip of manager privileges|
+
+
+### revokeInstitutionRole
+
+Revokes INSTITUTION_ROLE from an address
+
+Callable by VENDOR_ROLE (primary KYC lifecycle owner) or ADMIN_ROLE
+(documented backstop for compliance-team unavailability, erroneous grants,
+or urgent sanctions action). This is the one documented exception to strict
+grant/revoke authority symmetry in kRegistry.
+
+
+```solidity
+function revokeInstitutionRole(address institution_) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`institution_`|`address`|Address to strip of institution privileges|
 
 
 ### getContractById
