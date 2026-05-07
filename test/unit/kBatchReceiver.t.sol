@@ -8,6 +8,7 @@ import {
     KBATCHRECEIVER_ALREADY_INITIALIZED,
     KBATCHRECEIVER_INSUFFICIENT_BALANCE,
     KBATCHRECEIVER_ONLY_KMINTER,
+    KBATCHRECEIVER_TRANSFER_FAILED,
     KBATCHRECEIVER_WRONG_ASSET,
     KBATCHRECEIVER_ZERO_ADDRESS,
     KBATCHRECEIVER_ZERO_AMOUNT
@@ -34,8 +35,48 @@ contract kBatchReceiverTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
+                            CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
+    function test_Constructor_RevertsForZeroKMinter() public {
+        // Constructor calls _checkAddressNotZero on the kMinter parameter.
+        vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
+        new kBatchReceiver(address(0));
+    }
+
+    function test_Constructor_StoresImmutableKMinter() public {
+        kBatchReceiver _fresh = new kBatchReceiver(_minter);
+        assertEq(_fresh.K_MINTER(), _minter);
+    }
+
+    /* //////////////////////////////////////////////////////////////
                             INITIALIZE
     //////////////////////////////////////////////////////////////*/
+
+    function test_Initialize_Success_SetsState() public {
+        kBatchReceiver _fresh = new kBatchReceiver(_minter);
+        bytes32 _batchId = bytes32(uint256(0xdeadbeef));
+
+        // Pre-state: defaults are zero.
+        assertFalse(_fresh.isInitialised());
+        assertEq(_fresh.batchId(), bytes32(0));
+        assertEq(_fresh.asset(), address(0));
+
+        vm.expectEmit(true, true, false, true);
+        emit IkBatchReceiver.BatchReceiverInitialized(_minter, _batchId, USDC);
+        _fresh.initialize(_batchId, USDC);
+
+        // Post-state: every storage var is set.
+        assertTrue(_fresh.isInitialised());
+        assertEq(_fresh.batchId(), _batchId);
+        assertEq(_fresh.asset(), USDC);
+    }
+
+    function test_Initialize_RevertsForZeroAsset() public {
+        kBatchReceiver _fresh = new kBatchReceiver(_minter);
+        vm.expectRevert(bytes(KBATCHRECEIVER_ZERO_ADDRESS));
+        _fresh.initialize(bytes32(uint256(1)), address(0));
+    }
 
     function test_BatchReceiver_Require_Not_Initialized() public {
         (address _receiver, bytes32 _batchId) = _createBatchReceiver();
@@ -204,6 +245,30 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         kBatchReceiver(_receiver).rescueAssets(address(0), users.alice, _1_WBTC);
     }
 
+    function test_RescueAssets_ETH_RevertsWhenTransferFails() public {
+        (address _receiver,) = _createBatchReceiver();
+        ETHRejector _rejector = new ETHRejector();
+        vm.deal(_receiver, 1 ether);
+
+        // .call to a contract with no payable receive returns success=false → KBATCHRECEIVER_TRANSFER_FAILED.
+        vm.prank(address(minter));
+        vm.expectRevert(bytes(KBATCHRECEIVER_TRANSFER_FAILED));
+        kBatchReceiver(_receiver).rescueAssets(address(0), address(_rejector), 1 ether);
+
+        // Funds remain on the receiver — not silently consumed.
+        assertEq(_receiver.balance, 1 ether);
+    }
+
+    function test_RescueAssets_ERC20_RevertsForInsufficientBalance() public {
+        (address _receiver,) = _createBatchReceiver();
+        // Mint less than we attempt to rescue — _checkBalance must fire.
+        mockWBTC.mint(_receiver, _1_WBTC);
+
+        vm.prank(address(minter));
+        vm.expectRevert(bytes(KBATCHRECEIVER_INSUFFICIENT_BALANCE));
+        kBatchReceiver(_receiver).rescueAssets(WBTC, users.alice, _1_WBTC + 1);
+    }
+
     /* //////////////////////////////////////////////////////////////
                                 PRIVATE
     //////////////////////////////////////////////////////////////*/
@@ -242,3 +307,7 @@ contract kBatchReceiverTest is DeploymentBaseTest {
         _receiver = minter.getBatchReceiver(_newBatchId);
     }
 }
+
+// Helper used to exercise the rescueAssets ETH-transfer-failure branch.
+// No payable receive/fallback — any value-bearing call returns success=false.
+contract ETHRejector { }

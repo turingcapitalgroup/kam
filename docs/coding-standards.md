@@ -359,10 +359,7 @@ exclude_lints = [
     "mixed-case-variable",          # Allow _camelCase convention
     "unsafe-cheatcode",             # Allow test cheatcodes
     "unsafe-typecast",              # Suppress with inline comments
-    "shadowing",                    # Allow shadowing in test files
-    "unused-parameter",             # Allow unused params for interfaces
-    "unused-variable",              # Allow unused vars in tests
-    "function-mutability"           # Allow flexible mutability
+    "erc20-unchecked-transfer"      # Protocol uses SafeTransferLib
 ]
 ```
 

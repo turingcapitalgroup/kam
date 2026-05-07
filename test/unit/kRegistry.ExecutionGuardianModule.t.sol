@@ -167,6 +167,42 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
         guardianModule.authorizeCall(testTarget, testSelector, "");
     }
 
+    /// @notice With a validator registered, authorizeCall must forward to it with the
+    /// original (executor, target, selector, params). Verified via a recording mock.
+    function test_AuthorizeCall_InvokesValidatorWithParams() public {
+        EGRecordingValidator _mockValidator = new EGRecordingValidator();
+
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, testSelector, true);
+        vm.prank(users.admin);
+        guardianModule.setExecutionValidator(testExecutor, testTarget, testSelector, address(_mockValidator));
+
+        bytes memory _params = abi.encode(uint256(7), bytes32(uint256(0xb))); // arbitrary payload
+
+        vm.prank(testExecutor);
+        guardianModule.authorizeCall(testTarget, testSelector, _params);
+
+        assertEq(_mockValidator.callCount(), 1, "validator should be invoked exactly once");
+        assertEq(_mockValidator.lastExecutor(), testExecutor, "validator should receive the executor");
+        assertEq(_mockValidator.lastTarget(), testTarget, "validator should receive the target");
+        assertEq(_mockValidator.lastSelector(), testSelector, "validator should receive the selector");
+        assertEq(_mockValidator.lastParams(), _params, "validator should receive original params");
+    }
+
+    /// @notice A validator-side revert must propagate back through authorizeCall.
+    function test_AuthorizeCall_PropagatesValidatorRevert() public {
+        EGRevertingValidator _bad = new EGRevertingValidator();
+
+        vm.prank(users.admin);
+        guardianModule.setAllowedSelector(testExecutor, testTarget, TEST_TARGET_TYPE, testSelector, true);
+        vm.prank(users.admin);
+        guardianModule.setExecutionValidator(testExecutor, testTarget, testSelector, address(_bad));
+
+        vm.prank(testExecutor);
+        vm.expectRevert(bytes("EGValidatorReject"));
+        guardianModule.authorizeCall(testTarget, testSelector, "");
+    }
+
     /* //////////////////////////////////////////////////////////////
                             VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -534,5 +570,29 @@ contract kRegistryExecutionGuardianModuleTest is DeploymentBaseTest {
             if (_result[_i] == _custodial2) _hasC2 = true;
         }
         assertTrue(_hasC1 && _hasC2, "Result should include both custodial targets");
+    }
+}
+
+/// @dev Records the last authorizeCall arguments so tests can assert the module forwards them.
+contract EGRecordingValidator {
+    uint256 public callCount;
+    address public lastExecutor;
+    address public lastTarget;
+    bytes4 public lastSelector;
+    bytes public lastParams;
+
+    function authorizeCall(address _executor, address _target, bytes4 _selector, bytes calldata _params) external {
+        ++callCount;
+        lastExecutor = _executor;
+        lastTarget = _target;
+        lastSelector = _selector;
+        lastParams = _params;
+    }
+}
+
+/// @dev Always reverts; used to confirm validator reverts propagate through the module.
+contract EGRevertingValidator {
+    function authorizeCall(address, address, bytes4, bytes calldata) external pure {
+        revert("EGValidatorReject");
     }
 }

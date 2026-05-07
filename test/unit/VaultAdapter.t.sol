@@ -136,6 +136,22 @@ contract VaultAdapterTest is DeploymentBaseTest {
         adapter.pull(USDC, _amount);
     }
 
+    function test_Pull_RevertsWhenPaused() public {
+        uint256 _amount = 100 * _1_USDC;
+        mockUSDC.mint(address(adapter), _amount);
+
+        vm.prank(users.emergencyAdmin);
+        adapter.setPaused(true);
+
+        // Even the router cannot pull while paused.
+        vm.prank(address(assetRouter));
+        vm.expectRevert(bytes(VAULTADAPTER_IS_PAUSED));
+        adapter.pull(USDC, _amount);
+
+        // Funds remain on the adapter.
+        assertEq(mockUSDC.balanceOf(address(adapter)), _amount);
+    }
+
     /* //////////////////////////////////////////////////////////////
                             PAUSE COVERAGE
     //////////////////////////////////////////////////////////////*/
