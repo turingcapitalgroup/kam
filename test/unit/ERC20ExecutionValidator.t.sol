@@ -331,9 +331,12 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         bytes memory _params60 = abi.encode(testReceiver, 60 * _1_USDC);
         bytes memory _params30 = abi.encode(testReceiver, 30 * _1_USDC);
 
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params60); // 60
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params30); // 90
 
+        vm.prank(address(registry));
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params30); // 120 > 100
     }
@@ -351,10 +354,12 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         bytes memory _params90 = abi.encode(testReceiver, 90 * _1_USDC);
 
         // Block 1: use 90
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params90);
 
         // Block 2: should regain full 100 of headroom
         vm.roll(block.number + 1);
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params90);
     }
 
@@ -372,8 +377,10 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         bytes memory _transfer = abi.encode(testReceiver, 60 * _1_USDC);
         bytes memory _transferFrom = abi.encode(testSource, testReceiver, 50 * _1_USDC);
 
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _transfer); // 60
         // 60 + 50 = 110 > 100, must revert.
+        vm.prank(address(registry));
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
         validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _transferFrom);
     }
