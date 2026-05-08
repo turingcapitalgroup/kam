@@ -135,11 +135,11 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /// (3) Transferring stkTokens from user to vault contract to maintain stable share price during settlement period,
     /// (4) Notifying kAssetRouter of share redemption request for proper accounting across vault network. The stkTokens
     /// remain locked in the vault until settlement when they are burned and equivalent kTokens (including yield) are
-    /// made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens from
-    /// the batch receiver contract. This two-phase design ensures accurate yield calculations and prevents share
+    /// made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens directly
+    /// from the vault. This two-phase design ensures accurate yield calculations and prevents share
     /// price manipulation during the settlement process.
-    /// NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in stkToken (share) units, not kToken
-    /// (asset) units. This makes the limit immune to price fluctuations between request time and settlement time.
+    /// NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in kToken (asset) units: requested
+    /// shares are converted to assets at current prices before comparing to the configured limit.
     /// @param owner The address that owns this unstake request and can claim the resulting kTokens
     /// @param to The recipient address that will receive the kTokens after successful settlement and claiming
     /// @param stkTokenAmount The quantity of stkTokens to unstake (must not exceed user balance, cannot be zero)

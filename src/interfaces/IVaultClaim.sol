@@ -6,10 +6,10 @@ pragma solidity ^0.8.4;
 /// @dev This interface defines the final phase of the two-phase staking/unstaking system where users collect
 /// their rewards after batch settlement. The claiming mechanism operates after batches have been settled by
 /// kAssetRouter with finalized share prices and yield calculations. Key features include: (1) Share Distribution:
-/// For staking claims, users receive stkTokens at the settled share price reflecting vault performance during
-/// the batch period, (2) Asset Distribution: For unstaking claims, users receive kTokens (including accrued yield)
-/// distributed through batch-specific receiver contracts, (3) Request Validation: Claims are validated against
-/// original requests to ensure only authorized recipients can claim, (4) State Management: Claimed requests are
+/// For staking claims, users receive pre-minted stkTokens transferred from the vault at the settled share price,
+/// (2) Asset Distribution: For unstaking claims, users receive kTokens (including accrued yield) transferred
+/// directly from the vault, (3) Request Validation: Claims verify the caller is the original request owner,
+/// (4) State Management: Claimed requests are
 /// marked to prevent double-claiming while maintaining audit trails. The two-phase approach (request → claim)
 /// provides several advantages: fair pricing through synchronized settlement, gas efficiency by separating request
 /// processing from asset distribution, security through settled price finalization, and operational flexibility

@@ -351,13 +351,9 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     }
 
     /// @notice Calculates share price per stkToken
-    /// @dev This function provides the total vault performance-based share price before fee deductions. The
-    /// calculation:
-    /// (1) Handles zero total supply edge case with 1:1 initial pricing, (2) Uses total gross assets including accrued
-    /// fees for complete performance measurement, (3) Applies precise fixed-point mathematics for accurate pricing.
-    /// This gross pricing is used for settlement calculations, performance fee assessments, and watermark tracking.
-    /// The inclusion of fees provides complete vault performance measurement for fee calculations and settlement
-    /// coordination.
+    /// @dev Converts a one-share unit (10^decimals) to asset terms using current `_totalAssets()` and
+    /// `totalSupply()`. Handles zero total supply edge case with 1:1 initial pricing via the underlying
+    /// `convertToAssets` math.
     /// @return Gross price per stkToken in underlying asset terms (scaled to vault decimals)
     function _sharePrice() internal view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();

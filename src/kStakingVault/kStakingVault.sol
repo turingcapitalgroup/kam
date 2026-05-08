@@ -56,9 +56,9 @@ import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 /// coordination with kAssetRouter for cross-vault yield optimization, (4) Two-phase operations (request → claim)
 /// ensuring accurate settlement and preventing MEV attacks, (5) Fee management system supporting both management
 /// and performance fees with hurdle rate mechanisms. The vault integrates with the broader protocol through
-/// kAssetRouter for asset flow coordination and yield distribution. Gas optimizations include packed storage,
-/// minimal proxy deployment for batch receivers, and efficient batch settlement processing. The modular architecture
-/// enables upgrades while maintaining state integrity through UUPS pattern and ERC-7201 storage.
+/// kAssetRouter for asset flow coordination and yield distribution. Gas optimizations include packed storage
+/// and efficient batch settlement processing. The modular architecture enables upgrades while maintaining state
+/// integrity through UUPS pattern and ERC-7201 storage.
 contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUpgradeable, Ownable, MultiFacetProxy {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
     using SafeTransferLib for address;
@@ -81,9 +81,8 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     /// BaseVault foundation with registry and operational state, (3) Sets up ownership and access control through
     /// Ownable pattern, (4) Configures share token metadata and decimals for ERC20 functionality, (5) Establishes
     /// kToken integration through registry lookup for asset-to-token mapping, (6) Sets initial share price watermark
-    /// for performance fee calculations, (7) Deploys BatchReceiver implementation for settlement asset distribution.
-    /// The initialization creates a complete retail staking solution integrated with the protocol's institutional
-    /// flows.
+    /// for performance fee calculations. The initialization creates a complete retail staking solution integrated
+    /// with the protocol's institutional flows.
     /// @param _owner The address that will have administrative control over the vault
     /// @param _registryAddress The kRegistry contract address for protocol configuration integration
     /// @param _paused Initial operational state (true = paused, false = active)
@@ -155,7 +154,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         );
 
         // Make sure we dont exceed the max total assets
-        // Use actual kToken balance (not _totalAssets()) to prevent bypass via pending stakes
         require(
             $.totalBalance + $.totalPendingStake + _amount128 <= $.maxTotalAssets,
             KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED
@@ -355,29 +353,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     }
 
     /// @inheritdoc IVaultBatch
-    /// @dev CALL CONTRACT — DO NOT REORDER. Each step depends on state mutated by the previous
-    ///      step; reordering produces silent fee-math errors (double-charging of management fees
-    ///      as yield, stale settlement baselines) or hard reverts (zero-duration settlements).
-    ///
-    ///   1. Capture `_settlementElapsed` BEFORE `_accrueFees()` advances `_lastFeeTimestamp`.
-    ///      If this capture happens after the accrual, elapsed = 0 and `computePerformanceFee`
-    ///      reverts with `VAULTMATHLIB_ZERO_ELAPSED` (the library guard added to prevent the
-    ///      hurdle filter from being silently bypassed).
-    ///   2. `_accrueFees()` computes the management fee on pre-yield total assets and advances
-    ///      `_lastFeeTimestamp`. Returns the management-fee amount in asset terms.
-    ///   3. Compute net interest as
-    ///         `_currentBalance - _previousBalance - _mgmtFeeAssets`
-    ///      so the management fee is removed from the perf-fee base. Without this subtraction
-    ///      the management-fee charge appears as "yield" and is performance-fee'd a second time.
-    ///   4. Mint management-fee shares (`_mintManagementFees`).
-    ///   5. Compute performance fee using the captured elapsed and the net interest, against
-    ///      `_previousBalance` as the hurdle baseline.
-    ///   6. Mint performance-fee shares.
-    ///   7. Process pending stake/unstake at `_totalAssets()` / `totalSupply()`. These values
-    ///      include the just-minted fee shares — that is intentional: stakers join at the
-    ///      post-fee rate.
-    ///   8. Snapshot `_lastSettlementBalance = _totalBalance()` LAST so the next settlement's
-    ///      interest baseline is correct.
     function settleBatch(bytes32 _batchId) external override(IVaultBatch, ISettleBatch) {
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
@@ -602,17 +577,29 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         _decreaseBalance(_amount);
     }
 
+    /// @notice Computes the expected kToken balance held by the vault as a sum of active assets and pending reserves
+    /// @dev The expected balance reconciles three categories: (1) active assets earning yield in strategies,
+    /// (2) kTokens deposited for pending stake requests not yet settled, (3) kTokens reserved for settled-but-unclaimed
+    /// unstake requests. This sum is the invariant baseline the vault must maintain at all times.
+    /// @param $ Direct storage pointer for gas-efficient state access
+    /// @return The total kToken balance the vault should hold according to protocol state
     function _expectedKTokenBalance(BaseVaultStorage storage $) private view returns (uint256) {
         return _totalAssets() + $.totalPendingStake + $.totalPendingUnstake;
     }
 
+    /// @notice Audits the vault's kToken balance against the expected invariant, reverting on mismatch
+    /// @dev Called at the end of `settleBatch` to catch any kToken leakage caused by rounding, fee errors,
+    /// or balance manipulation. Reverts with KSTAKINGVAULT_BALANCE_AUDIT_FAILED if the vault holds fewer
+    /// kTokens than the sum of active assets and pending reserves. This is a safety check — the vault may
+    /// hold more kTokens than expected (e.g. from rounding in claim transfers) but never less.
+    /// @param $ Direct storage pointer for gas-efficient state access
     function _auditKTokenBalance(BaseVaultStorage storage $) private view {
         require($.kToken.balanceOf(address(this)) >= _expectedKTokenBalance($), KSTAKINGVAULT_BALANCE_AUDIT_FAILED);
     }
 
-    /// @notice Creates a unique request ID for a staking request
+    /// @notice Creates a unique request ID for a staking or unstaking request
     /// @param _user User address
-    /// @param _amount Amount of underlying assets
+    /// @param _amount Amount (kTokens for stakes, stkTokens for unstakes)
     /// @param _timestamp Timestamp
     /// @return Request ID
     function _createStakeRequestId(address _user, uint256 _amount, uint256 _timestamp) private returns (bytes32) {
