@@ -307,54 +307,6 @@ contract kAssetRouterTest is DeploymentBaseTest {
     }
 
     /* //////////////////////////////////////////////////////////////
-                            kSharesRequestPush
-    //////////////////////////////////////////////////////////////*/
-
-    function test_KSharesRequestPush_Success() public {
-        uint256 _amount = TEST_AMOUNT;
-        bytes32 _batchId = TEST_BATCH_ID;
-
-        vm.prank(address(alphaVault));
-        vm.expectEmit(true, true, false, true);
-        emit IkAssetRouter.SharesRequestedPushed(address(alphaVault), _batchId, _amount);
-        assetRouter.kSharesRequestPush(address(alphaVault), _amount, _batchId);
-    }
-
-    function test_KSharesRequestPush_Require_Not_Paused() public {
-        bytes32 _batchId = alphaVault.getBatchId();
-
-        vm.prank(users.emergencyAdmin);
-        assetRouter.setPaused(true);
-
-        vm.prank(address(alphaVault));
-        vm.expectRevert(bytes(KASSETROUTER_IS_PAUSED));
-        assetRouter.kSharesRequestPush(address(alphaVault), TEST_AMOUNT, _batchId);
-    }
-
-    function test_KSharesRequestPush_Require_Amount_Not_Zero() public {
-        bytes32 _batchId = alphaVault.getBatchId();
-        vm.prank(address(alphaVault));
-        vm.expectRevert(bytes(KASSETROUTER_ZERO_AMOUNT));
-        assetRouter.kSharesRequestPush(address(alphaVault), 0, _batchId);
-    }
-
-    function test_KSharesRequestPush_Require_Only_KStaking_Vault() public {
-        bytes32 _batchId = alphaVault.getBatchId();
-
-        vm.prank(users.alice);
-        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
-        assetRouter.kSharesRequestPush(address(alphaVault), TEST_AMOUNT, _batchId);
-
-        vm.prank(users.admin);
-        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
-        assetRouter.kSharesRequestPush(address(alphaVault), TEST_AMOUNT, _batchId);
-
-        vm.prank(users.owner);
-        vm.expectRevert(bytes(KASSETROUTER_ONLY_KSTAKING_VAULT));
-        assetRouter.kSharesRequestPush(address(alphaVault), TEST_AMOUNT, _batchId);
-    }
-
-    /* //////////////////////////////////////////////////////////////
                         ProposeSettleBatch
     //////////////////////////////////////////////////////////////*/
 

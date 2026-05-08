@@ -80,9 +80,9 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     /// process: (1) Validates asset address to prevent deployment with invalid configuration, (2) Initializes
     /// BaseVault foundation with registry and operational state, (3) Sets up ownership and access control through
     /// Ownable pattern, (4) Configures share token metadata and decimals for ERC20 functionality, (5) Establishes
-    /// kToken integration through registry lookup for asset-to-token mapping, (6) Sets initial share price watermark
-    /// for performance fee calculations. The initialization creates a complete retail staking solution integrated
-    /// with the protocol's institutional flows.
+    /// kToken integration through registry lookup for asset-to-token mapping, (6) Creates the initial open batch.
+    /// The initialization creates a complete retail staking solution integrated with the protocol's institutional
+    /// flows.
     /// @param _owner The address that will have administrative control over the vault
     /// @param _registryAddress The kRegistry contract address for protocol configuration integration
     /// @param _paused Initial operational state (true = paused, false = active)
@@ -241,8 +241,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         // Transfer stkTokens to contract to keep share price stable
         // It will only be burned when the assets are claimed later
         _transfer(_msgSender(), address(this), _stkTokenAmount);
-
-        IkAssetRouter(_getKAssetRouter()).kSharesRequestPush(address(this), _stkTokenAmount, _batchId);
 
         emit UnstakeRequestCreated(_requestId, _owner, _stkTokenAmount, _to, _batchId);
 

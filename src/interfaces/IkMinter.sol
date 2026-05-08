@@ -131,8 +131,8 @@ interface IkMinter is IVersioned {
 
     /// @notice Executes institutional minting of kTokens through immediate 1:1 issuance against deposited assets
     /// @dev This function enables qualified institutions to mint kTokens by depositing underlying assets. The process
-    /// involves: (1) transferring assets from the caller to kAssetRouter, (2) pushing assets into the current batch
-    /// of the designated DN vault for yield generation, and (3) immediately minting an equivalent amount of kTokens
+    /// involves: (1) transferring assets from the caller to kAssetRouter, (2) pushing assets into the kMinter adapter
+    /// for the asset's current batch, and (3) immediately minting an equivalent amount of kTokens
     /// to the recipient. Unlike retail operations, institutional mints bypass share-based accounting and provide
     /// immediate token issuance without waiting for batch settlement. The deposited assets are tracked separately
     /// to maintain the 1:1 backing ratio and will participate in vault yield strategies through the batch system.
@@ -148,8 +148,8 @@ interface IkMinter is IVersioned {
     /// generating a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4)
     /// registering the request with kAssetRouter for batch processing. The kTokens remain in escrow until the
     /// batch is settled (when they are burned in bulk by settleBatch()) and the user calls burn() to claim assets.
-    /// This two-phase approach is necessary because redemptions are processed in batches through the DN vault system,
-    /// which requires waiting for batch settlement to ensure proper asset availability and yield distribution.
+    /// This two-phase approach is necessary because redemptions are processed in batches through the settlement system,
+    /// which requires waiting for batch settlement to ensure proper asset availability.
     /// @param asset The underlying asset address to burn (must match the kToken's underlying asset)
     /// @param to The recipient address that will receive the underlying assets after batch settlement
     /// @param amount The amount of kTokens to burn (will receive equivalent underlying assets)
@@ -240,10 +240,10 @@ interface IkMinter is IVersioned {
     /// @return The current counter used for generating unique request IDs
     function getRequestCounter() external view returns (uint256);
 
-    /// @notice Gets the total locked assets for a specific asset
-    /// @dev Returns the cumulative amount of assets deposited through mint operations for accounting
+    /// @notice Gets the net kToken backing minted through kMinter for a specific asset
+    /// @dev Increases on mint and decreases when redemption batches settle.
     /// @param asset The asset address to query
-    /// @return The total amount of assets locked in the protocol
+    /// @return The net amount of kToken backing tracked by kMinter
     function getTotalLockedAssets(address asset) external view returns (uint256);
 
     /// @notice Returns the close state of a given batchId

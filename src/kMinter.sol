@@ -68,7 +68,7 @@ contract kMinter is IkMinter, ISettleBatch, Initializable, UUPSUpgradeable, kBas
         uint64 requestCounter;
         /// @dev receiverImplementation address
         address receiverImplementation;
-        /// @dev Tracks total assets locked in pending redemption requests per asset
+        /// @dev Tracks net kToken backing minted through kMinter per asset, reduced as redemption batches settle
         mapping(address => uint256) totalLockedAssets;
         /// @dev Maps request IDs to their corresponding burn request data
         mapping(bytes32 => BurnRequest) burnRequests;
@@ -249,7 +249,7 @@ contract kMinter is IkMinter, ISettleBatch, Initializable, UUPSUpgradeable, kBas
         // above already covers most paths but this makes the lifecycle invariant explicit).
         require(_burnRequest.status == RequestStatus.PENDING, KMINTER_REQUEST_NOT_PENDING);
 
-        // Mark request as burned to prevent double-spending
+        // Mark request as redeemed to prevent double-spending
         _burnRequest.status = RequestStatus.REDEEMED;
 
         address _kToken = _getKTokenForAsset(_asset);
