@@ -382,7 +382,7 @@ compile:
 	@$(MAKE) check-interface-completeness
 	@$(MAKE) check-natspec
 	forge fmt --check
-	forge build --sizes --skip test
+	FOUNDRY_PROFILE=$(DEPLOY_PROFILE) forge build --sizes --skip test
 
 build:
 	@$(MAKE) build-selectors
