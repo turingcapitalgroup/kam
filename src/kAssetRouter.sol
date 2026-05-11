@@ -932,7 +932,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Receive ETH ()
-    receive() external payable { } // TODO: validate with auditors best approach
+    receive() external payable { }
 
     /* //////////////////////////////////////////////////////////////
                         CONTRACT INFO
