@@ -262,7 +262,7 @@ The kAssetRouter serves as the central coordinator for all asset movements withi
 │                                                             │
 │  Retail Operations (kStakingVault):                         │
 │  • kAssetTransfer() - Virtual transfers between vaults      │
-│  • kSharesRequestPush() - Emit share request events         │
+│  • Unstake requests tracked directly in vault batch state   │
 │                                                             │
 │  Settlement Operations (Relayers):                          │
 │  • proposeSettleBatch() - Create settlement proposal        │

@@ -13,7 +13,7 @@ import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 /// @title ReaderModule
 /// @notice Contains fee, request, batch, and auxiliary getters for the Staking Vault
 /// @dev Essential vault getters (totalAssets, sharePrice, conversions, etc.) live directly on kStakingVault.
-/// This module holds the remaining specialized readers including batch info, fee config, and request queries.
+/// This module holds the remaining specialized readers including batch metadata, fee config, and request queries.
 contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
 
@@ -52,7 +52,7 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
     }
 
     /* //////////////////////////////////////////////////////////////
-                        BATCH RECEIVER GETTERS
+                        BATCH METADATA GETTERS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IVaultReader

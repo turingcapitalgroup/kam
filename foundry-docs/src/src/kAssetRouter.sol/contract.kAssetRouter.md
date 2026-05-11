@@ -183,29 +183,6 @@ function kAssetTransfer(
 |`_batchId`|`bytes32`||
 
 
-### kSharesRequestPush
-
-Requests shares to be pushed for kStakingVault staking operations and batch processing
-
-This function is part of the share-based accounting system for retail users in kStakingVaults.
-When users stake kTokens, the vault requests shares to be pushed to track their ownership. The
-process coordinates: (1) conversion of kTokens to vault shares at current share price, (2) updating
-user balances in the vault system, (3) preparing for batch settlement. Share requests are batched
-to optimize gas costs and ensure fair pricing across all users in the same settlement period.
-
-
-```solidity
-function kSharesRequestPush(address _sourceVault, uint256 _amount, bytes32 _batchId) external payable;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_sourceVault`|`address`||
-|`_amount`|`uint256`||
-|`_batchId`|`bytes32`||
-
-
 ### proposeSettleBatch
 
 Proposes a batch settlement for a vault with yield distribution through kToken minting/burning
@@ -1025,4 +1002,3 @@ struct kAssetRouterStorage {
     mapping(address sourceVault => mapping(address asset => uint256)) globalPendingRequests;
 }
 ```
-

@@ -527,9 +527,9 @@ Day 0:              Day 1:              Day 2:              Day 2:
 │                                               └─────────────────┘                               │
 │                                                                                                 │
 │  UNSTAKING FLOW:                                                                                │
-│  ┌─────────────────┐    kSharesRequestPush()  ┌─────────────────┐                               │
-│  │User requests    │─────────────────────────▶│   kAssetRouter  │                               │
-│  │unstaking        │    (via vault)           │                 │                               │
+│  ┌─────────────────┐    UnstakeRequestCreated ┌─────────────────┐                               │
+│  │User requests    │─────────────────────────▶│ kStakingVault   │                               │
+│  │unstaking        │    + batch state         │                 │                               │
 │  └─────────────────┘                          └─────────────────┘                               │
 │                                                         │                                       │
 │                        Settlement yield                 ▼                                       │

@@ -52,12 +52,12 @@ import { MAX_BPS } from "kam/src/constants/Constants.sol";
 /// distribution
 /// @dev This contract serves as the heart of the KAM protocol's financial infrastructure, coordinating complex
 /// interactions between institutional flows (kMinter), retail flows (kStakingVaults), and yield generation (DN vaults).
-/// Key responsibilities include: (1) Managing asset pushes from kMinter institutional deposits to DN vaults for yield
-/// generation, (2) Coordinating virtual asset transfers between kStakingVaults for optimal capital allocation,
+/// Key responsibilities include: (1) Managing asset pushes from kMinter institutional deposits to kMinter adapters,
+/// (2) Coordinating virtual asset transfers between kStakingVaults for optimal capital allocation,
 /// (3) Processing batch settlements with yield distribution through precise kToken minting/burning operations,
 /// (4) Maintaining virtual balance tracking across all vaults for accurate accounting, (5) Implementing security
-/// cooldown periods for settlement proposals, (6) Executing peg protection mechanisms during market stress.
-/// The contract ensures protocol integrity by maintaining the 1:1 backing guarantee through carefully orchestrated
+/// cooldown periods for settlement proposals, (6) Requiring guardian approval for high-delta settlements.
+/// The contract supports protocol integrity through carefully orchestrated
 /// money flows while enabling efficient capital utilization across the entire vault network.
 contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, Ownable {
     using OptimizedFixedPointMathLib for uint256;
@@ -94,7 +94,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         uint256 proposalCounter;
         /// @dev Current cooldown period in seconds before settlement proposals can be executed
         uint256 vaultSettlementCooldown;
-        /// @dev Maximum allowed yield deviation in basis points per vault before settlement proposal is rejected
+        /// @dev Maximum allowed yield deviation in basis points per vault before guardian approval is required
         mapping(address vault => uint256) maxAllowedDelta;
         /// @dev Set of proposal IDs that have been executed to prevent double-execution
         OptimizedBytes32EnumerableSetLib.Bytes32Set executedProposalIds;
@@ -221,17 +221,6 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         _checkSufficientVirtualBalance(_sourceVault, _asset, _totalGlobalPending);
 
         emit AssetsTransferred(_sourceVault, _targetVault, _asset, _batchId, _amount);
-        _unlockReentrant();
-    }
-
-    /// @inheritdoc IkAssetRouter
-    function kSharesRequestPush(address _sourceVault, uint256 _amount, bytes32 _batchId) external payable {
-        _lockReentrant();
-        _checkPaused();
-        _checkAmountNotZero(_amount);
-        _checkVault(msg.sender);
-
-        emit SharesRequestedPushed(_sourceVault, _batchId, _amount);
         _unlockReentrant();
     }
 
@@ -467,10 +456,9 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     }
 
     /// @notice Internal function to execute the core settlement logic with yield distribution
-    /// @dev This function performs the critical yield distribution process: (1) mints or burns kTokens
-    /// to reflect yield gains/losses, (2) updates vault accounting and batch tracking, (3) coordinates
-    /// the 1:1 backing maintenance. This is where the protocol's fundamental promise is maintained -
-    /// the kToken supply is adjusted to precisely match underlying asset changes plus distributed yield.
+    /// @dev This function performs the critical settlement process: (1) transfers kMinter redemption assets or
+    /// mints/burns kTokens for staking vault yield/losses, (2) updates adapter accounting and batch tracking,
+    /// (3) coordinates protocol accounting across the kMinter and staking vault adapters.
     /// @param _proposal The settlement proposal storage reference containing all settlement parameters
     function _executeSettlement(VaultSettlementProposal storage _proposal) private {
         // Cache some values
@@ -524,7 +512,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _adapter.setTotalAssets(uint256(_kMinterNewTotalAssets));
             emit TotalAssetsSet(address(_adapter), uint256(_kMinterNewTotalAssets));
         } else {
-            // kMinter yield is sent to insuranceFund, cannot be minted.
+            // Staking vault yield/loss is reflected through kToken supply and vault balance updates.
             if (_yield != 0) {
                 if (_profit) {
                     // casting to 'uint256' is safe because _yield is positive in this branch
@@ -584,10 +572,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
     /// @notice Updates the yield tolerance threshold for settlement proposals
     /// @dev This function allows protocol governance to adjust the maximum acceptable yield deviation before
-    /// settlement proposals are rejected. The yield tolerance acts as a safety mechanism to prevent settlement
-    /// proposals with extremely high or low yield values that could indicate calculation errors, data corruption,
-    /// or potential manipulation attempts. Setting an appropriate tolerance balances protocol safety with
-    /// operational flexibility, allowing normal yield fluctuations while blocking suspicious proposals.
+    /// settlement proposals require guardian approval. Proposals beyond the tolerance are flagged for explicit
+    /// guardian acceptance instead of being rejected outright.
     /// @param _maxDelta The new yield tolerance in basis points (e.g., 1000 = 10%)
     function setMaxAllowedDelta(address _vault, uint256 _maxDelta) external {
         _checkAdmin(msg.sender);

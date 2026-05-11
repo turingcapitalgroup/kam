@@ -5,7 +5,7 @@ import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 
 /// @title IVaultReader
 /// @notice Read-only interface for querying specialized vault metrics via the ReaderModule
-/// @dev This interface covers fee configuration, request queries, batch receiver lookups, and other readers.
+/// @dev This interface covers fee configuration, request queries, batch metadata lookups, and other readers.
 /// Essential vault getters (totalAssets, sharePrice, conversions, batch info, etc.) are declared in IVault
 /// and implemented directly on kStakingVault.
 interface IVaultReader {
@@ -29,14 +29,16 @@ interface IVaultReader {
     /// @return Management fee in basis points
     function managementFee() external view returns (uint16);
 
-    /// @notice Returns the batch receiver address for a specific batch ID
+    /// @notice Returns the batch receiver field for a specific batch ID
+    /// @dev kStakingVault does not custody settlement assets in batch receivers; this field is currently address(0).
     /// @param batchId The batch identifier to query
-    /// @return Address of the batch receiver
+    /// @return Address stored in the batch receiver field
     function getBatchReceiver(bytes32 batchId) external view returns (address);
 
-    /// @notice Returns batch receiver address with validation
+    /// @notice Returns the batch receiver field with unsettled-batch validation
+    /// @dev kStakingVault does not custody settlement assets in batch receivers; this field is currently address(0).
     /// @param batchId The batch identifier to query
-    /// @return Address of the batch receiver
+    /// @return Address stored in the batch receiver field
     function getSafeBatchReceiver(bytes32 batchId) external view returns (address);
 
     /// @notice Gets all request IDs associated with a user
@@ -116,7 +118,7 @@ interface IVaultReader {
 
     /// @notice Returns core state for the current batch
     /// @return batchId The current batch identifier
-    /// @return batchReceiver The receiver holding settlement assets for the batch
+    /// @return batchReceiver The stored batch receiver field, currently address(0) for kStakingVault batches
     /// @return isClosed_ True if the current batch is closed
     /// @return isSettled True if the current batch is settled
     function getCurrentBatchInfo()
@@ -126,7 +128,7 @@ interface IVaultReader {
 
     /// @notice Returns accounting and lifecycle data for a specific batch
     /// @param batchId The batch identifier to inspect
-    /// @return batchReceiver The receiver holding settlement assets for the batch
+    /// @return batchReceiver The stored batch receiver field, currently address(0) for kStakingVault batches
     /// @return isClosed_ True if the batch is closed
     /// @return isSettled True if the batch is settled
     /// @return sharePrice_ The settled share price for the batch

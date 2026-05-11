@@ -49,7 +49,7 @@ library BaseVaultTypes {
 
     /// @notice Batch information structure
     struct BatchInfo {
-        /// @notice Batch receiver address
+        /// @notice Batch receiver field, currently unused by kStakingVault and set to address(0)
         address batchReceiver;
         /// @notice Whether the batch is closed
         bool isClosed;

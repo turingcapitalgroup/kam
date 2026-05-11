@@ -44,8 +44,8 @@ import { K_ASSET_ROUTER, K_MINTER, K_TOKEN_FACTORY, MAX_BPS } from "kam/src/cons
 /// whitelisting, kToken deployment through kTokenFactory, and maintains bidirectional mappings between underlying assets and their
 /// corresponding kTokens, (3) Vault registry - manages vault registration, classification (DN, ALPHA, BETA, etc.),
 /// and routing logic to direct assets to appropriate vaults based on type and strategy, (4) Role-based access
-/// control - implements a hierarchical permission system with ADMIN, EMERGENCY_ADMIN, GUARDIAN, RELAYER, INSTITUTION,
-/// and VENDOR roles to enforce protocol security, (5) Adapter management - registers and tracks external protocol
+/// control - implements a hierarchical permission system with ADMIN, EMERGENCY_ADMIN, GUARDIAN, RELAYER, MANAGER,
+/// INSTITUTION, and VENDOR roles to enforce protocol security, (5) Adapter management - registers and tracks external protocol
 /// adapters per vault enabling yield strategy integrations. The registry uses upgradeable architecture with UUPS
 /// pattern and ERC-7201 namespaced storage to ensure future extensibility while maintaining state consistency.
 contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, MultiFacetProxy {
@@ -62,14 +62,11 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// Uses the diamond storage pattern to prevent storage collisions in upgradeable contracts.
     /// @custom:storage-location erc7201:kam.storage.kRegistry
     struct kRegistryStorage {
-        /// @dev Protocol insurance address for insurance fee collection
-        /// Receives protocol insurance fees for coverage reserves
+        /// @dev Protocol insurance address exposed to settlement integrations
         address insurance;
-        /// @dev Treasury fee in basis points (100 = 1%, max 10000 = 100%)
-        /// Portion of protocol profits allocated to treasury
+        /// @dev Treasury fee configuration in basis points (100 = 1%, max 10000 = 100%)
         uint16 treasuryBps;
-        /// @dev Insurance fee in basis points (100 = 1%, max 10000 = 100%)
-        /// Portion of protocol profits allocated to insurance
+        /// @dev Insurance fee configuration in basis points (100 = 1%, max 10000 = 100%)
         uint16 insuranceBps;
         /// @dev Global pause flag for protocol-wide emergency stop
         /// When true, all kBase-inheriting contracts are paused
@@ -80,8 +77,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         /// @dev Set of all registered vault contracts across all types
         /// Enables iteration and validation of vault registrations
         OptimizedAddressEnumerableSetLib.AddressSet allVaults;
-        /// @dev Protocol treasury address for fee collection and reserves
-        /// Receives protocol fees and serves as emergency fund holder
+        /// @dev Protocol treasury address exposed to fee and settlement integrations
         address treasury;
         /// @dev Maps assets to their maximum mint amount per batch
         mapping(address => uint256) maxMintPerBatch;
@@ -339,7 +335,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     function setHurdleRate(address _vault, uint16 _hurdleRate) external payable {
         _checkAdmin(msg.sender);
         // Ensure hurdle rate doesn't exceed 100% (10,000 basis points)
-        // Note: A hurdle rate of 0 is valid - it means performance fees apply to all positive yield
+        // Note: A hurdle rate of 0 is valid - vault performance fee logic may apply fees to all positive yield
         require(_hurdleRate <= MAX_BPS, KREGISTRY_FEE_EXCEEDS_MAXIMUM);
 
         kRegistryStorage storage $ = _getkRegistryStorage();

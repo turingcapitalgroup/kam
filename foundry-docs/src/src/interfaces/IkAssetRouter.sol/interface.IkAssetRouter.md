@@ -98,29 +98,6 @@ function kAssetTransfer(
 |`batchId`|`bytes32`|The batch identifier for coordinating this transfer with settlement|
 
 
-### kSharesRequestPush
-
-Requests shares to be pushed for kStakingVault staking operations and batch processing
-
-This function is part of the share-based accounting system for retail users in kStakingVaults.
-When users stake kTokens, the vault requests shares to be pushed to track their ownership. The
-process coordinates: (1) conversion of kTokens to vault shares at current share price, (2) updating
-user balances in the vault system, (3) preparing for batch settlement. Share requests are batched
-to optimize gas costs and ensure fair pricing across all users in the same settlement period.
-
-
-```solidity
-function kSharesRequestPush(address sourceVault, uint256 amount, bytes32 batchId) external payable;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`sourceVault`|`address`|The kStakingVault address requesting share push operations|
-|`amount`|`uint256`|The quantity of shares being requested for push to users|
-|`batchId`|`bytes32`|The batch identifier for coordinating share operations with settlement|
-
-
 ### proposeSettleBatch
 
 Proposes a batch settlement for a vault with yield distribution through kToken minting/burning
@@ -745,24 +722,6 @@ event AssetsTransferred(
 |`batchId`|`bytes32`|The batch identifier for this virtual transfer|
 |`amount`|`uint256`|The quantity of assets being transferred between vaults|
 
-### SharesRequestedPushed
-Emitted when shares are requested for push operations in kStakingVault flows
-
-Part of the share-based accounting system for retail users in kStakingVaults
-
-
-```solidity
-event SharesRequestedPushed(address indexed vault, bytes32 indexed batchId, uint256 amount);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`vault`|`address`|The kStakingVault requesting the share push operation|
-|`batchId`|`bytes32`|The batch identifier for this operation|
-|`amount`|`uint256`|The quantity of shares being pushed|
-
 ### BatchSettled
 Emitted when a vault batch is settled with final asset accounting
 
@@ -1025,4 +984,3 @@ enum ProposalStatus {
     REQUIRES_APPROVAL
 }
 ```
-

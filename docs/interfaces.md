@@ -49,7 +49,7 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 
 - `kAssetPush(address asset, uint256 amount, bytes32 batchId)` - Transfers incoming assets from kMinter to the adapter (batchId is reserved for future use)
 - `kAssetRequestPull(address asset, uint256 amount, bytes32 batchId)` - Stages outgoing asset requests from caller's virtual balance
-- `kSharesRequestPush(address vault, uint256 amount, bytes32 batchId)` - Emits share request event for off-chain tracking (no storage changes)
+- Retail unstake share requests are tracked in `kStakingVault` batch state and emitted through `UnstakeRequestCreated`
 
 **Settlement Operations**
 

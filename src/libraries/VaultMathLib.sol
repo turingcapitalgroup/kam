@@ -30,8 +30,8 @@ import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMath
 ///        - Call _accrueFees() before mutating fee rates; otherwise pending management fees
 ///          would be re-priced at the new rate.
 ///
-///      Management fees are time-prorated on total assets, charged on every interaction.
-///      Performance fees are charged on interest gains at settlement, with hurdle rate filtering.
+///      Management fees are time-prorated on total assets, accrued at settlement and before
+///      fee-rate changes. Performance fees are charged on interest gains at settlement, with hurdle rate filtering.
 library VaultMathLib {
     using OptimizedFixedPointMathLib for uint256;
 
