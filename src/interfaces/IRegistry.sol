@@ -216,7 +216,7 @@ interface IRegistry is IVersioned {
     function grantVendorRole(address vendor_) external payable;
 
     /// @notice Grants relayer role for external vault operations
-    /// @dev Only callable by ADMIN_ROLE. Relayers manage external vaults and set hurdle rates.
+    /// @dev Only callable by ADMIN_ROLE. Relayers manage external vault operations.
     /// @param relayer_ The address to grant relayer privileges
     function grantRelayerRole(address relayer_) external payable;
 
@@ -408,15 +408,14 @@ interface IRegistry is IVersioned {
     function getAllVaults() external view returns (address[] memory);
 
     /// @notice Gets the protocol treasury address
-    /// @dev Treasury receives protocol fees and serves as emergency fund holder.
+    /// @dev Returns the stored protocol treasury address.
     /// @return The treasury address
     function getTreasury() external view returns (address);
 
     /// @notice Sets the hurdle rate for a specific vault
     /// @dev Only admin can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
-    /// Vault must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
-    /// A hurdle rate of 0 is valid and means performance fees will be charged on all positive yield with no minimum
-    /// threshold.
+    /// Vault must be registered before setting hurdle rate. A hurdle rate of 0 means vault performance fee logic
+    /// has no minimum hurdle threshold.
     /// @param vault The vault address to set hurdle rate for
     /// @param hurdleRate The hurdle rate in basis points (100 = 1%), 0 means no minimum threshold
     function setHurdleRate(address vault, uint16 hurdleRate) external payable;
@@ -451,27 +450,27 @@ interface IRegistry is IVersioned {
     function removeVault(address vault) external payable;
 
     /// @notice Sets the treasury address
-    /// @dev Treasury receives protocol fees and serves as emergency fund holder. Only callable by ADMIN_ROLE.
+    /// @dev Stores the protocol treasury address. Only callable by ADMIN_ROLE.
     /// @param treasury_ The new treasury address
     function setTreasury(address treasury_) external payable;
 
     /// @notice Sets the insurance address
-    /// @dev Insurance receives protocol insurance fees. Only callable by ADMIN_ROLE.
+    /// @dev Stores the protocol insurance address. Only callable by ADMIN_ROLE.
     /// @param insurance_ The new insurance address
     function setInsurance(address insurance_) external payable;
 
     /// @notice Sets the treasury fee in basis points
-    /// @dev Treasury fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+    /// @dev Stores treasury fee configuration. Only callable by ADMIN_ROLE.
     /// @param treasuryBps_ The new treasury fee in basis points (max 10000 = 100%)
     function setTreasuryBps(uint16 treasuryBps_) external payable;
 
     /// @notice Sets the insurance fee in basis points
-    /// @dev Insurance fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+    /// @dev Stores insurance fee configuration. Only callable by ADMIN_ROLE.
     /// @param insuranceBps_ The new insurance fee in basis points (max 10000 = 100%)
     function setInsuranceBps(uint16 insuranceBps_) external payable;
 
     /// @notice Gets the insurance address
-    /// @dev Insurance receives protocol insurance fees.
+    /// @dev Returns the stored protocol insurance address.
     /// @return The insurance address
     function getInsurance() external view returns (address);
 

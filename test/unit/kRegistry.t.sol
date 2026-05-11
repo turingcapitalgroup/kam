@@ -1032,12 +1032,19 @@ contract kRegistryTest is DeploymentBaseTest {
         assertEq(_iBps, _insuranceBps);
     }
 
-    function test_getSettlementConfig_Returns_Defaults_When_Not_Set() public view {
+    function test_getSettlementConfig_Returns_Defaults_When_Not_Set() public {
+        kRegistry freshImpl = new kRegistry();
+        bytes memory initData = abi.encodeCall(
+            kRegistry.initialize,
+            (users.owner, users.admin, users.emergencyAdmin, users.guardian, users.relayer, users.treasury)
+        );
+        kRegistry freshRegistry = kRegistry(payable(factory.deployAndCall(address(freshImpl), initData)));
+
         (address _treasury, address _insurance, uint16 _treasuryBps, uint16 _insuranceBps) =
-            registry.getSettlementConfig();
+            freshRegistry.getSettlementConfig();
 
         assertEq(_treasury, users.treasury); // Set in initialize
-        assertEq(_insurance, insuranceSmartAccount); // Set during deployment via DeployInsuranceAccountScript
+        assertEq(_insurance, address(0)); // Not set
         assertEq(_treasuryBps, 0); // Not set
         assertEq(_insuranceBps, 0); // Not set
     }

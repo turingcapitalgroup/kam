@@ -221,6 +221,40 @@ contract ERC2771ContextTest is BaseVaultTest {
         assertFalse(success, "Call should fail when not from trusted forwarder");
     }
 
+    /// @notice Spoofed-forwarder discrimination test.
+    /// claimStakedShares gates on `_msgSender() == _request.user`. If _msgSender ignored the
+    /// trusted-forwarder check and always extracted bytes20 from the calldata suffix when long
+    /// enough, then Bob (who is NOT the trusted forwarder) could append Alice's address and
+    /// successfully drain Alice's claim. We craft exactly that calldata and assert the call
+    /// reverts with VAULTCLAIMS_NOT_BENEFICIARY.
+    function test_ForwardedCall_FromUntrustedSender_CannotSpoofMsgSender() public {
+        // Alice creates a stake request and the batch settles.
+        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
+
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+        uint256 lastTotalAssets = vault.totalAssets();
+        _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
+
+        // Bob crafts a claim and appends Alice as the "real sender" suffix.
+        bytes memory callData = abi.encodeCall(vault.claimStakedShares, (requestId));
+        vm.prank(users.bob);
+        (bool success,) = address(vault).call(_appendSender(callData, users.alice));
+
+        // Bob is not the trusted forwarder, so _msgSender must return Bob, not Alice.
+        // Bob != _request.user (Alice) → VAULTCLAIMS_NOT_BENEFICIARY.
+        assertFalse(success, "Untrusted sender must not be able to spoof _msgSender via calldata suffix");
+        // Alice's stake should still be unclaimed.
+        assertEq(vault.balanceOf(users.alice), 0, "Alice's shares should not have been credited yet");
+    }
+
     /* //////////////////////////////////////////////////////////////
                     CONTEXT SUFFIX LENGTH TESTS
     //////////////////////////////////////////////////////////////*/

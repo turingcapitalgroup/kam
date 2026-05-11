@@ -356,7 +356,7 @@ contract DNVaultTest is BaseVaultTest {
         assertEq(kTokenBalanceAfter - kTokenBalanceBefore, 1000 * _1_USDC, "balance");
 
         assertEq(vault.balanceOf(address(vault)), 0);
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
         assertEq(vault.totalAssets(), 0);
         assertEq(vault.totalSupply(), 0);
     }

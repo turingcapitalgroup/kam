@@ -135,11 +135,11 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
     /// (3) Transferring stkTokens from user to vault contract to maintain stable share price during settlement period,
     /// (4) Notifying kAssetRouter of share redemption request for proper accounting across vault network. The stkTokens
     /// remain locked in the vault until settlement when they are burned and equivalent kTokens (including yield) are
-    /// made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens from
-    /// the batch receiver contract. This two-phase design ensures accurate yield calculations and prevents share
+    /// made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens directly
+    /// from the vault. This two-phase design ensures accurate yield calculations and prevents share
     /// price manipulation during the settlement process.
-    /// NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in stkToken (share) units, not kToken
-    /// (asset) units. This makes the limit immune to price fluctuations between request time and settlement time.
+    /// NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in kToken (asset) units: requested
+    /// shares are converted to assets at current prices before comparing to the configured limit.
     /// @param owner The address that owns this unstake request and can claim the resulting kTokens
     /// @param to The recipient address that will receive the kTokens after successful settlement and claiming
     /// @param stkTokenAmount The quantity of stkTokens to unstake (must not exceed user balance, cannot be zero)
@@ -180,101 +180,41 @@ interface IVault is IERC2771, IVersioned, IVaultBatch, IVaultClaim, IVaultFees {
                           ESSENTIAL VAULT GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the protocol registry address
+    /// @notice Returns the protocol registry address used for configuration and role checks
     function registry() external view returns (address);
 
-    /// @notice Returns the vault's kToken address
+    /// @notice Returns the vault's kToken address, not the underlying settlement asset
     function asset() external view returns (address);
 
-    /// @notice Returns the underlying asset address
+    /// @notice Returns the underlying settlement asset address
     function underlyingAsset() external view returns (address);
 
-    /// @notice Returns total assets under management
+    /// @notice Returns active accounted vault assets
+    /// @dev Excludes pending stake collateral and kTokens reserved for settled-but-unclaimed unstake requests.
     function totalAssets() external view returns (uint256);
 
-    /// @notice Returns net assets after fees
-    function totalNetAssets() external view returns (uint256);
-
-    /// @notice Returns gross share price
+    /// @notice Returns gross share price based on active accounted vault assets
     function sharePrice() external view returns (uint256);
 
-    /// @notice Returns net share price after fees
-    function netSharePrice() external view returns (uint256);
-
-    /// @notice Converts assets to shares at current price
+    /// @notice Converts assets to shares at current price, rounding down
     function convertToShares(uint256 assets) external view returns (uint256);
 
-    /// @notice Converts shares to assets at current price
+    /// @notice Converts shares to assets at current price, rounding down
     function convertToAssets(uint256 shares) external view returns (uint256);
 
-    /// @notice Converts shares to assets with specified totals
-    function convertToAssetsWithTotals(
-        uint256 shares,
-        uint256 totalAssets_,
-        uint256 totalSupply_
-    )
-        external
-        pure
-        returns (uint256);
-
-    /// @notice Converts assets to shares with specified totals
-    function convertToSharesWithTotals(
-        uint256 assets,
-        uint256 totalAssets_,
-        uint256 totalSupply_
-    )
-        external
-        pure
-        returns (uint256);
-
-    /// @notice Returns the current active batch ID
-    function getBatchId() external view returns (bytes32);
-
-    /// @notice Returns current batch ID with safety validation
-    function getSafeBatchId() external view returns (bytes32);
-
-    /// @notice Returns the close state of a given batch
-    function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
-
-    /// @notice Returns whether the current batch is closed
-    function isBatchClosed() external view returns (bool);
-
-    /// @notice Returns whether the current batch is settled
-    function isBatchSettled() external view returns (bool);
-
-    /// @notice Returns comprehensive info about the current batch
-    function getCurrentBatchInfo()
-        external
-        view
-        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
-
-    /// @notice Returns comprehensive info about a specific batch
-    function getBatchIdInfo(bytes32 batchId)
-        external
-        view
-        returns (
-            address batchReceiver,
-            bool isClosed_,
-            bool isSettled,
-            uint256 sharePrice_,
-            uint256 netSharePrice_,
-            uint256 totalAssets_,
-            uint256 totalNetAssets_,
-            uint256 totalSupply_,
-            uint256 depositedInBatch,
-            uint256 requestedSharesInBatch
-        );
-
-    /// @notice Returns the maximum total assets (TVL cap)
+    /// @notice Returns the maximum active assets plus pending stake collateral allowed in the vault
     function maxTotalAssets() external view returns (uint128);
 
     /// @notice Returns kTokens reserved for pending stake requests
+    /// @dev These kTokens are held by the vault but not yet converted into active assets.
     function totalPendingStake() external view returns (uint128);
 
-    /// @notice Returns kTokens reserved for settled unstake claims
+    /// @notice Returns kTokens reserved for settled-but-unclaimed unstake requests
+    /// @dev These kTokens are not active assets and must not be consumed by strategy losses.
     function totalPendingUnstake() external view returns (uint128);
 
     /// @notice Returns active assets plus pending kToken reserves expected in the vault
+    /// @dev Equals totalAssets() + totalPendingStake() + totalPendingUnstake().
     function expectedKTokenBalance() external view returns (uint256);
 
     /// @notice Increases the vault's internal balance

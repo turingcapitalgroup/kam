@@ -23,9 +23,14 @@ import { ReaderModule } from "kam/src/kStakingVault/modules/ReaderModule.sol";
 
 // Adapters
 import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
+import { ERC20ExecutionValidator } from "kam/src/adapters/parameters/ERC20ExecutionValidator.sol";
+import { ERC4626ExecutionValidator } from "kam/src/adapters/parameters/ERC4626ExecutionValidator.sol";
 
 // Interfaces
 import { IRegistry } from "kam/src/interfaces/IkRegistry.sol";
+
+// Governance
+import { TimelockController } from "kam/src/vendor/openzeppelin/governance/TimelockController.sol";
 
 // Scripts
 import { DeployMockAssetsScript } from "kam/script/deployment/00_DeployMockAssets.s.sol";
@@ -40,6 +45,8 @@ import { DeployAdaptersScript } from "kam/script/deployment/08_DeployAdapters.s.
 import { DeployInsuranceAccountScript } from "kam/script/deployment/09_DeployInsuranceAccount.s.sol";
 import { ConfigureProtocolScript } from "kam/script/deployment/10_ConfigureProtocol.s.sol";
 import { ConfigureExecutorPermissionsScript } from "kam/script/deployment/11_ConfigureExecutorPermissions.s.sol";
+import { ConfigureAdapterApprovalsScript } from "kam/script/deployment/12_ConfigureAdapterApprovals.s.sol";
+import { DeployTimelockScript } from "kam/script/deployment/13_DeployTimelock.s.sol";
 
 import { MockERC4626 } from "kam/test/mocks/MockERC4626.sol";
 import { MockWallet } from "kam/test/mocks/MockWallet.sol";
@@ -52,10 +59,14 @@ contract DeploymentBaseTest is BaseTest {
     kToken public kUSD;
     kToken public kBTC;
     kMinter public minter;
-    IkStakingVault public dnVault; // DN vault (works with kMinter)
+    IkStakingVault public dnVault; // DN vault USDC (works with kMinter)
+    IkStakingVault public dnVaultWBTC; // DN vault WBTC
     IkStakingVault public alphaVault; // ALPHA vault
     IkStakingVault public betaVault; // BETA vault
     kBatchReceiver public batchReceiver;
+
+    // Governance
+    TimelockController public adminTimelock;
 
     // Modules for kStakingVault
     ReaderModule public readerModule;
@@ -64,10 +75,13 @@ contract DeploymentBaseTest is BaseTest {
     VaultAdapter public minterAdapterUSDC;
     VaultAdapter public minterAdapterWBTC;
     VaultAdapter public DNVaultAdapterUSDC;
+    VaultAdapter public DNVaultAdapterWBTC;
     VaultAdapter public ALPHAVaultAdapterUSDC;
     VaultAdapter public BETHAVaultAdapterUSDC;
     VaultAdapter public vaultAdapter6;
     VaultAdapter public vaultAdapterImpl;
+    ERC20ExecutionValidator public erc20ExecutionValidator;
+    ERC4626ExecutionValidator public erc4626ExecutionValidator;
 
     // Insurance
     address public insuranceSmartAccount;
@@ -227,7 +241,26 @@ contract DeploymentBaseTest is BaseTest {
         execAddr.metawalletWBTC = _mocks.metawalletWBTC;
         execAddr.walletUSDC = _mocks.WalletUSDC;
 
-        executorPermissionsScript.run(false, execAddr, _mocks.USDC, _mocks.WBTC);
+        ConfigureExecutorPermissionsScript.ExecutorPermissionsDeployment memory executorPermissionsDeploy =
+            executorPermissionsScript.run(false, execAddr, _mocks.USDC, _mocks.WBTC);
+        erc20ExecutionValidator = ERC20ExecutionValidator(executorPermissionsDeploy.erc20ExecutionValidator);
+        erc4626ExecutionValidator = ERC4626ExecutionValidator(executorPermissionsDeploy.erc4626ExecutionValidator);
+
+        ConfigureAdapterApprovalsScript adapterApprovalsScript = new ConfigureAdapterApprovalsScript();
+        adapterApprovalsScript.setVerbose(false);
+        adapterApprovalsScript.run(
+            _registryDeploy.registry,
+            _adaptersDeploy.kMinterAdapterUSDC,
+            _adaptersDeploy.kMinterAdapterWBTC,
+            _adaptersDeploy.dnVaultAdapterUSDC,
+            _adaptersDeploy.dnVaultAdapterWBTC,
+            _adaptersDeploy.alphaVaultAdapter,
+            _adaptersDeploy.betaVaultAdapter,
+            _mocks.metawalletUSDC,
+            _mocks.metawalletWBTC,
+            _mocks.USDC,
+            _mocks.WBTC
+        );
 
         // Note: ReaderModule is already registered to vaults in 07_DeployVaults.s.sol
 
@@ -236,6 +269,37 @@ contract DeploymentBaseTest is BaseTest {
         DeployInsuranceAccountScript.InsuranceDeployment memory insuranceDeploy =
             insuranceScript.run(false, _registryDeploy.factory, _registryDeploy.registry, address(0));
         insuranceSmartAccount = insuranceDeploy.insuranceSmartAccount;
+    }
+
+    /// @notice Deploy the Admin Timelock and transfer ownership of all UUPS contracts to it.
+    /// @dev NOT called by default in setUp() — only tests that need the post-migration state
+    /// should call this (e.g. TimelockMigration.t.sol). Calling this changes ownership of every
+    /// UUPS contract from `users.owner` to the timelock, which would break tests that assume
+    /// `users.owner` can upgrade contracts directly.
+    function _deployTimelock() internal {
+        DeployTimelockScript timelockScript = new DeployTimelockScript();
+        timelockScript.setVerbose(false);
+
+        DeployTimelockScript.TimelockTargets memory targets;
+        targets.registry = _registryDeploy.registry;
+        targets.minter = _minterDeploy.minter;
+        targets.assetRouter = _assetRouterDeploy.assetRouter;
+        targets.dnVaultUSDC = _vaultsDeploy.dnVaultUSDC;
+        targets.dnVaultWBTC = _vaultsDeploy.dnVaultWBTC;
+        targets.alphaVault = _vaultsDeploy.alphaVault;
+        targets.betaVault = _vaultsDeploy.betaVault;
+        targets.dnVaultAdapterUSDC = _adaptersDeploy.dnVaultAdapterUSDC;
+        targets.dnVaultAdapterWBTC = _adaptersDeploy.dnVaultAdapterWBTC;
+        targets.alphaVaultAdapter = _adaptersDeploy.alphaVaultAdapter;
+        targets.betaVaultAdapter = _adaptersDeploy.betaVaultAdapter;
+        targets.kMinterAdapterUSDC = _adaptersDeploy.kMinterAdapterUSDC;
+        targets.kMinterAdapterWBTC = _adaptersDeploy.kMinterAdapterWBTC;
+        targets.kUSD = _tokenDeploy.kUSD;
+        targets.kBTC = _tokenDeploy.kBTC;
+
+        address timelockAddr = timelockScript.run(false, targets);
+        adminTimelock = TimelockController(payable(timelockAddr));
+        vm.label(timelockAddr, "AdminTimelock");
     }
 
     function _assignContractReferences() internal {
@@ -256,6 +320,7 @@ contract DeploymentBaseTest is BaseTest {
 
         stakingVaultImpl = kStakingVault(payable(_vaultsDeploy.stakingVaultImpl));
         dnVault = IkStakingVault(payable(_vaultsDeploy.dnVaultUSDC));
+        dnVaultWBTC = IkStakingVault(payable(_vaultsDeploy.dnVaultWBTC));
         alphaVault = IkStakingVault(payable(_vaultsDeploy.alphaVault));
         betaVault = IkStakingVault(payable(_vaultsDeploy.betaVault));
 
@@ -263,6 +328,7 @@ contract DeploymentBaseTest is BaseTest {
         minterAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.kMinterAdapterUSDC));
         minterAdapterWBTC = VaultAdapter(payable(_adaptersDeploy.kMinterAdapterWBTC));
         DNVaultAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.dnVaultAdapterUSDC));
+        DNVaultAdapterWBTC = VaultAdapter(payable(_adaptersDeploy.dnVaultAdapterWBTC));
         ALPHAVaultAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.alphaVaultAdapter));
         BETHAVaultAdapterUSDC = VaultAdapter(payable(_adaptersDeploy.betaVaultAdapter));
 
@@ -286,13 +352,15 @@ contract DeploymentBaseTest is BaseTest {
         vm.label(address(kUSD), "kUSD");
         vm.label(address(kBTC), "kBTC");
         vm.label(address(stakingVaultImpl), "kStakingVaultImpl");
-        vm.label(address(dnVault), "DNVault");
+        vm.label(address(dnVault), "DNVaultUSDC");
+        vm.label(address(dnVaultWBTC), "DNVaultWBTC");
         vm.label(address(alphaVault), "AlphaVault");
         vm.label(address(betaVault), "BetaVault");
         vm.label(address(readerModule), "ReaderModule");
         vm.label(address(minterAdapterUSDC), "MinterAdapterUSDC");
         vm.label(address(minterAdapterWBTC), "MinterAdapterWBTC");
         vm.label(address(DNVaultAdapterUSDC), "DNVaultAdapterUSDC");
+        vm.label(address(DNVaultAdapterWBTC), "DNVaultAdapterWBTC");
         vm.label(address(ALPHAVaultAdapterUSDC), "ALPHAVaultAdapterUSDC");
         vm.label(address(BETHAVaultAdapterUSDC), "BETHAVaultAdapterUSDC");
         vm.label(address(vaultAdapterImpl), "VaultAdapterImpl");

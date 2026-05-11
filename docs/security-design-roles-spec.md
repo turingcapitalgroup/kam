@@ -158,8 +158,7 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 | `batchId` | `bytes32` | `_createNewBatch` |
 | `depositedInBatch` | `uint128` | Incremented by `stake` |
 | `requestedSharesInBatch` | `uint128` | Incremented by `unstake` |
-| `totalAssets` | `uint256` | Snapshot at settlement (gross, before fees) |
-| `totalNetAssets` | `uint256` | Snapshot at settlement (after fees) |
+| `totalAssets` | `uint256` | Snapshot at settlement after fee-share minting |
 | `totalSupply` | `uint256` | Snapshot at settlement |
 
 **Design note**: `totalAssets` and `totalSupply` snapshots are critical for claim conversion. `claimStakedShares` and `claimUnstakedAssets` use these snapshots (not live values) to compute the exact amount each user receives, ensuring `sum(individual claims) <= total reserved amount`.

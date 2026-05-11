@@ -16,7 +16,7 @@ fs_permissions = [{ access = "read-write", path = "." }]
 [profile.deploy]
 solc_version = "0.8.30"
 optimizer = true
-optimizer_runs = 5000
+optimizer_runs = 800
 
 [profile.solx]
 gas_limit = 100_000_000
@@ -58,6 +58,7 @@ number_underscore = "thousands"
 quote_style = "double"
 tab_width = 4
 sort_imports = true
+ignore = ["src/vendor/**"]
 
 [rpc_endpoints]
 mainnet = "${RPC_MAINNET}"

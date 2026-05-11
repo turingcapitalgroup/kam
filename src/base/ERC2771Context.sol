@@ -50,15 +50,12 @@ abstract contract ERC2771Context is IERC2771 {
         emit TrustedForwarderSet(_oldForwarder, trustedForwarder_);
     }
 
-    /// @notice Returns the address of the trusted forwarder.
-    /// @return forwarder the special address for metatransactions
+    /// @inheritdoc IERC2771
     function trustedForwarder() public view virtual returns (address forwarder) {
         return _getERC2771ContextStorage().trustedForwarder;
     }
 
-    /// @notice Indicates whether any particular address is the trusted forwarder.
-    /// @param forwarder wallet address
-    /// @return isTrusted whether is a trusted forwarder or not.
+    /// @inheritdoc IERC2771
     function isTrustedForwarder(address forwarder) public view virtual returns (bool) {
         address _trustedForwarder = trustedForwarder();
         return _trustedForwarder != address(0) && forwarder == _trustedForwarder;

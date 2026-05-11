@@ -1,8 +1,8 @@
 # kAssetRouter
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/kAssetRouter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kAssetRouter.sol)
 
 **Inherits:**
-[IkAssetRouter](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.IkAssetRouter.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
+[IkAssetRouter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.IkAssetRouter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
 
 Central money flow coordinator for the KAM protocol, orchestrating all asset movements and yield
 distribution
@@ -40,18 +40,6 @@ Prevents excessive delays that could harm user experience while maintaining secu
 
 ```solidity
 uint256 private constant MAX_VAULT_SETTLEMENT_COOLDOWN = 1 days
-```
-
-
-### DEFAULT_MAX_DELTA
-Default yield tolerance for settlement proposals (10%)
-
-Provides initial yield deviation threshold to prevent settlements with excessive yield changes
-that could indicate errors in yield calculation or potential manipulation attempts
-
-
-```solidity
-uint256 private constant DEFAULT_MAX_DELTA = 1000
 ```
 
 
@@ -104,13 +92,13 @@ registry and initialize the money flow coordination system.
 
 
 ```solidity
-function initialize(address _registry, address _owner) external initializer;
+function initialize(address _registryAddr, address _owner) external initializer;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_registry`|`address`|Address of the kRegistry contract that manages protocol configuration|
+|`_registryAddr`|`address`|Address of the kRegistry contract that manages protocol configuration|
 |`_owner`|`address`|Initial owner of the contract|
 
 
@@ -191,29 +179,6 @@ function kAssetTransfer(
 |`_sourceVault`|`address`||
 |`_targetVault`|`address`||
 |`_asset`|`address`|The underlying asset address being transferred between vaults|
-|`_amount`|`uint256`||
-|`_batchId`|`bytes32`||
-
-
-### kSharesRequestPush
-
-Requests shares to be pushed for kStakingVault staking operations and batch processing
-
-This function is part of the share-based accounting system for retail users in kStakingVaults.
-When users stake kTokens, the vault requests shares to be pushed to track their ownership. The
-process coordinates: (1) conversion of kTokens to vault shares at current share price, (2) updating
-user balances in the vault system, (3) preparing for batch settlement. Share requests are batched
-to optimize gas costs and ensure fair pricing across all users in the same settlement period.
-
-
-```solidity
-function kSharesRequestPush(address _sourceVault, uint256 _amount, bytes32 _batchId) external payable;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_sourceVault`|`address`||
 |`_amount`|`uint256`||
 |`_batchId`|`bytes32`||
 
@@ -1037,4 +1002,3 @@ struct kAssetRouterStorage {
     mapping(address sourceVault => mapping(address asset => uint256)) globalPendingRequests;
 }
 ```
-

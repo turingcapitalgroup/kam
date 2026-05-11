@@ -1,5 +1,5 @@
 # IVaultReader
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/interfaces/modules/IVaultReader.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/modules/IVaultReader.sol)
 
 Read-only interface for querying specialized vault metrics via the ReaderModule
 
@@ -191,4 +191,127 @@ function getUnstakeRequest(bytes32 requestId)
 |----|----|-----------|
 |`unstakeRequest`|`BaseVaultTypes.UnstakeRequest`|The unstake request struct|
 
+
+### totalNetAssets
+
+Returns net active accounted vault assets after fee accounting
+
+Currently equals totalAssets because fees are accrued and minted through the canonical fee path.
+
+
+```solidity
+function totalNetAssets() external view returns (uint256);
+```
+
+### convertToSharesWithTotals
+
+Converts assets to shares with specified totals, rounding down
+
+
+```solidity
+function convertToSharesWithTotals(
+    uint256 assets,
+    uint256 totalAssets_,
+    uint256 totalSupply_
+)
+    external
+    pure
+    returns (uint256);
+```
+
+### convertToAssetsWithTotals
+
+Converts shares to assets with specified totals, rounding down
+
+
+```solidity
+function convertToAssetsWithTotals(
+    uint256 shares,
+    uint256 totalAssets_,
+    uint256 totalSupply_
+)
+    external
+    pure
+    returns (uint256);
+```
+
+### getBatchId
+
+Returns the current active batch ID
+
+
+```solidity
+function getBatchId() external view returns (bytes32);
+```
+
+### getSafeBatchId
+
+Returns current batch ID with safety validation
+
+
+```solidity
+function getSafeBatchId() external view returns (bytes32);
+```
+
+### isClosed
+
+Returns the close state of a given batch
+
+
+```solidity
+function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
+```
+
+### isBatchClosed
+
+Returns whether the current batch is closed
+
+
+```solidity
+function isBatchClosed() external view returns (bool);
+```
+
+### isBatchSettled
+
+Returns whether the current batch is settled
+
+
+```solidity
+function isBatchSettled() external view returns (bool);
+```
+
+### getCurrentBatchInfo
+
+Returns core state for the current batch
+
+
+```solidity
+function getCurrentBatchInfo()
+    external
+    view
+    returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
+```
+
+### getBatchIdInfo
+
+Returns accounting and lifecycle data for a specific batch
+
+
+```solidity
+function getBatchIdInfo(bytes32 batchId)
+    external
+    view
+    returns (
+        address batchReceiver,
+        bool isClosed_,
+        bool isSettled,
+        uint256 sharePrice_,
+        uint256 netSharePrice_,
+        uint256 totalAssets_,
+        uint256 totalNetAssets_,
+        uint256 totalSupply_,
+        uint256 depositedInBatch,
+        uint256 requestedSharesInBatch
+    );
+```
 

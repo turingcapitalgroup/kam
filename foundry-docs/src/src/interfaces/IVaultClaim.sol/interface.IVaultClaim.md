@@ -1,5 +1,5 @@
 # IVaultClaim
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/interfaces/IVaultClaim.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IVaultClaim.sol)
 
 Interface for claiming settled staking rewards and unstaking assets after batch processing completion
 

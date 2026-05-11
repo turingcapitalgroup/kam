@@ -55,8 +55,8 @@ deployments/
     "treasury": "0x..."
   },
   "assets": {
-    "USDC": "0xA0b86a33E6d8c30c9b61aEB5eF6c5C756fA2A45F1",
-    "WBTC": "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f"
+    "USDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    "WBTC": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
   }
 }
 ```
@@ -98,13 +98,17 @@ deployments/
 
 ## 🔄 Deployment Flow
 
-1. **01-03**: Core contracts (Registry, Minter, AssetRouter)
-2. **04**: Register singletons (admin calls required)
-3. **05**: Deploy kTokens (admin calls required)
-4. **06**: Deploy vault modules
-5. **07**: Deploy vaults (DN, Alpha, Beta)
-6. **08**: Deploy adapters
-7. **09**: Configure protocol (executes vault registration)
+1. **00**: Deploy mock assets (testnets only)
+2. **01-03**: Core contracts (Registry, Minter, AssetRouter)
+3. **04**: Register singletons (admin calls required)
+4. **05**: Deploy kTokens (admin calls required)
+5. **06**: Deploy vault modules
+6. **07**: Deploy vaults (DN, Alpha, Beta)
+7. **08**: Deploy adapters
+8. **09**: Deploy insurance smart account
+9. **10**: Configure protocol (executes vault registration)
+10. **11**: Configure executor permissions
+11. **12**: Configure adapter approvals
 
 Scripts automatically read previous deployment addresses and validate dependencies.
 
@@ -128,9 +132,14 @@ forge script script/deployment/05_DeployTokens.s.sol --rpc-url mainnet
 forge script script/deployment/06_DeployVaultModules.s.sol --rpc-url mainnet
 forge script script/deployment/07_DeployVaults.s.sol --rpc-url mainnet
 
-# Adapters and final config (executes automatically)
+# Adapters and insurance
 forge script script/deployment/08_DeployAdapters.s.sol --rpc-url mainnet
-forge script script/deployment/09_ConfigureProtocol.s.sol --rpc-url mainnet
+forge script script/deployment/09_DeployInsuranceAccount.s.sol --rpc-url mainnet
+
+# Configuration (executes automatically)
+forge script script/deployment/10_ConfigureProtocol.s.sol --rpc-url mainnet
+forge script script/deployment/11_ConfigureExecutorPermissions.s.sol --rpc-url mainnet
+forge script script/deployment/12_ConfigureAdapterApprovals.s.sol --rpc-url mainnet
 ```
 
 ## Post-Deployment Configuration
@@ -172,7 +181,7 @@ cat output/mainnet/addresses.json | grep -v "0x000000000000000000000000000000000
 
 2. **Dependency errors**
    - Scripts validate previous deployments automatically
-   - Run scripts in order (01-10) or use `make deploy-all`
+   - Run scripts in order (01-12) or use `make deploy-all` followed by `make config-all`
 
 3. **Admin operations**
    - Check admin account for pending transactions

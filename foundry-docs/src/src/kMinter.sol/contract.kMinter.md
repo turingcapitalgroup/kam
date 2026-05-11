@@ -1,8 +1,8 @@
 # kMinter
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/kMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kMinter.sol)
 
 **Inherits:**
-[IkMinter](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
+[IkMinter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [ISettleBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.ISettleBatch.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
 
 Institutional gateway for kToken minting and redemption with batch settlement processing
 
@@ -10,10 +10,10 @@ This contract serves as the primary interface for qualified institutions to inte
 enabling them to mint kTokens by depositing underlying assets and burn them through a sophisticated batch
 settlement system. Key features include: (1) Immediate 1:1 kToken minting upon asset deposit, bypassing the
 share-based accounting used for retail users, (2) Two-phase redemption process that handles requests through
-batch settlements to optimize gas costs and maintain protocol efficiency, (3) Integration with kStakingVault
-for yield generation on deposited assets, (4) Request tracking and management system with unique IDs for each
-redemption. The contract enforces strict access control, ensuring only verified institutions can access these
-privileged operations while maintaining the security and integrity of the protocol's asset backing.
+batch settlements to optimize gas costs and maintain protocol efficiency, (3) Request tracking and management
+system with unique IDs for each redemption. The contract enforces strict access control, ensuring only
+verified institutions can access these privileged operations while maintaining the security and integrity of
+the protocol's asset backing.
 
 
 ## State Variables
@@ -60,13 +60,13 @@ Initializes the kMinter contract
 
 
 ```solidity
-function initialize(address _registry, address _owner) external initializer;
+function initialize(address _registryAddr, address _owner) external initializer;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_registry`|`address`|Address of the registry contract|
+|`_registryAddr`|`address`|Address of the registry contract|
 |`_owner`|`address`|Initial owner of the contract|
 
 
@@ -192,7 +192,7 @@ Burns all `requestedSharesInBatch` kTokens at once and decrements `totalLockedAs
 
 
 ```solidity
-function settleBatch(bytes32 _batchId) external;
+function settleBatch(bytes32 _batchId) external override(IkMinter, ISettleBatch);
 ```
 **Parameters**
 
@@ -640,18 +640,13 @@ function getTotalLockedAssets(address _asset) external view returns (uint256);
 
 Authorizes contract upgrades
 
-Only callable by contract owner
+Only callable by contract owner. Solady's UUPSUpgradeable already rejects a zero
+implementation via the `proxiableUUID` staticcall in `upgradeToAndCall`.
 
 
 ```solidity
-function _authorizeUpgrade(address _newImplementation) internal view override;
+function _authorizeUpgrade(address) internal view override;
 ```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_newImplementation`|`address`|New implementation address|
-
 
 ### contractName
 

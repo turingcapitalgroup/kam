@@ -1,8 +1,8 @@
 # BaseVault
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/kStakingVault/base/BaseVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kStakingVault/base/BaseVault.sol)
 
 **Inherits:**
-[ERC20](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
+[ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
 
 Foundation contract providing essential shared functionality for all kStakingVault implementations
 
@@ -789,6 +789,7 @@ struct BaseVaultStorage {
     mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;
     mapping(bytes32 => BaseVaultTypes.UnstakeRequest) unstakeRequests;
     mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set) userRequests;
+    uint128 totalPendingUnstake;
 }
 ```
 

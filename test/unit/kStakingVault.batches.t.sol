@@ -13,7 +13,6 @@ import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 import {
     KASSETROUTER_BATCH_ID_PROPOSED,
     KASSETROUTER_PROPOSAL_NOT_FOUND,
-    KSTAKINGVAULT_BALANCE_AUDIT_FAILED,
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
     KSTAKINGVAULT_WRONG_ROLE,
@@ -193,14 +192,21 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         vault.settleBatch(batchId);
     }
 
-    function test_SettleBatch_Reverts_WhenVaultKTokenBalanceDoesNotReconcile() public {
-        _performStakeAndSettle(users.alice, 1000 * _1_USDC, 0);
+    function test_SettleBatch_Allows_UnsolicitedKTokenBalance() public {
+        _mintKTokenToUser(users.alice, 1001 * _1_USDC, true);
 
-        vm.prank(address(vault));
-        kUSD.transfer(users.alice, 1);
-        assertEq(kUSD.balanceOf(address(vault)), vault.expectedKTokenBalance() - 1);
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
 
         bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
+
+        vm.prank(users.alice);
+        kUSD.transfer(address(vault), 1);
+
+        assertEq(kUSD.balanceOf(address(vault)), vault.expectedKTokenBalance() + 1);
 
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
@@ -210,9 +216,13 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         vm.prank(users.relayer);
         bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, totalAssets);
 
-        vm.expectRevert(bytes(KSTAKINGVAULT_BALANCE_AUDIT_FAILED));
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
+
+        assertEq(kUSD.balanceOf(address(vault)), vault.expectedKTokenBalance() + 1);
+
+        vm.prank(users.alice);
+        vault.claimStakedShares(requestId);
     }
 
     function test_SettleBatch_AlreadySettled_Revert() public {

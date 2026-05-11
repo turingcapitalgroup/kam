@@ -56,9 +56,9 @@ import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 /// coordination with kAssetRouter for cross-vault yield optimization, (4) Two-phase operations (request → claim)
 /// ensuring accurate settlement and preventing MEV attacks, (5) Fee management system supporting both management
 /// and performance fees with hurdle rate mechanisms. The vault integrates with the broader protocol through
-/// kAssetRouter for asset flow coordination and yield distribution. Gas optimizations include packed storage,
-/// minimal proxy deployment for batch receivers, and efficient batch settlement processing. The modular architecture
-/// enables upgrades while maintaining state integrity through UUPS pattern and ERC-7201 storage.
+/// kAssetRouter for asset flow coordination and yield distribution. Gas optimizations include packed storage
+/// and efficient batch settlement processing. The modular architecture enables upgrades while maintaining state
+/// integrity through UUPS pattern and ERC-7201 storage.
 contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUpgradeable, Ownable, MultiFacetProxy {
     using OptimizedBytes32EnumerableSetLib for OptimizedBytes32EnumerableSetLib.Bytes32Set;
     using SafeTransferLib for address;
@@ -80,8 +80,7 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     /// process: (1) Validates asset address to prevent deployment with invalid configuration, (2) Initializes
     /// BaseVault foundation with registry and operational state, (3) Sets up ownership and access control through
     /// Ownable pattern, (4) Configures share token metadata and decimals for ERC20 functionality, (5) Establishes
-    /// kToken integration through registry lookup for asset-to-token mapping, (6) Sets initial share price watermark
-    /// for performance fee calculations, (7) Deploys BatchReceiver implementation for settlement asset distribution.
+    /// kToken integration through registry lookup for asset-to-token mapping, (6) Creates the initial open batch.
     /// The initialization creates a complete retail staking solution integrated with the protocol's institutional
     /// flows.
     /// @param _owner The address that will have administrative control over the vault
@@ -155,7 +154,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         );
 
         // Make sure we dont exceed the max total assets
-        // Use actual kToken balance (not _totalAssets()) to prevent bypass via pending stakes
         require(
             $.totalBalance + $.totalPendingStake + _amount128 <= $.maxTotalAssets,
             KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED
@@ -243,8 +241,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         // Transfer stkTokens to contract to keep share price stable
         // It will only be burned when the assets are claimed later
         _transfer(_msgSender(), address(this), _stkTokenAmount);
-
-        IkAssetRouter(_getKAssetRouter()).kSharesRequestPush(address(this), _stkTokenAmount, _batchId);
 
         emit UnstakeRequestCreated(_requestId, _owner, _stkTokenAmount, _to, _batchId);
 
@@ -355,29 +351,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     }
 
     /// @inheritdoc IVaultBatch
-    /// @dev CALL CONTRACT — DO NOT REORDER. Each step depends on state mutated by the previous
-    ///      step; reordering produces silent fee-math errors (double-charging of management fees
-    ///      as yield, stale settlement baselines) or hard reverts (zero-duration settlements).
-    ///
-    ///   1. Capture `_settlementElapsed` BEFORE `_accrueFees()` advances `_lastFeeTimestamp`.
-    ///      If this capture happens after the accrual, elapsed = 0 and `computePerformanceFee`
-    ///      reverts with `VAULTMATHLIB_ZERO_ELAPSED` (the library guard added to prevent the
-    ///      hurdle filter from being silently bypassed).
-    ///   2. `_accrueFees()` computes the management fee on pre-yield total assets and advances
-    ///      `_lastFeeTimestamp`. Returns the management-fee amount in asset terms.
-    ///   3. Compute net interest as
-    ///         `_currentBalance - _previousBalance - _mgmtFeeAssets`
-    ///      so the management fee is removed from the perf-fee base. Without this subtraction
-    ///      the management-fee charge appears as "yield" and is performance-fee'd a second time.
-    ///   4. Mint management-fee shares (`_mintManagementFees`).
-    ///   5. Compute performance fee using the captured elapsed and the net interest, against
-    ///      `_previousBalance` as the hurdle baseline.
-    ///   6. Mint performance-fee shares.
-    ///   7. Process pending stake/unstake at `_totalAssets()` / `totalSupply()`. These values
-    ///      include the just-minted fee shares — that is intentional: stakers join at the
-    ///      post-fee rate.
-    ///   8. Snapshot `_lastSettlementBalance = _totalBalance()` LAST so the next settlement's
-    ///      interest baseline is correct.
     function settleBatch(bytes32 _batchId) external override(IVaultBatch, ISettleBatch) {
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
@@ -602,17 +575,29 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         _decreaseBalance(_amount);
     }
 
+    /// @notice Computes the expected kToken balance held by the vault as a sum of active assets and pending reserves
+    /// @dev The expected balance reconciles three categories: (1) active assets earning yield in strategies,
+    /// (2) kTokens deposited for pending stake requests not yet settled, (3) kTokens reserved for settled-but-unclaimed
+    /// unstake requests. This sum is the invariant baseline the vault must maintain at all times.
+    /// @param $ Direct storage pointer for gas-efficient state access
+    /// @return The total kToken balance the vault should hold according to protocol state
     function _expectedKTokenBalance(BaseVaultStorage storage $) private view returns (uint256) {
         return _totalAssets() + $.totalPendingStake + $.totalPendingUnstake;
     }
 
+    /// @notice Audits the vault's kToken balance against the expected invariant, reverting on mismatch
+    /// @dev Called at the end of `settleBatch` to catch any kToken leakage caused by rounding, fee errors,
+    /// or balance manipulation. Reverts with KSTAKINGVAULT_BALANCE_AUDIT_FAILED if the vault holds fewer
+    /// kTokens than the sum of active assets and pending reserves. This is a safety check — the vault may
+    /// hold more kTokens than expected (e.g. from rounding in claim transfers) but never less.
+    /// @param $ Direct storage pointer for gas-efficient state access
     function _auditKTokenBalance(BaseVaultStorage storage $) private view {
-        require($.kToken.balanceOf(address(this)) == _expectedKTokenBalance($), KSTAKINGVAULT_BALANCE_AUDIT_FAILED);
+        require($.kToken.balanceOf(address(this)) >= _expectedKTokenBalance($), KSTAKINGVAULT_BALANCE_AUDIT_FAILED);
     }
 
-    /// @notice Creates a unique request ID for a staking request
+    /// @notice Creates a unique request ID for a staking or unstaking request
     /// @param _user User address
-    /// @param _amount Amount of underlying assets
+    /// @param _amount Amount (kTokens for stakes, stkTokens for unstakes)
     /// @param _timestamp Timestamp
     /// @return Request ID
     function _createStakeRequestId(address _user, uint256 _amount, uint256 _timestamp) private returns (bytes32) {
@@ -675,165 +660,94 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
                           ESSENTIAL VAULT GETTERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the protocol registry address used for configuration and role checks
+    /// @dev Reverts before initialization so integrations do not read an unset registry.
+    /// @return The kRegistry address configured during initialization
     function registry() external view returns (address) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require(_getInitialized($), KSTAKINGVAULT_NOT_INITIALIZED);
         return $.registry;
     }
 
+    /// @notice Returns the vault's kToken address
+    /// @dev This is the share accounting asset held by the vault, not the underlying settlement asset.
+    /// @return The kToken associated with the vault's underlying asset
     function asset() external view returns (address) {
         return _getBaseVaultStorage().kToken;
     }
 
+    /// @notice Returns the underlying settlement asset address
+    /// @return The asset address used by the router and strategies for settlement
     function underlyingAsset() external view returns (address) {
         return _getBaseVaultStorage().underlyingAsset;
     }
 
+    /// @notice Returns active accounted vault assets
+    /// @dev Excludes pending stake collateral and kTokens reserved for settled-but-unclaimed unstake requests.
+    /// @return The active asset base that can absorb strategy gains and losses
     function totalAssets() external view returns (uint256) {
         return _totalAssets();
     }
 
-    function totalNetAssets() external view returns (uint256) {
-        return _totalAssets();
-    }
-
+    /// @notice Returns the current gross share price
+    /// @dev Uses one whole share unit based on the vault decimals and current active assets.
+    /// @return The amount of active assets represented by one whole share unit
     function sharePrice() external view returns (uint256) {
         return _sharePrice();
     }
 
-    function netSharePrice() external view returns (uint256) {
-        return _sharePrice();
-    }
-
+    /// @notice Converts an asset amount to shares using current totals
+    /// @dev Rounds down in favor of the vault.
+    /// @param _assets The active asset amount to convert
+    /// @return The share amount for the provided assets
     function convertToShares(uint256 _assets) external view returns (uint256) {
         return _convertToSharesWithTotals(_assets, _totalAssets(), totalSupply());
     }
 
+    /// @notice Converts a share amount to assets using current totals
+    /// @dev Rounds down in favor of the vault.
+    /// @param _shares The share amount to convert
+    /// @return The active asset amount for the provided shares
     function convertToAssets(uint256 _shares) external view returns (uint256) {
         return _convertToAssetsWithTotals(_shares, _totalAssets(), totalSupply());
     }
 
-    function convertToSharesWithTotals(
-        uint256 _assets,
-        uint256 _totalAssetsVal,
-        uint256 _totalSupplyVal
-    )
-        external
-        pure
-        returns (uint256)
-    {
-        return _convertToSharesWithTotals(_assets, _totalAssetsVal, _totalSupplyVal);
-    }
-
-    function convertToAssetsWithTotals(
-        uint256 _shares,
-        uint256 _totalAssetsVal,
-        uint256 _totalSupplyVal
-    )
-        external
-        pure
-        returns (uint256)
-    {
-        return _convertToAssetsWithTotals(_shares, _totalAssetsVal, _totalSupplyVal);
-    }
-
-    function getBatchId() public view returns (bytes32) {
-        return _getBaseVaultStorage().currentBatchId;
-    }
-
-    function getSafeBatchId() external view returns (bytes32) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        bytes32 _batchId = getBatchId();
-        require(!$.batches[_batchId].isClosed, KSTAKINGVAULT_VAULT_CLOSED);
-        require(!$.batches[_batchId].isSettled, KSTAKINGVAULT_VAULT_SETTLED);
-        return _batchId;
-    }
-
-    function isClosed(bytes32 _batchId) external view returns (bool isClosed_) {
-        isClosed_ = _getBaseVaultStorage().batches[_batchId].isClosed;
-    }
-
-    function isBatchClosed() external view returns (bool) {
-        return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed;
-    }
-
-    function isBatchSettled() external view returns (bool) {
-        return _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled;
-    }
-
-    function getCurrentBatchInfo()
-        external
-        view
-        returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled)
-    {
-        return (
-            _getBaseVaultStorage().currentBatchId,
-            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].batchReceiver,
-            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isClosed,
-            _getBaseVaultStorage().batches[_getBaseVaultStorage().currentBatchId].isSettled
-        );
-    }
-
-    function getBatchIdInfo(bytes32 _batchId)
-        external
-        view
-        returns (
-            address batchReceiver,
-            bool isClosed_,
-            bool isSettled,
-            uint256 sharePrice_,
-            uint256 netSharePrice_,
-            uint256 totalAssets_,
-            uint256 totalNetAssets_,
-            uint256 totalSupply_,
-            uint256 depositedInBatch,
-            uint256 requestedSharesInBatch
-        )
-    {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        BaseVaultTypes.BatchInfo storage batch = $.batches[_batchId];
-
-        uint256 _totalSupply = batch.totalSupply;
-        uint8 decimals = _getDecimals($);
-
-        sharePrice_ = _convertToAssetsWithTotals(10 ** decimals, batch.totalAssets, _totalSupply);
-        netSharePrice_ = sharePrice_;
-
-        return (
-            batch.batchReceiver,
-            batch.isClosed,
-            batch.isSettled,
-            sharePrice_,
-            netSharePrice_,
-            batch.totalAssets,
-            batch.totalAssets,
-            batch.totalSupply,
-            batch.depositedInBatch,
-            batch.requestedSharesInBatch
-        );
-    }
-
+    /// @notice Returns the vault TVL cap in active assets plus pending stake collateral
+    /// @return The maximum total assets configured for the vault
     function maxTotalAssets() external view returns (uint128) {
         return _getBaseVaultStorage().maxTotalAssets;
     }
 
+    /// @notice Returns kTokens reserved for pending stake requests
+    /// @dev These kTokens are held by the vault but not yet converted into active assets.
+    /// @return The pending stake reserve amount
     function totalPendingStake() external view returns (uint128) {
         return _getBaseVaultStorage().totalPendingStake;
     }
 
+    /// @notice Returns kTokens reserved for settled-but-unclaimed unstake requests
+    /// @dev These kTokens are not active assets and must not be consumed by strategy losses.
+    /// @return The pending unstake reserve amount
     function totalPendingUnstake() external view returns (uint128) {
         return _getBaseVaultStorage().totalPendingUnstake;
     }
 
+    /// @notice Returns the raw kToken balance expected to be held by the vault
+    /// @dev Equals totalAssets() + totalPendingStake() + totalPendingUnstake().
+    /// @return The expected kToken balance for invariant audits
     function expectedKTokenBalance() public view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _expectedKTokenBalance($);
     }
 
+    /// @notice Returns the human-readable contract name
+    /// @return The contract name
     function contractName() external pure returns (string memory) {
         return "kStakingVault";
     }
 
+    /// @notice Returns the contract version
+    /// @return The semantic version string
     function contractVersion() external pure returns (string memory) {
         return "1.0.0";
     }

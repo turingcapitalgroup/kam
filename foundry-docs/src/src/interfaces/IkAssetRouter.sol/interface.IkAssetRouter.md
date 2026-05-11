@@ -1,8 +1,8 @@
 # IkAssetRouter
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/interfaces/IkAssetRouter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IkAssetRouter.sol)
 
 **Inherits:**
-[IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Central money flow coordinator for the KAM protocol managing all asset movements and settlements
 
@@ -96,29 +96,6 @@ function kAssetTransfer(
 |`_asset`|`address`|The underlying asset address being transferred between vaults|
 |`amount`|`uint256`|The quantity of assets to transfer for rebalancing|
 |`batchId`|`bytes32`|The batch identifier for coordinating this transfer with settlement|
-
-
-### kSharesRequestPush
-
-Requests shares to be pushed for kStakingVault staking operations and batch processing
-
-This function is part of the share-based accounting system for retail users in kStakingVaults.
-When users stake kTokens, the vault requests shares to be pushed to track their ownership. The
-process coordinates: (1) conversion of kTokens to vault shares at current share price, (2) updating
-user balances in the vault system, (3) preparing for batch settlement. Share requests are batched
-to optimize gas costs and ensure fair pricing across all users in the same settlement period.
-
-
-```solidity
-function kSharesRequestPush(address sourceVault, uint256 amount, bytes32 batchId) external payable;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`sourceVault`|`address`|The kStakingVault address requesting share push operations|
-|`amount`|`uint256`|The quantity of shares being requested for push to users|
-|`batchId`|`bytes32`|The batch identifier for coordinating share operations with settlement|
 
 
 ### proposeSettleBatch
@@ -691,7 +668,7 @@ forwards these assets to the appropriate DN vault for yield farming strategies
 
 
 ```solidity
-event AssetsPushed(address indexed from, uint256 amount);
+event AssetsPushed(address indexed from, bytes32 indexed batchId, uint256 amount);
 ```
 
 **Parameters**
@@ -699,6 +676,7 @@ event AssetsPushed(address indexed from, uint256 amount);
 |Name|Type|Description|
 |----|----|-----------|
 |`from`|`address`|The address initiating the asset push (typically kMinter)|
+|`batchId`|`bytes32`|The batch identifier for this asset movement|
 |`amount`|`uint256`|The quantity of assets being pushed to the vault|
 
 ### AssetsRequestPulled
@@ -709,7 +687,7 @@ after batch settlement. The batchReceiver is deployed to hold assets for distrib
 
 
 ```solidity
-event AssetsRequestPulled(address indexed vault, address indexed asset, uint256 amount);
+event AssetsRequestPulled(address indexed vault, address indexed asset, bytes32 indexed batchId, uint256 amount);
 ```
 
 **Parameters**
@@ -718,6 +696,7 @@ event AssetsRequestPulled(address indexed vault, address indexed asset, uint256 
 |----|----|-----------|
 |`vault`|`address`|The vault address from which assets are being requested|
 |`asset`|`address`|The underlying asset address being requested for redemption|
+|`batchId`|`bytes32`|The batch identifier for this pull request|
 |`amount`|`uint256`|The quantity of assets requested for redemption|
 
 ### AssetsTransferred
@@ -729,7 +708,7 @@ physical location while vault balances are updated to reflect the new allocation
 
 ```solidity
 event AssetsTransferred(
-    address indexed sourceVault, address indexed targetVault, address indexed asset, uint256 amount
+    address indexed sourceVault, address indexed targetVault, address indexed asset, bytes32 batchId, uint256 amount
 );
 ```
 
@@ -740,25 +719,8 @@ event AssetsTransferred(
 |`sourceVault`|`address`|The vault transferring assets (losing virtual balance)|
 |`targetVault`|`address`|The vault receiving assets (gaining virtual balance)|
 |`asset`|`address`|The underlying asset address being transferred|
+|`batchId`|`bytes32`|The batch identifier for this virtual transfer|
 |`amount`|`uint256`|The quantity of assets being transferred between vaults|
-
-### SharesRequestedPushed
-Emitted when shares are requested for push operations in kStakingVault flows
-
-Part of the share-based accounting system for retail users in kStakingVaults
-
-
-```solidity
-event SharesRequestedPushed(address indexed vault, bytes32 indexed batchId, uint256 amount);
-```
-
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`vault`|`address`|The kStakingVault requesting the share push operation|
-|`batchId`|`bytes32`|The batch identifier for this operation|
-|`amount`|`uint256`|The quantity of shares being pushed|
 
 ### BatchSettled
 Emitted when a vault batch is settled with final asset accounting
@@ -1022,4 +984,3 @@ enum ProposalStatus {
     REQUIRES_APPROVAL
 }
 ```
-

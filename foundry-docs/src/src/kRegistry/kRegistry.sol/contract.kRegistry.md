@@ -1,8 +1,8 @@
 # kRegistry
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/kRegistry/kRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kRegistry/kRegistry.sol)
 
 **Inherits:**
-[IRegistry](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
+[IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
 
 Central configuration hub and contract registry for the KAM protocol ecosystem
 
@@ -171,22 +171,177 @@ function grantManagerRole(address _manager) external payable;
 |`_manager`|`address`||
 
 
-### revokeGivenRoles
+### grantAdminRole
 
-Revokes the specific role of a given user
+Grants ADMIN_ROLE to an address
 
-Only callable by ADMIN_ROLE.
+Only callable by contract owner
 
 
 ```solidity
-function revokeGivenRoles(address _user, uint256 _role) external payable;
+function grantAdminRole(address _admin) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_user`|`address`||
-|`_role`|`uint256`||
+|`_admin`|`address`||
+
+
+### grantEmergencyAdminRole
+
+Grants EMERGENCY_ADMIN_ROLE to an address
+
+Only callable by contract owner
+
+
+```solidity
+function grantEmergencyAdminRole(address _emergencyAdmin) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_emergencyAdmin`|`address`||
+
+
+### grantGuardianRole
+
+Grants GUARDIAN_ROLE to an address
+
+Only callable by contract owner
+
+
+```solidity
+function grantGuardianRole(address _guardian) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_guardian`|`address`||
+
+
+### revokeAdminRole
+
+Revokes ADMIN_ROLE from an address
+
+Only callable by contract owner
+
+
+```solidity
+function revokeAdminRole(address _admin) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_admin`|`address`||
+
+
+### revokeEmergencyAdminRole
+
+Revokes EMERGENCY_ADMIN_ROLE from an address
+
+Only callable by contract owner
+
+
+```solidity
+function revokeEmergencyAdminRole(address _emergencyAdmin) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_emergencyAdmin`|`address`||
+
+
+### revokeGuardianRole
+
+Revokes GUARDIAN_ROLE from an address
+
+Only callable by contract owner
+
+
+```solidity
+function revokeGuardianRole(address _guardian) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_guardian`|`address`||
+
+
+### revokeVendorRole
+
+Revokes VENDOR_ROLE from an address
+
+Only callable by addresses holding ADMIN_ROLE
+
+
+```solidity
+function revokeVendorRole(address _vendor) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_vendor`|`address`||
+
+
+### revokeRelayerRole
+
+Revokes RELAYER_ROLE from an address
+
+Only callable by addresses holding ADMIN_ROLE
+
+
+```solidity
+function revokeRelayerRole(address _relayer) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_relayer`|`address`||
+
+
+### revokeManagerRole
+
+Revokes MANAGER_ROLE from an address
+
+Only callable by addresses holding ADMIN_ROLE
+
+
+```solidity
+function revokeManagerRole(address _manager) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_manager`|`address`||
+
+
+### revokeInstitutionRole
+
+Revokes INSTITUTION_ROLE from an address
+
+Callable by VENDOR_ROLE (primary KYC lifecycle owner) or ADMIN_ROLE
+(documented backstop for compliance-team unavailability, erroneous grants,
+or urgent sanctions action). This is the one documented exception to strict
+grant/revoke authority symmetry in kRegistry.
+
+
+```solidity
+function revokeInstitutionRole(address _institution) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_institution`|`address`||
 
 
 ### setTreasury

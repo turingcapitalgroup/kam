@@ -1,9 +1,27 @@
 # VaultMathLib
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/fd8b703a6216c4a6a7aeca93ae8d60f4c197f8a2/src/libraries/VaultMathLib.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/libraries/VaultMathLib.sol)
 
 Fee calculation and share conversion math for KAM vaults
 
-Uses Solady OptimizedFixedPointMathLib for precision-safe fixed-point arithmetic.
+Single source of truth for protocol fee/share math. All callers must route through
+this library — no caller is permitted to reimplement these formulas. Stateless
+(`internal pure`) so it has no upgrade story of its own.
+ROUNDING CONTRACT (load-bearing — do not change without protocol-wide review):
+- convertToShares      rounds DOWN (favors the vault on deposit)
+- convertToAssets      rounds DOWN (favors the vault on withdrawal)
+- computeManagementFee rounds DOWN (favors users)
+- computePerformanceFee rounds DOWN (favors users)
+All four use Solady's `fullMulDiv`, which rounds toward zero (== down for non-negative
+operands).
+VIRTUAL OFFSETS for inflation-attack resistance:
+- VIRTUAL_SHARES = VIRTUAL_ASSETS = 1e6, added to both sides of every conversion.
+- Effect: an attacker must inflate the share price by ~1e6× the victim's deposit
+before rounding becomes exploitable. Sized for 6-decimal assets (USDC, WBTC).
+CALL CONTRACT for vault integrators:
+- Pass POST-MANAGEMENT-FEE total assets to computePerformanceFee, so performance
+fee is never charged on assets already deducted as management fee.
+- Call _accrueFees() before mutating fee rates; otherwise pending management fees
+would be re-priced at the new rate.
 Management fees are time-prorated on total assets, charged on every interaction.
 Performance fees are charged on interest gains at settlement, with hurdle rate filtering.
 
@@ -78,6 +96,8 @@ Computes the performance fee in asset terms based on interest gains
 Called at settlement when totalAssets increases (yield realization). The hurdle rate
 filters whether performance fees apply: returns must exceed the hurdle threshold.
 Hard hurdle: fee only on excess above hurdle. Soft hurdle: fee on all return.
+Reverts with `VAULTMATHLIB_ZERO_ELAPSED` when `_elapsed == 0` and `_interest > 0`,
+preventing the silent hurdle bypass that would otherwise occur.
 
 
 ```solidity
