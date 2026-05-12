@@ -427,20 +427,7 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
         $.supportedAssets.add(_asset);
         emit AssetSupported(_asset);
 
-        // Get kMinter address for granting mint permissions
-        address _minter = getContractById(K_MINTER);
-        _checkAddressNotZero(_minter);
-
-        // Get kTokenFactory address for deploying kToken
-        address _factory = getContractById(K_TOKEN_FACTORY);
-        _checkAddressNotZero(_factory);
-
-        // Extract decimals from underlying asset for kToken consistency
-        (bool _success, uint8 _decimals) = _tryGetAssetDecimals(_asset);
-        require(_success, KREGISTRY_WRONG_ASSET);
-
-        address _kToken = IkTokenFactory(_factory)
-            .deployKToken(owner(), msg.sender, _emergencyAdmin, _minter, _name, _symbol, _decimals);
+        (address _kToken, uint8 _decimals) = _deployKToken(_asset, _emergencyAdmin, _name, _symbol);
 
         $.maxMintPerBatch[_asset] = _maxMintPerBatch;
         $.maxBurnPerBatch[_asset] = _maxBurnPerBatch;
@@ -873,6 +860,38 @@ contract kRegistry is IRegistry, kBaseRoles, Initializable, UUPSUpgradeable, Mul
     /// @param _str The string to validate
     function _checkString(string memory _str) private pure {
         require(bytes(_str).length > 0, KREGISTRY_EMPTY_STRING);
+    }
+
+    /// @notice Deploys a new kToken for an asset via the kTokenFactory
+    /// @dev Extracts decimals, resolves factory and minter addresses, then deploys.
+    /// Reverts if the asset doesn't support the decimals() interface.
+    /// @param _asset The underlying asset address
+    /// @param _emergencyAdmin Emergency admin for the new kToken
+    /// @param _name Token name
+    /// @param _symbol Token symbol
+    /// @return _kToken The deployed kToken address
+    /// @return _decimals The decimals of the underlying asset
+    function _deployKToken(
+        address _asset,
+        address _emergencyAdmin,
+        string memory _name,
+        string memory _symbol
+    )
+        private
+        returns (address _kToken, uint8 _decimals)
+    {
+        bool _success;
+        (_success, _decimals) = _tryGetAssetDecimals(_asset);
+        require(_success, KREGISTRY_WRONG_ASSET);
+
+        address _factory = getContractById(K_TOKEN_FACTORY);
+        _checkAddressNotZero(_factory);
+
+        address _minter = getContractById(K_MINTER);
+        _checkAddressNotZero(_minter);
+
+        _kToken = IkTokenFactory(_factory)
+            .deployKToken(owner(), msg.sender, _emergencyAdmin, _minter, _name, _symbol, _decimals);
     }
 
     /// @dev Helper function to get the decimals of the underlying asset.

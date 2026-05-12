@@ -36,6 +36,24 @@ contract DeployTimelockScript is Script, DeploymentManager {
     /// @notice Minimum delay enforced by the Admin Timelock for every queued operation.
     uint256 internal constant ADMIN_TIMELOCK_DELAY = 3 days;
 
+    struct TimelockTargets {
+        address registry;
+        address minter;
+        address assetRouter;
+        address dnVaultUSDC;
+        address dnVaultWBTC;
+        address alphaVault;
+        address betaVault;
+        address dnVaultAdapterUSDC;
+        address dnVaultAdapterWBTC;
+        address alphaVaultAdapter;
+        address betaVaultAdapter;
+        address kMinterAdapterUSDC;
+        address kMinterAdapterWBTC;
+        address kUSD;
+        address kBTC;
+    }
+
     /// @notice Convenience wrapper for real deployments (writes to JSON).
     function run() public returns (address adminTimelock) {
         return run(true);
@@ -51,44 +69,26 @@ contract DeployTimelockScript is Script, DeploymentManager {
 
     /// @notice Run the deployment with explicitly-provided contract addresses.
     /// @dev Used by tests where contracts are deployed in-memory (no JSON I/O).
-    function run(
-        bool writeToJson,
-        address registryAddr,
-        address minterAddr,
-        address assetRouterAddr,
-        address dnVaultUSDCAddr,
-        address dnVaultWBTCAddr,
-        address alphaVaultAddr,
-        address betaVaultAddr,
-        address dnVaultAdapterUSDCAddr,
-        address dnVaultAdapterWBTCAddr,
-        address alphaVaultAdapterAddr,
-        address betaVaultAdapterAddr,
-        address kMinterAdapterUSDCAddr,
-        address kMinterAdapterWBTCAddr,
-        address kUSDAddr,
-        address kBTCAddr
-    )
-        public
-        returns (address adminTimelock)
-    {
-        DeploymentOutput memory output;
-        output.contracts.kRegistry = registryAddr;
-        output.contracts.kMinter = minterAddr;
-        output.contracts.kAssetRouter = assetRouterAddr;
-        output.contracts.dnVaultUSDC = dnVaultUSDCAddr;
-        output.contracts.dnVaultWBTC = dnVaultWBTCAddr;
-        output.contracts.alphaVault = alphaVaultAddr;
-        output.contracts.betaVault = betaVaultAddr;
-        output.contracts.dnVaultAdapterUSDC = dnVaultAdapterUSDCAddr;
-        output.contracts.dnVaultAdapterWBTC = dnVaultAdapterWBTCAddr;
-        output.contracts.alphaVaultAdapter = alphaVaultAdapterAddr;
-        output.contracts.betaVaultAdapter = betaVaultAdapterAddr;
-        output.contracts.kMinterAdapterUSDC = kMinterAdapterUSDCAddr;
-        output.contracts.kMinterAdapterWBTC = kMinterAdapterWBTCAddr;
-        output.contracts.kUSD = kUSDAddr;
-        output.contracts.kBTC = kBTCAddr;
-        return _deploy(writeToJson, output);
+    function run(bool writeToJson, TimelockTargets memory targets) public returns (address adminTimelock) {
+        return _deploy(writeToJson, _outputFromTargets(targets));
+    }
+
+    function _outputFromTargets(TimelockTargets memory targets) internal pure returns (DeploymentOutput memory output) {
+        output.contracts.kRegistry = targets.registry;
+        output.contracts.kMinter = targets.minter;
+        output.contracts.kAssetRouter = targets.assetRouter;
+        output.contracts.dnVaultUSDC = targets.dnVaultUSDC;
+        output.contracts.dnVaultWBTC = targets.dnVaultWBTC;
+        output.contracts.alphaVault = targets.alphaVault;
+        output.contracts.betaVault = targets.betaVault;
+        output.contracts.dnVaultAdapterUSDC = targets.dnVaultAdapterUSDC;
+        output.contracts.dnVaultAdapterWBTC = targets.dnVaultAdapterWBTC;
+        output.contracts.alphaVaultAdapter = targets.alphaVaultAdapter;
+        output.contracts.betaVaultAdapter = targets.betaVaultAdapter;
+        output.contracts.kMinterAdapterUSDC = targets.kMinterAdapterUSDC;
+        output.contracts.kMinterAdapterWBTC = targets.kMinterAdapterWBTC;
+        output.contracts.kUSD = targets.kUSD;
+        output.contracts.kBTC = targets.kBTC;
     }
 
     /// @dev Shared deployment logic used by both `run` overloads.

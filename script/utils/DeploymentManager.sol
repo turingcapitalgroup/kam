@@ -448,55 +448,43 @@ abstract contract DeploymentManager is Script {
 
     function _readParameterCheckerConfig(string memory json) private pure returns (ParameterCheckerConfig memory) {
         ParameterCheckerConfig memory config;
-
-        // Read max single transfer amounts
-        config.maxSingleTransfer.USDC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.USDC"));
-        config.maxSingleTransfer.WBTC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.WBTC"));
-        config.maxSingleTransfer.metawalletUSDC =
-            _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.metawalletUSDC"));
-        config.maxSingleTransfer.metawalletWBTC =
-            _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.metawalletWBTC"));
-
-        // Read allowed receivers arrays
-        bytes memory usdcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.USDC");
-        config.allowedReceivers.USDC = abi.decode(usdcReceivers, (string[]));
-
-        bytes memory wbtcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.WBTC");
-        config.allowedReceivers.WBTC = abi.decode(wbtcReceivers, (string[]));
-
-        bytes memory metawalletUsdcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.metawalletUSDC");
-        config.allowedReceivers.metawalletUSDC = abi.decode(metawalletUsdcReceivers, (string[]));
-
-        bytes memory metawalletWbtcReceivers = json.parseRaw(".parameterChecker.allowedReceivers.metawalletWBTC");
-        config.allowedReceivers.metawalletWBTC = abi.decode(metawalletWbtcReceivers, (string[]));
-
-        // Read allowed sources arrays
-        bytes memory usdcSources = json.parseRaw(".parameterChecker.allowedSources.USDC");
-        config.allowedSources.USDC = abi.decode(usdcSources, (string[]));
-
-        bytes memory wbtcSources = json.parseRaw(".parameterChecker.allowedSources.WBTC");
-        config.allowedSources.WBTC = abi.decode(wbtcSources, (string[]));
-
-        bytes memory metawalletUsdcSources = json.parseRaw(".parameterChecker.allowedSources.metawalletUSDC");
-        config.allowedSources.metawalletUSDC = abi.decode(metawalletUsdcSources, (string[]));
-
-        bytes memory metawalletWbtcSources = json.parseRaw(".parameterChecker.allowedSources.metawalletWBTC");
-        config.allowedSources.metawalletWBTC = abi.decode(metawalletWbtcSources, (string[]));
-
-        // Read allowed spenders arrays
-        bytes memory usdcSpenders = json.parseRaw(".parameterChecker.allowedSpenders.USDC");
-        config.allowedSpenders.USDC = abi.decode(usdcSpenders, (string[]));
-
-        bytes memory wbtcSpenders = json.parseRaw(".parameterChecker.allowedSpenders.WBTC");
-        config.allowedSpenders.WBTC = abi.decode(wbtcSpenders, (string[]));
-
-        bytes memory metawalletUsdcSpenders = json.parseRaw(".parameterChecker.allowedSpenders.metawalletUSDC");
-        config.allowedSpenders.metawalletUSDC = abi.decode(metawalletUsdcSpenders, (string[]));
-
-        bytes memory metawalletWbtcSpenders = json.parseRaw(".parameterChecker.allowedSpenders.metawalletWBTC");
-        config.allowedSpenders.metawalletWBTC = abi.decode(metawalletWbtcSpenders, (string[]));
-
+        config.maxSingleTransfer = _readMaxTransferAmounts(json);
+        config.allowedReceivers = _readAllowedReceivers(json);
+        config.allowedSources = _readAllowedSources(json);
+        config.allowedSpenders = _readAllowedSpenders(json);
         return config;
+    }
+
+    function _readMaxTransferAmounts(string memory json) private pure returns (MaxTransferAmounts memory config) {
+        config.USDC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.USDC"));
+        config.WBTC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.WBTC"));
+        config.metawalletUSDC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.metawalletUSDC"));
+        config.metawalletWBTC = _parseUintString(json.readString(".parameterChecker.maxSingleTransfer.metawalletWBTC"));
+    }
+
+    function _readAllowedReceivers(string memory json) private pure returns (AllowedReceivers memory config) {
+        config.USDC = _readStringArray(json, ".parameterChecker.allowedReceivers.USDC");
+        config.WBTC = _readStringArray(json, ".parameterChecker.allowedReceivers.WBTC");
+        config.metawalletUSDC = _readStringArray(json, ".parameterChecker.allowedReceivers.metawalletUSDC");
+        config.metawalletWBTC = _readStringArray(json, ".parameterChecker.allowedReceivers.metawalletWBTC");
+    }
+
+    function _readAllowedSources(string memory json) private pure returns (AllowedSources memory config) {
+        config.USDC = _readStringArray(json, ".parameterChecker.allowedSources.USDC");
+        config.WBTC = _readStringArray(json, ".parameterChecker.allowedSources.WBTC");
+        config.metawalletUSDC = _readStringArray(json, ".parameterChecker.allowedSources.metawalletUSDC");
+        config.metawalletWBTC = _readStringArray(json, ".parameterChecker.allowedSources.metawalletWBTC");
+    }
+
+    function _readAllowedSpenders(string memory json) private pure returns (AllowedSpenders memory config) {
+        config.USDC = _readStringArray(json, ".parameterChecker.allowedSpenders.USDC");
+        config.WBTC = _readStringArray(json, ".parameterChecker.allowedSpenders.WBTC");
+        config.metawalletUSDC = _readStringArray(json, ".parameterChecker.allowedSpenders.metawalletUSDC");
+        config.metawalletWBTC = _readStringArray(json, ".parameterChecker.allowedSpenders.metawalletWBTC");
+    }
+
+    function _readStringArray(string memory json, string memory path) private pure returns (string[] memory) {
+        return abi.decode(json.parseRaw(path), (string[]));
     }
 
     function _parseUintString(string memory str) private pure returns (uint256) {

@@ -9,6 +9,7 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
 import { IVaultBatch } from "kam/src/interfaces/IVaultBatch.sol";
+import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
 import { ExecutionLib } from "minimal-smart-account/libraries/ExecutionLib.sol";
 import { ModeLib } from "minimal-smart-account/libraries/ModeLib.sol";
@@ -84,6 +85,54 @@ contract KamIntegrationTest is DeploymentBaseTest {
         uint256 _amount = 100_000 * _1_USDC;
         uint256 _mintAmount = _amount * 5;
 
+        // --- Phase 1: Initial mint and first minter settlement ---
+        _phase1_initialMintAndSettle(_minter, _mintAmount);
+
+        // --- Phase 2: Distribute kTokens, stake into vaults, settle ---
+        {
+            vm.prank(users.institution);
+            IkToken(address(kUSD)).transfer(users.alice, _amount * 2);
+            vm.prank(users.institution);
+            IkToken(address(kUSD)).transfer(users.bob, _amount * 2);
+            assertEq(kUSD.balanceOf(users.institution), _amount);
+        }
+
+        {
+            vm.prank(users.alice);
+            IkToken(address(kUSD)).approve(_dnVault, _amount);
+            vm.prank(users.alice);
+            dnVault.requestStake(users.alice, users.alice, _amount);
+            assertEq(kUSD.balanceOf(users.alice), _amount);
+
+            vm.prank(users.bob);
+            IkToken(address(kUSD)).approve(_alphaVault, _amount);
+            vm.prank(users.bob);
+            alphaVault.requestStake(users.bob, users.bob, _amount);
+            assertEq(kUSD.balanceOf(users.bob), _amount);
+        }
+
+        _phase2_settleMinterAndVaults(_minter, _dnVault, _alphaVault, _minterAdapterUSDC, _amount);
+
+        // --- Phase 3: Claims, second round of stakes/unstakes ---
+        {
+            bytes32 _aliceStakeReq = _getLastUserRequest(address(dnVault), users.alice);
+            vm.prank(users.alice);
+            dnVault.claimStakedShares(_aliceStakeReq);
+            assertEq(dnVault.balanceOf(users.alice), _amount);
+
+            bytes32 _bobStakeReq = _getLastUserRequest(address(alphaVault), users.bob);
+            vm.prank(users.bob);
+            alphaVault.claimStakedShares(_bobStakeReq);
+            assertEq(alphaVault.balanceOf(users.bob), _amount);
+        }
+
+        _phase3_secondRound(_minter, _dnVault, _alphaVault, _minterAdapterUSDC, _amount, _mintAmount);
+
+        // --- Phase 4: Final unwind ---
+        _phase4_finalUnwind(_minter, _dnVault, _alphaVault, _minterAdapterUSDC, _mintAmount);
+    }
+
+    function _phase1_initialMintAndSettle(address _minter, uint256 _mintAmount) internal {
         mockUSDC.mint(users.institution, _mintAmount);
         assertEq(mockUSDC.balanceOf(users.institution), _mintAmount);
 
@@ -96,7 +145,7 @@ contract KamIntegrationTest is DeploymentBaseTest {
         minter.mint(USDC, users.institution, _mintAmount);
 
         assertEq(mockUSDC.balanceOf(users.institution), 0);
-        (uint256 _deposited, uint256 _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
+        (uint256 _deposited,) = assetRouter.getBatchIdBalances(_minter, _batchId);
         assertEq(_deposited, _mintAmount);
 
         _approveAndDeposit(address(minterAdapterUSDC), _mintAmount);
@@ -106,38 +155,25 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets);
         assertEq(mockUSDC.balanceOf(address(metawalletUSDC)), _mintAmount);
         assertEq(minterAdapterUSDC.totalAssets(), _mintAmount);
+    }
 
-        // This is what we need to do, for all the kStakingVaults and RequestBurn (kMinter) start working.
-        // This is intended since there are no kTokens accounted or available, so there cant be any deposit.
-        // --------------------------------------------------------------------------------------------- //
-
-        // To simplify and not have to add a mockDEX I will transfer between institution and users.
-        vm.prank(users.institution);
-        IkToken(address(kUSD)).transfer(users.alice, _amount * 2);
-        vm.prank(users.institution);
-        IkToken(address(kUSD)).transfer(users.bob, _amount * 2);
-        assertEq(kUSD.balanceOf(users.institution), _amount);
-
-        vm.prank(users.alice);
-        IkToken(address(kUSD)).approve(_dnVault, _amount);
-        vm.prank(users.alice);
-        bytes32 _requestIdDn = dnVault.requestStake(users.alice, users.alice, _amount);
-        assertEq(kUSD.balanceOf(users.alice), _amount);
-
-        vm.prank(users.bob);
-        IkToken(address(kUSD)).approve(_alphaVault, _amount);
-        vm.prank(users.bob);
-        bytes32 _requestIdAlpha = alphaVault.requestStake(users.bob, users.bob, _amount);
-        assertEq(kUSD.balanceOf(users.bob), _amount);
-
-        _batchId = minter.getBatchId(USDC);
+    function _phase2_settleMinterAndVaults(
+        address _minter,
+        address _dnVault,
+        address _alphaVault,
+        address _minterAdapterUSDC,
+        uint256 _amount
+    )
+        internal
+    {
+        bytes32 _batchId = minter.getBatchId(USDC);
         _closeBatch(_minter, _batchId);
         _transferAmongAdapters(_minterAdapterUSDC, address(DNVaultAdapterUSDC), _amount);
 
-        _minterTotalAssets = minterAdapterUSDC.totalAssets();
+        uint256 _minterTotalAssets = minterAdapterUSDC.totalAssets();
         _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets);
 
-        (_deposited, _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
+        (uint256 _deposited, uint256 _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         assertEq(minterAdapterUSDC.totalAssets(), kUSD.totalSupply());
         assertEq(_deposited, 0);
         assertEq(_requested, 0);
@@ -158,35 +194,40 @@ contract KamIntegrationTest is DeploymentBaseTest {
         assertEq(ALPHAVaultAdapterUSDC.totalAssets(), _amount);
         (_deposited,) = assetRouter.getBatchIdBalances(_alphaVault, _batchId);
         assertEq(_deposited, _amount);
+    }
 
-        // After the kStakingVaults settlement (dn and alpha) we can do claims and requestUnstake.
-        vm.prank(users.alice);
-        dnVault.claimStakedShares(_requestIdDn);
-        assertEq(dnVault.balanceOf(users.alice), _amount);
-
-        vm.prank(users.bob);
-        alphaVault.claimStakedShares(_requestIdAlpha);
-        assertEq(alphaVault.balanceOf(users.bob), _amount);
-
+    function _phase3_secondRound(
+        address _minter,
+        address _dnVault,
+        address _alphaVault,
+        address _minterAdapterUSDC,
+        uint256 _amount,
+        uint256 _mintAmount
+    )
+        internal
+    {
+        // Bob stakes in dnVault
         vm.prank(users.bob);
         IkToken(address(kUSD)).approve(_dnVault, _amount);
         vm.prank(users.bob);
-        _requestIdDn = dnVault.requestStake(users.bob, users.bob, _amount);
+        dnVault.requestStake(users.bob, users.bob, _amount);
 
-        _batchId = dnVault.getBatchId();
+        bytes32 _batchId = dnVault.getBatchId();
         _closeBatch(_dnVault, _batchId);
         _transferAmongAdapters(_minterAdapterUSDC, address(DNVaultAdapterUSDC), _amount);
 
+        // Bob unstakes half from alphaVault
         vm.prank(users.bob);
-        bytes32 _requestId = alphaVault.requestUnstake(users.bob, users.bob, _amount / 2);
+        alphaVault.requestUnstake(users.bob, users.bob, _amount / 2);
 
         mockUSDC.mint(address(metawalletUSDC), _1_USDC);
         _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _amount + _1_USDC);
 
-        assertApproxEqAbs(DNVaultAdapterUSDC.totalAssets(), ((_amount * 2) + _1_USDC), 10); // Rounding from convertToAssetsWithTotals
-        (_deposited,) = assetRouter.getBatchIdBalances(_dnVault, _batchId);
+        assertApproxEqAbs(DNVaultAdapterUSDC.totalAssets(), ((_amount * 2) + _1_USDC), 10);
+        (uint256 _deposited,) = assetRouter.getBatchIdBalances(_dnVault, _batchId);
         assertEq(_deposited, _amount);
 
+        // Settle alphaVault batch with yield
         _batchId = alphaVault.getBatchId();
         _closeBatch(_alphaVault, _batchId);
 
@@ -194,61 +235,80 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _proposeAndExecuteSettle(USDC, _alphaVault, _batchId, _amount + _1_USDC);
 
         uint256 _totalAmount = ((_amount + _1_USDC) / 2);
-        assertApproxEqAbs(ALPHAVaultAdapterUSDC.totalAssets(), _totalAmount, 10); // Rounding from convertToAssetsWithTotals
+        assertApproxEqAbs(ALPHAVaultAdapterUSDC.totalAssets(), _totalAmount, 10);
         uint256 _sharesRequested = assetRouter.getRequestedShares(_alphaVault, _batchId);
-        assertApproxEqAbs(_sharesRequested, alphaVault.convertToShares(_totalAmount), 1_000_000); // Vesting affects share price
+        assertApproxEqAbs(_sharesRequested, alphaVault.convertToShares(_totalAmount), 1_000_000);
 
+        // Deposit alpha proceeds into minter
         wallet.transfer(USDC, _minterAdapterUSDC, _totalAmount);
-
         _approveAndDeposit(_minterAdapterUSDC, _totalAmount);
 
+        // Bob claims dn stake and alpha unstake
+        bytes32 _bobDnStakeReq = _getLastUserRequest(address(dnVault), users.bob);
         vm.prank(users.bob);
-        dnVault.claimStakedShares(_requestIdDn);
+        dnVault.claimStakedShares(_bobDnStakeReq);
 
-        uint256 _balanceBeforeBob = IkToken(address(kUSD)).balanceOf(users.bob);
-        vm.prank(users.bob);
-        alphaVault.claimUnstakedAssets(_requestId);
-        uint256 _balanceAfterBob = IkToken(address(kUSD)).balanceOf(users.bob);
-        uint256 _claimedAmount = _balanceAfterBob - _balanceBeforeBob;
-        (,,,, uint256 totalAssets_, uint256 totalSupply_,,) = alphaVault.getBatchIdInfo(_batchId);
-        uint256 _expectedAmount = alphaVault.convertToAssetsWithTotals(_sharesRequested, totalAssets_, totalSupply_);
-        assertEq(_expectedAmount, _claimedAmount);
+        {
+            bytes32 _bobAlphaUnstakeReq = _getLastUserRequest(address(alphaVault), users.bob);
+            uint256 _balanceBeforeBob = IkToken(address(kUSD)).balanceOf(users.bob);
+            vm.prank(users.bob);
+            alphaVault.claimUnstakedAssets(_bobAlphaUnstakeReq);
+            uint256 _balanceAfterBob = IkToken(address(kUSD)).balanceOf(users.bob);
+            uint256 _claimedAmount = _balanceAfterBob - _balanceBeforeBob;
+            (,,,, uint256 totalAssets_, uint256 totalSupply_,,) = alphaVault.getBatchIdInfo(_batchId);
+            uint256 _expectedAmount = alphaVault.convertToAssetsWithTotals(_sharesRequested, totalAssets_, totalSupply_);
+            assertEq(_expectedAmount, _claimedAmount);
+        }
 
+        // Institution burns kTokens
         vm.prank(users.institution);
         kUSD.approve(_minter, _amount);
         vm.prank(users.institution);
-        bytes32 _firstRequestId = minter.requestBurn(USDC, users.institution, _amount);
+        bytes32 _burnRequestId = minter.requestBurn(USDC, users.institution, _amount);
 
         _batchId = minter.getBatchId(USDC);
         vm.prank(users.institution);
-        (, _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
+        (, uint256 _requested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         assertEq(_requested, _amount);
 
         _closeBatch(_minter, _batchId);
+        _requestAndRedeem(_minterAdapterUSDC, address(0), _amount + 1);
 
-        _requestAndRedeem(_minterAdapterUSDC, address(0), _amount + 1); // rounding to 99k instead of 100k will fail on settlement
-
-        _minterTotalAssets = minterAdapterUSDC.totalAssets();
+        uint256 _minterTotalAssets = minterAdapterUSDC.totalAssets();
         _proposeAndExecuteSettle(USDC, _minter, _batchId, _minterTotalAssets);
 
         vm.prank(users.institution);
-        minter.burn(_firstRequestId);
+        minter.burn(_burnRequestId);
 
         assertApproxEqAbs(
             minterAdapterUSDC.totalAssets(), _mintAmount - ((_amount * 3) + ((_amount - _1_USDC) / 2)), 10
-        ); // 3x stakes vaults + alpha unstaked; rounding from convertToAssetsWithTotals
-        // 2 * _1_USDC = yield generated. GetTotalLockedAsssets is only for deposited amount from the kMinter.
-        assertEq(kUSD.totalSupply(), minter.getTotalLockedAssets(USDC) + (2 * _1_USDC)); // 2 * _1_USDC is yield
+        );
+        assertEq(kUSD.totalSupply(), minter.getTotalLockedAssets(USDC) + (2 * _1_USDC));
+    }
 
+    function _phase4_finalUnwind(
+        address _minter,
+        address _dnVault,
+        address _alphaVault,
+        address _minterAdapterUSDC,
+        uint256 _mintAmount
+    )
+        internal
+    {
+        _phase4a_unstakeDnVault(_dnVault, _minterAdapterUSDC);
+        _phase4b_unstakeAlphaAndFinalBurn(_minter, _alphaVault, _minterAdapterUSDC, _mintAmount);
+    }
+
+    function _phase4a_unstakeDnVault(address _dnVault, address _minterAdapterUSDC) internal {
         uint256 _stkTokenAmountAl = dnVault.balanceOf(users.alice);
         vm.prank(users.alice);
-        bytes32 _aliceReq = dnVault.requestUnstake(users.alice, users.alice, _stkTokenAmountAl);
+        dnVault.requestUnstake(users.alice, users.alice, _stkTokenAmountAl);
 
         uint256 _stkTokenAmountBob = dnVault.balanceOf(users.bob);
         vm.prank(users.bob);
-        bytes32 _bobReq = dnVault.requestUnstake(users.bob, users.bob, _stkTokenAmountBob);
+        dnVault.requestUnstake(users.bob, users.bob, _stkTokenAmountBob);
 
-        _batchId = dnVault.getBatchId();
+        bytes32 _batchId = dnVault.getBatchId();
         _closeBatch(_dnVault, _batchId);
 
         uint256 _totalAssets = dnVault.convertToAssets(_stkTokenAmountAl + _stkTokenAmountBob);
@@ -257,39 +317,49 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _transferAmongAdapters(address(DNVaultAdapterUSDC), _minterAdapterUSDC, _transferAmount);
         _proposeAndExecuteSettle(USDC, _dnVault, _batchId, _totalAssets);
 
+        bytes32 _aliceDnReq = _getLastUserRequest(address(dnVault), users.alice);
         vm.prank(users.alice);
-        dnVault.claimUnstakedAssets(_aliceReq);
+        dnVault.claimUnstakedAssets(_aliceDnReq);
 
+        bytes32 _bobDnReq = _getLastUserRequest(address(dnVault), users.bob);
         vm.prank(users.bob);
-        dnVault.claimUnstakedAssets(_bobReq);
+        dnVault.claimUnstakedAssets(_bobDnReq);
 
         assertEq(metawalletUSDC.balanceOf(address(DNVaultAdapterUSDC)), 0);
 
         uint256 _kTokenAmount = kUSD.balanceOf(users.alice);
         vm.prank(users.alice);
         kUSD.transfer(users.institution, _kTokenAmount);
+    }
 
+    function _phase4b_unstakeAlphaAndFinalBurn(
+        address _minter,
+        address _alphaVault,
+        address _minterAdapterUSDC,
+        uint256 _mintAmount
+    )
+        internal
+    {
         uint256 _stkTokenAmount = alphaVault.balanceOf(users.bob);
-        _totalAssets = alphaVault.convertToAssets(_stkTokenAmount);
+        uint256 _totalAssets = alphaVault.convertToAssets(_stkTokenAmount);
         vm.prank(users.bob);
-        _bobReq = alphaVault.requestUnstake(users.bob, users.bob, _stkTokenAmount);
+        alphaVault.requestUnstake(users.bob, users.bob, _stkTokenAmount);
 
-        _batchId = alphaVault.getBatchId();
+        bytes32 _batchId = alphaVault.getBatchId();
         _closeBatch(_alphaVault, _batchId);
-
         _proposeAndExecuteSettle(USDC, _alphaVault, _batchId, _totalAssets);
 
-        // Transfer actual wallet balance (may be slightly less due to virtual offset rounding)
         uint256 _walletBalance = mockUSDC.balanceOf(address(wallet));
         wallet.transfer(USDC, _minterAdapterUSDC, _walletBalance);
         assertEq(mockUSDC.balanceOf(address(wallet)), 0);
 
         _approveAndDeposit(address(minterAdapterUSDC), _walletBalance);
 
+        bytes32 _bobAlphaReq = _getLastUserRequest(address(alphaVault), users.bob);
         vm.prank(users.bob);
-        alphaVault.claimUnstakedAssets(_bobReq);
+        alphaVault.claimUnstakedAssets(_bobAlphaReq);
 
-        _kTokenAmount = kUSD.balanceOf(users.bob);
+        uint256 _kTokenAmount = kUSD.balanceOf(users.bob);
         vm.prank(users.bob);
         kUSD.transfer(users.institution, _kTokenAmount);
 
@@ -298,32 +368,36 @@ contract KamIntegrationTest is DeploymentBaseTest {
         kUSD.approve(_minter, _kTokenAmount);
 
         vm.prank(users.admin);
-        uint256 _max = 1_000_000 * _1_USDC;
-        registry.setBatchLimits(USDC, _max, _max);
+        registry.setBatchLimits(USDC, 1_000_000 * _1_USDC, 1_000_000 * _1_USDC);
 
         vm.prank(users.institution);
-        _requestId = minter.requestBurn(USDC, users.institution, _kTokenAmount);
+        bytes32 _burnRequestId = minter.requestBurn(USDC, users.institution, _kTokenAmount);
 
         _batchId = minter.getBatchId(USDC);
         (, uint256 _finalRequested) = assetRouter.getBatchIdBalances(_minter, _batchId);
         _closeBatch(_minter, _batchId);
 
-        // Redeem against the real requested amount in this batch. Add 1 unit for share rounding safety.
         _requestAndRedeem(_minterAdapterUSDC, address(0), _finalRequested + 1);
 
         _proposeAndExecuteSettle(USDC, _minter, _batchId, minterAdapterUSDC.totalAssets());
 
         vm.prank(users.institution);
-        minter.burn(_requestId);
+        minter.burn(_burnRequestId);
 
         assertApproxEqAbs(mockUSDC.balanceOf(users.institution), _mintAmount + 2 * _1_USDC, 1_000_000);
         assertApproxEqAbs(kUSD.balanceOf(users.institution), 0, 50);
         assertApproxEqAbs(kUSD.balanceOf(users.alice), 0, 50);
         assertApproxEqAbs(kUSD.balanceOf(users.bob), 0, 50);
         assertApproxEqAbs(kUSD.balanceOf(_alphaVault), 0, 50);
-        assertApproxEqAbs(kUSD.balanceOf(_dnVault), 0, 50);
+        assertApproxEqAbs(kUSD.balanceOf(address(dnVault)), 0, 50);
         assertApproxEqAbs(kUSD.balanceOf(_minter), 0, 50);
-        assertApproxEqAbs(kUSD.totalSupply(), 0, 50); // Tiny dust from virtual offset rounding
+        assertApproxEqAbs(kUSD.totalSupply(), 0, 50);
+    }
+
+    function _getLastUserRequest(address _vault, address _user) internal view returns (bytes32) {
+        bytes32[] memory _requests = IVaultReader(_vault).getUserRequests(_user);
+        require(_requests.length > 0, "No requests found");
+        return _requests[_requests.length - 1];
     }
 
     /* //////////////////////////////////////////////////////////////
