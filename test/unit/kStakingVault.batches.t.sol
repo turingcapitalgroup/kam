@@ -181,15 +181,15 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         // Direct call should fail
         vm.prank(users.alice);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(batchId);
+        vault.settleBatch(batchId, uint64(block.timestamp));
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(batchId);
+        vault.settleBatch(batchId, uint64(block.timestamp));
 
         vm.prank(users.admin);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(batchId);
+        vault.settleBatch(batchId, uint64(block.timestamp));
     }
 
     function test_SettleBatch_Allows_UnsolicitedKTokenBalance() public {
@@ -330,7 +330,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         // Settle batch with zero ID
         vm.prank(users.alice);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(bytes32(0));
+        vault.settleBatch(bytes32(0), uint64(block.timestamp));
     }
 
     function test_BatchOperations_MaxBatchId() public {
@@ -343,7 +343,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(maxBatchId);
+        vault.settleBatch(maxBatchId, uint64(block.timestamp));
     }
 
     function test_reach_max_total_assets() public {

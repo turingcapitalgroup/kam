@@ -51,5 +51,11 @@ interface IkStakingVault is IVault, IVaultReader {
     /// @param _batchId The batch to preview
     /// @param _newTotalAssets The new total assets of the vault adapter before netting
     /// @return _requestedAssets The exact amount of underlying assets claimable by unstakers
-    function previewSettleBatchRequestedAssets(bytes32 _batchId, uint256 _newTotalAssets) external view returns (uint256 _requestedAssets);
+    function previewSettleBatchRequestedAssets(
+        bytes32 _batchId,
+        uint256 _newTotalAssets
+    )
+        external
+        view
+        returns (uint256 _requestedAssets);
 }

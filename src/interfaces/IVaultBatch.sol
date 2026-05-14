@@ -53,5 +53,6 @@ interface IVaultBatch {
     /// approach ensures share prices are locked at settlement and users receive shares via transfer (not mint) when
     /// they claim.
     /// @param _batchId The batch identifier to mark as settled (must be closed, not previously settled)
-    function settleBatch(bytes32 _batchId) external;
+    /// @param _proposedAt The exact block.timestamp when the proposal was submitted, used to freeze fee math
+    function settleBatch(bytes32 _batchId, uint64 _proposedAt) external;
 }

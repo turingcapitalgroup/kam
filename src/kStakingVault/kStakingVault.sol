@@ -351,7 +351,7 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     }
 
     /// @inheritdoc IVaultBatch
-    function settleBatch(bytes32 _batchId) external override(IVaultBatch, ISettleBatch) {
+    function settleBatch(bytes32 _batchId, uint64 _proposedAt) external override(IVaultBatch, ISettleBatch) {
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require($.batches[_batchId].isClosed, VAULTBATCHES_NOT_CLOSED);
@@ -359,10 +359,10 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         $.batches[_batchId].isSettled = true;
 
         // Capture elapsed time before _accrueFees() updates the timestamp
-        uint256 _settlementElapsed = block.timestamp - _getLastFeeTimestamp($);
+        uint256 _settlementElapsed = _proposedAt - _getLastFeeTimestamp($);
 
         // 1. Accrue management fees
-        uint256 _mgmtFeeAssets = _accrueFees();
+        uint256 _mgmtFeeAssets = _accrueFees(_proposedAt);
 
         // 2. Calculate interest AFTER management fees
         uint256 _previousBalance = _getLastSettlementBalance();
@@ -539,7 +539,7 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     function setManagementFee(uint16 _managementFee) external {
         _checkAdmin(_msgSender());
         _checkValidBPS(_managementFee);
-        uint256 mgmtFeeAssets = _accrueFees();
+        uint256 mgmtFeeAssets = _accrueFees(block.timestamp);
         _mintManagementFees(mgmtFeeAssets);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint16 oldFee = _getManagementFee($);
@@ -551,7 +551,7 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     function setPerformanceFee(uint16 _performanceFee) external {
         _checkAdmin(_msgSender());
         _checkValidBPS(_performanceFee);
-        uint256 mgmtFeeAssets = _accrueFees();
+        uint256 mgmtFeeAssets = _accrueFees(block.timestamp);
         _mintManagementFees(mgmtFeeAssets);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint16 oldFee = _getPerformanceFee($);
@@ -748,7 +748,11 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     function previewSettleBatchRequestedAssets(
         bytes32 _batchId,
         uint256 _newTotalAssets
-    ) external view returns (uint256 _requestedAssets) {
+    )
+        external
+        view
+        returns (uint256 _requestedAssets)
+    {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint128 _requestedShares = $.batches[_batchId].requestedSharesInBatch;
         if (_requestedShares == 0) return 0;
@@ -760,10 +764,7 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
 
         // 1. Accrue management fees (virtual)
         uint256 _mgmtFeeAssets = VaultMathLib.computeManagementFee(
-            _newTotalAssets,
-            _getManagementFee($),
-            _getLastFeeTimestamp($),
-            block.timestamp
+            _newTotalAssets, _getManagementFee($), _getLastFeeTimestamp($), block.timestamp
         );
 
         // 2. Interest
@@ -789,7 +790,8 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
             );
             if (_perfFeeAssets > 0) {
                 // Performance fee shares dilute existing supply + management fee shares
-                _perfFeeShares = VaultMathLib.convertToShares(_perfFeeAssets, _newTotalAssets, _totalSupply + _mgmtFeeShares);
+                _perfFeeShares =
+                    VaultMathLib.convertToShares(_perfFeeAssets, _newTotalAssets, _totalSupply + _mgmtFeeShares);
             }
         }
 

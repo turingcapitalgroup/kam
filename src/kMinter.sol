@@ -292,7 +292,7 @@ contract kMinter is IkMinter, ISettleBatch, Initializable, UUPSUpgradeable, kBas
     }
 
     /// @inheritdoc IkMinter
-    function settleBatch(bytes32 _batchId) external override(IkMinter, ISettleBatch) {
+    function settleBatch(bytes32 _batchId, uint64 _proposedAt) external override(IkMinter, ISettleBatch) {
         _checkRouter(msg.sender);
         kMinterStorage storage $ = _getkMinterStorage();
         require($.batches[_batchId].isClosed, KMINTER_BATCH_NOT_CLOSED);

@@ -138,7 +138,7 @@ contract kMinterBatchesTest is DeploymentBaseTest {
         vm.prank(address(assetRouter));
         vm.expectEmit(true, false, false, true);
         emit IkMinter.BatchSettled(_batchId);
-        minter.settleBatch(_batchId);
+        minter.settleBatch(_batchId, uint64(block.timestamp));
     }
 
     function test_SettleBatch_Requires_AssetRouter() public {
@@ -147,23 +147,23 @@ contract kMinterBatchesTest is DeploymentBaseTest {
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
-        minter.settleBatch(_batchId);
+        minter.settleBatch(_batchId, uint64(block.timestamp));
 
         vm.prank(users.admin);
         vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
-        minter.settleBatch(_batchId);
+        minter.settleBatch(_batchId, uint64(block.timestamp));
     }
 
     function test_SettleBatch_Requires_Closed() public {
         bytes32 _batchId = minter.getBatchId(USDC);
         vm.prank(address(assetRouter));
         vm.expectRevert(bytes(KMINTER_BATCH_NOT_CLOSED));
-        minter.settleBatch(_batchId);
+        minter.settleBatch(_batchId, uint64(block.timestamp));
 
         _batchId = keccak256("Banana");
         vm.prank(address(assetRouter));
         vm.expectRevert(bytes(KMINTER_BATCH_NOT_CLOSED));
-        minter.settleBatch(_batchId);
+        minter.settleBatch(_batchId, uint64(block.timestamp));
     }
 
     function test_SettleBatch_Requires_Not_Settled() public {
@@ -173,7 +173,7 @@ contract kMinterBatchesTest is DeploymentBaseTest {
 
         vm.prank(address(assetRouter));
         vm.expectRevert(bytes(KMINTER_BATCH_SETTLED));
-        minter.settleBatch(_batchId);
+        minter.settleBatch(_batchId, uint64(block.timestamp));
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -187,6 +187,6 @@ contract kMinterBatchesTest is DeploymentBaseTest {
 
     function _settleBatch(bytes32 _batchId) internal {
         vm.prank(address(assetRouter));
-        minter.settleBatch(_batchId);
+        minter.settleBatch(_batchId, uint64(block.timestamp));
     }
 }

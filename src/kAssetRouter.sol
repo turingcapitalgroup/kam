@@ -313,6 +313,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             totalAssets: _totalAssetsAdjusted,
             netted: _netted,
             yield: _yield,
+            proposedAt: uint64(block.timestamp),
             executeAfter: _executeAfter.toUint64(),
             requiresApproval: _requiresApproval
         });
@@ -398,8 +399,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             (,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
             _requestedInBatch = _requestedSharesInBatch;
-            uint256 _requestedAssets =
-                IkStakingVault(_vault).previewSettleBatchRequestedAssets(_batchId, _totalAssets);
+            uint256 _requestedAssets = IkStakingVault(_vault).previewSettleBatchRequestedAssets(_batchId, _totalAssets);
             // casting to 'int256' is safe because we're doing arithmetic on uint256 values
             // forge-lint: disable-next-line(unsafe-typecast)
             _netted = int256(_depositedInBatch) - int256(_requestedAssets);
@@ -587,7 +587,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             emit Withdrawn(_vault, _asset, uint256(-_netted));
         }
 
-        ISettleBatch(_vault).settleBatch(_batchId);
+        ISettleBatch(_vault).settleBatch(_batchId, _proposal.proposedAt);
 
         // Use DELTA instead of SET to avoid race condition with kStakingVault settlements
         // Both operations modifying kMinter adapter are now commutative (order-independent)
@@ -642,7 +642,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         emit TotalAssetsSet(address(_kMinterAdapter), uint256(_kMinterTotalAssets));
 
         // Mark batch as settled in the vault (accrues fees, mints/burns shares, snapshots prices)
-        ISettleBatch(_vault).settleBatch(_batchId);
+        ISettleBatch(_vault).settleBatch(_batchId, _proposal.proposedAt);
         _adapter.setTotalAssets(_totalAssets);
         emit TotalAssetsSet(address(_adapter), _totalAssets);
 
