@@ -112,7 +112,7 @@ The kMinter contract manages batches on a per-asset basis using `currentBatchIds
 
 **Settlement Proposal Mechanism**: The kAssetRouter implements a secure multi-phase settlement:
 
-1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets)` providing the total assets from external strategies. **Critical Operational Requirement:** For off-chain custodial vaults (Alpha/Beta), the `totalAssets` provided MUST be exactly snapshotted at the `closedAt` timestamp of the batch. This guarantees that the yield snapshot perfectly aligns with the fee accrual freeze. The kAssetRouter contract automatically calculates:
+1. **Proposal Phase**: Relayers call `proposeSettleBatch(asset, vault, batchId, totalAssets)` providing the current total assets from external strategies. The kAssetRouter contract automatically calculates:
    - `netted` = deposited - requested amounts from batch balances
    - `lastTotalAssets` = current virtual balance via `adapter.totalAssets()`
    - `yield` = totalAssets_ - lastTotalAssets
@@ -359,7 +359,7 @@ The kStakingVault is implemented as a unified contract that inherits from multip
 
 **Batch Processing**: The vault manages the complete batch lifecycle for efficient gas usage. Batches are created by the relayer via `createNewBatch()`, handles batch closure and settlement coordination with kAssetRouter, and processes direct asset transfers without requiring external BatchReceiver contracts.
 
-**Fee Management**: Fees are collected via share dilution at settlement time. Fee accrual is structurally frozen at the batch's `closedAt` timestamp (the moment the batch stopped accepting requests). `_accrueFees()` computes the management fee for the elapsed period up to `closedAt` and updates `lastFeeTimestamp`. This guarantees execution-time mathematical determinism and perfectly aligns fee charges with the yield snapshot provided during the proposal. A single `lastFeeTimestamp` replaces the previous dual-timestamp system. Management fees accrue on time and total assets; performance fees are computed once per settlement on net interest above the time-weighted hurdle threshold.
+**Fee Management**: Fees are collected via share dilution at settlement time. `_accrueFees()` computes the management fee for the elapsed period and updates `lastFeeTimestamp`; the actual share minting is done by `_mintManagementFees()` (management) and inline in `settleBatch()` (performance). `_accrueFees()` is called in `settleBatch()` and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). A single `lastFeeTimestamp` replaces the previous dual-timestamp system. Management fees accrue dynamically on time and total assets up to the exact moment of execution; performance fees are computed once per settlement on net interest above the time-weighted hurdle threshold.
 
 **Claims Processing**: Handles user claims for completed requests by converting stake requests into stkToken balances, processing unstaking requests with underlying token plus yield distribution, and ensuring claims are only processed for settled batches.
 
@@ -619,9 +619,9 @@ Performance fees are charged on net interest per settlement batch — only when 
 
 ### Fee Calculation
 
-**Management fee**: `_accrueFees()` computes `totalAssets * managementFee * elapsed / (SECS_PER_YEAR * 10000)` and updates `lastFeeTimestamp`. The `elapsed` time is strictly bounded by the batch's `closedAt` timestamp during settlement, ensuring no fees are charged for the Guardian execution delay. `_mintManagementFees()` converts that asset amount to shares and mints them to the treasury. Called at settlement and before fee-rate changes.
+**Management fee**: `_accrueFees()` computes `totalAssets * managementFee * elapsed / (SECS_PER_YEAR * 10000)` and updates `lastFeeTimestamp`. The `elapsed` time is strictly bounded by `block.timestamp` during execution, ensuring all fees are charged exactly up to the final execution moment. `_mintManagementFees()` converts that asset amount to shares and mints them to the treasury. Called at settlement and before fee-rate changes.
 
-**Performance fee**: computed once per settlement inside `settleBatch()`. Interest is `currentBalance − lastSettlementBalance − managementFeeAssets`. If interest exceeds the time-weighted hurdle (using the identical `closedAt` elapsed period), performance fee shares are minted directly to the treasury. `lastSettlementBalance` is then updated to the post-settlement balance.
+**Performance fee**: computed once per settlement inside `settleBatch()`. Interest is `currentBalance − lastSettlementBalance − managementFeeAssets`. If interest exceeds the time-weighted hurdle (using the identical dynamic `block.timestamp` elapsed period), performance fee shares are minted directly to the treasury. `lastSettlementBalance` is then updated to the post-settlement balance.
 
 Because all fees are collected via share dilution, `totalAssets()` and `sharePrice()` are the canonical accounting getters.
 

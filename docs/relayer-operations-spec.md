@@ -1,80 +1,48 @@
 # Relayer Operations & Settlement Specification
 
 ## 1. Overview
-This specification defines the strict operational rules for Relayers, Custodians, and Off-chain Managers during the batch settlement process. Adhering to these rules guarantees perfect mathematical alignment between yield distributed and fees charged, preventing economic leaks and ensuring institutional-grade compliance determinism.
+This specification defines the operational rules for Relayers, Custodians, and Off-chain Managers during the batch settlement process. The KAM protocol uses a **Dynamic Execution (TradFi Fund)** model. This means that fees and yield are dynamically calculated all the way up to the exact moment of execution (`block.timestamp`), identically mirroring the mechanics of a traditional mutual fund.
 
-## 2. The `closedAt` Determinism Invariant
-The protocol structurally freezes fee accrual at the exact timestamp a batch is closed (`closedAt`). To maintain strict economic fairness, the Total Value Locked (TVL) submitted during the settlement proposal **MUST** be snapshotted at this exact same `closedAt` timestamp.
+## 2. The Dynamic Execution Invariant
+The protocol structurally refuses to freeze fee accrual or yield measurement. 
+When a settlement batch is proposed and eventually executed, the smart contracts dynamically calculate the elapsed time and management fees up to the exact EVM block timestamp of the `executeSettleBatch` transaction.
 
 ## 3. Vault-Specific Operational Rules
 
 ### 3.1 Delta-Neutral (DN) Vaults
 - **Flow:** Fully on-chain automated settlement.
-- **Rule:** Relayers **MUST** use the `kam-settler` unified `closeAndProposeDNVaultBatch` function.
-- **Mechanism:** This function executes `closeBatch` and `proposeSettleBatch` synchronously in the exact same EVM transaction. 
-- **Result:** This guarantees that the `closedAt` timestamp and the proposal TVL snapshot are identical down to the second, automatically eliminating any possibility of an operational gap or economic leak.
+- **Rule:** Relayers should use the `kam-settler` unified `closeAndProposeDNVaultBatch` function.
+- **Mechanism:** This function executes `closeBatch` and `proposeSettleBatch` synchronously. The subsequent `executeSettleBatch` call will dynamically adjust netting based on the exact execution timestamp.
 
 ### 3.2 Alpha & Beta (Custodial) Vaults
 - **Flow:** Off-chain strategy execution with decoupled close and propose phases.
-- **Rule 1 - Snapshotting:** The external custodian or off-chain script **MUST** snapshot the strategy's exact TVL at the exact moment `closeBatch` is executed on-chain (T0).
-- **Rule 2 - Proposal Submission:** When the Relayer eventually calls `proposeSettleBatch` (even if it is hours or days later at T+N), the `_totalAssets` parameter **MUST** be the T0 snapshot, **not** the live TVL at T+N.
-- **Result:** This perfectly aligns the yield distributed with the fees charged up to T0. Yield generated during the delay (T0 to T+N) is cleanly and safely deferred to the next batch.
+- **Rule 1 - Snapshotting:** The external custodian or off-chain script **MUST** submit the live TVL snapshot at the exact moment they call `proposeSettleBatch` (T+N).
+- **Rule 2 - Custodial Liquidity Preparation (WARNING):** Because fees dynamically accrue during the mandatory Guardian cooldown period (between Proposal and Execution), the Net Transfer Amount will dynamically shift. Custodians **CANNOT** prepare exact, penny-perfect physical liquidity wires based on the Proposal event. They must wait for the Execution event to finalize, read the emitted blockchain state, and perform physical wires retroactively.
 
 ## 4. Fundamental Business Logic
-If a Relayer for an Alpha/Beta vault violates this specification by submitting a live TVL snapshot taken at T+N, it implicitly assumes that the unstakers are still participating in the vault's economics during the settlement delay. 
-
-This is fundamentally incorrect because **users officially lock in their exit at T0** (`closedAt`). 
-
-When `closeBatch` is called at T0, the batch is sealed. Unstakers can no longer cancel or change their requests. They are officially \"out\" of the active pool. Therefore, they should not be exposed to the strategy's gains, losses, or management fees that occur *after* T0. 
-
-By strictly adhering to the `closedAt` snapshot rule, the protocol ensures that unstakers are settled based exactly on the time they were active in the vault, and not a second longer.
+By using Dynamic Execution, the protocol behaves exactly like a traditional fund:
+1. Every single cent of management and performance fees is captured by the protocol up to the exact moment of execution.
+2. The exiting unstakers participate in the vault's economics (both yield and fees) during the liquidation transit period.
 
 ## 5. Visual Timeline
 
-### Scenario A: The Correct Flow (T0 Snapshot)
+### The Dynamic Flow (T+Execution Measurement)
 
 ```text
 Time        Event                             State of Yield & Fees
 ──────────────────────────────────────────────────────────────────────────────────────────
-T0          Batch Closes (closedAt)     ──────> UNSTAKERS LOCK IN THEIR EXIT.
-            Relayer snapshots TVL               Yield and Fee Accrual freeze at this exact
-            (e.g., $100M)                       moment. Perfect alignment is achieved.
+T0          Batch Closes                ──────> Unstakers are officially locked in.
+                                                However, Fee Accrual CONTINUES running. 
 
-T0 -> T+4   Gap Period                  ──────> $100M continues generating yield off-chain.
-                                                (These gains are safely deferred to Next Batch).
+T0 -> T+4   Liquidation Gap             ──────> Assets continue to generate yield/incur fees.
+                                                Unstakers remain fully exposed.
 
-T+4         Settlement Proposed         ──────> Relayer submits T0 snapshot.
-                                                Guardian signs perfectly matched numbers.
-
-T+5         Settlement Executed         ──────> Unstakers leave with EXACTLY the yield 
-                                                generated up to T0, minus the exact fees 
-                                                generated up to T0. The math is perfectly fair.
-```
-
-### Scenario B: The Incorrect Flow (T+N Snapshot)
-
-If the Relayer submits a live TVL snapshot taken at T+N and the protocol dynamically calculates fees up to T+N, it creates an unfair penalty for the exiting users.
-
-```text
-Time        Event                             State of Yield & Fees
-──────────────────────────────────────────────────────────────────────────────────────────
-T0          Batch Closes (closedAt)     ──────> UNSTAKERS LOCK IN THEIR EXIT.
-                                                They cannot cancel or change their request.
-                                                They are officially \"out\" of the active pool.
-
-T0 -> T+4   Gap Period                  ──────> The Guardian/Relayer execution delay.
-                                                Assets continue to generate yield/incur fees.
-
-T+4         Settlement Proposed         ──────> Relayer incorrectly submits current live TVL 
-            (Wrong Snapshot)                    ($100M + $105k yield). 
+T+4         Settlement Proposed         ──────> Relayer submits live TVL snapshot. 
+                                                Guardian reviews the estimated physical net transfer.
 
 T+5         Settlement Executed         ──────> Protocol mathematically processes the batch 
-            (Fundamentally Unfair)              as if the unstakers stayed until T+4.
-                                                RESULT: The unstaker is penalized. They 
-                                                officially requested to leave at T0, but 
-                                                are forced to pay management fees (and are 
-                                                exposed to strategy risks/yield) for the 
-                                                protocol's own 4-hour settlement delay!
+            (Dynamic Finalization)              using the exact timestamp of execution.
+                                                RESULT: The Net Transfer Amount physically shifts 
+                                                from what was proposed. Custodians must read 
+                                                the final state to execute wires.
 ```
-
-This clearly illustrates why the **T0 Snapshot** (Scenario A) is the only mathematically correct and perfectly fair architecture for all parties.
