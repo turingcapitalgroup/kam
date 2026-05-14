@@ -398,9 +398,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             (,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
             _requestedInBatch = _requestedSharesInBatch;
-            uint256 _totalSupply = IkStakingVault(_vault).totalSupply();
             uint256 _requestedAssets =
-                IkStakingVault(_vault).convertToAssetsWithTotals(_requestedSharesInBatch, _totalAssets, _totalSupply);
+                IkStakingVault(_vault).previewSettleBatchRequestedAssets(_batchId, _totalAssets);
             // casting to 'int256' is safe because we're doing arithmetic on uint256 values
             // forge-lint: disable-next-line(unsafe-typecast)
             _netted = int256(_depositedInBatch) - int256(_requestedAssets);
