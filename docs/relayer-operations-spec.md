@@ -20,73 +20,61 @@ The protocol structurally freezes fee accrual at the exact timestamp a batch is 
 - **Rule 2 - Proposal Submission:** When the Relayer eventually calls `proposeSettleBatch` (even if it is hours or days later at T+N), the `_totalAssets` parameter **MUST** be the T0 snapshot, **not** the live TVL at T+N.
 - **Result:** This perfectly aligns the yield distributed with the fees charged up to T0. Yield generated during the delay (T0 to T+N) is cleanly and safely deferred to the next batch.
 
-## 4. Economic Consequences of Misalignment
-If a Relayer for an Alpha/Beta vault violates this specification by submitting a live TVL (T+N) instead of the `closedAt` snapshot (T0):
-1. **Unstaker Unfair Advantage:** Users who are unstaking will receive the yield generated during the T0 -> T+N gap.
-2. **Protocol Fee Leak:** Because the mathematical fee accrual was frozen at T0, the protocol will not charge management or performance fees for the T0 -> T+N period on the current batch. Since the unstaking users leave the vault during this execution, the fees on their specific assets are permanently lost to the protocol.
-3. **Execution Unpredictability:** Institutional custodians will be unable to prepare exact physical liquidity based on the proposal, as the dynamic execution will force the final numbers to shift, breaking strict compliance auditability.
+## 4. Fundamental Business Logic
+If a Relayer for an Alpha/Beta vault violates this specification by submitting a live TVL snapshot taken at T+N, it implicitly assumes that the unstakers are still participating in the vault's economics during the settlement delay. 
 
-By strictly adhering to the `closedAt` snapshot rule, the protocol remains 100% mathematically fair, highly predictable, and perfectly auditable.
+This is fundamentally incorrect because **users officially lock in their exit at T0** (`closedAt`). 
 
-## 5. Visual Timeline & Impact Flow
+When `closeBatch` is called at T0, the batch is sealed. Unstakers can no longer cancel or change their requests. They are officially \"out\" of the active pool. Therefore, they should not be exposed to the strategy's gains, losses, or management fees that occur *after* T0. 
+
+By strictly adhering to the `closedAt` snapshot rule, the protocol ensures that unstakers are settled based exactly on the time they were active in the vault, and not a second longer.
+
+## 5. Visual Timeline
 
 ### Scenario A: The Correct Flow (T0 Snapshot)
 
 ```text
 Time        Event                             State of Yield & Fees
 ──────────────────────────────────────────────────────────────────────────────────────────
-T0          Batch Closes (closedAt)     ──────> FEE ACCRUAL FROZEN HERE. 
-            Relayer snapshots TVL               Yield up to T0 is recorded.
-            (e.g., $100M + $100k yield)         Perfect Math: Yield matches Fee Accrual.
+T0          Batch Closes (closedAt)     ──────> UNSTAKERS LOCK IN THEIR EXIT.
+            Relayer snapshots TVL               Yield and Fee Accrual freeze at this exact
+            (e.g., $100M)                       moment. Perfect alignment is achieved.
 
 T0 -> T+4   Gap Period                  ──────> $100M continues generating yield off-chain.
                                                 (These gains are safely deferred to Next Batch).
 
-T+4         Settlement Proposed         ──────> Relayer submits T0 snapshot ($100.1M).
+T+4         Settlement Proposed         ──────> Relayer submits T0 snapshot.
                                                 Guardian signs perfectly matched numbers.
 
 T+5         Settlement Executed         ──────> Unstakers leave with EXACTLY the yield 
                                                 generated up to T0, minus the exact fees 
-                                                generated up to T0. Protocol is 100% whole.
+                                                generated up to T0. The math is perfectly fair.
 ```
 
-### Scenario B: The Incorrect Flow (T+N Snapshot) - ECONOMIC LEAK
+### Scenario B: The Incorrect Flow (T+N Snapshot)
+
+If the Relayer submits a live TVL snapshot taken at T+N and the protocol dynamically calculates fees up to T+N, it creates an unfair penalty for the exiting users.
 
 ```text
 Time        Event                             State of Yield & Fees
 ──────────────────────────────────────────────────────────────────────────────────────────
-T0          Batch Closes (closedAt)     ──────> FEE ACCRUAL FROZEN HERE.
-                                                Protocol stops charging fees on this batch.
+T0          Batch Closes (closedAt)     ──────> UNSTAKERS LOCK IN THEIR EXIT.
+                                                They cannot cancel or change their request.
+                                                They are officially \"out\" of the active pool.
 
-T0 -> T+4   Gap Period                  ──────> Assets generate another $5,000 in yield.
-                                                NO FEES ARE BEING CHARGED FOR THIS $5K.
+T0 -> T+4   Gap Period                  ──────> The Guardian/Relayer execution delay.
+                                                Assets continue to generate yield/incur fees.
 
 T+4         Settlement Proposed         ──────> Relayer incorrectly submits current live TVL 
             (Wrong Snapshot)                    ($100M + $105k yield). 
-                                                Guardian unknowingly signs misaligned data.
 
-T+5         Settlement Executed         ──────> Unstakers are paid their share of the $105k 
-                                                yield, but only paid fees up to T0!
-                                                RESULT: Unstakers leave with free yield. 
-                                                Protocol loses the management fees on the 
-                                                unstakers' capital for the 4-hour gap.
-```
-
-### Scenario C: Dynamic Execution Fees (Why we don't just charge fees at T+N)
-You might ask: *"Why don't we just extend the fee accrual to run all the way until the T+N execution time?"*
-
-```text
-Time        Event                             State of Yield & Fees
-──────────────────────────────────────────────────────────────────────────────────────────
-T0          Batch Closes (closedAt)     ──────> Users are officially locked into unstaking.
-                                                They cannot cancel or change their request.
-
-T0 -> T+4   Gap Period                  ──────> The Guardian/Relayer execution delay.
-
-T+5         Settlement Executed         ──────> Protocol dynamically charges 4 extra hours
-            (Unfair to Unstaker)                of fees on the unstakers' capital.
+T+5         Settlement Executed         ──────> Protocol mathematically processes the batch 
+            (Fundamentally Unfair)              as if the unstakers stayed until T+4.
                                                 RESULT: The unstaker is penalized. They 
                                                 officially requested to leave at T0, but 
-                                                are forced to pay management fees for the 
+                                                are forced to pay management fees (and are 
+                                                exposed to strategy risks/yield) for the 
                                                 protocol's own 4-hour settlement delay!
 ```
+
+This clearly illustrates why the **T0 Snapshot** (Scenario A) is the only mathematically correct and perfectly fair architecture for all parties.
