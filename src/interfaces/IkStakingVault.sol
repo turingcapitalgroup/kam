@@ -45,5 +45,4 @@ interface IkStakingVault is IVault, IVaultReader {
 
     /// @notice Transfers tokens from sender to recipient using the allowance mechanism
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
-
 }

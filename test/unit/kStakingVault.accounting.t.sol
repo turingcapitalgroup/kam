@@ -387,7 +387,8 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         uint256 simulatedNewTotalAssets = lastTotalAssets + yield;
 
         // 5. Preview the requested assets calculation (the exact value we are verifying)
-        uint256 previewedRequestedAssets = vault.previewSettleBatchRequestedAssets(batchId, simulatedNewTotalAssets, uint64(block.timestamp));
+        uint256 previewedRequestedAssets =
+            vault.previewSettleBatchRequestedAssets(batchId, simulatedNewTotalAssets, uint64(block.timestamp));
 
         // 6. Execute settlement through asset router
         // This will:
