@@ -178,7 +178,16 @@ interface IkMinter is IVersioned {
     /// @notice Marks a batch as settled after processing and burns all escrowed kTokens for the batch
     /// @dev Burns all `requestedSharesInBatch` kTokens at once and decrements `totalLockedAssets`
     /// @param _batchId The batch ID to settle
-    function settleBatch(bytes32 _batchId) external;
+    /// @param _proposedAt The exact block.timestamp when the proposal was submitted
+    /// @param _managementFees Unused fee amount for interface compatibility
+    /// @param _performanceFees Unused fee amount for interface compatibility
+    function settleBatch(
+        bytes32 _batchId,
+        uint64 _proposedAt,
+        uint256 _managementFees,
+        uint256 _performanceFees
+    )
+        external;
 
     /// @notice Get the current active batch ID for a specific asset
     /// @param asset_ The asset to query

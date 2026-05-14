@@ -9,7 +9,6 @@ optimizer_runs = 2995
 ffi = true
 ast = true
 build_info = true
-extra_output = ["storageLayout"]
 dynamic_test_linking = false
 fs_permissions = [{ access = "read-write", path = "." }]
 
@@ -35,19 +34,15 @@ exclude_lints = [
 [fuzz]
 runs = 1000
 max_test_rejects = 65536
-seed = '0x1'
 dictionary_weight = 40
 include_storage = true
 include_push_bytes = true
-extra_output = ["storageLayout", "metadata"]
 
 [invariant]
-seed = '0x42'
 runs = 256
 depth = 128
 fail_on_revert = true
 call_override = false
-preserve_state = true   
 
 [fmt]
 bracket_spacing = true

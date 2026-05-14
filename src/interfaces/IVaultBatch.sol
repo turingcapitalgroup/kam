@@ -37,12 +37,11 @@ interface IVaultBatch {
     /// @param _create Whether to immediately create a new batch after closing for continued operations
     function closeBatch(bytes32 _batchId, bool _create) external;
 
-    /// @notice Marks a batch as settled after yield distribution, accrues fees, mints shares for pending stakers, and enables claiming
-    /// @dev This function finalizes batch settlement by computing and accruing fees, recording final asset values, minting shares, and enabling claims.
-    /// Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Accrues
-    /// time-prorated management fees via `_accrueFees()` and computes per-batch performance fees via
-    /// `VaultMathLib.computePerformanceFee()` on net interest above the hurdle rate — both fee types are minted
-    /// as shares directly to the treasury inside this function (no separate notify step), (3) Updates
+    /// @notice Marks a batch as settled after yield distribution, mints proposed fees, mints shares for pending stakers, and enables claiming
+    /// @dev This function finalizes batch settlement by minting the fee amounts snapshotted in the router proposal, recording final asset values, minting shares, and enabling claims.
+    /// Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Uses
+    /// the fee amounts computed at proposal time — both fee types are minted as shares directly to the
+    /// treasury inside this function (no separate notify step), (3) Updates
     /// `lastSettlementBalance` to snapshot current vault balance as the baseline for the next batch's interest
     /// calculation, (4) Snapshots total assets and total supply at settlement time from which share price is
     /// derived for stake and unstake calculations, (5) Mints stkTokens for all pending stakers in this batch
@@ -53,5 +52,14 @@ interface IVaultBatch {
     /// approach ensures share prices are locked at settlement and users receive shares via transfer (not mint) when
     /// they claim.
     /// @param _batchId The batch identifier to mark as settled (must be closed, not previously settled)
-    function settleBatch(bytes32 _batchId) external;
+    /// @param _proposedAt The exact block.timestamp when the proposal was submitted, used to freeze fee math
+    /// @param _managementFees Management fee assets computed when the settlement was proposed
+    /// @param _performanceFees Performance fee assets computed when the settlement was proposed
+    function settleBatch(
+        bytes32 _batchId,
+        uint64 _proposedAt,
+        uint256 _managementFees,
+        uint256 _performanceFees
+    )
+        external;
 }
