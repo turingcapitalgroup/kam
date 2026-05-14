@@ -149,4 +149,19 @@ interface IVaultReader {
             uint256 depositedInBatch,
             uint256 requestedSharesInBatch
         );
+
+    /// @notice Calculates the exact underlying assets that will be claimed by unstakers in a batch, simulating settlement fees
+    /// @dev Used by kAssetRouter and kSettler to determine exact netting amounts post-fee dilution
+    /// @param batchId The batch to preview
+    /// @param newTotalAssets The new total assets of the vault adapter before netting
+    /// @param endOfPeriod The timestamp up to which fees and yield are simulated
+    /// @return requestedAssets The exact amount of underlying assets claimable by unstakers
+    function previewSettleBatchRequestedAssets(
+        bytes32 batchId,
+        uint256 newTotalAssets,
+        uint64 endOfPeriod
+    )
+        external
+        view
+        returns (uint256 requestedAssets);
 }

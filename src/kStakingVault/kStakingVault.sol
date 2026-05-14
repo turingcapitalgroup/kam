@@ -740,68 +740,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         return _expectedKTokenBalance($);
     }
 
-    /// @notice Calculates the exact underlying assets that will be claimed by unstakers in a batch, simulating settlement fees
-    /// @dev Used by kAssetRouter and kSettler to determine exact netting amounts post-fee dilution
-    /// @param _batchId The batch to preview
-    /// @param _newTotalAssets The new total assets of the vault adapter before netting
-    /// @return _requestedAssets The exact amount of underlying assets claimable by unstakers
-    function previewSettleBatchRequestedAssets(
-        bytes32 _batchId,
-        uint256 _newTotalAssets
-    )
-        external
-        view
-        returns (uint256 _requestedAssets)
-    {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        uint128 _requestedShares = $.batches[_batchId].requestedSharesInBatch;
-        if (_requestedShares == 0) return 0;
-
-        uint256 _totalSupply = totalSupply();
-        if (_totalSupply == 0) return 0;
-
-        uint256 _elapsed = block.timestamp - _getLastFeeTimestamp($);
-
-        // 1. Accrue management fees (virtual)
-        uint256 _mgmtFeeAssets = VaultMathLib.computeManagementFee(
-            _newTotalAssets, _getManagementFee($), _getLastFeeTimestamp($), block.timestamp
-        );
-
-        // 2. Interest
-        uint256 _previousBalance = _getLastSettlementBalance();
-        int256 _interest = int256(_newTotalAssets) - int256(_previousBalance) - int256(_mgmtFeeAssets);
-
-        // 3. Management fee shares
-        uint256 _mgmtFeeShares = 0;
-        if (_mgmtFeeAssets > 0) {
-            _mgmtFeeShares = VaultMathLib.convertToShares(_mgmtFeeAssets, _newTotalAssets, _totalSupply);
-        }
-
-        // 4. Performance fee shares
-        uint256 _perfFeeShares = 0;
-        if (_interest > 0) {
-            uint256 _perfFeeAssets = VaultMathLib.computePerformanceFee(
-                uint256(_interest),
-                _previousBalance,
-                _getPerformanceFee($),
-                _getHurdleRate($),
-                _getIsHardHurdleRate($),
-                _elapsed
-            );
-            if (_perfFeeAssets > 0) {
-                // Performance fee shares dilute existing supply + management fee shares
-                _perfFeeShares =
-                    VaultMathLib.convertToShares(_perfFeeAssets, _newTotalAssets, _totalSupply + _mgmtFeeShares);
-            }
-        }
-
-        // Calculate final total supply reflecting all newly minted fee shares
-        uint256 _batchTotalSupply = _totalSupply + _mgmtFeeShares + _perfFeeShares;
-
-        // Calculate requested assets corresponding to the unstake requests
-        return VaultMathLib.convertToAssets(_requestedShares, _newTotalAssets, _batchTotalSupply);
-    }
-
     /// @notice Returns the human-readable contract name
     /// @return The contract name
     function contractName() external pure returns (string memory) {

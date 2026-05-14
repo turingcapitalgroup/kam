@@ -46,16 +46,4 @@ interface IkStakingVault is IVault, IVaultReader {
     /// @notice Transfers tokens from sender to recipient using the allowance mechanism
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 
-    /// @notice Calculates the exact underlying assets that will be claimed by unstakers in a batch, simulating settlement fees
-    /// @dev Used by kAssetRouter and kSettler to determine exact netting amounts post-fee dilution
-    /// @param _batchId The batch to preview
-    /// @param _newTotalAssets The new total assets of the vault adapter before netting
-    /// @return _requestedAssets The exact amount of underlying assets claimable by unstakers
-    function previewSettleBatchRequestedAssets(
-        bytes32 _batchId,
-        uint256 _newTotalAssets
-    )
-        external
-        view
-        returns (uint256 _requestedAssets);
 }
