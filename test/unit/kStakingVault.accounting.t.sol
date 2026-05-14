@@ -364,6 +364,49 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
                         EDGE CASE TESTS
     //////////////////////////////////////////////////////////////*/
 
+    function test_previewSettleBatchRequestedAssets_matches_actual_claimable() public {
+        _setupTestFees();
+
+        // 1. Setup initial state: Alice deposits 1M USDC
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+        assertEq(vault.totalAssets(), INITIAL_DEPOSIT);
+
+        // 2. Alice requests to unstake 500K shares
+        vm.prank(users.alice);
+        vault.requestUnstake(users.alice, users.alice, 500_000 * 1e6);
+
+        // 3. Close the batch
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        // 4. Simulate yield and time passing
+        vm.warp(block.timestamp + 30 days);
+        uint256 lastTotalAssets = vault.totalAssets();
+        uint256 yield = 200_000 * _1_USDC; // 20% yield
+        uint256 simulatedNewTotalAssets = lastTotalAssets + yield;
+
+        // 5. Preview the requested assets calculation (the exact value we are verifying)
+        uint256 previewedRequestedAssets = vault.previewSettleBatchRequestedAssets(batchId, simulatedNewTotalAssets);
+
+        // 6. Execute settlement through asset router
+        // This will:
+        // - increase vault balance by yield
+        // - run settleBatch which mints fee shares
+        // - decreases vault balance by the true claimable amount
+        _executeBatchSettlement(address(vault), batchId, simulatedNewTotalAssets);
+
+        // 7. Calculate the true claimable amount burned during settleBatch
+        // The balance was increased by 'yield' and then decreased by 'trueClaimable'
+        // So: finalTotalAssets = lastTotalAssets + yield - trueClaimable
+        // Therefore: trueClaimable = simulatedNewTotalAssets - finalTotalAssets
+        uint256 finalTotalAssets = vault.totalAssets();
+        uint256 trueClaimable = simulatedNewTotalAssets - finalTotalAssets;
+
+        // 8. Assert that the preview function is perfectly accurate down to the wei
+        assertEq(previewedRequestedAssets, trueClaimable, "Preview does not match true claimable amount");
+    }
+
     function test_ZeroDeposit_ShouldRevert() public {
         vm.prank(users.alice);
         kUSD.approve(address(vault), 0);
