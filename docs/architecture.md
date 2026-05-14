@@ -534,11 +534,11 @@ The protocol implements granular permissions via Solady's OptimizedOwnableRoles 
 | Role                 | Scope       | Key Permissions                 |
 | -------------------- | ----------- | ------------------------------- |
 | OWNER                | Protocol    | Upgrades, critical changes      |
-| ADMIN_ROLE           | Operational | Configuration, registry updates |
-| EMERGENCY_ADMIN_ROLE | Crisis      | Pause, emergency withdrawals    |
+| ADMIN_ROLE           | Operational | Configuration, register adapters, rescue assets |
+| EMERGENCY_ADMIN_ROLE | Crisis      | Protocol pause (global/local)   |
 | MINTER_ROLE          | Tokens      | Mint/burn kTokens               |
 | INSTITUTION_ROLE     | Access      | Use kMinter functions           |
-| VENDOR_ROLE          | Adapters    | Register adapters, manage assets|
+| VENDOR_ROLE          | Access      | Manage INSTITUTION_ROLE         |
 | RELAYER_ROLE         | Settlement  | Propose batch settlements       |
 | MANAGER_ROLE         | Adapters    | Adapter execution and management|
 | GUARDIAN_ROLE        | Settlement  | Cancel/approve settlement proposals |
