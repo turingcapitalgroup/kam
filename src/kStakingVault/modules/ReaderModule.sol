@@ -223,36 +223,35 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
     )
         external
         view
-        returns (uint256 _requestedAssets)
+        returns (uint256 _requestedAssets, uint256 _managementFees, uint256 _performanceFees)
     {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint128 _requestedShares = $.batches[_batchId].requestedSharesInBatch;
-        if (_requestedShares == 0) return 0;
 
         uint256 _totalSupply = totalSupply();
-        if (_totalSupply == 0) return 0;
+        if (_totalSupply == 0) return (0, 0, 0);
 
         uint256 _elapsed = _endOfPeriod - _getLastFeeTimestamp($);
 
         // 1. Accrue management fees (virtual)
-        uint256 _mgmtFeeAssets = VaultMathLib.computeManagementFee(
+        _managementFees = VaultMathLib.computeManagementFee(
             _newTotalAssets, _getManagementFee($), _getLastFeeTimestamp($), _endOfPeriod
         );
 
         // 2. Interest
         uint256 _previousBalance = _getLastSettlementBalance();
-        int256 _interest = int256(_newTotalAssets) - int256(_previousBalance) - int256(_mgmtFeeAssets);
+        int256 _interest = int256(_newTotalAssets) - int256(_previousBalance) - int256(_managementFees);
 
         // 3. Management fee shares
         uint256 _mgmtFeeShares = 0;
-        if (_mgmtFeeAssets > 0) {
-            _mgmtFeeShares = VaultMathLib.convertToShares(_mgmtFeeAssets, _newTotalAssets, _totalSupply);
+        if (_managementFees > 0) {
+            _mgmtFeeShares = VaultMathLib.convertToShares(_managementFees, _newTotalAssets, _totalSupply);
         }
 
         // 4. Performance fee shares
         uint256 _perfFeeShares = 0;
         if (_interest > 0) {
-            uint256 _perfFeeAssets = VaultMathLib.computePerformanceFee(
+            _performanceFees = VaultMathLib.computePerformanceFee(
                 uint256(_interest),
                 _previousBalance,
                 _getPerformanceFee($),
@@ -260,10 +259,10 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
                 _getIsHardHurdleRate($),
                 _elapsed
             );
-            if (_perfFeeAssets > 0) {
+            if (_performanceFees > 0) {
                 // Performance fee shares dilute existing supply + management fee shares
                 _perfFeeShares =
-                    VaultMathLib.convertToShares(_perfFeeAssets, _newTotalAssets, _totalSupply + _mgmtFeeShares);
+                    VaultMathLib.convertToShares(_performanceFees, _newTotalAssets, _totalSupply + _mgmtFeeShares);
             }
         }
 
@@ -271,7 +270,9 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         uint256 _batchTotalSupply = _totalSupply + _mgmtFeeShares + _perfFeeShares;
 
         // Calculate requested assets corresponding to the unstake requests
-        return VaultMathLib.convertToAssets(_requestedShares, _newTotalAssets, _batchTotalSupply);
+        if (_requestedShares != 0) {
+            _requestedAssets = VaultMathLib.convertToAssets(_requestedShares, _newTotalAssets, _batchTotalSupply);
+        }
     }
 
     /* //////////////////////////////////////////////////////////////

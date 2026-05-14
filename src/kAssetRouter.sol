@@ -81,6 +81,17 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// Prevents excessive delays that could harm user experience while maintaining security standards
     uint256 private constant MAX_VAULT_SETTLEMENT_COOLDOWN = 1 days;
 
+    struct SettlementProposalParams {
+        address asset;
+        address vault;
+        bytes32 batchId;
+        uint256 totalAssets;
+        int256 netted;
+        uint256 managementFees;
+        uint256 performanceFees;
+        uint64 proposedAt;
+    }
+
     /* //////////////////////////////////////////////////////////////
                             STORAGE LAYOUT
     //////////////////////////////////////////////////////////////*/
@@ -249,21 +260,31 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         require($.batchIds.add(_batchId), KASSETROUTER_BATCH_ID_PROPOSED);
         require(IkMinter(_vault).isClosed(_batchId), KASSETROUTER_NOT_BATCH_CLOSED);
 
-        bool _isMinter = _isKMinter(_vault);
+        SettlementProposalParams memory _params;
+        _params.asset = _asset;
+        _params.vault = _vault;
+        _params.batchId = _batchId;
+        _params.totalAssets = _totalAssets;
+        _params.proposedAt = block.timestamp.toUint64();
 
-        _proposalId = _generateProposalId($, _vault, _asset, _batchId);
-        _checkNoPendingProposalForAsset($, _vault, _asset, _isMinter);
+        bool _isMinter = _isKMinter(_params.vault);
+
+        _proposalId = _generateProposalId($, _params.vault, _params.asset, _params.batchId);
+        _checkNoPendingProposalForAsset($, _params.vault, _params.asset, _isMinter);
         require(!$.executedProposalIds.contains(_proposalId), KASSETROUTER_PROPOSAL_EXECUTED);
 
-        (uint256 _requestedInBatch, int256 _netted) = _computeNetting(_vault, _batchId, _asset, _totalAssets, _isMinter);
+        uint256 _requestedInBatch;
+        (_requestedInBatch, _params.netted, _params.managementFees, _params.performanceFees) = _computeNetting(
+            _params.vault, _params.batchId, _params.asset, _params.totalAssets, _isMinter, _params.proposedAt
+        );
 
         // Validate global pending coverage for kMinter BEFORE adding proposal to the set,
         // so _effectiveVirtualBalanceInt doesn't iterate this uninitialized proposal slot.
         if (_isMinter) {
-            _validateAndDecrementGlobalPending($, _vault, _asset, _requestedInBatch, _netted);
+            _validateAndDecrementGlobalPending($, _params.vault, _params.asset, _requestedInBatch, _params.netted);
         }
 
-        _createProposal($, _proposalId, _asset, _vault, _batchId, _totalAssets, _netted);
+        _createProposal($, _proposalId, _params);
 
         _unlockReentrant();
     }
@@ -273,29 +294,26 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     function _createProposal(
         kAssetRouterStorage storage $,
         bytes32 _proposalId,
-        address _asset,
-        address _vault,
-        bytes32 _batchId,
-        uint256 _totalAssets,
-        int256 _netted
+        SettlementProposalParams memory _params
     )
         private
     {
-        uint256 _lastTotalAssets = _virtualBalance(_vault, _asset);
+        uint256 _lastTotalAssets = _virtualBalance(_params.vault, _params.asset);
 
         // casting to 'int256' is safe because we're doing arithmetic on uint256 values
         // forge-lint: disable-next-line(unsafe-typecast)
-        int256 _yield = int256(_totalAssets) - int256(_lastTotalAssets);
+        int256 _yield = int256(_params.totalAssets) - int256(_lastTotalAssets);
 
         // To calculate the strategy yield we need to include the deposits and requests into the new total
         // assets to match last total assets.
         // casting to 'uint256' is safe because we're converting back from int256 arithmetic
         // forge-lint: disable-next-line(unsafe-typecast)
-        uint256 _totalAssetsAdjusted = uint256(int256(_totalAssets) + _netted);
+        uint256 _totalAssetsAdjusted = uint256(int256(_params.totalAssets) + _params.netted);
 
-        bool _requiresApproval = _checkYieldTolerance($, _vault, _asset, _batchId, _lastTotalAssets, _yield);
+        bool _requiresApproval =
+            _checkYieldTolerance($, _params.vault, _params.asset, _params.batchId, _lastTotalAssets, _yield);
 
-        address _adapter = _registry().getAdapter(_vault, _asset);
+        address _adapter = _registry().getAdapter(_params.vault, _params.asset);
         _checkAddressNotZero(_adapter);
 
         uint256 _executeAfter;
@@ -303,22 +321,26 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             _executeAfter = block.timestamp + $.vaultSettlementCooldown;
         }
 
-        require($.vaultPendingProposalIds[_vault].add(_proposalId), KASSETROUTER_PROPOSAL_EXISTS);
+        require($.vaultPendingProposalIds[_params.vault].add(_proposalId), KASSETROUTER_PROPOSAL_EXISTS);
 
         $.settlementProposals[_proposalId] = VaultSettlementProposal({
-            asset: _asset,
-            vault: _vault,
+            asset: _params.asset,
+            vault: _params.vault,
             adapter: _adapter,
-            batchId: _batchId,
+            batchId: _params.batchId,
             totalAssets: _totalAssetsAdjusted,
-            netted: _netted,
+            netted: _params.netted,
             yield: _yield,
-            proposedAt: uint64(block.timestamp),
+            managementFees: _params.managementFees,
+            performanceFees: _params.performanceFees,
+            proposedAt: _params.proposedAt,
             executeAfter: _executeAfter.toUint64(),
             requiresApproval: _requiresApproval
         });
 
-        emit SettlementProposed(_proposalId, _vault, _batchId, _totalAssets, _netted, _yield, _executeAfter);
+        emit SettlementProposed(
+            _proposalId, _params.vault, _params.batchId, _params.totalAssets, _params.netted, _yield, _executeAfter
+        );
     }
 
     /// @notice Generates a unique proposal ID using vault, asset, batch, timestamp and counter
@@ -383,11 +405,12 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         bytes32 _batchId,
         address _asset,
         uint256 _totalAssets,
-        bool _isMinter
+        bool _isMinter,
+        uint64 _proposedAt
     )
         private
         view
-        returns (uint256 _requestedInBatch, int256 _netted)
+        returns (uint256 _requestedInBatch, int256 _netted, uint256 _managementFees, uint256 _performanceFees)
     {
         if (_isMinter) {
             IkMinter.BatchInfo memory _batchInfo = IkMinter(_vault).getBatchInfo(_batchId);
@@ -399,8 +422,10 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             (,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
             _requestedInBatch = _requestedSharesInBatch;
-            uint256 _requestedAssets = IkStakingVault(_vault)
-                .previewSettleBatchRequestedAssets(_batchId, _totalAssets, uint64(block.timestamp));
+            (uint256 _requestedAssets, uint256 _managementFees_, uint256 _performanceFees_) =
+                IkStakingVault(_vault).previewSettleBatchRequestedAssets(_batchId, _totalAssets, _proposedAt);
+            _managementFees = _managementFees_;
+            _performanceFees = _performanceFees_;
             // casting to 'int256' is safe because we're doing arithmetic on uint256 values
             // forge-lint: disable-next-line(unsafe-typecast)
             _netted = int256(_depositedInBatch) - int256(_requestedAssets);
@@ -588,7 +613,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             emit Withdrawn(_vault, _asset, uint256(-_netted));
         }
 
-        ISettleBatch(_vault).settleBatch(_batchId, _proposal.proposedAt);
+        ISettleBatch(_vault).settleBatch(_batchId, _proposal.proposedAt, 0, 0);
 
         // Use DELTA instead of SET to avoid race condition with kStakingVault settlements
         // Both operations modifying kMinter adapter are now commutative (order-independent)
@@ -643,7 +668,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         emit TotalAssetsSet(address(_kMinterAdapter), uint256(_kMinterTotalAssets));
 
         // Mark batch as settled in the vault (accrues fees, mints/burns shares, snapshots prices)
-        ISettleBatch(_vault).settleBatch(_batchId, _proposal.proposedAt);
+        ISettleBatch(_vault)
+            .settleBatch(_batchId, _proposal.proposedAt, _proposal.managementFees, _proposal.performanceFees);
         _adapter.setTotalAssets(_totalAssets);
         emit TotalAssetsSet(address(_adapter), _totalAssets);
 

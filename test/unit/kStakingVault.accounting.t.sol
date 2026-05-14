@@ -16,6 +16,7 @@ import {
     KSTAKINGVAULT_ZERO_ADDRESS,
     KSTAKINGVAULT_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
+import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 
 contract kStakingVaultAccountingTest is BaseVaultTest {
     using OptimizedFixedPointMathLib for uint256;
@@ -387,7 +388,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         uint256 simulatedNewTotalAssets = lastTotalAssets + yield;
 
         // 5. Preview the requested assets calculation (the exact value we are verifying)
-        uint256 previewedRequestedAssets =
+        (uint256 previewedRequestedAssets,,) =
             vault.previewSettleBatchRequestedAssets(batchId, simulatedNewTotalAssets, uint64(block.timestamp));
 
         // 6. Execute settlement through asset router
@@ -406,6 +407,70 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         // 8. Assert that the preview function is perfectly accurate down to the wei
         assertEq(previewedRequestedAssets, trueClaimable, "Preview does not match true claimable amount");
+    }
+
+    function test_ProposeSettleBatch_StoresFeeSnapshot() public {
+        _setupTestFees();
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        vm.prank(users.alice);
+        vault.requestUnstake(users.alice, users.alice, 500_000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        vm.warp(block.timestamp + 30 days);
+
+        uint256 newTotalAssets = vault.totalAssets() + 200_000 * _1_USDC;
+        (uint256 expectedRequestedAssets, uint256 expectedManagementFees, uint256 expectedPerformanceFees) =
+            vault.previewSettleBatchRequestedAssets(batchId, newTotalAssets, uint64(block.timestamp));
+
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, newTotalAssets);
+
+        IkAssetRouter.VaultSettlementProposal memory proposal = assetRouter.getSettlementProposal(proposalId);
+        assertEq(proposal.managementFees, expectedManagementFees);
+        assertEq(proposal.performanceFees, expectedPerformanceFees);
+        assertEq(proposal.proposedAt, uint64(block.timestamp));
+        assertEq(proposal.netted, -int256(expectedRequestedAssets));
+    }
+
+    function test_ExecuteSettleBatch_UsesStoredFeeSnapshotAfterDelay() public {
+        _setupTestFees();
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        vm.prank(users.alice);
+        vault.requestUnstake(users.alice, users.alice, 500_000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        vm.warp(block.timestamp + 30 days);
+
+        uint256 newTotalAssets = vault.totalAssets() + 200_000 * _1_USDC;
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, newTotalAssets);
+
+        IkAssetRouter.VaultSettlementProposal memory proposal = assetRouter.getSettlementProposal(proposalId);
+        uint256 supplyBefore = vault.totalSupply();
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
+
+        uint256 expectedManagementFeeShares =
+            vault.convertToSharesWithTotals(proposal.managementFees, newTotalAssets, supplyBefore);
+        uint256 expectedPerformanceFeeShares = vault.convertToSharesWithTotals(
+            proposal.performanceFees, newTotalAssets, supplyBefore + expectedManagementFeeShares
+        );
+
+        vm.warp(block.timestamp + 365 days);
+        _acceptAndExecuteSettlement(proposalId);
+
+        assertEq(
+            vault.balanceOf(users.treasury) - treasurySharesBefore,
+            expectedManagementFeeShares + expectedPerformanceFeeShares
+        );
+        assertEq(vault.lastFeeTimestamp(), proposal.proposedAt);
     }
 
     function test_ZeroDeposit_ShouldRevert() public {

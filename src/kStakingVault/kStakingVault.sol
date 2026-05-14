@@ -17,8 +17,6 @@ import { ISettleBatch, IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.so
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces/IVault.sol";
 
-import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
-
 import {
     KSTAKINGVAULT_BALANCE_AUDIT_FAILED,
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
@@ -28,8 +26,6 @@ import {
     KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED,
     KSTAKINGVAULT_NOT_INITIALIZED,
     KSTAKINGVAULT_REQUEST_NOT_FOUND,
-    KSTAKINGVAULT_VAULT_CLOSED,
-    KSTAKINGVAULT_VAULT_SETTLED,
     KSTAKINGVAULT_WRONG_ROLE,
     KSTAKINGVAULT_ZERO_ADDRESS,
     KSTAKINGVAULT_ZERO_AMOUNT,
@@ -39,7 +35,8 @@ import {
     VAULTCLAIMS_BATCH_NOT_SETTLED,
     VAULTCLAIMS_NOT_BENEFICIARY,
     VAULTCLAIMS_REQUEST_NOT_PENDING,
-    VAULTFEES_FEE_EXCEEDS_MAXIMUM
+    VAULTFEES_FEE_EXCEEDS_MAXIMUM,
+    VAULTFEES_INVALID_TIMESTAMP
 } from "kam/src/errors/Errors.sol";
 
 import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
@@ -351,54 +348,40 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     }
 
     /// @inheritdoc IVaultBatch
-    function settleBatch(bytes32 _batchId, uint64 _proposedAt) external override(IVaultBatch, ISettleBatch) {
+    function settleBatch(
+        bytes32 _batchId,
+        uint64 _proposedAt,
+        uint256 _managementFees,
+        uint256 _performanceFees
+    )
+        external
+        override(IVaultBatch, ISettleBatch)
+    {
         _checkRouter(_msgSender());
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         require($.batches[_batchId].isClosed, VAULTBATCHES_NOT_CLOSED);
         require(!$.batches[_batchId].isSettled, VAULTBATCHES_VAULT_SETTLED);
         $.batches[_batchId].isSettled = true;
 
-        // Capture elapsed time before _accrueFees() updates the timestamp
-        uint256 _settlementElapsed = _proposedAt - _getLastFeeTimestamp($);
+        // Fee amounts are frozen in the router proposal; keep the timestamp in sync with that snapshot.
+        require(_proposedAt >= _getLastFeeTimestamp($), VAULTFEES_INVALID_TIMESTAMP);
+        _setLastFeeTimestamp($, _proposedAt);
 
-        // 1. Accrue management fees
-        uint256 _mgmtFeeAssets = _accrueFees(_proposedAt);
-
-        // 2. Calculate interest AFTER management fees
-        uint256 _previousBalance = _getLastSettlementBalance();
-        uint256 _currentBalance = _totalBalance();
-        // forge-lint: disable-next-line(unsafe-typecast) safe because diff of uint128 values
-        int256 _interest = int256(_currentBalance) - int256(_previousBalance) - int256(_mgmtFeeAssets);
-
-        // 3. Mint management fee shares
-        if (_mgmtFeeAssets > 0) {
-            _mintManagementFees(_mgmtFeeAssets);
+        // 1. Mint management fee shares
+        if (_managementFees > 0) {
+            _mintManagementFees(_managementFees);
         }
 
-        // 4. Charge performance fees on net interest
-        uint256 _performanceFeeShares;
-        if (_interest > 0) {
-            // forge-lint: disable-next-line(unsafe-typecast) safe because _interest > 0
-            uint256 _interestUint = uint256(_interest);
-            uint256 _perfFeeAssets = VaultMathLib.computePerformanceFee(
-                _interestUint,
-                _previousBalance,
-                _getPerformanceFee($),
-                _getHurdleRate($),
-                _getIsHardHurdleRate($),
-                _settlementElapsed
-            );
-
-            if (_perfFeeAssets > 0) {
-                _performanceFeeShares = _convertToSharesWithTotals(_perfFeeAssets, _totalAssets(), totalSupply());
-                if (_performanceFeeShares > 0) {
-                    _mint(_registry().getTreasury(), _performanceFeeShares);
-                    emit PerformanceFeesCharged(_performanceFeeShares);
-                }
+        // 2. Mint performance fee shares
+        if (_performanceFees > 0) {
+            uint256 _performanceFeeShares = _convertToSharesWithTotals(_performanceFees, _totalAssets(), totalSupply());
+            if (_performanceFeeShares > 0) {
+                _mint(_registry().getTreasury(), _performanceFeeShares);
+                emit PerformanceFeesCharged(_performanceFeeShares);
             }
         }
 
-        // 5. Cache total assets and supply after fee accrual for share calculations
+        // 3. Cache total assets and supply after fee accrual for share calculations
         uint256 _batchTotalAssets = _totalAssets();
         uint256 _batchTotalSupply = totalSupply();
 

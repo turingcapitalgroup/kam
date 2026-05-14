@@ -156,6 +156,8 @@ interface IVaultReader {
     /// @param newTotalAssets The new total assets of the vault adapter before netting
     /// @param endOfPeriod The timestamp up to which fees and yield are simulated
     /// @return requestedAssets The exact amount of underlying assets claimable by unstakers
+    /// @return managementFees Management fee assets that would be charged at settlement
+    /// @return performanceFees Performance fee assets that would be charged at settlement
     function previewSettleBatchRequestedAssets(
         bytes32 batchId,
         uint256 newTotalAssets,
@@ -163,5 +165,5 @@ interface IVaultReader {
     )
         external
         view
-        returns (uint256 requestedAssets);
+        returns (uint256 requestedAssets, uint256 managementFees, uint256 performanceFees);
 }

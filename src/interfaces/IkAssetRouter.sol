@@ -10,7 +10,15 @@ interface ISettleBatch {
     /// @notice Used by kAssetRouter to execute the settlement inside the Vault or kMinter.
     /// @param _batchId The ID of the batch to settle
     /// @param _proposedAt The exact block.timestamp when the proposal was submitted
-    function settleBatch(bytes32 _batchId, uint64 _proposedAt) external;
+    /// @param _managementFees Management fee assets computed when the settlement was proposed
+    /// @param _performanceFees Performance fee assets computed when the settlement was proposed
+    function settleBatch(
+        bytes32 _batchId,
+        uint64 _proposedAt,
+        uint256 _managementFees,
+        uint256 _performanceFees
+    )
+        external;
 }
 
 /// @title IkAssetRouter
@@ -61,6 +69,10 @@ interface IkAssetRouter is IVersioned {
         int256 netted;
         /// @dev Absolute yield amount (positive or negative) generated in this batch
         int256 yield;
+        /// @dev Management fee assets computed when the proposal was created
+        uint256 managementFees;
+        /// @dev Performance fee assets computed when the proposal was created
+        uint256 performanceFees;
         /// @notice Exact timestamp the proposal was submitted, used to freeze fee math
         uint64 proposedAt;
         /// @dev Timestamp after which this proposal can be executed (cooldown protection)
