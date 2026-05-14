@@ -395,24 +395,19 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @notice Computes pending management fee assets and updates the last fee timestamp
     /// @dev Called at settlement and before fee rate changes. Does NOT mint shares — the caller
     ///      is responsible for converting and minting. Returns 0 if no supply or no fees due.
-    ///      Will return 0 and not update timestamp if _timestamp <= lastFeeTimestamp to prevent backwards updates.
-    /// @param _timestamp The timestamp to accrue fees up to
     /// @return managementFeeAssets Management fee in asset terms
-    function _accrueFees(uint256 _timestamp) internal returns (uint256 managementFeeAssets) {
+    function _accrueFees() internal returns (uint256 managementFeeAssets) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint256 totalAssets_ = _totalAssets();
         uint256 _totalSupply = totalSupply();
 
         uint64 _lastFeeTimestamp = _getLastFeeTimestamp($);
-
-        if (_timestamp <= _lastFeeTimestamp) return 0;
-        
-        _setLastFeeTimestamp($, uint64(_timestamp));
+        _setLastFeeTimestamp($, uint64(block.timestamp));
 
         if (_totalSupply == 0) return 0;
 
         managementFeeAssets =
-            VaultMathLib.computeManagementFee(totalAssets_, _getManagementFee($), _lastFeeTimestamp, _timestamp);
+            VaultMathLib.computeManagementFee(totalAssets_, _getManagementFee($), _lastFeeTimestamp, block.timestamp);
     }
 
     /// @notice Mints management fee shares to the treasury

@@ -55,8 +55,6 @@ library BaseVaultTypes {
         bool isClosed;
         /// @notice Whether the batch is settled
         bool isSettled;
-        /// @notice Timestamp when the batch was closed (locks fee accrual for settlement determinism)
-        uint64 closedAt;
         /// @notice Batch ID
         bytes32 batchId;
         /// @notice Amount of assets deposited in a batch

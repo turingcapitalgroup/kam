@@ -375,17 +375,13 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         vm.prank(users.alice);
         vault.requestUnstake(users.alice, users.alice, 500_000 * 1e6);
 
-        // 3. Simulate time passing while batch is open
-        vm.warp(block.timestamp + 30 days);
-
-        // 4. Close the batch
+        // 3. Close the batch
         bytes32 batchId = vault.getBatchId();
         vm.prank(users.relayer);
         vault.closeBatch(batchId, true);
 
-        // 5. Simulate proposal delay where no fees should accrue for this batch
-        vm.warp(block.timestamp + 1 days);
-
+        // 4. Simulate yield and time passing
+        vm.warp(block.timestamp + 30 days);
         uint256 lastTotalAssets = vault.totalAssets();
         uint256 yield = 200_000 * _1_USDC; // 20% yield
         uint256 simulatedNewTotalAssets = lastTotalAssets + yield;
