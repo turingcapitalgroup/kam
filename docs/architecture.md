@@ -359,7 +359,7 @@ The kStakingVault is implemented as a unified contract that inherits from multip
 
 **Batch Processing**: The vault manages the complete batch lifecycle for efficient gas usage. Batches are created by the relayer via `createNewBatch()`, handles batch closure and settlement coordination with kAssetRouter, and processes direct asset transfers without requiring external BatchReceiver contracts.
 
-**Fee Management**: Fees are collected via share dilution at settlement time. Fee accrual is structurally frozen at the batch's `proposedAt` timestamp (the moment the batch was proposed to the router). `_accrueFees(proposedAt)` computes the management fee for the elapsed period up to `proposedAt` and updates `lastFeeTimestamp`. This guarantees execution-time mathematical determinism and perfectly aligns fee charges with the yield snapshot provided during the proposal, avoiding any netted drifting during the Guardian Cooldown. Management fees accrue on time and total assets; performance fees are computed once per settlement on net interest above the time-weighted hurdle threshold.
+**Fee Management**: Fees are collected via share dilution at settlement time only. Fee accrual is structurally frozen at the batch's `proposedAt` timestamp (the moment the batch was proposed to the router). The router's `quoteBatchSettlement` computes the management fee for the elapsed period up to `proposedAt`, and `settleBatch` sets `lastFeeTimestamp` accordingly. This guarantees execution-time mathematical determinism and perfectly aligns fee charges with the yield snapshot provided during the proposal, avoiding any netted drifting during the Guardian Cooldown. Management fees accrue on time and total assets; performance fees are computed once per settlement on net interest above the time-weighted hurdle threshold. Fee-rate changes (`setManagementFee`, `setPerformanceFee`) update the rate directly without accruing pending fees — the new rate applies from the next settlement.
 
 **Claims Processing**: Handles user claims for completed requests by converting stake requests into stkToken balances, processing unstaking requests with underlying token plus yield distribution, and ensuring claims are only processed for settled batches.
 
@@ -590,7 +590,7 @@ The protocol implements a multi-layered emergency response system with global pa
 
 ## Fee Structure
 
-Fees are accrued and collected automatically via share dilution through the `_accrueFees()` internal function, which is called during `settleBatch()` and before fee-rate changes (`setManagementFee`, `setPerformanceFee`).
+Fees are accrued and collected automatically via share dilution at settlement time only (inside `settleBatch()`). Fee-rate changes (`setManagementFee`, `setPerformanceFee`) update the rate directly without accruing pending fees.
 
 A single `lastFeeTimestamp` tracks when management fees were last accrued, replacing the previous dual-timestamp system (`lastFeesChargedManagement` / `lastFeesChargedPerformance`). `lastSettlementBalance` records the vault balance at the last settlement and serves as the interest baseline for the next batch's performance fee calculation.
 
@@ -619,7 +619,7 @@ Performance fees are charged on net interest per settlement batch — only when 
 
 ### Fee Calculation
 
-**Management fee**: `_accrueFees(uint256 _timestamp)` computes `totalAssets * managementFee * elapsed / (SECS_PER_YEAR * 10000)` and updates `lastFeeTimestamp`. The `elapsed` time is strictly bounded by the `proposedAt` timestamp during execution, ensuring all fees are charged exactly up to the moment the relayer submitted the T+4 NAV. The 1 hour of fees from the Guardian Cooldown is securely deferred to the next batch. `_mintManagementFees()` converts that asset amount to shares and mints them to the treasury.
+**Management fee**: Management fees are computed by `VaultMathLib.computeManagementFee` and passed into `settleBatch()` by the router. The `elapsed` time is strictly bounded by the `proposedAt` timestamp during execution, ensuring all fees are charged exactly up to the moment the relayer submitted the T+4 NAV. The 1 hour of fees from the Guardian Cooldown is securely deferred to the next batch. `_mintManagementFees()` converts that asset amount to shares and mints them to the treasury.
 
 **Performance fee**: computed once per settlement inside `settleBatch()`. Interest is `currentBalance − lastSettlementBalance − managementFeeAssets`. If interest exceeds the time-weighted hurdle (using the identical `proposedAt` elapsed period), performance fee shares are minted directly to the treasury. `lastSettlementBalance` is then updated to the post-settlement balance.
 

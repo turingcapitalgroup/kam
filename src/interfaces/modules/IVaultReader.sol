@@ -158,7 +158,7 @@ interface IVaultReader {
     /// @return requestedAssets The exact amount of underlying assets claimable by unstakers
     /// @return managementFees Management fee assets that would be charged at settlement
     /// @return performanceFees Performance fee assets that would be charged at settlement
-    function previewSettleBatchRequestedAssets(
+    function quoteBatchSettlement(
         bytes32 batchId,
         uint256 newTotalAssets,
         uint64 endOfPeriod

@@ -14,7 +14,7 @@ At `T_propose` the router stores, for each settlement proposal:
 
 - The live TVL (`totalAssets`) provided by the relayer.
 - The exact `block.timestamp` (`proposedAt`).
-- Management fee and performance fee assets, computed deterministically by `previewSettleBatchRequestedAssets` using `proposedAt` as the end-of-period.
+- Management fee and performance fee assets, computed deterministically by `quoteBatchSettlement` using `proposedAt` as the end-of-period.
 - `netted` = `depositedInBatch - requestedAssets` where `requestedAssets` already accounts for fee dilution (post-fee).
 - `yield` = `totalAssets - lastAdapterTotalAssets`.
 
@@ -60,17 +60,14 @@ A guardian or emergency admin may also call `cancelProposal(proposalId)` at any 
 
 ## 5. Operational Constraints During the Cooldown
 
-### 5.1 Fee-rate changes invalidate in-flight proposals
-`setManagementFee` and `setPerformanceFee` both call `_accrueFees(block.timestamp)`, which advances `lastFeeTimestamp` to the call's `block.timestamp`. If this happens while a proposal is in cooldown:
+### 5.1 Fee-rate changes
 
-- The vault's `settleBatch` invariant `_proposedAt >= lastFeeTimestamp` no longer holds for the in-flight proposal.
-- `executeSettleBatch` will revert with `VAULTFEES_INVALID_TIMESTAMP`.
-- The proposal must be cancelled (`cancelProposal`) and re-proposed by the relayer. The new proposal will use the updated rate.
+`setManagementFee` and `setPerformanceFee` update the fee rate directly without accruing pending fees. Fees are only accrued and minted at settlement time (`settleBatch`). Fee-rate changes take effect at the next settlement.
 
-**Rule:** Admins should not change fee rates while a settlement proposal is in flight. Operationally, schedule rate changes for immediately after `executeSettleBatch` completes (or via a brief pause window with no open proposals).
+**Rule:** Admins can change fee rates at any time. The new rate will apply starting from the next settlement batch.
 
 ### 5.2 Mid-period fee-rate changes bias the next batch's perf fee
-Both `setManagementFee` and `setPerformanceFee` push `lastFeeTimestamp` forward to the call's `block.timestamp` but do not update `lastSettlementBalance`. The next batch's settlement math therefore mixes two periods:
+Fee-rate changes do not update `lastSettlementBalance`. The next batch's settlement math therefore mixes two periods:
 
 - **Interest** spans `[lastSettlement, proposedAt]` — the full period since the previous settlement.
 - **Hurdle and management-fee elapsed window** span `[lastFeeTimestamp, proposedAt]` — shorter, because `lastFeeTimestamp` was advanced by the rate change.

@@ -27,11 +27,9 @@ import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMath
 ///      CALL CONTRACT for vault integrators:
 ///        - Pass POST-MANAGEMENT-FEE total assets to computePerformanceFee, so performance
 ///          fee is never charged on assets already deducted as management fee.
-///        - Call _accrueFees() before mutating fee rates; otherwise pending management fees
-///          would be re-priced at the new rate.
 ///
-///      Management fees are time-prorated on total assets, accrued at settlement and before
-///      fee-rate changes. Performance fees are charged on interest gains at settlement, with hurdle rate filtering.
+///      Management fees are time-prorated on total assets, accrued at settlement only.
+///      Performance fees are charged on interest gains at settlement, with hurdle rate filtering.
 library VaultMathLib {
     using OptimizedFixedPointMathLib for uint256;
 

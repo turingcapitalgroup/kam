@@ -522,8 +522,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     function setManagementFee(uint16 _managementFee) external {
         _checkAdmin(_msgSender());
         _checkValidBPS(_managementFee);
-        uint256 mgmtFeeAssets = _accrueFees(block.timestamp);
-        _mintManagementFees(mgmtFeeAssets);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint16 oldFee = _getManagementFee($);
         _setManagementFee($, _managementFee);
@@ -534,8 +532,6 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
     function setPerformanceFee(uint16 _performanceFee) external {
         _checkAdmin(_msgSender());
         _checkValidBPS(_performanceFee);
-        uint256 mgmtFeeAssets = _accrueFees(block.timestamp);
-        _mintManagementFees(mgmtFeeAssets);
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         uint16 oldFee = _getPerformanceFee($);
         _setPerformanceFee($, _performanceFee);

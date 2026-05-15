@@ -216,7 +216,7 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
     }
 
     /// @inheritdoc IVaultReader
-    function previewSettleBatchRequestedAssets(
+    function quoteBatchSettlement(
         bytes32 _batchId,
         uint256 _newTotalAssets,
         uint64 _endOfPeriod
@@ -301,7 +301,7 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         moduleSelectors[16] = this.isBatchSettled.selector;
         moduleSelectors[17] = this.getCurrentBatchInfo.selector;
         moduleSelectors[18] = this.getBatchIdInfo.selector;
-        moduleSelectors[19] = this.previewSettleBatchRequestedAssets.selector;
+        moduleSelectors[19] = this.quoteBatchSettlement.selector;
         return moduleSelectors;
     }
 }

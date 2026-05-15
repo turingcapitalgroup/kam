@@ -16,7 +16,7 @@ All numbered security findings (TOB-KAM-1 through 38) have already been fixed an
 
 **Problem**: Fee computations exist in three separate locations — the kSettler, the vault's ReaderModule, and the kAssetRouter — each reading inputs at different points in the settlement flow. This redundancy makes it difficult to reason about correctness and increases the risk of future regressions. Rounding direction is not documented or consistently enforced across share conversion paths.
 
-**Already fixed on this branch**: `setManagementFee` and `setPerformanceFee` now call `_accrueFees()` + `_mintManagementFees()` before changing the rate (commit `f020291`).
+**Already fixed on this branch**: Fee setters (`setManagementFee`, `setPerformanceFee`) no longer accrue fees on-the-fly; fees are only accrued at settlement.
 
 ### Remaining work
 
@@ -24,7 +24,7 @@ All numbered security findings (TOB-KAM-1 through 38) have already been fixed an
 
 2. **Audit the kSettler fee path** (`kam-settler/src/kSettler.sol`): search for any independent management/performance fee calculation and replace with a call forwarded to the on-chain vault or a shared library. If kSettler computes fees off-chain, document that the on-chain `kStakingVault.settleBatch` is authoritative and the kSettler result is advisory only.
 
-3. **Audit the ReaderModule fee path** (`src/kStakingVault/modules/ReaderModule.sol`): the reader exposes fee views for the frontend. Verify these call `VaultMathLib` or `BaseVault._accrueFees` internally, not independent math. If they diverge, rewrite to delegate to the canonical path.
+3. **Audit the ReaderModule fee path** (`src/kStakingVault/modules/ReaderModule.sol`): the reader exposes fee views for the frontend. Verify these call `VaultMathLib` internally, not independent math. If they diverge, rewrite to delegate to the canonical path.
 
 4. **Document rounding direction**: add a comment block at the top of `VaultMathLib` stating:
    - `convertToShares` rounds **down** (favors the vault).

@@ -365,7 +365,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
                         EDGE CASE TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_previewSettleBatchRequestedAssets_matches_actual_claimable() public {
+    function test_quoteBatchSettlement_matches_actual_claimable() public {
         _setupTestFees();
 
         // 1. Setup initial state: Alice deposits 1M USDC
@@ -389,7 +389,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         // 5. Preview the requested assets calculation (the exact value we are verifying)
         (uint256 previewedRequestedAssets,,) =
-            vault.previewSettleBatchRequestedAssets(batchId, simulatedNewTotalAssets, uint64(block.timestamp));
+            vault.quoteBatchSettlement(batchId, simulatedNewTotalAssets, uint64(block.timestamp));
 
         // 6. Execute settlement through asset router
         // This will:
@@ -424,7 +424,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         uint256 newTotalAssets = vault.totalAssets() + 200_000 * _1_USDC;
         (uint256 expectedRequestedAssets, uint256 expectedManagementFees, uint256 expectedPerformanceFees) =
-            vault.previewSettleBatchRequestedAssets(batchId, newTotalAssets, uint64(block.timestamp));
+            vault.quoteBatchSettlement(batchId, newTotalAssets, uint64(block.timestamp));
 
         vm.prank(users.relayer);
         bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, newTotalAssets);

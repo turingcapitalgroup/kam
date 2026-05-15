@@ -423,7 +423,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
             _requestedInBatch = _requestedSharesInBatch;
             (uint256 _requestedAssets, uint256 _managementFees_, uint256 _performanceFees_) =
-                IkStakingVault(_vault).previewSettleBatchRequestedAssets(_batchId, _totalAssets, _proposedAt);
+                IkStakingVault(_vault).quoteBatchSettlement(_batchId, _totalAssets, _proposedAt);
             _managementFees = _managementFees_;
             _performanceFees = _performanceFees_;
             // casting to 'int256' is safe because we're doing arithmetic on uint256 values

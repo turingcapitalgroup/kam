@@ -372,8 +372,7 @@ contract kStakingVaultHandler is BaseHandler {
         uint256 newTotalAssets = uint256(newTotalAssetsInt);
 
         // Convert requested shares to assets using the same fee-aware preview as the router.
-        (requested,,) =
-            kStakingVault_vault.previewSettleBatchRequestedAssets(batchId, newTotalAssets, uint64(block.timestamp));
+        (requested,,) = kStakingVault_vault.quoteBatchSettlement(batchId, newTotalAssets, uint64(block.timestamp));
         int256 netted = int256(deposited) - int256(requested);
 
         if (netted < 0 && netted.abs() > kStakingVault_expectedAdapterTotalAssets) {

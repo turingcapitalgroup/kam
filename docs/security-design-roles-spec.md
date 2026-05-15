@@ -209,7 +209,7 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 
 | Fee | Computed in | Formula | Recipient |
 |-----|------------|---------|-----------|
-| Management fee | `VaultMathLib.computeManagementFee` → called from `BaseVault._accrueFees` → called from `kStakingVault.settleBatch` | `totalAssets * elapsed * managementFee / (SECS_PER_YEAR * MAX_BPS)` | Treasury (minted as stkToken shares) |
+| Management fee | `VaultMathLib.computeManagementFee` → called from `kStakingVault.settleBatch` | `totalAssets * elapsed * managementFee / (SECS_PER_YEAR * MAX_BPS)` | Treasury (minted as stkToken shares) |
 | Performance fee (hard hurdle) | `VaultMathLib.computePerformanceFee` → called from `kStakingVault.settleBatch` | `excessAboveHurdle * performanceFee / MAX_BPS` | Treasury (minted as stkToken shares) |
 | Performance fee (soft hurdle) | Same path | `totalInterest * performanceFee / MAX_BPS` (if return > hurdle) | Treasury (minted as stkToken shares) |
 | Yield split — treasury | `kAssetRouter._executeSettlement` | `yieldForTreasury = yield * treasuryBps / MAX_BPS` | Treasury address from registry |
@@ -223,7 +223,7 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 4. **Fee parameters are bounded**: `managementFee ≤ MAX_BPS`, `performanceFee ≤ MAX_BPS`, enforced by `require(_fee <= MAX_BPS, VAULTFEES_FEE_EXCEEDS_MAXIMUM)` in `setManagementFee` and `setPerformanceFee`.
 5. **Hurdle rate is annualized**: `hurdleReturn = previousTotalAssets * hurdleRate * elapsed / (SECS_PER_YEAR * MAX_BPS)`.
 6. **Fee timestamp is advanced on every fee accrual**: `_setLastFeeTimestamp($, uint64(block.timestamp))` to prevent double-counting.
-7. **Fee parameter changes accrue pending fees first**: `setManagementFee` and `setPerformanceFee` call `_accrueFees()` + `_mintManagementFees()` before updating the rate. Implemented in commit `f020291`.
+7. **Fee parameter changes take effect at next settlement**: `setManagementFee` and `setPerformanceFee` update the rate directly without accruing pending fees. The new rate applies from the next settlement.
 
 ### Fee parameter storage
 
