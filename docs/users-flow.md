@@ -338,8 +338,9 @@
 │  └────────┬────────┘                                                │
 │           │                                                         │
 │           │ Fees collected via share dilution                        │
-│           │ (_accrueFees() runs only at settleBatch;                │
-│           │  shares minted by _mintManagementFees()                 │
+│           │ (computed only at settleBatch;                          │
+│           │  treasury shares minted via                             │
+│           │  VaultMathLib.computeFeeShares()                        │
 │           │  — no fee deduction needed in share price formula)      │
 │           ▼                                                         │
 │  ┌─────────────────────────────────┐                                │
@@ -355,7 +356,7 @@
 
 ## Fee Distribution
 
-Fees are collected via share dilution at settlement time only. During `settleBatch()`, `_accrueFees()` computes the management fee for the elapsed period and updates `lastFeeTimestamp`; `_mintManagementFees()` then mints the corresponding shares to the treasury. Performance fees are computed on net interest (`currentBalance − lastSettlementBalance − managementFeeAssets`) above the time-weighted hurdle threshold and minted to treasury in the same call.
+Fees are collected via share dilution at settlement time only. During `settleBatch()`, the management fee for the elapsed period is computed via `VaultMathLib.computeManagementFee` and `lastFeeTimestamp` is updated. Performance fees are computed on net interest (`currentBalance − lastSettlementBalance − managementFeeAssets`) above the time-weighted hurdle threshold. Both fee asset amounts are then converted to treasury shares in a single `VaultMathLib.computeFeeShares` call using a dilution-adjusted denominator (`totalAssets − totalFeeAssets`), so the treasury's post-mint share value equals the asset quote regardless of the size of the mint. Per-fee event amounts (`ManagementFeesAccrued`, `PerformanceFeesCharged`) are emitted as proportional splits of the single mint.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐

@@ -248,12 +248,12 @@ Interface for vault fee management including performance and management fees.
 
 **Fee Management**
 
-- `setManagementFee(uint16 fee)` - Sets management fee in basis points (ADMIN_ROLE required, max 10000 bp). Accrues pending fees before updating the rate.
-- `setPerformanceFee(uint16 fee)` - Sets performance fee in basis points (ADMIN_ROLE required, max 10000 bp). Accrues pending fees before updating the rate.
+- `setManagementFee(uint16 fee)` - Sets management fee in basis points (ADMIN_ROLE required, max 10000 bp). The new rate applies to the entire elapsed period at the next `settleBatch()` — fee setters do not accrue eagerly.
+- `setPerformanceFee(uint16 fee)` - Sets performance fee in basis points (ADMIN_ROLE required, max 10000 bp). The new rate applies to the entire elapsed period at the next `settleBatch()` — fee setters do not accrue eagerly.
 
 **Internal Fee Accrual**
 
-- `_accrueFees()` - Internal function that computes pending management fees based on time elapsed since `lastFeeTimestamp`, updates the timestamp, and returns the fee amount in assets. Called in `settleBatch()` and before fee-rate changes (`setManagementFee`, `setPerformanceFee`). Does not mint shares itself; the caller handles minting via `_mintManagementFees()`. Performance fees are computed separately in `settleBatch()` on net interest above the hurdle threshold.
+Fee accrual happens exclusively inside `settleBatch()` using the asset amounts the router froze in the proposal. Management fees come from `VaultMathLib.computeManagementFee` (time-prorated on `totalAssets`); performance fees come from `VaultMathLib.computePerformanceFee` (interest above the time-weighted hurdle, where interest is `currentBalance − lastSettlementBalance − managementFeeAssets`). Both asset amounts are then converted to treasury shares in a single `VaultMathLib.computeFeeShares` call using a dilution-adjusted denominator, so the treasury's post-mint share value equals the asset quote.
 
 ### IVaultReader
 

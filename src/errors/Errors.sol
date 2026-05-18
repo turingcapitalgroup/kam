@@ -223,3 +223,4 @@ string constant MULTIFACETPROXY_SELECTOR_ALREADY_SET = "MFP4";
 
 // VaultMathLib Errors
 string constant VAULTMATHLIB_ZERO_ELAPSED = "VML1";
+string constant VAULTMATHLIB_FEES_EXCEED_ASSETS = "VML2";
