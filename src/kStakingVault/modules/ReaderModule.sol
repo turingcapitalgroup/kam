@@ -231,42 +231,33 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         uint256 _totalSupply = totalSupply();
         if (_totalSupply == 0) return (0, 0, 0);
 
-        uint256 _elapsed = _endOfPeriod - _getLastFeeTimestamp($);
-
         // 1. Accrue management fees (virtual)
         _managementFees = VaultMathLib.computeManagementFee(
             _newTotalAssets, _getManagementFee($), _getLastFeeTimestamp($), _endOfPeriod
         );
 
-        // 2. Interest
-        uint256 _previousBalance = _getLastSettlementBalance();
-        int256 _interest = int256(_newTotalAssets) - int256(_previousBalance) - int256(_managementFees);
-
-        // 3. Compute all fee shares at the SAME pre-mint rate to avoid dilution
-        uint256 _mgmtFeeShares = 0;
-        uint256 _perfFeeShares = 0;
-        if (_managementFees > 0) {
-            _mgmtFeeShares = VaultMathLib.convertToShares(_managementFees, _newTotalAssets, _totalSupply);
-        }
-
-        if (_interest > 0) {
-            _performanceFees = VaultMathLib.computePerformanceFee(
-                uint256(_interest),
-                _previousBalance,
-                _getPerformanceFee($),
-                _getHurdleRate($),
-                _getIsHardHurdleRate($),
-                _elapsed
-            );
-            if (_performanceFees > 0) {
-                _perfFeeShares = VaultMathLib.convertToShares(_performanceFees, _newTotalAssets, _totalSupply);
+        // 2. Performance fees in asset terms (over post-management-fee interest)
+        {
+            uint256 _previousBalance = _getLastSettlementBalance();
+            int256 _interest = int256(_newTotalAssets) - int256(_previousBalance) - int256(_managementFees);
+            if (_interest > 0) {
+                _performanceFees = VaultMathLib.computePerformanceFee(
+                    uint256(_interest),
+                    _previousBalance,
+                    _getPerformanceFee($),
+                    _getHurdleRate($),
+                    _getIsHardHurdleRate($),
+                    _endOfPeriod - _getLastFeeTimestamp($)
+                );
             }
         }
 
-        // Calculate final total supply reflecting all newly minted fee shares
-        uint256 _batchTotalSupply = _totalSupply + _mgmtFeeShares + _perfFeeShares;
+        // 3. Mirror the dilution-adjusted mint that `settleBatch` will perform, so the proposal's
+        //    netted/requested numbers match the executed state. Both call sites route through
+        //    `VaultMathLib.computeFeeShares` to guarantee no drift between propose and execute.
+        uint256 _batchTotalSupply = _totalSupply
+            + VaultMathLib.computeFeeShares(_managementFees + _performanceFees, _newTotalAssets, _totalSupply);
 
-        // Calculate requested assets corresponding to the unstake requests
         if (_requestedShares != 0) {
             _requestedAssets = VaultMathLib.convertToAssets(_requestedShares, _newTotalAssets, _batchTotalSupply);
         }

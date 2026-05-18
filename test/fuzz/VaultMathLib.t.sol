@@ -4,7 +4,7 @@ pragma solidity 0.8.30;
 import { Test } from "forge-std/Test.sol";
 
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
-import { VAULTMATHLIB_ZERO_ELAPSED } from "kam/src/errors/Errors.sol";
+import { VAULTMATHLIB_FEES_EXCEED_ASSETS, VAULTMATHLIB_ZERO_ELAPSED } from "kam/src/errors/Errors.sol";
 import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 
@@ -592,6 +592,84 @@ contract VaultMathLibFuzzTest is Test {
         returns (uint256)
     {
         return (previousTotalAssets * hurdleRate).fullMulDiv(elapsed, SECS_PER_YEAR) / MAX_BPS;
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                          computeFeeShares
+    //////////////////////////////////////////////////////////////*/
+
+    function test_computeFeeShares_zeroFee_returnsZero(uint128 totalAssets, uint128 totalSupply) external pure {
+        assertEq(VaultMathLib.computeFeeShares(0, totalAssets, totalSupply), 0);
+    }
+
+    function test_computeFeeShares_zeroSupply_returnsZero(uint128 feeAssets, uint128 totalAssets) external pure {
+        assertEq(VaultMathLib.computeFeeShares(feeAssets, totalAssets, 0), 0);
+    }
+
+    function test_computeFeeShares_feesEqualTotalAssets_reverts(uint128 fees, uint128 supply) external {
+        uint256 feeAssets = bound(uint256(fees), 1, type(uint128).max);
+        uint256 totalSupply = bound(uint256(supply), 1, type(uint128).max);
+
+        vm.expectRevert(bytes(VAULTMATHLIB_FEES_EXCEED_ASSETS));
+        this.computeFeeSharesExternal(feeAssets, feeAssets, totalSupply);
+    }
+
+    function test_computeFeeShares_feesExceedTotalAssets_reverts(uint128 fees, uint128 supply) external {
+        uint256 feeAssets = bound(uint256(fees), 2, type(uint128).max);
+        uint256 totalAssets = bound(uint256(fees), 1, feeAssets - 1);
+        uint256 totalSupply = bound(uint256(supply), 1, type(uint128).max);
+
+        vm.expectRevert(bytes(VAULTMATHLIB_FEES_EXCEED_ASSETS));
+        this.computeFeeSharesExternal(feeAssets, totalAssets, totalSupply);
+    }
+
+    /// @notice With share price ≈ 1 (the operational regime for KAM USDC vaults at issuance), the
+    ///         post-mint treasury value never overshoots the fee quote and undercharges by at most
+    ///         1 wei. This is the precision claim of the dilution-adjusted formula: a single
+    ///         `convertToShares` rounding-down across the joint denominator.
+    /// @dev When share price deviates from 1 (yield accumulation over time), the cumulative
+    ///      round-trip rounding error scales with ⌈sharePrice⌉. That's a property of any
+    ///      virtual-offset ERC-4626 share math, not of this fix — the pre-fix formula had the same
+    ///      rounding regime plus a systemic ~`feeShares/totalSupply * feeAssets` undercharge from
+    ///      self-dilution.
+    function test_computeFeeShares_treasuryValueMatchesQuote_sharePriceOne(
+        uint128 feeAssetsRaw,
+        uint128 totalAssetsRaw
+    )
+        external
+        pure
+    {
+        uint256 totalAssets = bound(uint256(totalAssetsRaw), 1e6, type(uint96).max);
+        uint256 totalSupply = totalAssets;
+        uint256 feeAssets = bound(uint256(feeAssetsRaw), 1, totalAssets / 2);
+
+        uint256 feeShares = VaultMathLib.computeFeeShares(feeAssets, totalAssets, totalSupply);
+        uint256 postMintValue = VaultMathLib.convertToAssets(feeShares, totalAssets, totalSupply + feeShares);
+
+        assertLe(postMintValue, feeAssets);
+        assertLe(feeAssets - postMintValue, 1);
+    }
+
+    /// @notice Dust regime: very small fees on a high-share-price vault round to zero shares. This
+    ///         is inherent to virtual-offset ERC-4626 share math (the buggy pre-fix formula had the
+    ///         same dust behavior). Documented here so future readers don't mistake it for a fix
+    ///         regression.
+    function test_computeFeeShares_dustRegime_roundsToZero() external pure {
+        // Share price ~6e13 (far outside any realistic operating regime); 1 wei fee → 0 shares.
+        uint256 feeShares = VaultMathLib.computeFeeShares(1, 6e19, 1e6);
+        assertEq(feeShares, 0);
+    }
+
+    function computeFeeSharesExternal(
+        uint256 feeAssets,
+        uint256 totalAssets,
+        uint256 totalSupply
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return VaultMathLib.computeFeeShares(feeAssets, totalAssets, totalSupply);
     }
 
     function computeManagementFeeExternal(
