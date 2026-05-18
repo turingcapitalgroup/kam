@@ -242,14 +242,13 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         uint256 _previousBalance = _getLastSettlementBalance();
         int256 _interest = int256(_newTotalAssets) - int256(_previousBalance) - int256(_managementFees);
 
-        // 3. Management fee shares
+        // 3. Compute all fee shares at the SAME pre-mint rate to avoid dilution
         uint256 _mgmtFeeShares = 0;
+        uint256 _perfFeeShares = 0;
         if (_managementFees > 0) {
             _mgmtFeeShares = VaultMathLib.convertToShares(_managementFees, _newTotalAssets, _totalSupply);
         }
 
-        // 4. Performance fee shares
-        uint256 _perfFeeShares = 0;
         if (_interest > 0) {
             _performanceFees = VaultMathLib.computePerformanceFee(
                 uint256(_interest),
@@ -260,9 +259,7 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
                 _elapsed
             );
             if (_performanceFees > 0) {
-                // Performance fee shares dilute existing supply + management fee shares
-                _perfFeeShares =
-                    VaultMathLib.convertToShares(_performanceFees, _newTotalAssets, _totalSupply + _mgmtFeeShares);
+                _perfFeeShares = VaultMathLib.convertToShares(_performanceFees, _newTotalAssets, _totalSupply);
             }
         }
 

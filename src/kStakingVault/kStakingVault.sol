@@ -18,6 +18,7 @@ import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces/IVault.sol";
 
 import {
+    BASEVAULT_INVALID_TREASURY,
     KSTAKINGVAULT_BALANCE_AUDIT_FAILED,
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
     KSTAKINGVAULT_BATCH_NOT_VALID,
@@ -367,21 +368,37 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         require(_proposedAt >= _getLastFeeTimestamp($), VAULTFEES_INVALID_TIMESTAMP);
         _setLastFeeTimestamp($, _proposedAt);
 
-        // 1. Mint management fee shares
-        if (_managementFees > 0) {
-            _mintManagementFees(_managementFees);
-        }
+        // 1. Compute and mint all fee shares BEFORE anything else to avoid dilution.
+        //    Both conversions use the same pre-mint totalAssets/totalSupply so that
+        //    the management-fee mint does not inflate the denominator for the
+        //    performance-fee conversion (and vice-versa).
+        {
+            uint256 _preFeeAssets = _totalAssets();
+            uint256 _preFeeSupply = totalSupply();
 
-        // 2. Mint performance fee shares
-        if (_performanceFees > 0) {
-            uint256 _performanceFeeShares = _convertToSharesWithTotals(_performanceFees, _totalAssets(), totalSupply());
-            if (_performanceFeeShares > 0) {
-                _mint(_registry().getTreasury(), _performanceFeeShares);
-                emit PerformanceFeesCharged(_performanceFeeShares);
+            if (_preFeeSupply > 0) {
+                address _treasury = _registry().getTreasury();
+                require(_treasury != address(0), BASEVAULT_INVALID_TREASURY);
+
+                if (_managementFees > 0) {
+                    uint256 _shares = _convertToSharesWithTotals(_managementFees, _preFeeAssets, _preFeeSupply);
+                    if (_shares > 0) {
+                        _mint(_treasury, _shares);
+                        emit ManagementFeesAccrued(_shares);
+                    }
+                }
+
+                if (_performanceFees > 0) {
+                    uint256 _shares = _convertToSharesWithTotals(_performanceFees, _preFeeAssets, _preFeeSupply);
+                    if (_shares > 0) {
+                        _mint(_treasury, _shares);
+                        emit PerformanceFeesCharged(_shares);
+                    }
+                }
             }
         }
 
-        // 3. Cache total assets and supply after fee accrual for share calculations
+        // 2. Cache total assets and supply after fee accrual for share calculations
         uint256 _batchTotalAssets = _totalAssets();
         uint256 _batchTotalSupply = totalSupply();
 

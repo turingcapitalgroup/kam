@@ -459,9 +459,8 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         uint256 expectedManagementFeeShares =
             vault.convertToSharesWithTotals(proposal.managementFees, newTotalAssets, supplyBefore);
-        uint256 expectedPerformanceFeeShares = vault.convertToSharesWithTotals(
-            proposal.performanceFees, newTotalAssets, supplyBefore + expectedManagementFeeShares
-        );
+        uint256 expectedPerformanceFeeShares =
+            vault.convertToSharesWithTotals(proposal.performanceFees, newTotalAssets, supplyBefore);
 
         vm.warp(block.timestamp + 365 days);
         _acceptAndExecuteSettlement(proposalId);
@@ -471,6 +470,46 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
             expectedManagementFeeShares + expectedPerformanceFeeShares
         );
         assertEq(vault.lastFeeTimestamp(), proposal.proposedAt);
+    }
+
+    /// @dev Verifies that fee shares minted to the treasury represent the expected asset value
+    ///      at the pre-mint conversion rate. This ensures management and performance fee shares
+    ///      don't dilute each other through sequential minting.
+    function test_FeeSharesValueMatchesExpectedAssets() public {
+        _setupTestFees();
+
+        // 1. Alice deposits 1M
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        // 2. Close batch and advance time to accrue fees + yield
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        uint256 yield = 200_000 * _1_USDC; // 20% yield
+        uint256 newTotalAssets = vault.totalAssets() + yield;
+
+        // 3. Quote to get the exact fee amounts the router will pass to settleBatch
+        vm.warp(block.timestamp + 30 days);
+        (, uint256 _managementFees, uint256 _performanceFees) =
+            vault.quoteBatchSettlement(batchId, newTotalAssets, uint64(block.timestamp));
+
+        // 4. Compute expected fee shares at the pre-mint rate (what the fix guarantees).
+        //    The router applies yield before settleBatch, so totalAssets includes yield.
+        uint256 supplyBefore = vault.totalSupply();
+        uint256 expectedMgmtShares = vault.convertToSharesWithTotals(_managementFees, newTotalAssets, supplyBefore);
+        uint256 expectedPerfShares = vault.convertToSharesWithTotals(_performanceFees, newTotalAssets, supplyBefore);
+
+        // 5. Settle through the router (the real path)
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, newTotalAssets);
+
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
+        _acceptAndExecuteSettlement(proposalId);
+
+        // 6. Treasury should have received exactly the expected shares (no dilution between fee types)
+        uint256 treasurySharesMinted = vault.balanceOf(users.treasury) - treasurySharesBefore;
+        assertEq(treasurySharesMinted, expectedMgmtShares + expectedPerfShares, "Fee shares diluted");
     }
 
     function test_ZeroDeposit_ShouldRevert() public {
