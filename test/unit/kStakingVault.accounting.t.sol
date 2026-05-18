@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
-import { console2 } from "forge-std/Test.sol";
 
 import { BaseVaultTest, DeploymentBaseTest } from "../utils/BaseVaultTest.sol";
 import { _1_USDC } from "../utils/Constants.sol";
@@ -564,11 +563,6 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         uint256 quotedFeeAssets = proposal.managementFees + proposal.performanceFees;
         assertGt(quotedFeeAssets, 0);
 
-        console2.log("new total assets", newTotalAssets);
-        console2.log("management fee assets", proposal.managementFees);
-        console2.log("performance fee assets", proposal.performanceFees);
-        console2.log("quoted fee assets total", quotedFeeAssets);
-
         uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
 
         _acceptAndExecuteSettlement(proposalId);
@@ -577,12 +571,6 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         uint256 actualTreasuryFeeValue =
             vault.convertToAssetsWithTotals(feeSharesMinted, vault.totalAssets(), vault.totalSupply());
         uint256 undercharge = quotedFeeAssets - actualTreasuryFeeValue;
-
-        console2.log("fee shares minted", feeSharesMinted);
-        console2.log("final total assets", vault.totalAssets());
-        console2.log("final total supply", vault.totalSupply());
-        console2.log("actual treasury fee value", actualTreasuryFeeValue);
-        console2.log("undercharge", undercharge);
 
         assertLe(undercharge, 1);
     }

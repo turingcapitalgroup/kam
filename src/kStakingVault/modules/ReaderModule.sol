@@ -255,8 +255,8 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         // 3. Mirror the dilution-adjusted mint that `settleBatch` will perform, so the proposal's
         //    netted/requested numbers match the executed state. Both call sites route through
         //    `VaultMathLib.computeFeeShares` to guarantee no drift between propose and execute.
-        uint256 _batchTotalSupply =
-            _totalSupply + VaultMathLib.computeFeeShares(_managementFees + _performanceFees, _newTotalAssets, _totalSupply);
+        uint256 _batchTotalSupply = _totalSupply
+            + VaultMathLib.computeFeeShares(_managementFees + _performanceFees, _newTotalAssets, _totalSupply);
 
         if (_requestedShares != 0) {
             _requestedAssets = VaultMathLib.convertToAssets(_requestedShares, _newTotalAssets, _batchTotalSupply);
