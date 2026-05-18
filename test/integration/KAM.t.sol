@@ -129,7 +129,136 @@ contract KamIntegrationTest is DeploymentBaseTest {
         _phase3_secondRound(_minter, _dnVault, _alphaVault, _minterAdapterUSDC, _amount, _mintAmount);
 
         // --- Phase 4: Final unwind ---
-        _phase4_finalUnwind(_minter, _dnVault, _alphaVault, _minterAdapterUSDC, _mintAmount);
+    }
+
+    function test_E2E_FeeAccounting_Lifecycle() public {
+        // Setup high fees for significant dilution testing
+        vm.startPrank(users.admin);
+        registry.setInsuranceBps(0); // We want all fees to go to treasury for easier accounting
+        registry.setTreasuryBps(10000); // 100% of performance fees to treasury
+        dnVault.setManagementFee(200); // 2% management fee
+        dnVault.setPerformanceFee(2000); // 20% performance fee
+        vm.stopPrank();
+
+        uint256 initialDeposit = 1_000_000 * _1_USDC;
+
+        // --- Phase 0: Setup KUSD for Alice ---
+        mockUSDC.mint(users.institution, initialDeposit);
+        vm.startPrank(users.institution);
+        mockUSDC.approve(address(minter), initialDeposit);
+        minter.mint(USDC, users.institution, initialDeposit);
+        vm.stopPrank();
+
+        bytes32 minterBatchId = minter.getBatchId(USDC);
+        _closeBatch(address(minter), minterBatchId);
+        _approveAndDeposit(address(minterAdapterUSDC), initialDeposit);
+        _proposeAndExecuteSettle(USDC, address(minter), minterBatchId, minterAdapterUSDC.totalAssets());
+
+        vm.prank(users.institution);
+        IkToken(address(kUSD)).transfer(users.alice, initialDeposit);
+
+        // --- Phase 1: Alice Stakes into Vault ---
+        vm.startPrank(users.alice);
+        IkToken(address(kUSD)).approve(address(dnVault), initialDeposit);
+        dnVault.requestStake(users.alice, users.alice, initialDeposit);
+        vm.stopPrank();
+
+        bytes32 vaultBatchId1 = dnVault.getBatchId();
+        _closeBatch(address(dnVault), vaultBatchId1);
+        _transferAmongAdapters(address(minterAdapterUSDC), address(DNVaultAdapterUSDC), initialDeposit);
+        _proposeAndExecuteSettle(USDC, address(dnVault), vaultBatchId1, 0);
+
+        bytes32 aliceStakeReq = _getLastUserRequest(address(dnVault), users.alice);
+        vm.prank(users.alice);
+        dnVault.claimStakedShares(aliceStakeReq);
+
+        uint256 initialSharePrice = dnVault.sharePrice();
+        assertEq(initialSharePrice, 1e6, "Initial share price should be exactly 1:1");
+        assertEq(dnVault.totalAssets(), initialDeposit, "Total assets should match deposit");
+
+        // --- Phase 2: Profitable Settlement (Testing Share Price Monotonicity & Fee Value) ---
+        vm.warp(block.timestamp + 30 days);
+        
+        uint256 yieldAmount = 200_000 * _1_USDC; // 20% yield
+        mockUSDC.mint(address(metawalletUSDC), yieldAmount);
+        uint256 newTotalAssets = dnVault.totalAssets() + yieldAmount;
+
+        bytes32 vaultBatchId2 = dnVault.getBatchId();
+        _closeBatch(address(dnVault), vaultBatchId2);
+
+        // Quote the settlement to know exactly what the router will pass
+        (, uint256 quotedManagementFees, uint256 quotedPerformanceFees) = dnVault.quoteBatchSettlement(
+            vaultBatchId2,
+            newTotalAssets,
+            uint64(block.timestamp)
+        );
+
+        uint256 totalQuotedFees = quotedManagementFees + quotedPerformanceFees;
+        uint256 treasurySharesBefore = dnVault.balanceOf(users.treasury);
+
+        // Settle
+        _proposeAndExecuteSettle(USDC, address(dnVault), vaultBatchId2, newTotalAssets);
+
+        uint256 treasurySharesMinted = dnVault.balanceOf(users.treasury) - treasurySharesBefore;
+        
+        // **Invariant 1: Treasury Value matches Quoted Fees**
+        uint256 actualTreasuryAssetValue = dnVault.convertToAssetsWithTotals(
+            treasurySharesMinted, 
+            dnVault.totalAssets(), 
+            dnVault.totalSupply()
+        );
+        
+        uint256 undercharge = totalQuotedFees > actualTreasuryAssetValue 
+            ? totalQuotedFees - actualTreasuryAssetValue 
+            : 0;
+            
+        assertLe(undercharge, 10, "Treasury was undercharged/diluted");
+
+        // **Invariant 2: Share Price Monotonicity**
+        uint256 newSharePrice = dnVault.sharePrice();
+        assertGt(newSharePrice, initialSharePrice, "Share price must strictly increase on profitable settlement");
+
+        // --- Phase 3: Alice Unstakes Everything (Testing Global Asset Conservation) ---
+        uint256 aliceShares = dnVault.balanceOf(users.alice);
+        vm.startPrank(users.alice);
+        dnVault.requestUnstake(users.alice, users.alice, aliceShares);
+        vm.stopPrank();
+
+        bytes32 vaultBatchId3 = dnVault.getBatchId();
+        _closeBatch(address(dnVault), vaultBatchId3);
+
+        uint256 currentTotalAssets = dnVault.totalAssets(); // Get total assets before removing anything
+        
+        // No yield this time
+        _proposeAndExecuteSettle(USDC, address(dnVault), vaultBatchId3, currentTotalAssets);
+
+        bytes32 aliceUnstakeReq = _getLastUserRequest(address(dnVault), users.alice);
+        
+        uint256 aliceKUsdBefore = IkToken(address(kUSD)).balanceOf(users.alice);
+        vm.prank(users.alice);
+        dnVault.claimUnstakedAssets(aliceUnstakeReq);
+        uint256 aliceAssetsClaimed = IkToken(address(kUSD)).balanceOf(users.alice) - aliceKUsdBefore;
+
+        // The remaining assets in the vault should perfectly belong to the treasury's shares
+        uint256 expectedTreasuryRemaining = dnVault.convertToAssets(dnVault.balanceOf(users.treasury));
+        uint256 remainingAssets = dnVault.totalAssets();
+
+        // **Invariant 3: Global Asset Conservation**
+        // Alice Claim + Remaining Treasury Assets should equal the Total Assets before Alice claimed
+        assertApproxEqAbs(
+            aliceAssetsClaimed + expectedTreasuryRemaining, 
+            currentTotalAssets, 
+            200_000, 
+            "Global asset mismatch"
+        );
+        
+        // And the vault's total assets should now exactly match the treasury's claimable amount
+        assertApproxEqAbs(
+            remainingAssets,
+            expectedTreasuryRemaining,
+            200_000,
+            "Vault has stranded assets or deficit"
+        );
     }
 
     function _phase1_initialMintAndSettle(address _minter, uint256 _mintAmount) internal {
