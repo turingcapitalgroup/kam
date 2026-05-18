@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 /// @title BaseVaultTypes
 /// @notice Library containing all data structures used in the ModuleBase

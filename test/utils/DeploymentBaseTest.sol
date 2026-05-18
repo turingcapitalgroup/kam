@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { BaseTest } from "./BaseTest.sol";
 import { _1_USDC, _1_WBTC } from "./Constants.sol";
