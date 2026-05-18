@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
-import { VAULTMATHLIB_ZERO_ELAPSED } from "kam/src/errors/Errors.sol";
+import { VAULTMATHLIB_FEES_EXCEED_ASSETS, VAULTMATHLIB_ZERO_ELAPSED } from "kam/src/errors/Errors.sol";
 import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 
 /// @title VaultMathLib
@@ -43,7 +43,8 @@ library VaultMathLib {
     uint256 constant VIRTUAL_ASSETS = 1e6;
 
     /// @notice Computes the management fee in asset terms based on time elapsed
-    /// @dev Time-prorated annual fee on total assets. Called by _accrueFees at settlement.
+    /// @dev Time-prorated annual fee on total assets. Called inside `settleBatch` / `quoteBatchSettlement`
+    ///      at settlement; not accrued eagerly by fee-rate setters.
     /// @param _totalAssets Current total assets in the vault
     /// @param _managementFee Annual management fee in basis points
     /// @param _lastFeeTimestamp Timestamp of last fee accrual
@@ -145,5 +146,38 @@ library VaultMathLib {
         returns (uint256)
     {
         return _assets.fullMulDiv(_totalSupply + VIRTUAL_SHARES, _totalAssets + VIRTUAL_ASSETS);
+    }
+
+    /// @notice Treasury fee shares to mint for a combined management + performance fee.
+    /// @dev Single source of truth for fee → share conversion at settlement. Both the on-chain mint
+    ///      (`kStakingVault.settleBatch`) and the off-chain quote (`ReaderModule.quoteBatchSettlement`)
+    ///      must route through this function so the proposal numbers and the executed mint can't drift.
+    ///
+    ///      Pricing the fee against `_totalAssets - _totalFeeAssets` (plus the virtual offset added by
+    ///      `convertToShares`) cancels the self-dilution introduced by minting the new shares: the
+    ///      treasury's post-mint share value then equals `_totalFeeAssets` (modulo virtual-offset
+    ///      rounding — a single floor on a single `convertToShares` call, ≤ 1 wei when share price
+    ///      is ~1 and bounded by `ceil(sharePrice)` otherwise).
+    ///
+    ///      Returns 0 when there are no fees to mint or no existing supply to dilute. Reverts when the
+    ///      combined fee would consume the entire pre-fee asset base — that can only happen with
+    ///      misconfigured fee rates or extreme settlement periods and must fail loud rather than
+    ///      silently mint zero shares and let unstakers absorb the asset chunk meant for the treasury.
+    /// @param _totalFeeAssets Combined management + performance fee in asset terms
+    /// @param _totalAssets Vault total assets snapshot used for settlement
+    /// @param _totalSupply Pre-mint share supply
+    /// @return Treasury fee share amount to mint
+    function computeFeeShares(
+        uint256 _totalFeeAssets,
+        uint256 _totalAssets,
+        uint256 _totalSupply
+    )
+        internal
+        pure
+        returns (uint256)
+    {
+        if (_totalFeeAssets == 0 || _totalSupply == 0) return 0;
+        require(_totalAssets > _totalFeeAssets, VAULTMATHLIB_FEES_EXCEED_ASSETS);
+        return convertToShares(_totalFeeAssets, _totalAssets - _totalFeeAssets, _totalSupply);
     }
 }

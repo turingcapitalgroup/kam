@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import { Ownable } from "solady/auth/Ownable.sol";
 
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
+import { OptimizedFixedPointMathLib } from "solady/utils/OptimizedFixedPointMathLib.sol";
 
 import { OptimizedEfficientHashLib } from "solady/utils/OptimizedEfficientHashLib.sol";
 import { OptimizedSafeCastLib } from "solady/utils/OptimizedSafeCastLib.sol";
@@ -18,6 +19,7 @@ import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { IVault, IVaultBatch, IVaultClaim, IVaultFees } from "kam/src/interfaces/IVault.sol";
 
 import {
+    BASEVAULT_INVALID_TREASURY,
     KSTAKINGVAULT_BALANCE_AUDIT_FAILED,
     KSTAKINGVAULT_BATCH_LIMIT_REACHED,
     KSTAKINGVAULT_BATCH_NOT_VALID,
@@ -43,6 +45,7 @@ import { MultiFacetProxy } from "kam/src/base/MultiFacetProxy.sol";
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
+import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
 /// @title kStakingVault
 /// @notice Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
@@ -367,33 +370,27 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         require(_proposedAt >= _getLastFeeTimestamp($), VAULTFEES_INVALID_TIMESTAMP);
         _setLastFeeTimestamp($, _proposedAt);
 
-        // 1. Mint fee shares to the treasury
+        // 1. Mint treasury fee shares using a dilution-adjusted denominator so the treasury's
+        //    post-mint share value equals the asset-denominated fee quote. The same math also runs
+        //    inside `quoteBatchSettlement`, so both call sites share `VaultMathLib.computeFeeShares`
+        //    to make drift between the proposed and executed numbers impossible.
         uint256 _totalFeeAssets = _managementFees + _performanceFees;
-        if (_totalFeeAssets > 0) {
-            uint256 _currentTotalAssets = _totalAssets();
-            uint256 _currentTotalSupply = totalSupply();
-            uint256 _assetDenominator =
-                _currentTotalAssets > _totalFeeAssets ? _currentTotalAssets - _totalFeeAssets : 0;
+        uint256 _totalFeeShares = VaultMathLib.computeFeeShares(_totalFeeAssets, _totalAssets(), totalSupply());
+        if (_totalFeeShares > 0) {
+            address _treasury = _registry().getTreasury();
+            require(_treasury != address(0), BASEVAULT_INVALID_TREASURY);
+            _mint(_treasury, _totalFeeShares);
 
-            if (_assetDenominator > 0 && _currentTotalSupply > 0) {
-                uint256 _totalFeeShares =
-                    _convertToSharesWithTotals(_totalFeeAssets, _assetDenominator, _currentTotalSupply);
+            // Split the single mint into per-fee event amounts proportional to the asset quote.
+            // Algebraically identical to converting each fee independently; differs by at most 1 wei
+            // from the standalone conversion thanks to integer division.
+            uint256 _managementFeeShares = _managementFees == 0
+                ? 0
+                : OptimizedFixedPointMathLib.fullMulDiv(_totalFeeShares, _managementFees, _totalFeeAssets);
+            uint256 _performanceFeeShares = _totalFeeShares - _managementFeeShares;
 
-                if (_totalFeeShares > 0) {
-                    _mint(_registry().getTreasury(), _totalFeeShares);
-
-                    uint256 _mgmtShares =
-                        _managementFees == 0 ? 0 : (_totalFeeShares * _managementFees) / _totalFeeAssets;
-                    uint256 _perfShares = _totalFeeShares - _mgmtShares;
-
-                    if (_mgmtShares > 0) {
-                        emit ManagementFeesAccrued(_mgmtShares);
-                    }
-                    if (_perfShares > 0) {
-                        emit PerformanceFeesCharged(_perfShares);
-                    }
-                }
-            }
+            if (_managementFeeShares > 0) emit ManagementFeesAccrued(_managementFeeShares);
+            if (_performanceFeeShares > 0) emit PerformanceFeesCharged(_performanceFeeShares);
         }
 
         // 3. Cache total assets and supply after fee accrual for share calculations

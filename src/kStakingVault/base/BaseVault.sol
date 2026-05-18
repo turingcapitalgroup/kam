@@ -18,7 +18,6 @@ import {
     BASEVAULT_ALREADY_INITIALIZED,
     BASEVAULT_CONTRACT_NOT_FOUND,
     BASEVAULT_INVALID_REGISTRY,
-    BASEVAULT_INVALID_TREASURY,
     BASEVAULT_NOT_INITIALIZED
 } from "kam/src/errors/Errors.sol";
 
@@ -174,8 +173,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     }
 
     function _setInitialized(BaseVaultStorage storage $, bool _value) internal {
-        $.config =
-            ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT)) | (uint256(_value ? 1 : 0) << INITIALIZED_SHIFT);
+        $.config = ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT))
+            | (uint256(_value ? 1 : 0) << INITIALIZED_SHIFT);
     }
 
     /// @dev Returns true if the vault is paused either locally (via packed config) or globally (via registry).
