@@ -174,8 +174,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     }
 
     function _setInitialized(BaseVaultStorage storage $, bool _value) internal {
-        $.config =
-            ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT)) | (uint256(_value ? 1 : 0) << INITIALIZED_SHIFT);
+        $.config = ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT))
+            | (uint256(_value ? 1 : 0) << INITIALIZED_SHIFT);
     }
 
     /// @dev Returns true if the vault is paused either locally (via packed config) or globally (via registry).
@@ -390,23 +390,6 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     function _decreaseBalance(uint128 _amount) internal {
         _getBaseVaultStorage().totalBalance -= _amount;
         emit BalanceDecreased(_amount);
-    }
-
-    /// @notice Mints management fee shares to the treasury
-    /// @dev Called by settlement and fee config setters to mint accrued management fees
-    /// @param _managementFeeAssets Management fee amount in asset terms
-    function _mintManagementFees(uint256 _managementFeeAssets) internal {
-        if (_managementFeeAssets == 0) return;
-        uint256 _totalSupply = totalSupply();
-        if (_totalSupply == 0) return;
-
-        address treasury = _registry().getTreasury();
-        require(treasury != address(0), BASEVAULT_INVALID_TREASURY);
-        uint256 managementFeeShares = _convertToSharesWithTotals(_managementFeeAssets, _totalAssets(), _totalSupply);
-        if (managementFeeShares > 0) {
-            _mint(treasury, managementFeeShares);
-            emit ManagementFeesAccrued(managementFeeShares);
-        }
     }
 
     /// @notice Returns the last settlement balance for interest calculation

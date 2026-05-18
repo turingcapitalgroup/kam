@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.30;
+import { console2 } from "forge-std/Test.sol";
 
 import { BaseVaultTest, DeploymentBaseTest } from "../utils/BaseVaultTest.sol";
 import { _1_USDC } from "../utils/Constants.sol";
@@ -457,19 +458,19 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         uint256 supplyBefore = vault.totalSupply();
         uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
 
-        uint256 expectedManagementFeeShares =
-            vault.convertToSharesWithTotals(proposal.managementFees, newTotalAssets, supplyBefore);
-        uint256 expectedPerformanceFeeShares = vault.convertToSharesWithTotals(
-            proposal.performanceFees, newTotalAssets, supplyBefore + expectedManagementFeeShares
-        );
+        uint256 expectedTotalFeeShares = 0;
+        uint256 totalFees = proposal.managementFees + proposal.performanceFees;
+        if (totalFees > 0) {
+            uint256 assetDenominator = newTotalAssets > totalFees ? newTotalAssets - totalFees : 0;
+            if (assetDenominator > 0 && supplyBefore > 0) {
+                expectedTotalFeeShares = vault.convertToSharesWithTotals(totalFees, assetDenominator, supplyBefore);
+            }
+        }
 
         vm.warp(block.timestamp + 365 days);
         _acceptAndExecuteSettlement(proposalId);
 
-        assertEq(
-            vault.balanceOf(users.treasury) - treasurySharesBefore,
-            expectedManagementFeeShares + expectedPerformanceFeeShares
-        );
+        assertEq(vault.balanceOf(users.treasury) - treasurySharesBefore, expectedTotalFeeShares);
         assertEq(vault.lastFeeTimestamp(), proposal.proposedAt);
     }
 
@@ -541,4 +542,49 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         vm.expectRevert(bytes(KSTAKINGVAULT_ZERO_ADDRESS));
         kStakingVault(payable(vaultAddr)).upgradeToAndCall(address(0), "");
     }
+
+    function test_FeeShareMinting_UnderchargesAssetDenominatedFees() public {
+        _setupTestFees();
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        vm.prank(users.alice);
+        vault.requestUnstake(users.alice, users.alice, 500_000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        vm.warp(block.timestamp + 30 days);
+
+        uint256 newTotalAssets = vault.totalAssets() + 200_000 * _1_USDC;
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, newTotalAssets);
+
+        IkAssetRouter.VaultSettlementProposal memory proposal = assetRouter.getSettlementProposal(proposalId);
+        uint256 quotedFeeAssets = proposal.managementFees + proposal.performanceFees;
+        assertGt(quotedFeeAssets, 0);
+
+        console2.log("new total assets", newTotalAssets);
+        console2.log("management fee assets", proposal.managementFees);
+        console2.log("performance fee assets", proposal.performanceFees);
+        console2.log("quoted fee assets total", quotedFeeAssets);
+
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
+
+        _acceptAndExecuteSettlement(proposalId);
+
+        uint256 feeSharesMinted = vault.balanceOf(users.treasury) - treasurySharesBefore;
+        uint256 actualTreasuryFeeValue =
+            vault.convertToAssetsWithTotals(feeSharesMinted, vault.totalAssets(), vault.totalSupply());
+        uint256 undercharge = quotedFeeAssets - actualTreasuryFeeValue;
+
+        console2.log("fee shares minted", feeSharesMinted);
+        console2.log("final total assets", vault.totalAssets());
+        console2.log("final total supply", vault.totalSupply());
+        console2.log("actual treasury fee value", actualTreasuryFeeValue);
+        console2.log("undercharge", undercharge);
+
+        assertLe(undercharge, 1);
+    }
 }
+

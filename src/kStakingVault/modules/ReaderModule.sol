@@ -242,14 +242,6 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         uint256 _previousBalance = _getLastSettlementBalance();
         int256 _interest = int256(_newTotalAssets) - int256(_previousBalance) - int256(_managementFees);
 
-        // 3. Management fee shares
-        uint256 _mgmtFeeShares = 0;
-        if (_managementFees > 0) {
-            _mgmtFeeShares = VaultMathLib.convertToShares(_managementFees, _newTotalAssets, _totalSupply);
-        }
-
-        // 4. Performance fee shares
-        uint256 _perfFeeShares = 0;
         if (_interest > 0) {
             _performanceFees = VaultMathLib.computePerformanceFee(
                 uint256(_interest),
@@ -259,15 +251,20 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
                 _getIsHardHurdleRate($),
                 _elapsed
             );
-            if (_performanceFees > 0) {
-                // Performance fee shares dilute existing supply + management fee shares
-                _perfFeeShares =
-                    VaultMathLib.convertToShares(_performanceFees, _newTotalAssets, _totalSupply + _mgmtFeeShares);
+        }
+
+        uint256 _totalFeeShares = 0;
+        uint256 _totalFeeAssets = _managementFees + _performanceFees;
+        if (_totalFeeAssets > 0) {
+            uint256 _assetDenominator = _newTotalAssets > _totalFeeAssets ? _newTotalAssets - _totalFeeAssets : 0;
+
+            if (_assetDenominator > 0 && _totalSupply > 0) {
+                _totalFeeShares = VaultMathLib.convertToShares(_totalFeeAssets, _assetDenominator, _totalSupply);
             }
         }
 
         // Calculate final total supply reflecting all newly minted fee shares
-        uint256 _batchTotalSupply = _totalSupply + _mgmtFeeShares + _perfFeeShares;
+        uint256 _batchTotalSupply = _totalSupply + _totalFeeShares;
 
         // Calculate requested assets corresponding to the unstake requests
         if (_requestedShares != 0) {

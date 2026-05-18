@@ -367,17 +367,32 @@ contract kStakingVault is IVault, ISettleBatch, BaseVault, Initializable, UUPSUp
         require(_proposedAt >= _getLastFeeTimestamp($), VAULTFEES_INVALID_TIMESTAMP);
         _setLastFeeTimestamp($, _proposedAt);
 
-        // 1. Mint management fee shares
-        if (_managementFees > 0) {
-            _mintManagementFees(_managementFees);
-        }
+        // 1. Mint fee shares to the treasury
+        uint256 _totalFeeAssets = _managementFees + _performanceFees;
+        if (_totalFeeAssets > 0) {
+            uint256 _currentTotalAssets = _totalAssets();
+            uint256 _currentTotalSupply = totalSupply();
+            uint256 _assetDenominator =
+                _currentTotalAssets > _totalFeeAssets ? _currentTotalAssets - _totalFeeAssets : 0;
 
-        // 2. Mint performance fee shares
-        if (_performanceFees > 0) {
-            uint256 _performanceFeeShares = _convertToSharesWithTotals(_performanceFees, _totalAssets(), totalSupply());
-            if (_performanceFeeShares > 0) {
-                _mint(_registry().getTreasury(), _performanceFeeShares);
-                emit PerformanceFeesCharged(_performanceFeeShares);
+            if (_assetDenominator > 0 && _currentTotalSupply > 0) {
+                uint256 _totalFeeShares =
+                    _convertToSharesWithTotals(_totalFeeAssets, _assetDenominator, _currentTotalSupply);
+
+                if (_totalFeeShares > 0) {
+                    _mint(_registry().getTreasury(), _totalFeeShares);
+
+                    uint256 _mgmtShares =
+                        _managementFees == 0 ? 0 : (_totalFeeShares * _managementFees) / _totalFeeAssets;
+                    uint256 _perfShares = _totalFeeShares - _mgmtShares;
+
+                    if (_mgmtShares > 0) {
+                        emit ManagementFeesAccrued(_mgmtShares);
+                    }
+                    if (_perfShares > 0) {
+                        emit PerformanceFeesCharged(_perfShares);
+                    }
+                }
             }
         }
 
