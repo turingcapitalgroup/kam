@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 /// @title MinimalProxyFactory
 /// @notice Factory for deploying minimal ERC1967 proxies without admin or upgrade logic.

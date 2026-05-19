@@ -3,7 +3,7 @@ src = "src"
 out = "out"
 libs = ["dependencies"]
 gas_reports = ['*']
-solc_version = "0.8.30"
+solc_version = "0.8.34"
 optimizer = true
 optimizer_runs = 2995
 ffi = true
@@ -72,9 +72,9 @@ ignore = [
 
 [dependencies]
 forge-std = "1.9.7"
-minimal-smart-account = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-smart-account.git" }
-kToken0 = { version = "1.0", git = "https://github.com/turingcapitalgroup/kToken0.git" }
-minimal-uups-factory = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-uups-factory" }
+minimal-smart-account = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-smart-account.git", rev = "0fd060740a7d929b56cff6f73350a19179612ac4" }
+kToken0 = { version = "1.0", git = "https://github.com/turingcapitalgroup/kToken0.git", rev = "0fd060740a7d929b56cff6f73350a19179612ac4" }
+minimal-uups-factory = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-uups-factory", rev = "568d85a0921f5b0bc7c410d99363cebdd0cd2ee5" }
 
 [soldeer]
 # whether soldeer manages remappings

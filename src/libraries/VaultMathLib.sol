@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { MAX_BPS } from "kam/src/constants/Constants.sol";
 import { VAULTMATHLIB_FEES_EXCEED_ASSETS, VAULTMATHLIB_ZERO_ELAPSED } from "kam/src/errors/Errors.sol";

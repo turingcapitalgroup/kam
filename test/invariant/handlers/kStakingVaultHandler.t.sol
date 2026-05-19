@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { AddressSet, LibAddressSet } from "../helpers/AddressSet.sol";
 import { Bytes32Set, LibBytes32Set } from "../helpers/Bytes32Set.sol";

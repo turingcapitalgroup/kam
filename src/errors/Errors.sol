@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 /// @dev KAM Protocol Error Codes - Centralized error code constants for the KAM protocol.
 /// All error codes use contract-specific prefixes for easier debugging:
