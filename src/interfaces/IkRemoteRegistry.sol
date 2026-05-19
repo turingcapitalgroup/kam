@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: UNLICENSED
-<<<<<<< HEAD
 pragma solidity ^0.8.4;
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
