@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedAddressEnumerableSetLib.sol";
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
@@ -38,8 +38,8 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         mapping(address => mapping(address => mapping(bytes4 => address))) executionValidator;
         /// @dev Tracks all allowed targets for each executor
         mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) executorTargets;
-        /// @dev Maps the type of each target
-        mapping(address => uint8 targetType) targetType;
+        /// @dev Maps the type of each target (METAWALLET / CUSTODIAL / ASSET / ...)
+        mapping(address => IExecutionGuardian.TargetType targetType) targetType;
         /// @dev Counts allowed selectors per executor-target pair for accurate target tracking
         mapping(address => mapping(address => uint256)) executorTargetSelectorCount;
         /// @dev Tracks all allowed selectors for each executor-target pair
@@ -48,7 +48,7 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.ExecutionGuardianModule")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant EXECUTIONGUARDIANMODULE_STORAGE_LOCATION =
-        0xd14aec45f1b64da194d5b24d6a4dfb8fd6ac8faca4e3d35f6c5e6d5e6f748f00;
+        0x1cf339485c663c819058b30a6fe2837d9e6929a0f830fe23d7a50344bd0f3a00;
 
     /// @notice Retrieves the ExecutionGuardianModule storage struct from its designated storage slot
     /// @dev Uses ERC-7201 namespaced storage pattern to access the storage struct at a deterministic location.
@@ -69,13 +69,32 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
     function setAllowedSelector(
         address _executor,
         address _target,
-        uint8 _targetType,
+        IExecutionGuardian.TargetType _targetType,
         bytes4 _selector,
         bool _isAllowed
     )
         external
+        virtual
     {
         _checkAdmin(msg.sender);
+        _setAllowedSelector(_executor, _target, _targetType, _selector, _isAllowed);
+    }
+
+    /// @notice Internal function to set executor selector permissions
+    /// @param _executor The executor address
+    /// @param _target The target contract address
+    /// @param _targetType The target type classification
+    /// @param _selector The function selector
+    /// @param _isAllowed Whether the selector should be allowed
+    function _setAllowedSelector(
+        address _executor,
+        address _target,
+        IExecutionGuardian.TargetType _targetType,
+        bytes4 _selector,
+        bool _isAllowed
+    )
+        internal
+    {
         _checkAddressNotZero(_executor);
         _checkAddressNotZero(_target);
 
@@ -116,8 +135,25 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         address _executionValidator
     )
         external
+        virtual
     {
         _checkAdmin(msg.sender);
+        _setExecutionValidator(_executor, _target, _selector, _executionValidator);
+    }
+
+    /// @notice Internal function to set an execution validator
+    /// @param _executor The executor address
+    /// @param _target The target contract address
+    /// @param _selector The function selector
+    /// @param _executionValidator The execution validator contract address
+    function _setExecutionValidator(
+        address _executor,
+        address _target,
+        bytes4 _selector,
+        address _executionValidator
+    )
+        internal
+    {
         _checkAddressNotZero(_executor);
         _checkAddressNotZero(_target);
 
@@ -129,10 +165,6 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         $.executionValidator[_executor][_target][_selector] = _executionValidator;
         emit ExecutionValidatorSet(_executor, _target, _selector, _executionValidator);
     }
-
-    /* //////////////////////////////////////////////////////////////
-                          VIEW FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IExecutionGuardian
     function authorizeCall(address _target, bytes4 _selector, bytes calldata _params) external {
@@ -154,6 +186,10 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
 
         IExecutionValidator(_validator).authorizeCall(_executor, _target, _selector, _params);
     }
+
+    /* //////////////////////////////////////////////////////////////
+                          VIEW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IExecutionGuardian
     function isSelectorAllowed(address _executor, address _target, bytes4 _selector) external view returns (bool) {
@@ -204,7 +240,7 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
     /// @inheritdoc IExecutionGuardian
     function getExecutorTargetsByType(
         address _executor,
-        uint8 _targetType
+        IExecutionGuardian.TargetType _targetType
     )
         external
         view
@@ -214,24 +250,25 @@ contract ExecutionGuardianModule is IExecutionGuardian, IModule, kBaseRoles {
         address[] memory _all = $.executorTargets[_executor].values();
         uint256 _len = _all.length;
 
+        // Over-allocate to the upper bound and fill in a single pass; truncate the dynamic
+        // array length in place at the end to avoid a second pass + second allocation.
+        _filtered = new address[](_len);
         uint256 _count;
         for (uint256 _i; _i < _len; ++_i) {
-            if ($.targetType[_all[_i]] == _targetType) {
-                ++_count;
+            address _t = _all[_i];
+            if ($.targetType[_t] == _targetType) {
+                _filtered[_count++] = _t;
             }
         }
 
-        _filtered = new address[](_count);
-        uint256 _idx;
-        for (uint256 _i; _i < _len; ++_i) {
-            if ($.targetType[_all[_i]] == _targetType) {
-                _filtered[_idx++] = _all[_i];
-            }
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(_filtered, _count)
         }
     }
 
     /// @inheritdoc IExecutionGuardian
-    function getTargetType(address _target) external view returns (uint8) {
+    function getTargetType(address _target) external view returns (IExecutionGuardian.TargetType) {
         ExecutionGuardianModuleStorage storage $ = _getExecutionGuardianModuleStorage();
         return $.targetType[_target];
     }

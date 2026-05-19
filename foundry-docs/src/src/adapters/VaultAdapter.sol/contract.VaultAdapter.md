@@ -1,8 +1,8 @@
 # VaultAdapter
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/adapters/VaultAdapter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/adapters/VaultAdapter.sol)
 
 **Inherits:**
-[SmartAdapterAccount](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/adapters/SmartAdapterAccount.sol/contract.SmartAdapterAccount.md), [IVaultAdapter](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md)
+[SmartAdapterAccount](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/adapters/SmartAdapterAccount.sol/contract.SmartAdapterAccount.md), [IVaultAdapter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md)
 
 Protocol adapter enabling secure interaction with external DeFi protocols for yield generation.
 
@@ -135,24 +135,9 @@ function pull(address _asset, uint256 _amount) external;
 |`_amount`|`uint256`||
 
 
-### _checkAdmin
-
-Check if caller has admin role
-
-
-```solidity
-function _checkAdmin(address _user) private view;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_user`|`address`|Address to check|
-
-
 ### _checkPaused
 
-Ensures the contract is not paused
+Ensures neither the local adapter pause nor the registry-wide global pause is active
 
 
 ```solidity
@@ -206,7 +191,7 @@ function _checkAssetNotRegistered(address _asset) private view;
 
 Authorizes contract upgrades
 
-Only callable by ADMIN_ROLE
+Only callable by contract owner
 
 
 ```solidity

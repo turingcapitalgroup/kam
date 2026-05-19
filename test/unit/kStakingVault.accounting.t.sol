@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { BaseVaultTest, DeploymentBaseTest } from "../utils/BaseVaultTest.sol";
 import { _1_USDC } from "../utils/Constants.sol";
@@ -16,6 +16,7 @@ import {
     KSTAKINGVAULT_ZERO_ADDRESS,
     KSTAKINGVAULT_ZERO_AMOUNT
 } from "kam/src/errors/Errors.sol";
+import { IkAssetRouter } from "kam/src/interfaces/IkAssetRouter.sol";
 
 contract kStakingVaultAccountingTest is BaseVaultTest {
     using OptimizedFixedPointMathLib for uint256;
@@ -42,10 +43,10 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         // Vault should start with zero assets and shares
         assertEq(vault.totalAssets(), 0);
         assertEq(vault.totalSupply(), 0);
-        assertEq(vault.totalNetAssets(), 0);
+        assertEq(vault.totalAssets(), 0);
 
         // Share price should be 1:1 initially (1e6 for 6 decimals)
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
     }
 
     function test_InitialSharePriceWith6Decimals() public view {
@@ -53,7 +54,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         assertEq(vault.decimals(), 6);
 
         // Initial share price should be 1 USDC (1e6)
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -74,7 +75,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         assertEq(vault.totalSupply(), INITIAL_DEPOSIT);
 
         // // Share price should remain 1:1
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
     }
 
     function test_SharePriceCalculation_AfterYield() public {
@@ -99,7 +100,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         // Share price should be 1.1 USDC per stkToken (with small rounding tolerance due to virtual offset)
         uint256 expectedSharePrice = 1.1e6; // 1.1 USDC
-        assertApproxEqAbs(vault.netSharePrice(), expectedSharePrice, 1);
+        assertApproxEqAbs(vault.sharePrice(), expectedSharePrice, 1);
     }
 
     function test_SharePriceCalculation_AfterLoss() public {
@@ -121,7 +122,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
         // Share price should be 0.95 USDC per stkToken
         uint256 expectedSharePrice = 0.95e6; // 0.95 USDC
-        assertEq(vault.netSharePrice(), expectedSharePrice);
+        assertEq(vault.sharePrice(), expectedSharePrice);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -148,7 +149,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         vault.closeBatch(batchId, true);
 
         vm.prank(users.relayer);
-        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, INITIAL_DEPOSIT, 0, 0);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, INITIAL_DEPOSIT);
         vm.prank(users.relayer);
         assetRouter.executeSettleBatch(proposalId);
 
@@ -166,7 +167,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         assertEq(vault.totalSupply(), INITIAL_DEPOSIT + bobDeposit);
 
         // Share price should remain 1:1
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
     }
 
     function test_SecondDeposit_AfterYield() public {
@@ -184,14 +185,14 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         _executeBatchSettlement(address(vault), batchId, lastTotalAssets + yield);
 
         // Share price is now 1.2 USDC per stkToken (with small rounding tolerance due to virtual offset)
-        assertApproxEqAbs(vault.netSharePrice(), 1.2e6, 1);
+        assertApproxEqAbs(vault.sharePrice(), 1.2e6, 1);
 
         // Bob deposits 600K USDC (should get 500K stkTokens)
         uint256 bobDeposit = 600_000 * _1_USDC;
         _performStakeAndSettle(users.bob, bobDeposit, 0);
 
         // Calculate expected stkTokens for Bob using actual share price
-        uint256 actualSharePrice = vault.netSharePrice();
+        uint256 actualSharePrice = vault.sharePrice();
         uint256 expectedBobShares = bobDeposit * 1e6 / actualSharePrice;
 
         // Verify Bob's share balance (with tolerance for virtual offset rounding)
@@ -201,7 +202,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         assertEq(vault.totalAssets(), 1.8e6 * _1_USDC);
 
         // Share price should remain approximately 1.2 USDC
-        assertApproxEqRel(vault.netSharePrice(), 1.2e6, 0.001e18); // 0.1% tolerance
+        assertApproxEqRel(vault.sharePrice(), 1.2e6, 0.001e18); // 0.1% tolerance
     }
 
     function test_MultipleDeposits_DifferentSharePrices() public {
@@ -231,7 +232,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
 
             // Calculate expected shares based on the actual share price used during settlement
             // The share price is calculated during settlement and includes any yield added
-            uint256 actualSharePrice = vault.netSharePrice();
+            uint256 actualSharePrice = vault.sharePrice();
             expectedShares[i] = deposits[i] * 1e6 / actualSharePrice;
 
             // Verify user's share balance
@@ -262,7 +263,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
     function test_ConvertToAssets_ZeroTotalSupply() public view {
         // With zero total supply, assets per share should be 1:1
         // This is implicitly tested in initial share price
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
     }
 
     function test_ConvertToShares_WithExistingSupply() public {
@@ -271,14 +272,14 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         _performStakeAndSettle(users.alice, aliceDeposit, 0);
 
         uint256 aliceShares = vault.balanceOf(users.alice);
-        uint256 sharePriceBefore = vault.netSharePrice();
+        uint256 sharePriceBefore = vault.sharePrice();
 
         // Bob deposits at the same share price
         uint256 bobDeposit = 750_000 * _1_USDC;
         _performStakeAndSettle(users.bob, bobDeposit, 0);
 
         uint256 bobShares = vault.balanceOf(users.bob);
-        uint256 sharePriceAfter = vault.netSharePrice();
+        uint256 sharePriceAfter = vault.sharePrice();
 
         // Share price should remain approximately the same
         assertApproxEqRel(sharePriceAfter, sharePriceBefore, 0.001e18); // 0.1% tolerance
@@ -298,10 +299,12 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         uint256 yieldAmount = 200_000 * _1_USDC; // 20% yield
         vm.prank(address(minter));
         kUSD.mint(address(vault), yieldAmount);
+        vm.prank(address(assetRouter));
+        vault.increaseBalance(uint128(yieldAmount));
 
         // Alice's 1M stkTokens should now be worth 1.2M USDC (with small rounding tolerance due to virtual offset)
         uint256 aliceShares = vault.balanceOf(users.alice);
-        uint256 expectedAssetValue = aliceShares * vault.netSharePrice() / 1e6;
+        uint256 expectedAssetValue = aliceShares * vault.sharePrice() / 1e6;
 
         assertApproxEqAbs(expectedAssetValue, 1.2e6 * _1_USDC, 1e6); // 1 USDC tolerance
     }
@@ -319,7 +322,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         // Should receive exactly 1 stkToken (1e6 wei)
         assertEq(vault.balanceOf(users.alice), smallAmount);
         assertEq(vault.totalAssets(), smallAmount);
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
     }
 
     function test_LargeNumbers_Precision() public {
@@ -336,46 +339,139 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         // Verify no precision loss
         assertEq(vault.balanceOf(users.alice), largeAmount);
         assertEq(vault.totalAssets(), largeAmount);
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
     }
 
     /* //////////////////////////////////////////////////////////////
-                        NET ASSETS WITH FEES TESTS
+                        SHARE-MINTED FEE ACCOUNTING TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_TotalNetAssets_WithoutFees() public {
-        // Setup: Alice deposits 1M USDC
+    function test_TotalAssets_WithoutFees() public {
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
-
-        // Without any time passing, net assets should equal total assets
-        assertEq(vault.totalNetAssets(), vault.totalAssets());
+        assertEq(vault.totalAssets(), INITIAL_DEPOSIT);
     }
 
-    function test_TotalNetAssets_WithAccruedManagementFees() public {
-        // Setup vault with fees
+    function test_TotalAssets_WithAccruedManagementFees() public {
         _setupTestFees();
-
-        // Alice deposits 1M USDC
         _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 
-        // Fast forward time to accrue management fees
         vm.warp(block.timestamp + 365 days);
 
-        // Net assets should be less than total assets due to accrued fees
-        uint256 totalAssets = vault.totalAssets();
-        uint256 netAssets = vault.totalNetAssets();
-
-        assertLt(netAssets, totalAssets);
-
-        // Difference should be approximately 1% (management fee)
-        uint256 feeAmount = totalAssets - netAssets;
-        uint256 expectedFeeAmount = totalAssets / 100; //1%
-        assertApproxEqRel(feeAmount, expectedFeeAmount, 0.1e18); // 10% tolerance
+        // Fees are collected as shares, not subtracted from assets
+        assertEq(vault.totalAssets(), INITIAL_DEPOSIT);
     }
 
     /* //////////////////////////////////////////////////////////////
                         EDGE CASE TESTS
     //////////////////////////////////////////////////////////////*/
+
+    function test_quoteBatchSettlement_matches_actual_claimable() public {
+        _setupTestFees();
+
+        // 1. Setup initial state: Alice deposits 1M USDC
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+        assertEq(vault.totalAssets(), INITIAL_DEPOSIT);
+
+        // 2. Alice requests to unstake 500K shares
+        vm.prank(users.alice);
+        vault.requestUnstake(users.alice, users.alice, 500_000 * 1e6);
+
+        // 3. Close the batch
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        // 4. Simulate yield and time passing
+        vm.warp(block.timestamp + 30 days);
+        uint256 lastTotalAssets = vault.totalAssets();
+        uint256 yield = 200_000 * _1_USDC; // 20% yield
+        uint256 simulatedNewTotalAssets = lastTotalAssets + yield;
+
+        // 5. Preview the requested assets calculation (the exact value we are verifying)
+        (uint256 previewedRequestedAssets,,) =
+            vault.quoteBatchSettlement(batchId, simulatedNewTotalAssets, uint64(block.timestamp));
+
+        // 6. Execute settlement through asset router
+        // This will:
+        // - increase vault balance by yield
+        // - run settleBatch which mints fee shares
+        // - decreases vault balance by the true claimable amount
+        _executeBatchSettlement(address(vault), batchId, simulatedNewTotalAssets);
+
+        // 7. Calculate the true claimable amount burned during settleBatch
+        // The balance was increased by 'yield' and then decreased by 'trueClaimable'
+        // So: finalTotalAssets = lastTotalAssets + yield - trueClaimable
+        // Therefore: trueClaimable = simulatedNewTotalAssets - finalTotalAssets
+        uint256 finalTotalAssets = vault.totalAssets();
+        uint256 trueClaimable = simulatedNewTotalAssets - finalTotalAssets;
+
+        // 8. Assert that the preview function is perfectly accurate down to the wei
+        assertEq(previewedRequestedAssets, trueClaimable, "Preview does not match true claimable amount");
+    }
+
+    function test_ProposeSettleBatch_StoresFeeSnapshot() public {
+        _setupTestFees();
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        vm.prank(users.alice);
+        vault.requestUnstake(users.alice, users.alice, 500_000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        vm.warp(block.timestamp + 30 days);
+
+        uint256 newTotalAssets = vault.totalAssets() + 200_000 * _1_USDC;
+        (uint256 expectedRequestedAssets, uint256 expectedManagementFees, uint256 expectedPerformanceFees) =
+            vault.quoteBatchSettlement(batchId, newTotalAssets, uint64(block.timestamp));
+
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, newTotalAssets);
+
+        IkAssetRouter.VaultSettlementProposal memory proposal = assetRouter.getSettlementProposal(proposalId);
+        assertEq(proposal.managementFees, expectedManagementFees);
+        assertEq(proposal.performanceFees, expectedPerformanceFees);
+        assertEq(proposal.proposedAt, uint64(block.timestamp));
+        assertEq(proposal.netted, -int256(expectedRequestedAssets));
+    }
+
+    function test_ExecuteSettleBatch_UsesStoredFeeSnapshotAfterDelay() public {
+        _setupTestFees();
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        vm.prank(users.alice);
+        vault.requestUnstake(users.alice, users.alice, 500_000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        vm.warp(block.timestamp + 30 days);
+
+        uint256 newTotalAssets = vault.totalAssets() + 200_000 * _1_USDC;
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, newTotalAssets);
+
+        IkAssetRouter.VaultSettlementProposal memory proposal = assetRouter.getSettlementProposal(proposalId);
+        uint256 supplyBefore = vault.totalSupply();
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
+
+        uint256 expectedTotalFeeShares = 0;
+        uint256 totalFees = proposal.managementFees + proposal.performanceFees;
+        if (totalFees > 0) {
+            uint256 assetDenominator = newTotalAssets > totalFees ? newTotalAssets - totalFees : 0;
+            if (assetDenominator > 0 && supplyBefore > 0) {
+                expectedTotalFeeShares = vault.convertToSharesWithTotals(totalFees, assetDenominator, supplyBefore);
+            }
+        }
+
+        vm.warp(block.timestamp + 365 days);
+        _acceptAndExecuteSettlement(proposalId);
+
+        assertEq(vault.balanceOf(users.treasury) - treasurySharesBefore, expectedTotalFeeShares);
+        assertEq(vault.lastFeeTimestamp(), proposal.proposedAt);
+    }
 
     function test_ZeroDeposit_ShouldRevert() public {
         vm.prank(users.alice);
@@ -400,7 +496,7 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
     function test_SharePrice_WithZeroTotalSupply() public view {
         // Edge case: what happens with zero total supply
         // Should maintain 1:1 ratio (1e6 for 6 decimals)
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -445,4 +541,38 @@ contract kStakingVaultAccountingTest is BaseVaultTest {
         vm.expectRevert(bytes(KSTAKINGVAULT_ZERO_ADDRESS));
         kStakingVault(payable(vaultAddr)).upgradeToAndCall(address(0), "");
     }
+
+    function test_FeeShareMinting_UnderchargesAssetDenominatedFees() public {
+        _setupTestFees();
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        vm.prank(users.alice);
+        vault.requestUnstake(users.alice, users.alice, 500_000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        vm.warp(block.timestamp + 30 days);
+
+        uint256 newTotalAssets = vault.totalAssets() + 200_000 * _1_USDC;
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, newTotalAssets);
+
+        IkAssetRouter.VaultSettlementProposal memory proposal = assetRouter.getSettlementProposal(proposalId);
+        uint256 quotedFeeAssets = proposal.managementFees + proposal.performanceFees;
+        assertGt(quotedFeeAssets, 0);
+
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
+
+        _acceptAndExecuteSettlement(proposalId);
+
+        uint256 feeSharesMinted = vault.balanceOf(users.treasury) - treasurySharesBefore;
+        uint256 actualTreasuryFeeValue =
+            vault.convertToAssetsWithTotals(feeSharesMinted, vault.totalAssets(), vault.totalSupply());
+        uint256 undercharge = quotedFeeAssets - actualTreasuryFeeValue;
+
+        assertLe(undercharge, 1);
+    }
 }
+

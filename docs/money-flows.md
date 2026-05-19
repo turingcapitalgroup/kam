@@ -366,7 +366,7 @@ kMinter → Institution: 10M kUSDC (instant!)
 Physical: 10M USDC in kMinter adapter
 Virtual: kMinter owns 10M
 
-Relayer deploys:
+Manager deploys (MANAGER_ROLE via kMinterAdapter.execute()):
    kMinter adapter → DN external strategy: 10M USDC
    
 State:
@@ -458,21 +458,23 @@ Share prices increased:
 
 ## Key Technical Insights
 
-### 1. Settlement Updates Virtual Balances ONLY
+### 1. kStakingVault Settlement Updates Virtual Balances ONLY
 
-From `kAssetRouter.sol` line 477-481:
+From `kAssetRouter.sol`:
 ```
 When settling a staking vault:
    kMinterAdapter.setTotalAssets(oldAmount - netted)
    vaultAdapter.setTotalAssets(newAmount)
 ```
 
-These are just number updates! No `safeTransfer` calls in settlement.
+These are just number updates! No `safeTransfer` calls in kStakingVault settlement.
+
+Note: kMinter settlement DOES physically move assets — `adapter.pull()` + `safeTransfer` to BatchReceiver for redemptions.
 
 ### 2. Physical Transfers via Adapter.execute()
 
 Adapters inherit from `MinimalSmartAccount` which has an `execute()` function.
-Relayers call this to:
+Managers (MANAGER_ROLE) call this to:
 
 - Deploy to strategies
 - Transfer between adapters
@@ -485,7 +487,7 @@ Relayers call this to:
 - Both invest in same external strategy (per asset)
 - Transfer shares, not USDC/WBTC
 - More efficient (no physical moves)
-- Code: `vaultRequestedShares` mapping
+- Code: `requestedSharesInBatch` in `BatchInfo` struct
 
 **Asset Accounting** (kMinter ↔ Alpha/Beta):
 
@@ -494,14 +496,14 @@ Relayers call this to:
 - Physical movement via kMinter Adapter
 - Code: `vaultBatchBalances.deposited/requested`
 
-### 4. kAssetRouter Never Holds USDC
+### 4. kAssetRouter Briefly Holds USDC During Mint
 
-The router just updates numbers! It:
+During institutional minting, the router temporarily receives USDC from kMinter via `safeTransferFrom`, then immediately forwards it to the kMinter adapter via `kAssetPush()`. Outside of this brief transit, the router does not hold assets. It:
 
 - Tracks virtual balances
 - Calculates yield
 - Tells adapters to update their totalAssets
-- Does NOT hold or transfer USDC itself
+- Forwards assets from kMinter to adapters during mint
 
 Physical USDC/WBTC is always in:
 
@@ -518,7 +520,7 @@ Only kMinter Adapter physically holds and moves assets!
 ## FAQ - Common Questions
 
 **Q: So settlement doesn't move money?**  
-A: Correct! Settlement only updates the bookkeeping (virtual balances). Physical money moves separately when relayers call adapter.execute().
+A: For kStakingVault settlements, yes — only virtual balances are updated. kMinter settlements also move physical assets to BatchReceiver for redemptions. Physical deployment to strategies happens separately when managers (MANAGER_ROLE) call adapter.execute().
 
 **Q: Why have virtual balances at all?**  
 A: Efficiency! Users can stake/unstake instantly. Physical deployment happens in batches to save gas and keep money earning yield continuously.
@@ -549,7 +551,7 @@ A: NO! They only track virtual balances. All physical USDC stays in kMinter adap
 A: Yes! Multiple protections:
 
 - 1 hour settlement cooldown (guardians can cancel)
-- Yield tolerance checks (max 10% deviation)
+- Yield tolerance checks (configurable per vault via `setMaxAllowedDelta`, defaults to 0 until set)
 - Strict adapter permissions
 - All movements are auditable on-chain
 
@@ -564,10 +566,10 @@ INSTITUTIONAL FLOW (kMinter):
    kMinter (instant kUSDC)
        ↓ physical deployment
    kMinter Adapter
-       ↓ relayer execute()
+       ↓ manager execute() (MANAGER_ROLE)
    Delta Neutral Strategy
        ↓ earns yield
-   Settlement: mint/burn kUSDC
+   Settlement: update adapter totalAssets
 
 
 USER FLOW - DELTA NEUTRAL (shares):
@@ -577,16 +579,16 @@ USER FLOW - DELTA NEUTRAL (shares):
        ↓ virtual (no physical move!)
    Shares of DN Strategy
        ↓ earns yield  
-   Settlement: update share price
+   Settlement: mint/burn kUSDC, update share price
 
 
 USER FLOW - ALPHA/BETA (assets):
    User
        ↓ kUSDC
    Alpha/Beta Vault
-       ↓ relayer withdraws from DN to kMinter adapter
+       ↓ manager withdraws from DN to kMinter adapter
    DN Strategy → kMinter Adapter
-       ↓ kMinterAdapter.execute()
+       ↓ kMinterAdapter.execute() (MANAGER_ROLE)
    CEFFU Custody (Alpha/Beta)
        ↓ earns yield
    Settlement: mint/burn kUSDC

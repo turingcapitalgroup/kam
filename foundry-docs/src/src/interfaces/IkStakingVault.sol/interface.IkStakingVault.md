@@ -1,8 +1,8 @@
 # IkStakingVault
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IkStakingVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IkStakingVault.sol)
 
 **Inherits:**
-[IVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [IVaultReader](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IVaultReader.sol/interface.IVaultReader.md)
+[IVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [IVaultReader](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IVaultReader.sol/interface.IVaultReader.md)
 
 Comprehensive interface combining retail staking operations with ERC20 share tokens and vault state reading
 

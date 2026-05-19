@@ -1,5 +1,5 @@
 # Constants
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/errors/Errors.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/errors/Errors.sol)
 
 ### KASSETROUTER_ALREADY_REGISTERED
 KAM Protocol Error Codes - Centralized error code constants for the KAM protocol.
@@ -167,6 +167,24 @@ string constant KASSETROUTER_PROPOSAL_ALREADY_ACCEPTED = "A24"
 string constant KASSETROUTER_ASSET_MISMATCH = "A25"
 ```
 
+### KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE
+
+```solidity
+string constant KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE = "A26"
+```
+
+### KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD
+
+```solidity
+string constant KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD = "A27"
+```
+
+### KASSETROUTER_INSUFFICIENT_ACTIVE_ASSETS
+
+```solidity
+string constant KASSETROUTER_INSUFFICIENT_ACTIVE_ASSETS = "A28"
+```
+
 ### ADAPTER_ALREADY_INITIALIZED
 
 ```solidity
@@ -243,6 +261,12 @@ string constant BASEVAULT_INVALID_VAULT = "BV4"
 
 ```solidity
 string constant BASEVAULT_NOT_INITIALIZED = "BV5"
+```
+
+### BASEVAULT_INVALID_TREASURY
+
+```solidity
+string constant BASEVAULT_INVALID_TREASURY = "BV6"
 ```
 
 ### KBATCHRECEIVER_ALREADY_INITIALIZED
@@ -483,6 +507,12 @@ string constant KMINTER_BATCH_NOT_SETTLED = "M14"
 
 ```solidity
 string constant KMINTER_UNAUTHORIZED = "M15"
+```
+
+### KMINTER_REQUEST_NOT_PENDING
+
+```solidity
+string constant KMINTER_REQUEST_NOT_PENDING = "M16"
 ```
 
 ### KREGISTRY_ADAPTER_ALREADY_SET
@@ -749,6 +779,12 @@ string constant KSTAKINGVAULT_MAX_TOTAL_ASSETS_REACHED = "SV11"
 string constant KSTAKINGVAULT_BATCH_NOT_VALID = "SV12"
 ```
 
+### KSTAKINGVAULT_BALANCE_AUDIT_FAILED
+
+```solidity
+string constant KSTAKINGVAULT_BALANCE_AUDIT_FAILED = "SV13"
+```
+
 ### VAULTBATCHES_NOT_CLOSED
 
 ```solidity
@@ -935,6 +971,18 @@ string constant EXECUTIONVALIDATOR_SPENDER_NOT_ALLOWED = "EV6"
 string constant EXECUTIONVALIDATOR_SELECTOR_NOT_ALLOWED = "EV7"
 ```
 
+### EXECUTIONVALIDATOR_VAULT_NOT_ALLOWED
+
+```solidity
+string constant EXECUTIONVALIDATOR_VAULT_NOT_ALLOWED = "EV8"
+```
+
+### EXECUTIONVALIDATOR_OWNER_NOT_ALLOWED
+
+```solidity
+string constant EXECUTIONVALIDATOR_OWNER_NOT_ALLOWED = "EV9"
+```
+
 ### KREMOTEREGISTRY_NOT_ALLOWED
 
 ```solidity
@@ -963,5 +1011,35 @@ string constant KREMOTEREGISTRY_SELECTOR_ALREADY_SET = "RR4"
 
 ```solidity
 string constant KREMOTEREGISTRY_SELECTOR_NOT_FOUND = "RR5"
+```
+
+### MULTIFACETPROXY_ZERO_ADDRESS
+
+```solidity
+string constant MULTIFACETPROXY_ZERO_ADDRESS = "MFP1"
+```
+
+### MULTIFACETPROXY_SELF_DELEGATION
+
+```solidity
+string constant MULTIFACETPROXY_SELF_DELEGATION = "MFP2"
+```
+
+### MULTIFACETPROXY_NOT_CONTRACT
+
+```solidity
+string constant MULTIFACETPROXY_NOT_CONTRACT = "MFP3"
+```
+
+### MULTIFACETPROXY_SELECTOR_ALREADY_SET
+
+```solidity
+string constant MULTIFACETPROXY_SELECTOR_ALREADY_SET = "MFP4"
+```
+
+### VAULTMATHLIB_ZERO_ELAPSED
+
+```solidity
+string constant VAULTMATHLIB_ZERO_ELAPSED = "VML1"
 ```
 

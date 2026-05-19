@@ -1,8 +1,8 @@
 # kBatchReceiver
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kBatchReceiver.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kBatchReceiver.sol)
 
 **Inherits:**
-[IkBatchReceiver](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkBatchReceiver.sol/interface.IkBatchReceiver.md)
+[IkBatchReceiver](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkBatchReceiver.sol/interface.IkBatchReceiver.md)
 
 Minimal proxy contract implementation for isolated batch asset distribution in the KAM protocol
 

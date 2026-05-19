@@ -1,8 +1,8 @@
 # BaseVault
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kStakingVault/base/BaseVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kStakingVault/base/BaseVault.sol)
 
 **Inherits:**
-[ERC20](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
+[ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
 
 Foundation contract providing essential shared functionality for all kStakingVault implementations
 
@@ -92,45 +92,17 @@ uint256 internal constant PAUSED_SHIFT = 41
 ```
 
 
-### IS_HARD_HURDLE_RATE_MASK
+### LAST_FEE_TIMESTAMP_MASK
 
 ```solidity
-uint256 internal constant IS_HARD_HURDLE_RATE_MASK = 0x1
+uint256 internal constant LAST_FEE_TIMESTAMP_MASK = 0xFFFFFFFFFFFFFFFF
 ```
 
 
-### IS_HARD_HURDLE_RATE_SHIFT
+### LAST_FEE_TIMESTAMP_SHIFT
 
 ```solidity
-uint256 internal constant IS_HARD_HURDLE_RATE_SHIFT = 42
-```
-
-
-### LAST_FEES_CHARGED_MANAGEMENT_MASK
-
-```solidity
-uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_MASK = 0xFFFFFFFFFFFFFFFF
-```
-
-
-### LAST_FEES_CHARGED_MANAGEMENT_SHIFT
-
-```solidity
-uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_SHIFT = 43
-```
-
-
-### LAST_FEES_CHARGED_PERFORMANCE_MASK
-
-```solidity
-uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_MASK = 0xFFFFFFFFFFFFFFFF
-```
-
-
-### LAST_FEES_CHARGED_PERFORMANCE_SHIFT
-
-```solidity
-uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 107
+uint256 internal constant LAST_FEE_TIMESTAMP_SHIFT = 42
 ```
 
 
@@ -223,6 +195,8 @@ function _setInitialized(BaseVaultStorage storage $, bool _value) internal;
 
 ### _getPaused
 
+Returns true if the vault is paused either locally (via packed config) or globally (via registry).
+
 
 ```solidity
 function _getPaused(BaseVaultStorage storage $) internal view returns (bool);
@@ -242,39 +216,18 @@ function _setPaused(BaseVaultStorage storage $, bool _value) internal;
 function _getIsHardHurdleRate(BaseVaultStorage storage $) internal view returns (bool);
 ```
 
-### _setIsHardHurdleRate
+### _getLastFeeTimestamp
 
 
 ```solidity
-function _setIsHardHurdleRate(BaseVaultStorage storage $, bool _value) internal;
+function _getLastFeeTimestamp(BaseVaultStorage storage $) internal view returns (uint64);
 ```
 
-### _getLastFeesChargedManagement
+### _setLastFeeTimestamp
 
 
 ```solidity
-function _getLastFeesChargedManagement(BaseVaultStorage storage $) internal view returns (uint64);
-```
-
-### _setLastFeesChargedManagement
-
-
-```solidity
-function _setLastFeesChargedManagement(BaseVaultStorage storage $, uint64 _value) internal;
-```
-
-### _getLastFeesChargedPerformance
-
-
-```solidity
-function _getLastFeesChargedPerformance(BaseVaultStorage storage $) internal view returns (uint64);
-```
-
-### _setLastFeesChargedPerformance
-
-
-```solidity
-function _setLastFeesChargedPerformance(BaseVaultStorage storage $, uint64 _value) internal;
+function _setLastFeeTimestamp(BaseVaultStorage storage $, uint64 _value) internal;
 ```
 
 ### __BaseVault_init
@@ -397,7 +350,7 @@ function decimals() public view override returns (uint8);
 
 ### _setPaused
 
-Updates the vault's operational pause state for emergency risk management
+Updates the vault's local operational pause state for emergency risk management
 
 This internal function enables vault implementations to halt operations during emergencies or maintenance.
 The pause mechanism: (1) Validates vault initialization to prevent invalid state changes, (2) Updates the
@@ -405,6 +358,8 @@ packed config storage with new pause state, (3) Emits event for monitoring and u
 state-changing operations should be blocked while view functions remain accessible for monitoring. The pause
 state is stored in packed config for gas efficiency. This function provides the foundation for emergency
 controls while maintaining transparency through event emission.
+Note: Even if the vault is locally unpaused, it will still be considered paused if the registry's global
+pause is active (see `_getPaused`).
 
 
 ```solidity
@@ -492,31 +447,9 @@ function _convertToSharesWithTotals(
 |`_shares`|`uint256`|The equivalent stkToken amount based on current share price|
 
 
-### _netSharePrice
-
-Calculates net share price per stkToken after deducting accumulated fees
-
-This function provides the user-facing share price that reflects actual value after management and
-performance fee deductions. The calculation: (1) Uses vault decimals for proper scaling to match token
-precision, (2) Calls _convertToAssets with unit share amount to determine per-token value, (3) Reflects
-total net assets which exclude accrued but unpaid fees. This net pricing ensures users see accurate
-value after all fee obligations, providing transparent visibility into their true vault position value.
-Used primarily for user-facing calculations and accurate balance reporting.
-
-
-```solidity
-function _netSharePrice() internal view returns (uint256);
-```
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`uint256`|Net price per stkToken in underlying asset terms (scaled to vault decimals)|
-
-
 ### _sharePrice
 
-Calculates gross share price per stkToken including accumulated fees
+Calculates share price per stkToken
 
 This function provides the total vault performance-based share price before fee deductions. The
 calculation:
@@ -539,14 +472,7 @@ function _sharePrice() internal view returns (uint256);
 
 ### _totalAssets
 
-Calculates total assets under management including pending stakes and accrued yields
-
-This function determines the complete asset base managed by the vault for share price calculations.
-The calculation: (1) Starts with total kToken balance held by the vault contract, (2) Subtracts pending
-stakes that haven't yet been converted to stkTokens to avoid double-counting during settlement periods,
-(3) Includes all accrued yields and performance gains. The pending stake adjustment is crucial for accurate
-share pricing during batch processing periods when assets are deposited but shares haven't been issued.
-This total forms the basis for both gross and net share price calculations.
+Returns total assets under management
 
 
 ```solidity
@@ -556,53 +482,110 @@ function _totalAssets() internal view returns (uint256);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|Total asset value managed by the vault including yields but excluding pending operations|
+|`<none>`|`uint256`|Total asset value|
 
 
-### _totalNetAssets
+### _totalBalance
 
-Calculates net assets available to users after deducting accumulated fees
-
-This function provides the user-facing asset value by removing management and performance fee obligations.
-The calculation: (1) Takes total gross assets as the starting point, (2) Subtracts accumulated fees calculated
-by the fee computation module, (3) Results in the net value attributable to stkToken holders. This net asset
-calculation is critical for fair share pricing, ensuring new entrants pay appropriate prices and existing
-holders receive accurate valuations. The fee deduction prevents users from claiming value that belongs to
-vault operators through fee mechanisms.
+Returns the raw totalBalance
 
 
 ```solidity
-function _totalNetAssets() internal view returns (uint256);
+function _totalBalance() internal view returns (uint256);
 ```
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|Net asset value available to users after all fee deductions|
+|`<none>`|`uint256`|Raw balance|
 
 
-### _accumulatedFees
+### _increaseBalance
 
-Delegates fee calculation to the vault reader module for comprehensive fee computation
+Increases the vault's internal balance
 
-This function serves as a gateway to the modular fee calculation system implemented in the vault reader.
-The delegation pattern: (1) Calls the reader module which implements detailed fee calculation logic including
-management fee accrual and performance fee assessment, (2) Returns total accumulated fees for asset
-calculations,
-(3) Maintains separation of concerns by isolating complex fee logic in dedicated modules. The reader module
-handles time-based management fees, watermark-based performance fees, and hurdle rate calculations.
-This modular approach enables upgradeable fee calculation logic while maintaining consistent interfaces.
+Used for yield distribution. Authorization must be handled by the calling contract.
 
 
 ```solidity
-function _accumulatedFees() internal view returns (uint256);
+function _increaseBalance(uint128 _amount) internal;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_amount`|`uint128`|The amount to increase the balance by|
+
+
+### _decreaseBalance
+
+Decreases the vault's internal balance
+
+Used for yield distribution. Authorization must be handled by the calling contract.
+
+
+```solidity
+function _decreaseBalance(uint128 _amount) internal;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_amount`|`uint128`|The amount to decrease the balance by|
+
+
+### _accrueFees
+
+Computes pending management fee assets and updates the last fee timestamp
+
+Called at settlement and before fee rate changes. Does NOT mint shares — the caller
+is responsible for converting and minting. Returns 0 if no supply or no fees due.
+
+
+```solidity
+function _accrueFees() internal returns (uint256 managementFeeAssets);
 ```
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|Total accumulated fees (management + performance) in underlying asset terms|
+|`managementFeeAssets`|`uint256`|Management fee in asset terms|
 
+
+### _mintManagementFees
+
+Mints management fee shares to the treasury
+
+Called by settlement and fee config setters to mint accrued management fees
+
+
+```solidity
+function _mintManagementFees(uint256 _managementFeeAssets) internal;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_managementFeeAssets`|`uint256`|Management fee amount in asset terms|
+
+
+### _getLastSettlementBalance
+
+Returns the last settlement balance for interest calculation
+
+
+```solidity
+function _getLastSettlementBalance() internal view returns (uint256);
+```
+
+### _setLastSettlementBalance
+
+Sets the last settlement balance snapshot
+
+
+```solidity
+function _setLastSettlementBalance(uint128 _balance) internal;
+```
 
 ### _isAdmin
 
@@ -715,6 +698,62 @@ event Paused(bool paused);
 |----|----|-----------|
 |`paused`|`bool`|The new paused state|
 
+### BalanceIncreased
+Emitted when the vault's internal balance is increased
+
+
+```solidity
+event BalanceIncreased(uint128 amount);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`amount`|`uint128`|The amount the balance was increased by|
+
+### BalanceDecreased
+Emitted when the vault's internal balance is decreased
+
+
+```solidity
+event BalanceDecreased(uint128 amount);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`amount`|`uint128`|The amount the balance was decreased by|
+
+### ManagementFeesAccrued
+Emitted when management fees are accrued and shares minted to treasury
+
+
+```solidity
+event ManagementFeesAccrued(uint256 managementFeeShares);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`managementFeeShares`|`uint256`|Number of shares minted for management fees|
+
+### PerformanceFeesCharged
+Emitted when performance fees are charged and shares minted to treasury
+
+
+```solidity
+event PerformanceFeesCharged(uint256 performanceFeeShares);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`performanceFeeShares`|`uint256`|Number of shares minted for performance fees|
+
 ## Structs
 ### BaseVaultStorage
 **Note:**
@@ -724,34 +763,33 @@ storage-location: erc7201.kam.storage.BaseVault
 ```solidity
 struct BaseVaultStorage {
     //1
-    uint256 config; // decimals, performance fee, management fee, initialized, paused,
-    // isHardHurdleRate, lastFeesChargedManagement, lastFeesChargedPerformance
-    //2 - packed together for gas efficiency (both read in _totalAssets)
-    uint128 totalPendingStake;
-    uint128 totalPendingUnstake;
-    //3
-    uint128 sharePriceWatermark;
+    uint256 config; // decimals, performance fee, management fee, initialized, paused, lastFeeTimestamp
+    //2 - asset tracking (both read in _totalAssets hot path)
+    uint128 totalBalance;
     uint128 maxTotalAssets;
-    //4
+    //3
     uint256 currentBatch;
-    //5
+    //4
     uint256 requestCounter;
-    //6
+    //5
     bytes32 currentBatchId;
-    //7
+    //6
     address registry;
-    //8
+    //7
     address underlyingAsset;
-    //9
+    //8
     address kToken;
-    //10
+    //9 - last settlement balance for performance fee calculation
+    uint128 lastSettlementBalance;
+    uint128 totalPendingStake;
+    // Dynamic values
     string name;
-    //11
     string symbol;
     mapping(bytes32 => BaseVaultTypes.BatchInfo) batches;
     mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;
     mapping(bytes32 => BaseVaultTypes.UnstakeRequest) unstakeRequests;
     mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set) userRequests;
+    uint128 totalPendingUnstake;
 }
 ```
 

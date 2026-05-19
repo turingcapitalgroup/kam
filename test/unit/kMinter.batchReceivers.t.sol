@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { _1_USDC, _1_WBTC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
@@ -102,7 +102,8 @@ contract kMinterBatchReceiversTest is DeploymentBaseTest {
         vm.prank(users.admin);
         assetRouter.setSettlementCooldown(0);
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(USDC, _minter, _batchId, 0);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_proposalId);
 
         // Now request burn - this creates the batch receiver

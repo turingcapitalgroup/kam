@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 /// @notice Library for managing enumerable sets in storage.
 /// @author Originally by Solady (https://github.com/Vectorized/solady/blob/main/src/utils/EnumerableSetLib.sol)

@@ -1,8 +1,8 @@
 # kStakingVault
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kStakingVault/kStakingVault.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kStakingVault/kStakingVault.sol)
 
 **Inherits:**
-[IVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [BaseVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
+[IVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [ISettleBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.ISettleBatch.md), [BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
 
 Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
 
@@ -172,16 +172,13 @@ function claimStakedShares(bytes32 _requestId) external payable;
 
 ### claimUnstakedAssets
 
-Claims kTokens plus accrued yield from a settled unstaking batch through batch receiver distribution
+Claims kTokens plus accrued yield from a settled unstaking batch
 
 This function completes the unstaking process by distributing redeemed assets to users after settlement.
-Process: (1) Validates batch settlement and asset distribution readiness through batch receiver verification,
-(2) Confirms request ownership and pending status to ensure authorized claiming, (3) Calculates kToken amount
-based on original stkToken redemption and settled share price including yield, (4) Burns locked stkTokens
-that were held during settlement period, (5) Triggers batch receiver to transfer calculated kTokens to
-recipient,
-(6) Marks request as claimed completing the unstaking cycle. The batch receiver pattern ensures asset isolation
-between settlement periods while enabling efficient distribution. Users receive their original investment plus
+Process: (1) Validates batch settlement and request ownership/pending status, (2) Calculates kToken amount
+based on original stkToken redemption and settled share price including yield, (3) Transfers calculated
+kTokens to recipient (stkTokens were already burned during settleBatch(), not at claim time),
+(4) Marks request as claimed completing the unstaking cycle. Users receive their original investment plus
 proportional share of vault yields earned during their staking period.
 
 
@@ -245,20 +242,34 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 ### settleBatch
 
-Marks a batch as settled after yield distribution, mints shares for pending stakers, and enables claiming
+Marks a batch as settled after yield distribution, accrues fees, mints shares for pending stakers, and enables claiming
 
-This function finalizes batch settlement by recording final asset values, minting shares, and enabling claims.
-Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Snapshots both
-gross and net share prices at settlement time for accurate reward calculations, (3) Mints stkTokens for all pending
-stakers in this batch to the vault itself at the settlement share price (clearing totalPendingStake for this batch),
-(4) Marks batch as settled enabling users to claim their staked shares or unstaked assets, (5) Completes the batch
-lifecycle allowing reward distribution through the claiming mechanism. Only kAssetRouter can settle batches as it
-coordinates yield calculations across DN vaults and manages cross-vault asset flows. The pre-minting approach ensures
-share prices are locked at settlement and users receive shares via transfer (not mint) when they claim.
+CALL CONTRACT — DO NOT REORDER. Each step depends on state mutated by the previous
+step; reordering produces silent fee-math errors (double-charging of management fees
+as yield, stale settlement baselines) or hard reverts (zero-duration settlements).
+1. Capture `_settlementElapsed` BEFORE `_accrueFees()` advances `_lastFeeTimestamp`.
+If this capture happens after the accrual, elapsed = 0 and `computePerformanceFee`
+reverts with `VAULTMATHLIB_ZERO_ELAPSED` (the library guard added to prevent the
+hurdle filter from being silently bypassed).
+2. `_accrueFees()` computes the management fee on pre-yield total assets and advances
+`_lastFeeTimestamp`. Returns the management-fee amount in asset terms.
+3. Compute net interest as
+`_currentBalance - _previousBalance - _mgmtFeeAssets`
+so the management fee is removed from the perf-fee base. Without this subtraction
+the management-fee charge appears as "yield" and is performance-fee'd a second time.
+4. Mint management-fee shares (`_mintManagementFees`).
+5. Compute performance fee using the captured elapsed and the net interest, against
+`_previousBalance` as the hurdle baseline.
+6. Mint performance-fee shares.
+7. Process pending stake/unstake at `_totalAssets()` / `totalSupply()`. These values
+include the just-minted fee shares — that is intentional: stakers join at the
+post-fee rate.
+8. Snapshot `_lastSettlementBalance = _totalBalance()` LAST so the next settlement's
+interest baseline is correct.
 
 
 ```solidity
-function settleBatch(bytes32 _batchId) external;
+function settleBatch(bytes32 _batchId) external override(IVaultBatch, ISettleBatch);
 ```
 **Parameters**
 
@@ -406,62 +417,12 @@ function _checkAdmin(address _admin) private view;
 |`_admin`|`address`|The address to validate against registered admin roles|
 
 
-### _validateTimestamp
-
-Validates timestamp progression preventing manipulation and ensuring logical sequence
-
-This function ensures fee timestamp updates follow logical progression and remain within valid ranges.
-Validation checks: (1) New timestamp must be >= last timestamp to prevent backwards time manipulation,
-(2) New timestamp must be <= current block time to prevent future-dating. These validations are critical
-for accurate fee calculations and preventing temporal manipulation attacks on the fee system.
-
-
-```solidity
-function _validateTimestamp(uint256 _timestamp, uint256 _lastTimestamp) private view;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_timestamp`|`uint256`|The new timestamp being set for fee tracking|
-|`_lastTimestamp`|`uint256`|The previous timestamp for progression validation|
-
-
-### setHardHurdleRate
-
-Configures the hurdle rate fee calculation mechanism for performance fee determination
-
-This function switches between soft and hard hurdle rate modes affecting performance fee calculations.
-Hurdle Rate Modes: (1) Soft Hurdle (_isHard = false): Performance fees are charged on all profits when returns
-exceed the hurdle rate threshold, providing simpler fee calculation while maintaining performance incentives,
-(2) Hard Hurdle (_isHard = true): Performance fees are only charged on the excess return above the hurdle rate,
-ensuring users keep the full hurdle rate return before any performance fees. The hurdle rate itself is set
-globally in the registry per asset, providing consistent benchmarks across vaults. This mechanism ensures
-vault operators are only rewarded for generating returns above market expectations, protecting user interests
-while incentivizing superior performance.
-
-
-```solidity
-function setHardHurdleRate(bool _isHard) external;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_isHard`|`bool`|True for hard hurdle (fees only on excess), false for soft hurdle (fees on all profits)|
-
-
 ### setManagementFee
 
 Sets the annual management fee rate charged on assets under management
 
-This function configures the periodic fee charged regardless of vault performance, compensating operators
-for ongoing vault management, risk monitoring, and operational costs. Management fees are calculated based on
-time elapsed since last fee charge and total assets under management. Process: (1) Validates fee rate does not
-exceed maximum allowed to protect users from excessive fees, (2) Updates stored management fee rate for future
-calculations, (3) Emits event for transparency and off-chain tracking. The fee accrues continuously and is
-realized during batch settlements, ensuring users see accurate net returns. Management fees are deducted from
-vault assets before performance fee calculations, following traditional fund management practices.
+Accrues pending fees before changing the rate. Management fees are calculated based on
+time elapsed since last accrual and total assets under management.
 
 
 ```solidity
@@ -478,13 +439,7 @@ function setManagementFee(uint16 _managementFee) external;
 
 Sets the performance fee rate charged on vault returns above hurdle rates
 
-This function configures the success fee charged when vault performance exceeds benchmark hurdle rates,
-aligning operator incentives with user returns. Performance fees are calculated during settlement based on
-share price appreciation above the watermark (highest previous share price) and hurdle rate requirements.
-Process: (1) Validates fee rate is within acceptable bounds for user protection, (2) Updates performance fee
-rate for future calculations, (3) Emits tracking event for transparency. The fee applies only to new high
-watermarks, preventing double-charging on recovered losses. Combined with hurdle rates, this ensures operators
-are rewarded for generating superior risk-adjusted returns while protecting users from excessive fee extraction.
+Accrues pending fees before changing the rate.
 
 
 ```solidity
@@ -497,70 +452,53 @@ function setPerformanceFee(uint16 _performanceFee) external;
 |`_performanceFee`|`uint16`|Performance fee rate in basis points charged on excess returns (max 10000 bp)|
 
 
-### notifyManagementFeesCharged
+### increaseBalance
 
-Updates the timestamp tracking for management fee calculations after backend fee processing
+Increases the vault's internal balance
 
-This function maintains accurate management fee accrual by recording when fees were last processed.
-Backend Coordination: (1) Off-chain systems calculate and process management fees based on time elapsed and
-assets under management, (2) Fees are deducted from vault assets through settlement mechanisms, (3) This
-function
-updates the tracking timestamp to prevent double-charging in future calculations. The timestamp validation
-ensures logical progression and prevents manipulation. Management fees accrue continuously, and proper timestamp
-tracking is essential for accurate pro-rata fee calculations across all vault participants.
+Only callable by authorized addresses (router)
 
 
 ```solidity
-function notifyManagementFeesCharged(uint64 _timestamp) external;
+function increaseBalance(uint128 _amount) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_timestamp`|`uint64`|The timestamp when management fees were processed (must be >= last timestamp, <= current time)|
+|`_amount`|`uint128`||
 
 
-### notifyPerformanceFeesCharged
+### decreaseBalance
 
-Updates the timestamp tracking for performance fee calculations after backend fee processing
+Decreases the vault's internal balance
 
-This function maintains accurate performance fee tracking by recording when performance fees were last
-calculated and charged. Backend Processing: (1) Off-chain systems evaluate vault performance against watermarks
-and hurdle rates, (2) Performance fees are calculated on excess returns and deducted during settlement,
-(3) This notification updates tracking timestamp and potentially adjusts watermark levels. The timestamp ensures
-proper sequencing of performance evaluations and prevents fee calculation errors. Performance fees are
-event-driven
-based on new high watermarks, making accurate timestamp tracking crucial for fair fee assessment across all
-users.
+Only callable by authorized addresses (router)
 
 
 ```solidity
-function notifyPerformanceFeesCharged(uint64 _timestamp) external;
+function decreaseBalance(uint128 _amount) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_timestamp`|`uint64`|The timestamp when performance fees were processed (must be >= last timestamp, <= current time)|
+|`_amount`|`uint128`||
 
 
-### _updateGlobalWatermark
-
-Updates the share price watermark using the share price at a specific timestamp
-
-Updates the high water mark if the share price at _timestamp exceeds the previous mark.
-Uses VaultMathLib to compute fees at the given timestamp for accurate historical pricing.
+### _expectedKTokenBalance
 
 
 ```solidity
-function _updateGlobalWatermark(uint64 _timestamp) private;
+function _expectedKTokenBalance(BaseVaultStorage storage $) private view returns (uint256);
 ```
-**Parameters**
 
-|Name|Type|Description|
-|----|----|-----------|
-|`_timestamp`|`uint64`|The timestamp at which to evaluate the share price for watermark comparison|
+### _auditKTokenBalance
 
+
+```solidity
+function _auditKTokenBalance(BaseVaultStorage storage $) private view;
+```
 
 ### _createStakeRequestId
 
@@ -610,7 +548,6 @@ to pause all user-facing operations during security incidents, market anomalies,
 (3) Maintaining read-only access to vault data and view functions during pause periods for transparency,
 (4) Allowing authorized emergency admins to resume operations once issues are resolved or maintenance completed.
 When paused, all state-changing functions (requestStake, requestUnstake,
-cancelUnstakeRequest,
 claimStakedShares, claimUnstakedAssets) will revert with KSTAKINGVAULT_IS_PAUSED error. The pause mechanism
 serves as a circuit breaker protecting user funds during unexpected events while maintaining protocol integrity.
 Only emergency admins have permission to toggle this state, ensuring rapid response capabilities during critical
@@ -670,6 +607,248 @@ function _authorizeModifyFunctions(
     view
     override;
 ```
+
+### registry
+
+Returns the protocol registry address used for configuration and role checks
+
+Reverts before initialization so integrations do not read an unset registry.
+
+
+```solidity
+function registry() external view returns (address);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The kRegistry address configured during initialization|
+
+
+### asset
+
+Returns the vault's kToken address
+
+This is the share accounting asset held by the vault, not the underlying settlement asset.
+
+
+```solidity
+function asset() external view returns (address);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The kToken associated with the vault's underlying asset|
+
+
+### underlyingAsset
+
+Returns the underlying settlement asset address
+
+
+```solidity
+function underlyingAsset() external view returns (address);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|The asset address used by the router and strategies for settlement|
+
+
+### totalAssets
+
+Returns active accounted vault assets
+
+Excludes pending stake collateral and kTokens reserved for settled-but-unclaimed unstake requests.
+
+
+```solidity
+function totalAssets() external view returns (uint256);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The active asset base that can absorb strategy gains and losses|
+
+
+### sharePrice
+
+Returns the current gross share price
+
+Uses one whole share unit based on the vault decimals and current active assets.
+
+
+```solidity
+function sharePrice() external view returns (uint256);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The amount of active assets represented by one whole share unit|
+
+
+### netSharePrice
+
+Returns the current net share price after fee accounting
+
+Currently equals sharePrice because pending fee effects are reflected through settlement/accrual paths.
+
+
+```solidity
+function netSharePrice() external view returns (uint256);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The net amount of active assets represented by one whole share unit|
+
+
+### convertToShares
+
+Converts an asset amount to shares using current totals
+
+Rounds down in favor of the vault.
+
+
+```solidity
+function convertToShares(uint256 _assets) external view returns (uint256);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_assets`|`uint256`|The active asset amount to convert|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The share amount for the provided assets|
+
+
+### convertToAssets
+
+Converts a share amount to assets using current totals
+
+Rounds down in favor of the vault.
+
+
+```solidity
+function convertToAssets(uint256 _shares) external view returns (uint256);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_shares`|`uint256`|The share amount to convert|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The active asset amount for the provided shares|
+
+
+### maxTotalAssets
+
+Returns the vault TVL cap in active assets plus pending stake collateral
+
+
+```solidity
+function maxTotalAssets() external view returns (uint128);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint128`|The maximum total assets configured for the vault|
+
+
+### totalPendingStake
+
+Returns kTokens reserved for pending stake requests
+
+These kTokens are held by the vault but not yet converted into active assets.
+
+
+```solidity
+function totalPendingStake() external view returns (uint128);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint128`|The pending stake reserve amount|
+
+
+### totalPendingUnstake
+
+Returns kTokens reserved for settled-but-unclaimed unstake requests
+
+These kTokens are not active assets and must not be consumed by strategy losses.
+
+
+```solidity
+function totalPendingUnstake() external view returns (uint128);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint128`|The pending unstake reserve amount|
+
+
+### expectedKTokenBalance
+
+Returns the raw kToken balance expected to be held by the vault
+
+Equals totalAssets() + totalPendingStake() + totalPendingUnstake().
+
+
+```solidity
+function expectedKTokenBalance() public view returns (uint256);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The expected kToken balance for invariant audits|
+
+
+### contractName
+
+Returns the human-readable contract name
+
+
+```solidity
+function contractName() external pure returns (string memory);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`string`|The contract name|
+
+
+### contractVersion
+
+Returns the contract version
+
+
+```solidity
+function contractVersion() external pure returns (string memory);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`string`|The semantic version string|
+
 
 ### receive
 

@@ -18,6 +18,11 @@ broadcast/
 .cursorrules
 CLAUDE.md
 .claude/
+.letta/
+.trigrep/
+.planning/
+.repo-audit/
+superpowers/
 
 # Soldeer
 /dependencies

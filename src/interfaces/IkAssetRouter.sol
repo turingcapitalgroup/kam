@@ -7,21 +7,30 @@ import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 /// @notice Interface for contracts that implement batch settlement functionality.
 /// @dev Used by kAssetRouter to settle batches across different vault types.
 interface ISettleBatch {
-    /// @notice Marks a batch as settled after yield distribution and enables user claiming.
-    /// @param _batchId The batch identifier to mark as settled.
-    function settleBatch(bytes32 _batchId) external;
+    /// @notice Used by kAssetRouter to execute the settlement inside the Vault or kMinter.
+    /// @param _batchId The ID of the batch to settle
+    /// @param _proposedAt The exact block.timestamp when the proposal was submitted
+    /// @param _managementFees Management fee assets computed when the settlement was proposed
+    /// @param _performanceFees Performance fee assets computed when the settlement was proposed
+    function settleBatch(
+        bytes32 _batchId,
+        uint64 _proposedAt,
+        uint256 _managementFees,
+        uint256 _performanceFees
+    )
+        external;
 }
 
 /// @title IkAssetRouter
 /// @notice Central money flow coordinator for the KAM protocol managing all asset movements and settlements
 /// @dev This interface defines the core functionality for kAssetRouter, which serves as the primary coordinator
 /// for all asset movements within the KAM protocol ecosystem. Key responsibilities include: (1) Managing asset
-/// flows from kMinter institutional deposits to DN vaults for yield generation, (2) Coordinating asset transfers
+/// flows from kMinter institutional deposits to kMinter adapters, (2) Coordinating asset transfers
 /// between kStakingVaults for optimal allocation, (3) Processing batch settlements with yield distribution through
 /// kToken minting/burning, (4) Maintaining virtual balance tracking across all vaults, (5) Implementing settlement
-/// cooldown periods for security, (6) Executing peg protection mechanisms during market stress. The router acts as
-/// the central hub that enables efficient capital allocation while maintaining the 1:1 backing guarantee of kTokens
-/// through precise yield distribution and loss management across the protocol's vault network.
+/// cooldown periods for security, (6) Requiring guardian approval for high-delta settlements. The router acts as
+/// the central hub that enables efficient capital allocation and coordinated yield/loss management across the
+/// protocol's vault network.
 interface IkAssetRouter is IVersioned {
     /* ///////////////////////////////////////////////////////////////
                                 ENUMS
@@ -43,12 +52,12 @@ interface IkAssetRouter is IVersioned {
 
     /// @notice Contains all parameters for a batch settlement proposal in the yield distribution system
     /// @dev Settlement proposals implement a cooldown mechanism for security, allowing guardians to verify
-    /// yield calculations before execution. Once executed, the proposal triggers kToken minting/burning to
-    /// distribute yield or account for losses, maintaining the 1:1 backing ratio across all kTokens.
+    /// yield calculations before execution. Once executed, the proposal may trigger kToken minting/burning for
+    /// staking vault yield/losses and updates adapter accounting.
     struct VaultSettlementProposal {
         /// @dev The underlying asset address being settled (USDC, WBTC, etc.)
         address asset;
-        /// @dev The DN vault address where yield was generated
+        /// @dev The vault address being settled
         address vault;
         /// @dev Cached adapter address at proposal creation - prevents registry modification from breaking execution
         address adapter;
@@ -60,12 +69,14 @@ interface IkAssetRouter is IVersioned {
         int256 netted;
         /// @dev Absolute yield amount (positive or negative) generated in this batch
         int256 yield;
+        /// @dev Management fee assets computed when the proposal was created
+        uint256 managementFees;
+        /// @dev Performance fee assets computed when the proposal was created
+        uint256 performanceFees;
+        /// @notice Exact timestamp the proposal was submitted, used to freeze fee math
+        uint64 proposedAt;
         /// @dev Timestamp after which this proposal can be executed (cooldown protection)
         uint64 executeAfter;
-        /// @dev Timestamp when management fees were last charged (0 means no fees to charge)
-        uint64 lastFeesChargedManagement;
-        /// @dev Timestamp when performance fees were last charged (0 means no fees to charge)
-        uint64 lastFeesChargedPerformance;
         /// @dev True if yield delta exceeded threshold, requires guardian approval before execution
         bool requiresApproval;
     }
@@ -74,7 +85,7 @@ interface IkAssetRouter is IVersioned {
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Emitted when the kAssetRouter contract is initialized with registry configuration
+    /// @notice Emitted when an adapter's total assets are updated during settlement execution
     /// @param adapter The address of the adapter that was updated
     /// @param totalAssets the totalAssets used as param to update
     event TotalAssetsSet(address indexed adapter, uint256 totalAssets);
@@ -83,20 +94,22 @@ interface IkAssetRouter is IVersioned {
     /// @param registry The address of the kRegistry contract that manages protocol configuration
     event ContractInitialized(address indexed registry);
 
-    /// @notice Emitted when assets are pushed from kMinter to a DN vault for yield generation
+    /// @notice Emitted when assets are pushed from kMinter to its adapter
     /// @dev This occurs when institutional users deposit assets through kMinter, and the router
-    /// forwards these assets to the appropriate DN vault for yield farming strategies
+    /// forwards these assets to the registered kMinter adapter for that asset.
     /// @param from The address initiating the asset push (typically kMinter)
+    /// @param batchId The batch identifier for this asset movement
     /// @param amount The quantity of assets being pushed to the vault
-    event AssetsPushed(address indexed from, uint256 amount);
+    event AssetsPushed(address indexed from, bytes32 indexed batchId, uint256 amount);
 
     /// @notice Emitted when assets are requested for pull from a vault to fulfill kMinter redemptions
     /// @dev Part of the two-phase redemption process - assets are first requested, then later pulled
     /// after batch settlement. The batchReceiver is deployed to hold assets for distribution.
     /// @param vault The vault address from which assets are being requested
     /// @param asset The underlying asset address being requested for redemption
+    /// @param batchId The batch identifier for this pull request
     /// @param amount The quantity of assets requested for redemption
-    event AssetsRequestPulled(address indexed vault, address indexed asset, uint256 amount);
+    event AssetsRequestPulled(address indexed vault, address indexed asset, bytes32 indexed batchId, uint256 amount);
 
     /// @notice Emitted when assets are transferred between kStakingVaults for optimal allocation
     /// @dev This is a virtual transfer for accounting purposes - actual assets may remain in the same
@@ -104,17 +117,11 @@ interface IkAssetRouter is IVersioned {
     /// @param sourceVault The vault transferring assets (losing virtual balance)
     /// @param targetVault The vault receiving assets (gaining virtual balance)
     /// @param asset The underlying asset address being transferred
+    /// @param batchId The batch identifier for this virtual transfer
     /// @param amount The quantity of assets being transferred between vaults
     event AssetsTransferred(
-        address indexed sourceVault, address indexed targetVault, address indexed asset, uint256 amount
+        address indexed sourceVault, address indexed targetVault, address indexed asset, bytes32 batchId, uint256 amount
     );
-    /// @notice Emitted when shares are requested for push operations in kStakingVault flows
-    /// @dev Part of the share-based accounting system for retail users in kStakingVaults
-    /// @param vault The kStakingVault requesting the share push operation
-    /// @param batchId The batch identifier for this operation
-    /// @param amount The quantity of shares being pushed
-    event SharesRequestedPushed(address indexed vault, bytes32 indexed batchId, uint256 amount);
-
     /// @notice Emitted when a vault batch is settled with final asset accounting
     /// @dev Indicates completion of yield distribution and final asset allocation for a batch
     /// @param vault The vault address that completed batch settlement
@@ -152,8 +159,6 @@ interface IkAssetRouter is IVersioned {
     /// @param netted Net amount of new deposits/redemptions in this batch
     /// @param yield Absolute yield amount generated in this batch
     /// @param executeAfter Timestamp after which the proposal can be executed
-    /// @param lastFeesChargedManagement Timestamp when management fees were last charged (0 = no fees)
-    /// @param lastFeesChargedPerformance Timestamp when performance fees were last charged (0 = no fees)
     event SettlementProposed(
         bytes32 indexed proposalId,
         address indexed vault,
@@ -161,9 +166,7 @@ interface IkAssetRouter is IVersioned {
         uint256 totalAssets,
         int256 netted,
         int256 yield,
-        uint256 executeAfter,
-        uint64 lastFeesChargedManagement,
-        uint64 lastFeesChargedPerformance
+        uint256 executeAfter
     );
 
     /// @notice Emitted when a settlement proposal is successfully executed
@@ -205,7 +208,7 @@ interface IkAssetRouter is IVersioned {
     event MaxAllowedDeltaUpdated(address indexed vault, uint256 oldTolerance, uint256 newTolerance);
 
     /// @notice Emitted when yield exceeds the tolerance threshold
-    /// @param vault The DN vault address
+    /// @param vault The vault address
     /// @param asset The underlying asset address
     /// @param batchId The batch identifier
     /// @param yield The yield amount
@@ -218,24 +221,23 @@ interface IkAssetRouter is IVersioned {
                             KMINTER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Pushes assets from kMinter institutional deposits to the designated DN vault for yield generation
+    /// @notice Pushes assets from kMinter institutional deposits to the registered kMinter adapter
     /// @dev This function is called by kMinter when institutional users deposit underlying assets. The process
-    /// involves: (1) receiving assets already transferred from kMinter, (2) forwarding them to the appropriate
-    /// DN vault for the asset type, (3) updating virtual balance tracking for accurate accounting. This enables
-    /// immediate kToken minting (1:1 with deposits) while assets begin generating yield in the vault system.
-    /// The assets enter the current batch for eventual settlement and yield distribution back to kToken holders.
+    /// involves: (1) receiving assets already transferred from kMinter, (2) forwarding them to the registered
+    /// kMinter adapter for the asset, and (3) using the batch ID for later settlement accounting. This enables
+    /// immediate kToken minting (1:1 with deposits).
     /// @param _asset The underlying asset address being deposited (must be registered in protocol)
-    /// @param amount The quantity of assets being pushed to the vault for yield generation
-    /// @param batchId The current batch identifier from the DN vault for tracking and settlement
+    /// @param amount The quantity of assets being pushed to the adapter
+    /// @param batchId The current kMinter batch identifier for tracking and settlement
     function kAssetPush(address _asset, uint256 amount, bytes32 batchId) external payable;
 
     /// @notice Requests asset withdrawal from vault to fulfill institutional redemption through kMinter
-    /// @dev This function initiates the first phase of the institutional redemption process. The workflow
-    /// involves: (1) registering the redemption request with the vault, (2) creating a kBatchReceiver minimal
-    /// proxy to hold assets for distribution, (3) updating virtual balance accounting, (4) preparing for
-    /// batch settlement. The actual asset transfer occurs later during batch settlement when the vault
-    /// processes all pending requests together. This two-phase approach optimizes gas costs and ensures
-    /// fair settlement across all institutional redemption requests in the batch.
+    /// @dev This function records a pending redemption request from kMinter. The workflow involves:
+    /// (1) incrementing globalPendingRequests to track cumulative pending withdrawals,
+    /// (2) validating that the effective virtual balance remains sufficient after this request,
+    /// (3) emitting an event for off-chain tracking. The kBatchReceiver is created separately by kMinter
+    /// during requestBurn(). The actual asset transfer occurs later during batch settlement when the
+    /// router processes all pending requests together.
     /// @param _asset The underlying asset address being redeemed
     /// @param amount The quantity of assets requested for redemption
     /// @param batchId The batch identifier for coordinating this redemption with other requests
@@ -267,41 +269,28 @@ interface IkAssetRouter is IVersioned {
         external
         payable;
 
-    /// @notice Requests shares to be pushed for kStakingVault staking operations and batch processing
-    /// @dev This function is part of the share-based accounting system for retail users in kStakingVaults.
-    /// When users stake kTokens, the vault requests shares to be pushed to track their ownership. The
-    /// process coordinates: (1) conversion of kTokens to vault shares at current share price, (2) updating
-    /// user balances in the vault system, (3) preparing for batch settlement. Share requests are batched
-    /// to optimize gas costs and ensure fair pricing across all users in the same settlement period.
-    /// @param sourceVault The kStakingVault address requesting share push operations
-    /// @param amount The quantity of shares being requested for push to users
-    /// @param batchId The batch identifier for coordinating share operations with settlement
-    function kSharesRequestPush(address sourceVault, uint256 amount, bytes32 batchId) external payable;
-
     /* //////////////////////////////////////////////////////////////
                         SETTLEMENT FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Proposes a batch settlement for a vault with yield distribution through kToken minting/burning
+    /// @notice Proposes a batch settlement for a vault with adapter accounting and optional yield distribution
     /// @dev This is the core function that initiates yield distribution in the KAM protocol. The settlement
     /// process involves: (1) calculating final yields after a batch period, (2) determining net new deposits/
     /// redemptions, (3) creating a proposal with cooldown period for security verification, (4) preparing for
-    /// kToken supply adjustment to maintain 1:1 backing. Positive yields result in kToken minting (distributing
-    /// gains to all holders), while losses result in kToken burning (socializing losses). The cooldown period
-    /// allows guardians to verify calculations before execution, ensuring protocol integrity.
+    /// adapter accounting updates. For staking vaults, positive yields result in kToken minting to the vault while
+    /// losses burn kTokens from the vault. The cooldown period allows guardians to verify calculations before
+    /// execution, supporting protocol integrity. On a vault's first
+    /// settlement (no prior virtual balance), non-zero yields revert with KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD
+    /// to prevent unverified bootstrapping.
     /// @param asset The underlying asset address being settled (USDC, WBTC, etc.)
-    /// @param vault The DN vault address where yield was generated
+    /// @param vault The vault address being settled
     /// @param batchId The batch identifier for this settlement period
     /// @param totalAssets Total asset value in the vault after yield generation/loss
-    /// @param lastFeesChargedManagement Timestamp when management fees were last charged (0 = no fees)
-    /// @param lastFeesChargedPerformance Timestamp when performance fees were last charged (0 = no fees)
     function proposeSettleBatch(
         address asset,
         address vault,
         bytes32 batchId,
-        uint256 totalAssets,
-        uint64 lastFeesChargedManagement,
-        uint64 lastFeesChargedPerformance
+        uint256 totalAssets
     )
         external
         payable
@@ -309,11 +298,9 @@ interface IkAssetRouter is IVersioned {
 
     /// @notice Executes a settlement proposal after the security cooldown period has elapsed
     /// @dev This function completes the yield distribution process by: (1) verifying the cooldown period has
-    /// passed, (2) executing the actual kToken minting/burning to distribute yield or account for losses,
-    /// (3) updating all vault balances and user accounting, (4) processing any pending redemption requests
-    /// from the batch. This is where the 1:1 backing is maintained - the kToken supply is adjusted to exactly
-    /// reflect the underlying asset changes, ensuring every kToken remains backed by real assets plus distributed
-    /// yield.
+    /// passed, (2) executing kToken minting/burning for staking vault yield or losses when needed,
+    /// (3) updating adapter and vault accounting, (4) processing any pending kMinter redemption requests
+    /// from the batch.
     /// @param proposalId The unique identifier of the settlement proposal to execute
     function executeSettleBatch(bytes32 proposalId) external payable;
 
@@ -348,10 +335,10 @@ interface IkAssetRouter is IVersioned {
 
     /// @notice Updates the yield tolerance threshold for settlement proposals
     /// @dev This function allows protocol governance to adjust the maximum acceptable yield deviation before
-    /// settlement proposals are rejected. The yield tolerance acts as a safety mechanism to prevent settlement
-    /// proposals with extremely high or low yield values that could indicate calculation errors, data corruption,
-    /// or potential manipulation attempts. Setting an appropriate tolerance balances protocol safety with
-    /// operational flexibility, allowing normal yield fluctuations while blocking suspicious proposals.
+    /// settlement proposals require guardian approval. The yield tolerance acts as a safety mechanism: proposals
+    /// with yield exceeding this threshold are flagged with `requiresApproval = true` and emit a
+    /// `YieldExceedsMaxDeltaWarning` event, requiring explicit guardian approval via `acceptProposal()` before
+    /// execution. Setting an appropriate tolerance balances protocol safety with operational flexibility.
     /// Only admin roles can modify this parameter as it affects protocol safety.
     /// @param tolerance_ The new yield tolerance in basis points (e.g., 1000 = 10%)
     function setMaxAllowedDelta(address vault_, uint256 tolerance_) external;
@@ -451,8 +438,8 @@ interface IkAssetRouter is IVersioned {
 
     /// @notice Gets the current yield tolerance threshold for settlement proposals
     /// @dev The yield tolerance determines the maximum acceptable yield deviation before settlement proposals
-    /// are automatically rejected. This acts as a safety mechanism to prevent processing of settlement proposals
-    /// with excessive yield values that could indicate calculation errors or potential manipulation. The tolerance
+    /// require guardian approval. Proposals exceeding this threshold are flagged with `requiresApproval = true`
+    /// rather than rejected, requiring explicit guardian acceptance via `acceptProposal()`. The tolerance
     /// is expressed in basis points where 10000 equals 100%.
     /// @return tolerance The current yield tolerance in basis points
     function getMaxAllowedDelta(address vault_) external view returns (uint256 tolerance);

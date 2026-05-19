@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { kMinterHandler } from "../handlers/kMinterHandler.t.sol";
 
@@ -158,7 +158,7 @@ abstract contract SetUp is StdInvariant, DeploymentBaseTest {
 
         minter.closeBatch(batchId, true);
 
-        bytes32 proposalId = assetRouter.proposeSettleBatch(token, address(minter), batchId, lastTotalAssets, 0, 0);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(token, address(minter), batchId, lastTotalAssets);
         assetRouter.executeSettleBatch(proposalId);
         vm.stopPrank();
         if (useMinter) {

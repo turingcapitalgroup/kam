@@ -1,8 +1,8 @@
 # IkRegistry
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IkRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IkRegistry.sol)
 
 **Inherits:**
-[IRegistry](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [IExecutionGuardian](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md)
+[IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [IExecutionGuardian](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md)
 
 Unified interface for the KAM protocol registry combining core registry and execution guardian functionality.
 

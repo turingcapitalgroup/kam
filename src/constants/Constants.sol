@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 /// @title KAM Protocol Constants
 /// @notice Centralized constants used across the KAM protocol.

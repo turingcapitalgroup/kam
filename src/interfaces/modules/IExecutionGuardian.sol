@@ -45,7 +45,7 @@ interface IExecutionGuardian {
     function setAllowedSelector(
         address executor,
         address target,
-        uint8 targetType_,
+        TargetType targetType_,
         bytes4 selector,
         bool isAllowed
     )
@@ -108,11 +108,11 @@ interface IExecutionGuardian {
 
     /// @notice Gets executor targets filtered by target type
     /// @param executor The executor address
-    /// @param targetType_ The target type to filter by (e.g., 0 = METAWALLET, 1 = CUSTODIAL)
+    /// @param targetType_ The target type to filter by (e.g., METAWALLET, CUSTODIAL, ASSET)
     /// @return targets An array of target addresses matching the specified type
     function getExecutorTargetsByType(
         address executor,
-        uint8 targetType_
+        TargetType targetType_
     )
         external
         view
@@ -120,8 +120,8 @@ interface IExecutionGuardian {
 
     /// @notice Gets the type of a target
     /// @param target The target address to check the type of
-    /// @return type An array of allowed target addresses for the executor
-    function getTargetType(address target) external view returns (uint8);
+    /// @return type The TargetType variant assigned to the target
+    function getTargetType(address target) external view returns (TargetType);
 
     enum TargetType {
         METAWALLET,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { OptimizedOwnableRoles } from "solady/auth/OptimizedOwnableRoles.sol";
 
@@ -78,6 +78,15 @@ contract kBaseRoles is OptimizedOwnableRoles {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Initializes role assignments for the protocol.
+    ///
+    /// @dev Dual-role grants are convenience defaults for testnet deployments:
+    /// - `_admin` is granted both `ADMIN_ROLE` and `VENDOR_ROLE`.
+    /// - `_relayer` is granted both `RELAYER_ROLE` and `MANAGER_ROLE`.
+    ///
+    /// Production deployments should use separate addresses for each role.
+    /// The owner can revoke and re-grant roles to dedicated addresses after
+    /// initialization via `revokeRoles` and `grantRoles`.
     function __kBaseRoles_init(
         address _owner,
         address _admin,

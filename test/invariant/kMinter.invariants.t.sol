@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { SetUp } from "kam/test/invariant/helpers/SetUp.t.sol";
 
@@ -35,5 +35,13 @@ contract kMinterInvariants is SetUp {
 
     function invariant_kMinterKTokenSupply() public view {
         minterHandler.INVARIANT_G_KTOKEN_SUPPLY();
+    }
+
+    function invariant_kMinterVirtualBalanceNonNegative() public view {
+        minterHandler.INVARIANT_H_VIRTUAL_BALANCE_NON_NEGATIVE();
+    }
+
+    function invariant_kMinterGlobalPendingCovered() public view {
+        minterHandler.INVARIANT_I_GLOBAL_PENDING_COVERED();
     }
 }

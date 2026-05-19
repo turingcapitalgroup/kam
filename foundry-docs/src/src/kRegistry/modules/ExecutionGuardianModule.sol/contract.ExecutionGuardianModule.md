@@ -1,8 +1,8 @@
 # ExecutionGuardianModule
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kRegistry/modules/ExecutionGuardianModule.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kRegistry/modules/ExecutionGuardianModule.sol)
 
 **Inherits:**
-[IExecutionGuardian](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md), [IModule](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
+[IExecutionGuardian](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
 
 Module for managing executor permissions and parameter checking in kRegistry
 
@@ -14,7 +14,7 @@ Inherits from kBaseRoles for role-based access control
 
 ```solidity
 bytes32 private constant EXECUTIONGUARDIANMODULE_STORAGE_LOCATION =
-    0xd14aec45f1b64da194d5b24d6a4dfb8fd6ac8faca4e3d35f6c5e6d5e6f748f00
+    0x1cf339485c663c819058b30a6fe2837d9e6929a0f830fe23d7a50344bd0f3a00
 ```
 
 
@@ -49,11 +49,12 @@ Only callable by ADMIN_ROLE
 function setAllowedSelector(
     address _executor,
     address _target,
-    uint8 _targetType,
+    IExecutionGuardian.TargetType _targetType,
     bytes4 _selector,
     bool _isAllowed
 )
-    external;
+    external
+    virtual;
 ```
 **Parameters**
 
@@ -61,9 +62,35 @@ function setAllowedSelector(
 |----|----|-----------|
 |`_executor`|`address`||
 |`_target`|`address`||
-|`_targetType`|`uint8`||
+|`_targetType`|`IExecutionGuardian.TargetType`||
 |`_selector`|`bytes4`||
 |`_isAllowed`|`bool`||
+
+
+### _setAllowedSelector
+
+Internal function to set executor selector permissions
+
+
+```solidity
+function _setAllowedSelector(
+    address _executor,
+    address _target,
+    IExecutionGuardian.TargetType _targetType,
+    bytes4 _selector,
+    bool _isAllowed
+)
+    internal;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_executor`|`address`|The executor address|
+|`_target`|`address`|The target contract address|
+|`_targetType`|`IExecutionGuardian.TargetType`|The target type classification|
+|`_selector`|`bytes4`|The function selector|
+|`_isAllowed`|`bool`|Whether the selector should be allowed|
 
 
 ### setExecutionValidator
@@ -80,7 +107,8 @@ function setExecutionValidator(
     bytes4 _selector,
     address _executionValidator
 )
-    external;
+    external
+    virtual;
 ```
 **Parameters**
 
@@ -90,6 +118,30 @@ function setExecutionValidator(
 |`_target`|`address`||
 |`_selector`|`bytes4`||
 |`_executionValidator`|`address`||
+
+
+### _setExecutionValidator
+
+Internal function to set an execution validator
+
+
+```solidity
+function _setExecutionValidator(
+    address _executor,
+    address _target,
+    bytes4 _selector,
+    address _executionValidator
+)
+    internal;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_executor`|`address`|The executor address|
+|`_target`|`address`|The target contract address|
+|`_selector`|`bytes4`|The function selector|
+|`_executionValidator`|`address`|The execution validator contract address|
 
 
 ### authorizeCall
@@ -236,7 +288,7 @@ Gets executor targets filtered by target type
 ```solidity
 function getExecutorTargetsByType(
     address _executor,
-    uint8 _targetType
+    IExecutionGuardian.TargetType _targetType
 )
     external
     view
@@ -247,7 +299,7 @@ function getExecutorTargetsByType(
 |Name|Type|Description|
 |----|----|-----------|
 |`_executor`|`address`||
-|`_targetType`|`uint8`||
+|`_targetType`|`IExecutionGuardian.TargetType`||
 
 **Returns**
 
@@ -262,7 +314,7 @@ Gets the type of a target
 
 
 ```solidity
-function getTargetType(address _target) external view returns (uint8);
+function getTargetType(address _target) external view returns (IExecutionGuardian.TargetType);
 ```
 **Parameters**
 
@@ -274,7 +326,7 @@ function getTargetType(address _target) external view returns (uint8);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint8`|type An array of allowed target addresses for the executor|
+|`<none>`|`IExecutionGuardian.TargetType`|type The TargetType variant assigned to the target|
 
 
 ### selectors
@@ -312,8 +364,8 @@ struct ExecutionGuardianModuleStorage {
     mapping(address => mapping(address => mapping(bytes4 => address))) executionValidator;
     /// @dev Tracks all allowed targets for each executor
     mapping(address => OptimizedAddressEnumerableSetLib.AddressSet) executorTargets;
-    /// @dev Maps the type of each target
-    mapping(address => uint8 targetType) targetType;
+    /// @dev Maps the type of each target (METAWALLET / CUSTODIAL / ASSET / ...)
+    mapping(address => IExecutionGuardian.TargetType targetType) targetType;
     /// @dev Counts allowed selectors per executor-target pair for accurate target tracking
     mapping(address => mapping(address => uint256)) executorTargetSelectorCount;
     /// @dev Tracks all allowed selectors for each executor-target pair
