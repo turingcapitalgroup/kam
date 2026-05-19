@@ -1,5 +1,5 @@
 # VaultMathLib
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/libraries/VaultMathLib.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/libraries/VaultMathLib.sol)
 
 Fee calculation and share conversion math for KAM vaults
 
@@ -20,9 +20,7 @@ before rounding becomes exploitable. Sized for 6-decimal assets (USDC, WBTC).
 CALL CONTRACT for vault integrators:
 - Pass POST-MANAGEMENT-FEE total assets to computePerformanceFee, so performance
 fee is never charged on assets already deducted as management fee.
-- Call _accrueFees() before mutating fee rates; otherwise pending management fees
-would be re-priced at the new rate.
-Management fees are time-prorated on total assets, charged on every interaction.
+Management fees are time-prorated on total assets, accrued at settlement only.
 Performance fees are charged on interest gains at settlement, with hurdle rate filtering.
 
 
@@ -59,7 +57,8 @@ uint256 constant VIRTUAL_ASSETS = 1e6
 
 Computes the management fee in asset terms based on time elapsed
 
-Time-prorated annual fee on total assets. Called by _accrueFees at settlement.
+Time-prorated annual fee on total assets. Called inside `settleBatch` / `quoteBatchSettlement`
+at settlement; not accrued eagerly by fee-rate setters.
 
 
 ```solidity
@@ -146,6 +145,20 @@ function convertToAssets(
     pure
     returns (uint256);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_shares`|`uint256`|Number of shares to convert|
+|`_totalAssets`|`uint256`|Current total assets in the vault|
+|`_totalSupply`|`uint256`|Current total share supply|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|Asset amount equivalent to the provided shares|
+
 
 ### convertToShares
 
@@ -162,4 +175,61 @@ function convertToShares(
     pure
     returns (uint256);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_assets`|`uint256`|Number of assets to convert|
+|`_totalAssets`|`uint256`|Current total assets in the vault|
+|`_totalSupply`|`uint256`|Current total share supply|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|Share amount equivalent to the provided assets|
+
+
+### computeFeeShares
+
+Treasury fee shares to mint for a combined management + performance fee.
+
+Single source of truth for fee → share conversion at settlement. Both the on-chain mint
+(`kStakingVault.settleBatch`) and the off-chain quote (`ReaderModule.quoteBatchSettlement`)
+must route through this function so the proposal numbers and the executed mint can't drift.
+Pricing the fee against `_totalAssets - _totalFeeAssets` (plus the virtual offset added by
+`convertToShares`) cancels the self-dilution introduced by minting the new shares: the
+treasury's post-mint share value then equals `_totalFeeAssets` (modulo virtual-offset
+rounding — a single floor on a single `convertToShares` call, ≤ 1 wei when share price
+is ~1 and bounded by `ceil(sharePrice)` otherwise).
+Returns 0 when there are no fees to mint or no existing supply to dilute. Reverts when the
+combined fee would consume the entire pre-fee asset base — that can only happen with
+misconfigured fee rates or extreme settlement periods and must fail loud rather than
+silently mint zero shares and let unstakers absorb the asset chunk meant for the treasury.
+
+
+```solidity
+function computeFeeShares(
+    uint256 _totalFeeAssets,
+    uint256 _totalAssets,
+    uint256 _totalSupply
+)
+    internal
+    pure
+    returns (uint256);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_totalFeeAssets`|`uint256`|Combined management + performance fee in asset terms|
+|`_totalAssets`|`uint256`|Vault total assets snapshot used for settlement|
+|`_totalSupply`|`uint256`|Pre-mint share supply|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|Treasury fee share amount to mint|
+
 

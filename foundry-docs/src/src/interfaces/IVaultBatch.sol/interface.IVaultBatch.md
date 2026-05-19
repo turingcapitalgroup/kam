@@ -1,5 +1,5 @@
 # IVaultBatch
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IVaultBatch.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/interfaces/IVaultBatch.sol)
 
 Interface for batch lifecycle management enabling gas-efficient settlement of multiple user operations
 
@@ -65,18 +65,17 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 ### settleBatch
 
-Marks a batch as settled after yield distribution, accrues fees, mints shares for pending stakers, and enables claiming
+Marks a batch as settled after yield distribution, mints proposed fees, mints shares for pending stakers, and enables claiming
 
-This function finalizes batch settlement by computing and accruing fees, recording final asset values, minting shares, and enabling claims.
-Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Accrues
-time-prorated management fees via `_accrueFees()` and computes per-batch performance fees via
-`VaultMathLib.computePerformanceFee()` on net interest above the hurdle rate — both fee types are minted
-as shares directly to the treasury inside this function (no separate notify step), (3) Updates
+This function finalizes batch settlement by minting the fee amounts snapshotted in the router proposal, recording final asset values, minting shares, and enabling claims.
+Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Uses
+the fee amounts computed at proposal time — both fee types are minted as shares directly to the
+treasury inside this function (no separate notify step), (3) Updates
 `lastSettlementBalance` to snapshot current vault balance as the baseline for the next batch's interest
 calculation, (4) Snapshots total assets and total supply at settlement time from which share price is
 derived for stake and unstake calculations, (5) Mints stkTokens for all pending stakers in this batch
-to the vault itself at the settlement net share price, (6) Burns all requested unstake stkTokens and
-calculates claimable kTokens at net price, decreasing internal balance accordingly, (7) Marks batch as
+to the vault itself at the settlement share price, (6) Burns all requested unstake stkTokens and
+calculates claimable kTokens at the settled price, decreasing internal balance accordingly, (7) Marks batch as
 settled enabling users to claim their staked shares or unstaked assets. Only kAssetRouter can settle batches
 as it coordinates yield calculations across DN vaults and manages cross-vault asset flows. The pre-minting
 approach ensures share prices are locked at settlement and users receive shares via transfer (not mint) when
@@ -84,12 +83,21 @@ they claim.
 
 
 ```solidity
-function settleBatch(bytes32 _batchId) external;
+function settleBatch(
+    bytes32 _batchId,
+    uint64 _proposedAt,
+    uint256 _managementFees,
+    uint256 _performanceFees
+)
+    external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`_batchId`|`bytes32`|The batch identifier to mark as settled (must be closed, not previously settled)|
+|`_proposedAt`|`uint64`|The exact block.timestamp when the proposal was submitted, used to freeze fee math|
+|`_managementFees`|`uint256`|Management fee assets computed when the settlement was proposed|
+|`_performanceFees`|`uint256`|Performance fee assets computed when the settlement was proposed|
 
 

@@ -1,5 +1,5 @@
 # OptimizedOwnableRoles
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/vendor/solady/auth/OptimizedOwnableRoles.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/vendor/solady/auth/OptimizedOwnableRoles.sol)
 
 **Inherits:**
 [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)

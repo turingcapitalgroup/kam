@@ -1,5 +1,5 @@
 # BaseVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kStakingVault/base/BaseVault.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kStakingVault/base/BaseVault.sol)
 
 **Inherits:**
 [ERC20](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md), [OptimizedReentrancyGuardTransient](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/OptimizedReentrancyGuardTransient.sol/abstract.OptimizedReentrancyGuardTransient.md), [ERC2771Context](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md)
@@ -451,13 +451,9 @@ function _convertToSharesWithTotals(
 
 Calculates share price per stkToken
 
-This function provides the total vault performance-based share price before fee deductions. The
-calculation:
-(1) Handles zero total supply edge case with 1:1 initial pricing, (2) Uses total gross assets including accrued
-fees for complete performance measurement, (3) Applies precise fixed-point mathematics for accurate pricing.
-This gross pricing is used for settlement calculations, performance fee assessments, and watermark tracking.
-The inclusion of fees provides complete vault performance measurement for fee calculations and settlement
-coordination.
+Converts a one-share unit (10^decimals) to asset terms using current `_totalAssets()` and
+`totalSupply()`. Handles zero total supply edge case with 1:1 initial pricing via the underlying
+`convertToAssets` math.
 
 
 ```solidity
@@ -532,41 +528,6 @@ function _decreaseBalance(uint128 _amount) internal;
 |Name|Type|Description|
 |----|----|-----------|
 |`_amount`|`uint128`|The amount to decrease the balance by|
-
-
-### _accrueFees
-
-Computes pending management fee assets and updates the last fee timestamp
-
-Called at settlement and before fee rate changes. Does NOT mint shares — the caller
-is responsible for converting and minting. Returns 0 if no supply or no fees due.
-
-
-```solidity
-function _accrueFees() internal returns (uint256 managementFeeAssets);
-```
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`managementFeeAssets`|`uint256`|Management fee in asset terms|
-
-
-### _mintManagementFees
-
-Mints management fee shares to the treasury
-
-Called by settlement and fee config setters to mint accrued management fees
-
-
-```solidity
-function _mintManagementFees(uint256 _managementFeeAssets) internal;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_managementFeeAssets`|`uint256`|Management fee amount in asset terms|
 
 
 ### _getLastSettlementBalance

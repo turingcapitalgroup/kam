@@ -1,8 +1,8 @@
 # IERC1155Receiver
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/vendor/openzeppelin/token/ERC1155/IERC1155Receiver.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/vendor/openzeppelin/token/ERC1155/IERC1155Receiver.sol)
 
 **Inherits:**
-[IERC165](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/utils/introspection/IERC165.sol/interface.IERC165.md)
+[IERC165](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/utils/introspection/IERC165.sol/interface.IERC165.md)
 
 Interface that must be implemented by smart contracts in order to receive
 ERC-1155 token transfers.

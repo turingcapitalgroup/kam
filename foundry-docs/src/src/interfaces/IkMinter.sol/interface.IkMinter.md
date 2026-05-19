@@ -1,5 +1,5 @@
 # IkMinter
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IkMinter.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/interfaces/IkMinter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -17,8 +17,8 @@ supports a two-phase redemption process to accommodate batch processing and yiel
 Executes institutional minting of kTokens through immediate 1:1 issuance against deposited assets
 
 This function enables qualified institutions to mint kTokens by depositing underlying assets. The process
-involves: (1) transferring assets from the caller to kAssetRouter, (2) pushing assets into the current batch
-of the designated DN vault for yield generation, and (3) immediately minting an equivalent amount of kTokens
+involves: (1) transferring assets from the caller to kAssetRouter, (2) pushing assets into the kMinter adapter
+for the asset's current batch, and (3) immediately minting an equivalent amount of kTokens
 to the recipient. Unlike retail operations, institutional mints bypass share-based accounting and provide
 immediate token issuance without waiting for batch settlement. The deposited assets are tracked separately
 to maintain the 1:1 backing ratio and will participate in vault yield strategies through the batch system.
@@ -46,8 +46,8 @@ consists of: (1) transferring kTokens from the caller to this contract for escro
 generating a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4)
 registering the request with kAssetRouter for batch processing. The kTokens remain in escrow until the
 batch is settled (when they are burned in bulk by settleBatch()) and the user calls burn() to claim assets.
-This two-phase approach is necessary because redemptions are processed in batches through the DN vault system,
-which requires waiting for batch settlement to ensure proper asset availability and yield distribution.
+This two-phase approach is necessary because redemptions are processed in batches through the settlement system,
+which requires waiting for batch settlement to ensure proper asset availability.
 
 
 ```solidity
@@ -134,13 +134,22 @@ Burns all `requestedSharesInBatch` kTokens at once and decrements `totalLockedAs
 
 
 ```solidity
-function settleBatch(bytes32 _batchId) external;
+function settleBatch(
+    bytes32 _batchId,
+    uint64 _proposedAt,
+    uint256 _managementFees,
+    uint256 _performanceFees
+)
+    external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`_batchId`|`bytes32`|The batch ID to settle|
+|`_proposedAt`|`uint64`|The exact block.timestamp when the proposal was submitted|
+|`_managementFees`|`uint256`|Unused fee amount for interface compatibility|
+|`_performanceFees`|`uint256`|Unused fee amount for interface compatibility|
 
 
 ### getBatchId
@@ -355,9 +364,9 @@ function getRequestCounter() external view returns (uint256);
 
 ### getTotalLockedAssets
 
-Gets the total locked assets for a specific asset
+Gets the net kToken backing minted through kMinter for a specific asset
 
-Returns the cumulative amount of assets deposited through mint operations for accounting
+Increases on mint and decreases when redemption batches settle.
 
 
 ```solidity
@@ -373,7 +382,7 @@ function getTotalLockedAssets(address asset) external view returns (uint256);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|The total amount of assets locked in the protocol|
+|`<none>`|`uint256`|The net amount of kToken backing tracked by kMinter|
 
 
 ### isClosed

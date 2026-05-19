@@ -1,5 +1,5 @@
 # kAssetRouter
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kAssetRouter.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kAssetRouter.sol)
 
 **Inherits:**
 [IkAssetRouter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.IkAssetRouter.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
@@ -9,12 +9,12 @@ distribution
 
 This contract serves as the heart of the KAM protocol's financial infrastructure, coordinating complex
 interactions between institutional flows (kMinter), retail flows (kStakingVaults), and yield generation (DN vaults).
-Key responsibilities include: (1) Managing asset pushes from kMinter institutional deposits to DN vaults for yield
-generation, (2) Coordinating virtual asset transfers between kStakingVaults for optimal capital allocation,
+Key responsibilities include: (1) Managing asset pushes from kMinter institutional deposits to kMinter adapters,
+(2) Coordinating virtual asset transfers between kStakingVaults for optimal capital allocation,
 (3) Processing batch settlements with yield distribution through precise kToken minting/burning operations,
 (4) Maintaining virtual balance tracking across all vaults for accurate accounting, (5) Implementing security
-cooldown periods for settlement proposals, (6) Executing peg protection mechanisms during market stress.
-The contract ensures protocol integrity by maintaining the 1:1 backing guarantee through carefully orchestrated
+cooldown periods for settlement proposals, (6) Requiring guardian approval for high-delta settlements.
+The contract supports protocol integrity through carefully orchestrated
 money flows while enabling efficient capital utilization across the entire vault network.
 
 
@@ -104,13 +104,12 @@ function initialize(address _registryAddr, address _owner) external initializer;
 
 ### kAssetPush
 
-Pushes assets from kMinter institutional deposits to the designated DN vault for yield generation
+Pushes assets from kMinter institutional deposits to the registered kMinter adapter
 
 This function is called by kMinter when institutional users deposit underlying assets. The process
-involves: (1) receiving assets already transferred from kMinter, (2) forwarding them to the appropriate
-DN vault for the asset type, (3) updating virtual balance tracking for accurate accounting. This enables
-immediate kToken minting (1:1 with deposits) while assets begin generating yield in the vault system.
-The assets enter the current batch for eventual settlement and yield distribution back to kToken holders.
+involves: (1) receiving assets already transferred from kMinter, (2) forwarding them to the registered
+kMinter adapter for the asset, and (3) using the batch ID for later settlement accounting. This enables
+immediate kToken minting (1:1 with deposits).
 
 
 ```solidity
@@ -185,14 +184,14 @@ function kAssetTransfer(
 
 ### proposeSettleBatch
 
-Proposes a batch settlement for a vault with yield distribution through kToken minting/burning
+Proposes a batch settlement for a vault with adapter accounting and optional yield distribution
 
 This is the core function that initiates yield distribution in the KAM protocol. The settlement
 process involves: (1) calculating final yields after a batch period, (2) determining net new deposits/
 redemptions, (3) creating a proposal with cooldown period for security verification, (4) preparing for
-kToken supply adjustment to maintain 1:1 backing. Positive yields result in kToken minting (distributing
-gains to all holders), while losses result in kToken burning (socializing losses). The cooldown period
-allows guardians to verify calculations before execution, ensuring protocol integrity. On a vault's first
+adapter accounting updates. For staking vaults, positive yields result in kToken minting to the vault while
+losses burn kTokens from the vault. The cooldown period allows guardians to verify calculations before
+execution, supporting protocol integrity. On a vault's first
 settlement (no prior virtual balance), non-zero yields revert with KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD
 to prevent unverified bootstrapping.
 
@@ -218,16 +217,155 @@ function proposeSettleBatch(
 |`_totalAssets`|`uint256`||
 
 
+### _createProposal
+
+Creates and stores the settlement proposal after all validations pass
+
+Computes yield, checks tolerance, caches adapter, and emits events.
+
+
+```solidity
+function _createProposal(
+    kAssetRouterStorage storage $,
+    bytes32 _proposalId,
+    SettlementProposalParams memory _params
+)
+    private;
+```
+
+### _generateProposalId
+
+Generates a unique proposal ID using vault, asset, batch, timestamp and counter
+
+
+```solidity
+function _generateProposalId(
+    kAssetRouterStorage storage $,
+    address _vault,
+    address _asset,
+    bytes32 _batchId
+)
+    private
+    returns (bytes32 _proposalId);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`$`|`kAssetRouterStorage`|Storage reference|
+|`_vault`|`address`|Vault address|
+|`_asset`|`address`|Asset address|
+|`_batchId`|`bytes32`|Batch identifier|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_proposalId`|`bytes32`|The generated unique proposal ID|
+
+
+### _checkNoPendingProposalForAsset
+
+Ensures no pending proposal exists for the same asset on the given vault
+
+kMinter allows multiple pending proposals per vault but only one per asset;
+kStakingVaults allow only one pending proposal at a time.
+
+
+```solidity
+function _checkNoPendingProposalForAsset(
+    kAssetRouterStorage storage $,
+    address _vault,
+    address _asset,
+    bool _isMinter
+)
+    private
+    view;
+```
+
+### _computeNetting
+
+Computes the netting (deposits minus requested assets) for a batch
+
+Uses different logic for kMinter (direct share amounts) vs kStakingVault (convertToAssetsWithTotals)
+
+
+```solidity
+function _computeNetting(
+    address _vault,
+    bytes32 _batchId,
+    address _asset,
+    uint256 _totalAssets,
+    bool _isMinter,
+    uint64 _proposedAt
+)
+    private
+    view
+    returns (uint256 _requestedInBatch, int256 _netted, uint256 _managementFees, uint256 _performanceFees);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_requestedInBatch`|`uint256`|The number of shares/assets requested for withdrawal in this batch|
+|`_netted`|`int256`|The net deposit/withdrawal amount (positive = net deposit, negative = net withdrawal)|
+|`_managementFees`|`uint256`||
+|`_performanceFees`|`uint256`||
+
+
+### _checkYieldTolerance
+
+Checks if yield exceeds the tolerance threshold for the vault
+
+Emits a warning event if yield exceeds tolerance and returns true to flag for guardian approval
+
+
+```solidity
+function _checkYieldTolerance(
+    kAssetRouterStorage storage $,
+    address _vault,
+    address _asset,
+    bytes32 _batchId,
+    uint256 _lastTotalAssets,
+    int256 _yield
+)
+    private
+    returns (bool _requiresApproval);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_requiresApproval`|`bool`|Whether the proposal requires guardian approval before execution|
+
+
+### _validateAndDecrementGlobalPending
+
+Validates that kMinter has sufficient global pending coverage and decrements it
+
+Checks virtual balance after applying netting to ensure no overdraft. Must be called
+BEFORE adding the proposal to the pending set to avoid iterating an uninitialized proposal slot.
+
+
+```solidity
+function _validateAndDecrementGlobalPending(
+    kAssetRouterStorage storage $,
+    address _vault,
+    address _asset,
+    uint256 _requestedInBatch,
+    int256 _netted
+)
+    private;
+```
+
 ### executeSettleBatch
 
 Executes a settlement proposal after the security cooldown period has elapsed
 
 This function completes the yield distribution process by: (1) verifying the cooldown period has
-passed, (2) executing the actual kToken minting/burning to distribute yield or account for losses,
-(3) updating all vault balances and user accounting, (4) processing any pending redemption requests
-from the batch. This is where the 1:1 backing is maintained - the kToken supply is adjusted to exactly
-reflect the underlying asset changes, ensuring every kToken remains backed by real assets plus distributed
-yield.
+passed, (2) executing kToken minting/burning for staking vault yield or losses when needed,
+(3) updating adapter and vault accounting, (4) processing any pending kMinter redemption requests
+from the batch.
 
 
 ```solidity
@@ -284,10 +422,9 @@ function acceptProposal(bytes32 _proposalId) external;
 
 Internal function to execute the core settlement logic with yield distribution
 
-This function performs the critical yield distribution process: (1) mints or burns kTokens
-to reflect yield gains/losses, (2) updates vault accounting and batch tracking, (3) coordinates
-the 1:1 backing maintenance. This is where the protocol's fundamental promise is maintained -
-the kToken supply is adjusted to precisely match underlying asset changes plus distributed yield.
+This function performs the critical settlement process: (1) transfers kMinter redemption assets or
+mints/burns kTokens for staking vault yield/losses, (2) updates adapter accounting and batch tracking,
+(3) coordinates protocol accounting across the kMinter and staking vault adapters.
 
 
 ```solidity
@@ -299,6 +436,29 @@ function _executeSettlement(VaultSettlementProposal storage _proposal) private;
 |----|----|-----------|
 |`_proposal`|`VaultSettlementProposal`|The settlement proposal storage reference containing all settlement parameters|
 
+
+### _executeMinterSettlement
+
+Executes settlement for kMinter batches
+
+Handles pull of requested assets, batch settlement, and kMinter adapter total asset update
+
+
+```solidity
+function _executeMinterSettlement(VaultSettlementProposal storage _proposal) private;
+```
+
+### _executeVaultSettlement
+
+Executes settlement for kStakingVault batches
+
+Handles yield distribution (mint/burn kTokens), kMinter adapter update, vault settlement,
+and global pending request cleanup.
+
+
+```solidity
+function _executeVaultSettlement(VaultSettlementProposal storage _proposal, address _kMinter) private;
+```
 
 ### setSettlementCooldown
 
@@ -326,10 +486,8 @@ function setSettlementCooldown(uint256 _cooldown) external;
 Updates the yield tolerance threshold for settlement proposals
 
 This function allows protocol governance to adjust the maximum acceptable yield deviation before
-settlement proposals are rejected. The yield tolerance acts as a safety mechanism to prevent settlement
-proposals with extremely high or low yield values that could indicate calculation errors, data corruption,
-or potential manipulation attempts. Setting an appropriate tolerance balances protocol safety with
-operational flexibility, allowing normal yield fluctuations while blocking suspicious proposals.
+settlement proposals require guardian approval. Proposals beyond the tolerance are flagged for explicit
+guardian acceptance instead of being rejected outright.
 
 
 ```solidity
@@ -969,6 +1127,21 @@ function contractVersion() external pure returns (string memory);
 
 
 ## Structs
+### SettlementProposalParams
+
+```solidity
+struct SettlementProposalParams {
+    address asset;
+    address vault;
+    bytes32 batchId;
+    uint256 totalAssets;
+    int256 netted;
+    uint256 managementFees;
+    uint256 performanceFees;
+    uint64 proposedAt;
+}
+```
+
 ### kAssetRouterStorage
 Core storage structure for kAssetRouter using ERC-7201 namespaced storage pattern
 
@@ -985,7 +1158,7 @@ struct kAssetRouterStorage {
     uint256 proposalCounter;
     /// @dev Current cooldown period in seconds before settlement proposals can be executed
     uint256 vaultSettlementCooldown;
-    /// @dev Maximum allowed yield deviation in basis points per vault before settlement proposal is rejected
+    /// @dev Maximum allowed yield deviation in basis points per vault before guardian approval is required
     mapping(address vault => uint256) maxAllowedDelta;
     /// @dev Set of proposal IDs that have been executed to prevent double-execution
     OptimizedBytes32EnumerableSetLib.Bytes32Set executedProposalIds;

@@ -1,8 +1,8 @@
 # kMinter
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kMinter.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kMinter.sol)
 
 **Inherits:**
-[IkMinter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [ISettleBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.ISettleBatch.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
+[IkMinter](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [ISettleBatch](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.ISettleBatch.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
 
 Institutional gateway for kToken minting and redemption with batch settlement processing
 
@@ -75,8 +75,8 @@ function initialize(address _registryAddr, address _owner) external initializer;
 Executes institutional minting of kTokens through immediate 1:1 issuance against deposited assets
 
 This function enables qualified institutions to mint kTokens by depositing underlying assets. The process
-involves: (1) transferring assets from the caller to kAssetRouter, (2) pushing assets into the current batch
-of the designated DN vault for yield generation, and (3) immediately minting an equivalent amount of kTokens
+involves: (1) transferring assets from the caller to kAssetRouter, (2) pushing assets into the kMinter adapter
+for the asset's current batch, and (3) immediately minting an equivalent amount of kTokens
 to the recipient. Unlike retail operations, institutional mints bypass share-based accounting and provide
 immediate token issuance without waiting for batch settlement. The deposited assets are tracked separately
 to maintain the 1:1 backing ratio and will participate in vault yield strategies through the batch system.
@@ -104,8 +104,8 @@ consists of: (1) transferring kTokens from the caller to this contract for escro
 generating a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4)
 registering the request with kAssetRouter for batch processing. The kTokens remain in escrow until the
 batch is settled (when they are burned in bulk by settleBatch()) and the user calls burn() to claim assets.
-This two-phase approach is necessary because redemptions are processed in batches through the DN vault system,
-which requires waiting for batch settlement to ensure proper asset availability and yield distribution.
+This two-phase approach is necessary because redemptions are processed in batches through the settlement system,
+which requires waiting for batch settlement to ensure proper asset availability.
 
 
 ```solidity
@@ -192,13 +192,16 @@ Burns all `requestedSharesInBatch` kTokens at once and decrements `totalLockedAs
 
 
 ```solidity
-function settleBatch(bytes32 _batchId) external override(IkMinter, ISettleBatch);
+function settleBatch(bytes32 _batchId, uint64, uint256, uint256) external override(IkMinter, ISettleBatch);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`_batchId`|`bytes32`|The batch ID to settle|
+|`<none>`|`uint64`||
+|`<none>`|`uint256`||
+|`<none>`|`uint256`||
 
 
 ### _createBatchReceiver
@@ -615,9 +618,9 @@ function getRequestCounter() external view returns (uint256);
 
 ### getTotalLockedAssets
 
-Gets the total locked assets for a specific asset
+Gets the net kToken backing minted through kMinter for a specific asset
 
-Returns the cumulative amount of assets deposited through mint operations for accounting
+Increases on mint and decreases when redemption batches settle.
 
 
 ```solidity
@@ -633,7 +636,7 @@ function getTotalLockedAssets(address _asset) external view returns (uint256);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|The total amount of assets locked in the protocol|
+|`<none>`|`uint256`|The net amount of kToken backing tracked by kMinter|
 
 
 ### _authorizeUpgrade
@@ -704,7 +707,7 @@ struct kMinterStorage {
     uint64 requestCounter;
     /// @dev receiverImplementation address
     address receiverImplementation;
-    /// @dev Tracks total assets locked in pending redemption requests per asset
+    /// @dev Tracks net kToken backing minted through kMinter per asset, reduced as redemption batches settle
     mapping(address => uint256) totalLockedAssets;
     /// @dev Maps request IDs to their corresponding burn request data
     mapping(bytes32 => BurnRequest) burnRequests;

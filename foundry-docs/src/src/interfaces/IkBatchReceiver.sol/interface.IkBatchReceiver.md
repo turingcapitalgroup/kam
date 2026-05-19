@@ -1,5 +1,5 @@
 # IkBatchReceiver
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IkBatchReceiver.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/interfaces/IkBatchReceiver.sol)
 
 Interface for minimal proxy contracts that manage asset distribution for completed batch redemptions
 
@@ -116,7 +116,7 @@ function rescueAssets(address asset, address to, uint256 amount) external payabl
 |----|----|-----------|
 |`asset`|`address`|The contract address of the asset to rescue (use address(0) for native ETH recovery)|
 |`to`|`address`|The address that will receive the recovered assets|
-|`amount`|`uint256`|the amount of assets to be recovered to.|
+|`amount`|`uint256`|The quantity of assets to be recovered|
 
 
 ## Events

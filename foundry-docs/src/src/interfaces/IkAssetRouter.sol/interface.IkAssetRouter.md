@@ -1,5 +1,5 @@
 # IkAssetRouter
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IkAssetRouter.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/interfaces/IkAssetRouter.sol)
 
 **Inherits:**
 [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
@@ -8,24 +8,23 @@ Central money flow coordinator for the KAM protocol managing all asset movements
 
 This interface defines the core functionality for kAssetRouter, which serves as the primary coordinator
 for all asset movements within the KAM protocol ecosystem. Key responsibilities include: (1) Managing asset
-flows from kMinter institutional deposits to DN vaults for yield generation, (2) Coordinating asset transfers
+flows from kMinter institutional deposits to kMinter adapters, (2) Coordinating asset transfers
 between kStakingVaults for optimal allocation, (3) Processing batch settlements with yield distribution through
 kToken minting/burning, (4) Maintaining virtual balance tracking across all vaults, (5) Implementing settlement
-cooldown periods for security, (6) Executing peg protection mechanisms during market stress. The router acts as
-the central hub that enables efficient capital allocation while maintaining the 1:1 backing guarantee of kTokens
-through precise yield distribution and loss management across the protocol's vault network.
+cooldown periods for security, (6) Requiring guardian approval for high-delta settlements. The router acts as
+the central hub that enables efficient capital allocation and coordinated yield/loss management across the
+protocol's vault network.
 
 
 ## Functions
 ### kAssetPush
 
-Pushes assets from kMinter institutional deposits to the designated DN vault for yield generation
+Pushes assets from kMinter institutional deposits to the registered kMinter adapter
 
 This function is called by kMinter when institutional users deposit underlying assets. The process
-involves: (1) receiving assets already transferred from kMinter, (2) forwarding them to the appropriate
-DN vault for the asset type, (3) updating virtual balance tracking for accurate accounting. This enables
-immediate kToken minting (1:1 with deposits) while assets begin generating yield in the vault system.
-The assets enter the current batch for eventual settlement and yield distribution back to kToken holders.
+involves: (1) receiving assets already transferred from kMinter, (2) forwarding them to the registered
+kMinter adapter for the asset, and (3) using the batch ID for later settlement accounting. This enables
+immediate kToken minting (1:1 with deposits).
 
 
 ```solidity
@@ -36,8 +35,8 @@ function kAssetPush(address _asset, uint256 amount, bytes32 batchId) external pa
 |Name|Type|Description|
 |----|----|-----------|
 |`_asset`|`address`|The underlying asset address being deposited (must be registered in protocol)|
-|`amount`|`uint256`|The quantity of assets being pushed to the vault for yield generation|
-|`batchId`|`bytes32`|The current batch identifier from the DN vault for tracking and settlement|
+|`amount`|`uint256`|The quantity of assets being pushed to the adapter|
+|`batchId`|`bytes32`|The current kMinter batch identifier for tracking and settlement|
 
 
 ### kAssetRequestPull
@@ -100,14 +99,14 @@ function kAssetTransfer(
 
 ### proposeSettleBatch
 
-Proposes a batch settlement for a vault with yield distribution through kToken minting/burning
+Proposes a batch settlement for a vault with adapter accounting and optional yield distribution
 
 This is the core function that initiates yield distribution in the KAM protocol. The settlement
 process involves: (1) calculating final yields after a batch period, (2) determining net new deposits/
 redemptions, (3) creating a proposal with cooldown period for security verification, (4) preparing for
-kToken supply adjustment to maintain 1:1 backing. Positive yields result in kToken minting (distributing
-gains to all holders), while losses result in kToken burning (socializing losses). The cooldown period
-allows guardians to verify calculations before execution, ensuring protocol integrity. On a vault's first
+adapter accounting updates. For staking vaults, positive yields result in kToken minting to the vault while
+losses burn kTokens from the vault. The cooldown period allows guardians to verify calculations before
+execution, supporting protocol integrity. On a vault's first
 settlement (no prior virtual balance), non-zero yields revert with KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD
 to prevent unverified bootstrapping.
 
@@ -128,7 +127,7 @@ function proposeSettleBatch(
 |Name|Type|Description|
 |----|----|-----------|
 |`asset`|`address`|The underlying asset address being settled (USDC, WBTC, etc.)|
-|`vault`|`address`|The DN vault address where yield was generated|
+|`vault`|`address`|The vault address being settled|
 |`batchId`|`bytes32`|The batch identifier for this settlement period|
 |`totalAssets`|`uint256`|Total asset value in the vault after yield generation/loss|
 
@@ -138,11 +137,9 @@ function proposeSettleBatch(
 Executes a settlement proposal after the security cooldown period has elapsed
 
 This function completes the yield distribution process by: (1) verifying the cooldown period has
-passed, (2) executing the actual kToken minting/burning to distribute yield or account for losses,
-(3) updating all vault balances and user accounting, (4) processing any pending redemption requests
-from the batch. This is where the 1:1 backing is maintained - the kToken supply is adjusted to exactly
-reflect the underlying asset changes, ensuring every kToken remains backed by real assets plus distributed
-yield.
+passed, (2) executing kToken minting/burning for staking vault yield or losses when needed,
+(3) updating adapter and vault accounting, (4) processing any pending kMinter redemption requests
+from the batch.
 
 
 ```solidity
@@ -661,10 +658,10 @@ event ContractInitialized(address indexed registry);
 |`registry`|`address`|The address of the kRegistry contract that manages protocol configuration|
 
 ### AssetsPushed
-Emitted when assets are pushed from kMinter to a DN vault for yield generation
+Emitted when assets are pushed from kMinter to its adapter
 
 This occurs when institutional users deposit assets through kMinter, and the router
-forwards these assets to the appropriate DN vault for yield farming strategies
+forwards these assets to the registered kMinter adapter for that asset.
 
 
 ```solidity
@@ -931,7 +928,7 @@ event YieldExceedsMaxDeltaWarning(
 
 |Name|Type|Description|
 |----|----|-----------|
-|`vault`|`address`|The DN vault address|
+|`vault`|`address`|The vault address|
 |`asset`|`address`|The underlying asset address|
 |`batchId`|`bytes32`|The batch identifier|
 |`yield`|`int256`|The yield amount|
@@ -942,15 +939,15 @@ event YieldExceedsMaxDeltaWarning(
 Contains all parameters for a batch settlement proposal in the yield distribution system
 
 Settlement proposals implement a cooldown mechanism for security, allowing guardians to verify
-yield calculations before execution. Once executed, the proposal triggers kToken minting/burning to
-distribute yield or account for losses, maintaining the 1:1 backing ratio across all kTokens.
+yield calculations before execution. Once executed, the proposal may trigger kToken minting/burning for
+staking vault yield/losses and updates adapter accounting.
 
 
 ```solidity
 struct VaultSettlementProposal {
     /// @dev The underlying asset address being settled (USDC, WBTC, etc.)
     address asset;
-    /// @dev The DN vault address where yield was generated
+    /// @dev The vault address being settled
     address vault;
     /// @dev Cached adapter address at proposal creation - prevents registry modification from breaking execution
     address adapter;
@@ -962,6 +959,12 @@ struct VaultSettlementProposal {
     int256 netted;
     /// @dev Absolute yield amount (positive or negative) generated in this batch
     int256 yield;
+    /// @dev Management fee assets computed when the proposal was created
+    uint256 managementFees;
+    /// @dev Performance fee assets computed when the proposal was created
+    uint256 performanceFees;
+    /// @notice Exact timestamp the proposal was submitted, used to freeze fee math
+    uint64 proposedAt;
     /// @dev Timestamp after which this proposal can be executed (cooldown protection)
     uint64 executeAfter;
     /// @dev True if yield delta exceeded threshold, requires guardian approval before execution
@@ -984,3 +987,4 @@ enum ProposalStatus {
     REQUIRES_APPROVAL
 }
 ```
+

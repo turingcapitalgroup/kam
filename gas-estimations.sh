@@ -34,12 +34,12 @@ TT='┬'  # Top T
 BT='┴'  # Bottom T
 CR='┼'  # Cross
 
-echo -e "${CYAN}${BOLD}⛽ Running forge test --gas-report...${RESET}"
-forge test --gas-report > "$TEMP_FILE" 2>&1 || true
+echo -e "${CYAN}${BOLD}⛽ Running forge test --gas-report (excluding invariants)...${RESET}"
+forge test --gas-report --no-match-contract "Invariant" > "$TEMP_FILE" 2>&1 || true
 
-# Hardcoded mainnet gas price and ETH price (2026-03-20)
-GAS_PRICE_GWEI="0.12"
-ETH_PRICE="2135"
+# Hardcoded mainnet gas price and ETH price (2026-05-19)
+GAS_PRICE_GWEI="0.097"
+ETH_PRICE="2113"
 echo -e "${CYAN}📡 Using mainnet gas price: ${GAS_PRICE_GWEI} gwei${RESET}"
 echo -e "${CYAN}💰 Using ETH price: \$${ETH_PRICE}${RESET}"
 
