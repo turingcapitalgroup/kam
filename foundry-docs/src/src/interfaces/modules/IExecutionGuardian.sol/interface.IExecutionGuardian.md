@@ -1,5 +1,5 @@
 # IExecutionGuardian
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/modules/IExecutionGuardian.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/modules/IExecutionGuardian.sol)
 
 Interface for managing executor permissions and security controls.
 
@@ -18,7 +18,7 @@ Only callable by ADMIN_ROLE
 function setAllowedSelector(
     address executor,
     address target,
-    uint8 targetType_,
+    TargetType targetType_,
     bytes4 selector,
     bool isAllowed
 )
@@ -30,7 +30,7 @@ function setAllowedSelector(
 |----|----|-----------|
 |`executor`|`address`|The executor address|
 |`target`|`address`|The target contract address|
-|`targetType_`|`uint8`||
+|`targetType_`|`TargetType`||
 |`selector`|`bytes4`|The function selector|
 |`isAllowed`|`bool`|Whether the selector is allowed|
 
@@ -181,7 +181,7 @@ Gets executor targets filtered by target type
 ```solidity
 function getExecutorTargetsByType(
     address executor,
-    uint8 targetType_
+    TargetType targetType_
 )
     external
     view
@@ -192,7 +192,7 @@ function getExecutorTargetsByType(
 |Name|Type|Description|
 |----|----|-----------|
 |`executor`|`address`|The executor address|
-|`targetType_`|`uint8`|The target type to filter by (e.g., 0 = METAWALLET, 1 = CUSTODIAL)|
+|`targetType_`|`TargetType`|The target type to filter by (e.g., METAWALLET, CUSTODIAL, ASSET)|
 
 **Returns**
 
@@ -207,7 +207,7 @@ Gets the type of a target
 
 
 ```solidity
-function getTargetType(address target) external view returns (uint8);
+function getTargetType(address target) external view returns (TargetType);
 ```
 **Parameters**
 
@@ -219,7 +219,7 @@ function getTargetType(address target) external view returns (uint8);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint8`|type An array of allowed target addresses for the executor|
+|`<none>`|`TargetType`|type The TargetType variant assigned to the target|
 
 
 ## Events

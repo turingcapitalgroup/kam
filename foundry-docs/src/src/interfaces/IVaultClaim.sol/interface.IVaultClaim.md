@@ -1,5 +1,5 @@
 # IVaultClaim
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IVaultClaim.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IVaultClaim.sol)
 
 Interface for claiming settled staking rewards and unstaking assets after batch processing completion
 
@@ -43,16 +43,13 @@ function claimStakedShares(bytes32 requestId) external payable;
 
 ### claimUnstakedAssets
 
-Claims kTokens plus accrued yield from a settled unstaking batch through batch receiver distribution
+Claims kTokens plus accrued yield from a settled unstaking batch
 
 This function completes the unstaking process by distributing redeemed assets to users after settlement.
-Process: (1) Validates batch settlement and asset distribution readiness through batch receiver verification,
-(2) Confirms request ownership and pending status to ensure authorized claiming, (3) Calculates kToken amount
-based on original stkToken redemption and settled share price including yield, (4) Burns locked stkTokens
-that were held during settlement period, (5) Triggers batch receiver to transfer calculated kTokens to
-recipient,
-(6) Marks request as claimed completing the unstaking cycle. The batch receiver pattern ensures asset isolation
-between settlement periods while enabling efficient distribution. Users receive their original investment plus
+Process: (1) Validates batch settlement and request ownership/pending status, (2) Calculates kToken amount
+based on original stkToken redemption and settled share price including yield, (3) Transfers calculated
+kTokens to recipient (stkTokens were already burned during settleBatch(), not at claim time),
+(4) Marks request as claimed completing the unstaking cycle. Users receive their original investment plus
 proportional share of vault yields earned during their staking period.
 
 

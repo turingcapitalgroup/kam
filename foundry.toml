@@ -3,22 +3,19 @@ src = "src"
 out = "out"
 libs = ["dependencies"]
 gas_reports = ['*']
-solc_version = "0.8.30"
+solc_version = "0.8.34"
 optimizer = true
-optimizer_runs = 100
-via_ir = true
+optimizer_runs = 200
 ffi = true
 ast = true
 build_info = true
-extra_output = ["storageLayout"]
 dynamic_test_linking = false
 fs_permissions = [{ access = "read-write", path = "." }]
 
 [profile.deploy]
-solc_version = "0.8.30"
-via_ir = true
+solc_version = "0.8.34"
 optimizer = true
-optimizer_runs = 7777
+optimizer_runs = 2800
 
 [profile.solx]
 gas_limit = 100_000_000
@@ -37,19 +34,15 @@ exclude_lints = [
 [fuzz]
 runs = 1000
 max_test_rejects = 65536
-seed = '0x1'
 dictionary_weight = 40
 include_storage = true
 include_push_bytes = true
-extra_output = ["storageLayout", "metadata"]
 
 [invariant]
-seed = '0x42'
 runs = 256
 depth = 128
 fail_on_revert = true
 call_override = false
-preserve_state = true   
 
 [fmt]
 bracket_spacing = true
@@ -60,6 +53,7 @@ number_underscore = "thousands"
 quote_style = "double"
 tab_width = 4
 sort_imports = true
+ignore = ["src/vendor/**"]
 
 [rpc_endpoints]
 mainnet = "${RPC_MAINNET}"
@@ -78,9 +72,9 @@ ignore = [
 
 [dependencies]
 forge-std = "1.9.7"
-minimal-smart-account = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-smart-account.git" }
-kToken0 = { version = "1.0", git = "https://github.com/turingcapitalgroup/kToken0.git" }
-minimal-uups-factory = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-uups-factory" }
+minimal-smart-account = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-smart-account.git", rev = "0fd060740a7d929b56cff6f73350a19179612ac4" }
+kToken0 = { version = "1.0", git = "https://github.com/turingcapitalgroup/kToken0.git", rev = "35de5f94a316ad76bd8500d0ba21e99f3d5acd21" }
+minimal-uups-factory = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-uups-factory", rev = "568d85a0921f5b0bc7c410d99363cebdd0cd2ee5" }
 
 [soldeer]
 # whether soldeer manages remappings

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { _1_USDC } from "../utils/Constants.sol";
@@ -7,6 +7,7 @@ import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { MinimalUUPSFactory } from "minimal-uups-factory/MinimalUUPSFactory.sol";
 import { Initializable } from "solady/utils/Initializable.sol";
+import { UUPSUpgradeable } from "solady/utils/UUPSUpgradeable.sol";
 
 import { IkToken } from "kToken0/interfaces/IkToken.sol";
 import { kBase } from "kam/src/base/kBase.sol";
@@ -132,6 +133,21 @@ contract kMinterTest is DeploymentBaseTest {
         minter.mint(USDC, users.institution, MINT_AMOUNT);
     }
 
+    /// @notice kBase._isPaused() = local OR global. Even with local pause off, a global
+    /// pause set on the registry must block mint with KMINTER_IS_PAUSED.
+    function test_Mint_Require_Not_GloballyPaused() public {
+        // Local pause is off (default).
+        assertFalse(minter.isPaused(), "local pause should be off");
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+        assertTrue(registry.isGlobalPaused(), "global pause should be on");
+
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
+        minter.mint(USDC, users.institution, MINT_AMOUNT);
+    }
+
     function test_Mint_Require_Only_Institution() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
@@ -216,6 +232,18 @@ contract kMinterTest is DeploymentBaseTest {
         minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
     }
 
+    /// @notice Global pause must also block requestBurn even when local pause is off.
+    function test_RequestBurn_Require_Not_GloballyPaused() public {
+        assertFalse(minter.isPaused(), "local pause should be off");
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
+        minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+    }
+
     function test_RequestBurn_Require_Only_Institution() public {
         vm.prank(users.alice);
         vm.expectRevert(bytes(KMINTER_WRONG_ROLE));
@@ -286,6 +314,21 @@ contract kMinterTest is DeploymentBaseTest {
 
         vm.prank(users.emergencyAdmin);
         minter.setPaused(true);
+
+        bytes32[] memory _requestIds = minter.getUserRequests(users.institution);
+        vm.prank(users.institution);
+        vm.expectRevert(bytes(KMINTER_IS_PAUSED));
+        minter.burn(_requestIds[0]);
+    }
+
+    /// @notice Global pause must also block burn even when local pause is off.
+    function test_Burn_Require_Not_GloballyPaused() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+        _requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+        assertFalse(minter.isPaused(), "local pause should be off");
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
 
         bytes32[] memory _requestIds = minter.getUserRequests(users.institution);
         vm.prank(users.institution);
@@ -383,8 +426,11 @@ contract kMinterTest is DeploymentBaseTest {
     }
 
     function test_AuthorizeUpgrade_Require_Implementation_Not_Zero_Address() public {
+        // Solady's UUPSUpgradeable rejects a zero implementation via the proxiableUUID
+        // staticcall in upgradeToAndCall, reverting with `UpgradeFailed()` instead of a
+        // contract-specific zero-address message.
         vm.prank(users.admin);
-        vm.expectRevert(bytes(KMINTER_ZERO_ADDRESS));
+        vm.expectRevert(UUPSUpgradeable.UpgradeFailed.selector);
         minter.upgradeToAndCall(ZERO_ADDRESS, "");
     }
 
@@ -582,7 +628,8 @@ contract kMinterTest is DeploymentBaseTest {
         assetRouter.setSettlementCooldown(0);
 
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, 0, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, 0);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_proposalId);
     }
 
@@ -603,7 +650,8 @@ contract kMinterTest is DeploymentBaseTest {
 
         uint256 _totalAssets = IkToken(_kToken).totalSupply();
         vm.prank(users.relayer);
-        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, _totalAssets, 0, 0);
+        bytes32 _proposalId = assetRouter.proposeSettleBatch(_asset, _minter, _batchId, _totalAssets);
+        vm.prank(users.relayer);
         assetRouter.executeSettleBatch(_proposalId);
     }
 }

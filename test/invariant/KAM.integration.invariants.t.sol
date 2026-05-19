@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { SetUp } from "kam/test/invariant/helpers/SetUp.t.sol";
 
@@ -29,6 +29,14 @@ contract IntegrationInvariants is SetUp {
         minterHandler.INVARIANT_C_ADAPTER_TOTAL_ASSETS();
     }
 
+    function invariant_INTEGRATION_kMinterVirtualBalanceNonNegative() public view {
+        minterHandler.INVARIANT_H_VIRTUAL_BALANCE_NON_NEGATIVE();
+    }
+
+    function invariant_INTEGRATION_kMinterGlobalPendingCovered() public view {
+        minterHandler.INVARIANT_I_GLOBAL_PENDING_COVERED();
+    }
+
     function invariant_INTEGRATION_kStakingVaultTotalAssets() public view {
         vaultHandlerDeltaNeutral.INVARIANT_A_TOTAL_ASSETS();
         vaultHandlerAlpha.INVARIANT_A_TOTAL_ASSETS();
@@ -51,12 +59,6 @@ contract IntegrationInvariants is SetUp {
         vaultHandlerDeltaNeutral.INVARIANT_D_SHARE_PRICE();
         vaultHandlerAlpha.INVARIANT_D_SHARE_PRICE();
         vaultHandlerBeta.INVARIANT_D_SHARE_PRICE();
-    }
-
-    function invariant_INTEGRATION_kStakingVaultTotalNetAssets() public view {
-        vaultHandlerDeltaNeutral.INVARIANT_E_TOTAL_NET_ASSETS();
-        vaultHandlerAlpha.INVARIANT_E_TOTAL_NET_ASSETS();
-        vaultHandlerBeta.INVARIANT_E_TOTAL_NET_ASSETS();
     }
 
     function invariant_INTEGRATION_kStakingVaultSupply() public view {

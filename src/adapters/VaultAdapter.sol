@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { OptimizedAddressEnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedAddressEnumerableSetLib.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
@@ -120,15 +120,12 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
                               INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Check if caller has admin role
-    /// @param _user Address to check
-    function _checkAdmin(address _user) private view {
-        require(IkRegistry(address(_getMinimalAccountStorage().registry)).isAdmin(_user), VAULTADAPTER_WRONG_ROLE);
-    }
-
-    /// @notice Ensures the contract is not paused
+    /// @notice Ensures neither the local adapter pause nor the registry-wide global pause is active
     function _checkPaused(VaultAdapterStorage storage $) internal view {
-        require(!$.paused, VAULTADAPTER_IS_PAUSED);
+        require(
+            !$.paused && !IkRegistry(address(_getMinimalAccountStorage().registry)).isGlobalPaused(),
+            VAULTADAPTER_IS_PAUSED
+        );
     }
 
     /// @notice Ensures the caller is the kAssetRouter
@@ -159,7 +156,7 @@ contract VaultAdapter is SmartAdapterAccount, IVaultAdapter {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Authorizes contract upgrades
-    /// @dev Only callable by ADMIN_ROLE
+    /// @dev Only callable by contract owner
     /// @param _newImplementation New implementation address
     function _authorizeUpgrade(address _newImplementation) internal view override {
         _checkOwner();

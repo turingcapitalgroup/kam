@@ -1,8 +1,8 @@
 # kRegistry
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kRegistry/kRegistry.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kRegistry/kRegistry.sol)
 
 **Inherits:**
-[IRegistry](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
+[IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
 
 Central configuration hub and contract registry for the KAM protocol ecosystem
 
@@ -171,22 +171,177 @@ function grantManagerRole(address _manager) external payable;
 |`_manager`|`address`||
 
 
-### revokeGivenRoles
+### grantAdminRole
 
-Revokes the specific role of a given user
+Grants ADMIN_ROLE to an address
 
-Only callable by ADMIN_ROLE.
+Only callable by contract owner
 
 
 ```solidity
-function revokeGivenRoles(address _user, uint256 _role) external payable;
+function grantAdminRole(address _admin) external;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_user`|`address`||
-|`_role`|`uint256`||
+|`_admin`|`address`||
+
+
+### grantEmergencyAdminRole
+
+Grants EMERGENCY_ADMIN_ROLE to an address
+
+Only callable by contract owner
+
+
+```solidity
+function grantEmergencyAdminRole(address _emergencyAdmin) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_emergencyAdmin`|`address`||
+
+
+### grantGuardianRole
+
+Grants GUARDIAN_ROLE to an address
+
+Only callable by contract owner
+
+
+```solidity
+function grantGuardianRole(address _guardian) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_guardian`|`address`||
+
+
+### revokeAdminRole
+
+Revokes ADMIN_ROLE from an address
+
+Only callable by contract owner
+
+
+```solidity
+function revokeAdminRole(address _admin) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_admin`|`address`||
+
+
+### revokeEmergencyAdminRole
+
+Revokes EMERGENCY_ADMIN_ROLE from an address
+
+Only callable by contract owner
+
+
+```solidity
+function revokeEmergencyAdminRole(address _emergencyAdmin) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_emergencyAdmin`|`address`||
+
+
+### revokeGuardianRole
+
+Revokes GUARDIAN_ROLE from an address
+
+Only callable by contract owner
+
+
+```solidity
+function revokeGuardianRole(address _guardian) external;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_guardian`|`address`||
+
+
+### revokeVendorRole
+
+Revokes VENDOR_ROLE from an address
+
+Only callable by addresses holding ADMIN_ROLE
+
+
+```solidity
+function revokeVendorRole(address _vendor) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_vendor`|`address`||
+
+
+### revokeRelayerRole
+
+Revokes RELAYER_ROLE from an address
+
+Only callable by addresses holding ADMIN_ROLE
+
+
+```solidity
+function revokeRelayerRole(address _relayer) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_relayer`|`address`||
+
+
+### revokeManagerRole
+
+Revokes MANAGER_ROLE from an address
+
+Only callable by addresses holding ADMIN_ROLE
+
+
+```solidity
+function revokeManagerRole(address _manager) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_manager`|`address`||
+
+
+### revokeInstitutionRole
+
+Revokes INSTITUTION_ROLE from an address
+
+Callable by VENDOR_ROLE (primary KYC lifecycle owner) or ADMIN_ROLE
+(documented backstop for compliance-team unavailability, erroneous grants,
+or urgent sanctions action). This is the one documented exception to strict
+grant/revoke authority symmetry in kRegistry.
+
+
+```solidity
+function revokeInstitutionRole(address _institution) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_institution`|`address`||
 
 
 ### setTreasury
@@ -291,23 +446,43 @@ function isGlobalPaused() external view returns (bool);
 
 ### setHurdleRate
 
-Sets the hurdle rate for a specific asset
+Sets the hurdle rate for a specific vault
 
 Only admin can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
-Asset must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
+Vault must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
 A hurdle rate of 0 is valid and means performance fees will be charged on all positive yield with no minimum
 threshold.
 
 
 ```solidity
-function setHurdleRate(address _asset, uint16 _hurdleRate) external payable;
+function setHurdleRate(address _vault, uint16 _hurdleRate) external payable;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_asset`|`address`||
+|`_vault`|`address`||
 |`_hurdleRate`|`uint16`||
+
+
+### setIsHardHurdleRate
+
+Sets the hard hurdle rate mode for a specific vault
+
+Only admin can set hurdle rate modes. Vault must be registered.
+Hard hurdle (true): performance fees charged only on excess return above hurdle rate.
+Soft hurdle (false): performance fees charged on all profits when returns exceed hurdle rate.
+
+
+```solidity
+function setIsHardHurdleRate(address _vault, bool _isHard) external payable;
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_vault`|`address`||
+|`_isHard`|`bool`||
 
 
 ### rescueAssets
@@ -405,7 +580,7 @@ Removes a registered asset from the protocol
 This function deregisters an asset and cleans up all associated storage mappings. Critical safety checks
 ensure the asset cannot be removed if any vaults still reference it (vaultsByAsset must be empty).
 This prevents orphaned state where vaults reference a non-existent asset. Clears: supportedAssets set,
-maxMintPerBatch, maxBurnPerBatch, assetToKToken mapping, and assetHurdleRate. Note that the kToken contract
+maxMintPerBatch, maxBurnPerBatch, and assetToKToken mapping. Note that the kToken contract
 remains deployed but becomes orphaned - this is intentional as existing kToken holders should retain their
 tokens. Only callable by ADMIN_ROLE.
 
@@ -551,23 +726,44 @@ function getMaxBurnPerBatch(address _asset) external view returns (uint256);
 
 ### getHurdleRate
 
-Gets the hurdle rate for a specific asset
+Gets the hurdle rate for a specific vault
 
 
 ```solidity
-function getHurdleRate(address _asset) external view returns (uint16);
+function getHurdleRate(address _vault) external view returns (uint16);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_asset`|`address`|The asset address|
+|`_vault`|`address`|The vault address|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`uint16`|The hurdle rate in basis points|
+
+
+### getIsHardHurdleRate
+
+Gets the hard hurdle rate mode for a specific vault
+
+
+```solidity
+function getIsHardHurdleRate(address _vault) external view returns (bool);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_vault`|`address`|The vault address|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bool`|True if hard hurdle rate, false if soft hurdle rate|
 
 
 ### getContractById
@@ -1367,9 +1563,12 @@ struct kRegistryStorage {
     /// @dev Maps vaults to their registered external protocol adapters
     /// Enables yield strategies through DeFi protocol integrations
     mapping(address => mapping(address => address)) vaultAdaptersByAsset;
-    /// @dev Maps assets to their hurdle rates in basis points (100 = 1%)
-    /// Defines minimum performance thresholds for yield distribution
-    mapping(address => uint16) assetHurdleRate;
+    /// @dev Maps vaults to their hurdle rates in basis points (100 = 1%)
+    /// Defines minimum performance thresholds for yield distribution per vault
+    mapping(address => uint16) vaultHurdleRate;
+    /// @dev Maps vaults to their hurdle rate mode (true = hard, false = soft)
+    /// Hard hurdle: fees only on excess above hurdle. Soft hurdle: fees on all profit once hurdle exceeded
+    mapping(address => bool) vaultIsHardHurdleRate;
 }
 ```
 

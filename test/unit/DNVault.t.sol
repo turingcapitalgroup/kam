@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { BaseVaultTest, DeploymentBaseTest } from "../utils/BaseVaultTest.sol";
 import { _1_USDC } from "../utils/Constants.sol";
@@ -356,7 +356,7 @@ contract DNVaultTest is BaseVaultTest {
         assertEq(kTokenBalanceAfter - kTokenBalanceBefore, 1000 * _1_USDC, "balance");
 
         assertEq(vault.balanceOf(address(vault)), 0);
-        assertEq(vault.netSharePrice(), 1e6);
+        assertEq(vault.sharePrice(), 1e6);
         assertEq(vault.totalAssets(), 0);
         assertEq(vault.totalSupply(), 0);
     }

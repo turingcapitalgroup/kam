@@ -1,8 +1,8 @@
 # MultiFacetProxy
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/base/MultiFacetProxy.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/base/MultiFacetProxy.sol)
 
 **Inherits:**
-[Proxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md)
+[Proxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md)
 
 A proxy contract that can route function calls to different implementation contracts
 
@@ -32,7 +32,9 @@ function _getMultiFacetProxyStorage() internal pure returns (MultiFacetProxyStor
 
 Adds a function selector mapping to an implementation address
 
-Only callable by admin role
+Only callable by admin role. Rejects address(0), address(this), and non-contract addresses.
+If `_forceOverride` is true and `_impl` is the current implementation, the call is a no-op
+for the mapping but still enforces validation.
 
 
 ```solidity
@@ -107,6 +109,51 @@ Authorize the sender to modify functions
 function _authorizeModifyFunctions(address _sender) internal virtual;
 ```
 
+### implementationOf
+
+Returns the implementation address routed for a given selector
+
+
+```solidity
+function implementationOf(bytes4 _selector) external view returns (address);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_selector`|`bytes4`|Function selector to look up|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`address`|Implementation address (address(0) if unregistered)|
+
+
+### registeredSelectors
+
+Returns all currently registered function selectors
+
+
+```solidity
+function registeredSelectors() external view returns (bytes4[] memory);
+```
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bytes4[]`|Array of active selectors|
+
+
+### selectorCount
+
+Returns the number of registered selectors
+
+
+```solidity
+function selectorCount() external view returns (uint256);
+```
+
 ### _implementation
 
 Returns the implementation address for a function selector
@@ -166,6 +213,8 @@ storage-location: erc7201:kam.storage.MultiFacetProxy
 struct MultiFacetProxyStorage {
     /// @notice Mapping of chain method selectors to implementation contracts
     mapping(bytes4 => address) selectorToImplementation;
+    /// @notice Enumerable set of registered selectors (as bytes32 for lib compatibility)
+    OptimizedBytes32EnumerableSetLib.Bytes32Set registeredSelectorSet;
 }
 ```
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { BaseVaultTest, DeploymentBaseTest } from "../utils/BaseVaultTest.sol";
 import { _1_USDC } from "../utils/Constants.sol";
@@ -165,6 +165,42 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         vault.claimStakedShares(requestId);
     }
 
+    function test_ClaimStakedShares_WhenGlobalPaused() public {
+        // Setup: Create and settle a staking request
+        _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
+
+        // Close and settle batch
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        uint256 lastTotalAssets = vault.totalAssets();
+        _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
+
+        // Global pause via registry (vault is NOT locally paused)
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        // Try to claim while globally paused
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KSTAKINGVAULT_IS_PAUSED));
+        vault.claimStakedShares(requestId);
+
+        // Unpause globally, claim should succeed
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(false);
+
+        vm.prank(users.alice);
+        vault.claimStakedShares(requestId);
+    }
+
     function test_ClaimStakedShares_MultipleUsers() public {
         // Setup: Create staking requests for multiple users
         _mintKTokenToUser(users.alice, 1000 * _1_USDC, true);
@@ -254,6 +290,12 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         lastTotalAssets = vault.totalAssets();
         _executeBatchSettlement(address(vault), unstakeBatchId, lastTotalAssets);
 
+        assertEq(vault.totalAssets(), 0);
+        assertEq(vault.totalPendingStake(), 0);
+        assertEq(vault.totalPendingUnstake(), aliceDeposit);
+        assertEq(vault.expectedKTokenBalance(), aliceDeposit);
+        assertEq(kUSD.balanceOf(address(vault)), vault.expectedKTokenBalance());
+
         // Get kToken balance before claim
         uint256 kTokenBalanceBefore = kUSD.balanceOf(users.alice);
 
@@ -266,6 +308,8 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         // Verify user received kTokens back
         uint256 kTokenBalanceAfter = kUSD.balanceOf(users.alice);
         assertEq(kTokenBalanceAfter - kTokenBalanceBefore, aliceDeposit);
+        assertEq(vault.totalPendingUnstake(), 0);
+        assertEq(kUSD.balanceOf(address(vault)), vault.expectedKTokenBalance());
 
         // Verify stkTokens were burned from vault
         assertEq(vault.balanceOf(address(vault)), 0);
@@ -295,15 +339,9 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         uint256 lastTotalAssets = vault.totalAssets();
         _executeBatchSettlement(address(vault), stakeBatchId, lastTotalAssets);
 
-        uint256 sharePrice = vault.sharePrice();
-        uint256 netSharePrice = vault.netSharePrice();
-
         // Claim staked shares to get stkTokens
         vm.prank(users.alice);
         vault.claimStakedShares(stakeRequestId);
-
-        assertEq(vault.sharePrice(), sharePrice);
-        assertEq(vault.netSharePrice(), netSharePrice);
 
         uint256 stkBalance = vault.balanceOf(users.alice);
         assertEq(stkBalance, aliceDeposit);
@@ -311,14 +349,11 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         // Now request unstaking
         bytes32 unstakeBatchId = vault.getBatchId();
 
-        // Time passes and fees accumulate
         vm.warp(block.timestamp + 30 days);
+        uint256 treasurySharesBefore = vault.balanceOf(users.treasury);
 
         vm.prank(users.alice);
         bytes32 unstakeRequestId = vault.requestUnstake(users.alice, users.alice, stkBalance);
-
-        sharePrice = vault.sharePrice();
-        netSharePrice = vault.netSharePrice();
 
         // Close and settle unstaking batch
         vm.prank(users.relayer);
@@ -327,8 +362,12 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         lastTotalAssets = vault.totalAssets();
         _executeBatchSettlement(address(vault), unstakeBatchId, lastTotalAssets);
 
-        assertApproxEqRel(vault.sharePrice(), sharePrice, 0.001 ether);
-        assertApproxEqRel(vault.netSharePrice(), netSharePrice, 0.001 ether);
+        uint256 claimableAssets = vault.totalPendingUnstake();
+
+        assertGt(vault.balanceOf(users.treasury), treasurySharesBefore);
+        assertLt(claimableAssets, aliceDeposit);
+        assertGt(claimableAssets, aliceDeposit * 99 / 100);
+        assertEq(vault.totalAssets(), aliceDeposit - claimableAssets);
 
         // Get kToken balance before claim
         uint256 kTokenBalanceBefore = kUSD.balanceOf(users.alice);
@@ -337,16 +376,9 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         vm.prank(users.alice);
         vault.claimUnstakedAssets(unstakeRequestId);
 
-        assertApproxEqRel(vault.sharePrice(), sharePrice, 0.01 ether); // 1% tolerance
-        assertApproxEqRel(vault.netSharePrice(), netSharePrice, 0.01 ether); // 1% tolerance
-
-        // Verify user received kTokens back
         uint256 kTokenBalanceAfter = kUSD.balanceOf(users.alice);
-        // Expected return is approximately deposit minus ~0.08% fees for 30 days
-        uint256 minExpectedReturn = aliceDeposit * 99 / 100; // At least 99% of deposit
-        assertTrue(
-            kTokenBalanceAfter - kTokenBalanceBefore > minExpectedReturn, "User should receive most of deposit back"
-        );
+        assertEq(kTokenBalanceAfter - kTokenBalanceBefore, claimableAssets);
+        assertEq(vault.totalPendingUnstake(), 0);
 
         // Verify stkTokens were burned from vault
         assertEq(vault.balanceOf(address(vault)), 0);
@@ -439,6 +471,39 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         vault.claimUnstakedAssets(requestId);
     }
 
+    function test_ClaimUnstakedAssets_WhenGlobalPaused() public {
+        // Setup: Get stkTokens and create unstaking request
+        _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestUnstake(users.alice, users.alice, 1000 * _1_USDC);
+
+        // Close and settle batch
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        uint256 lastTotalAssets = vault.totalAssets();
+        _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
+
+        // Global pause via registry (vault is NOT locally paused)
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        // Try to claim while globally paused
+        vm.prank(users.alice);
+        vm.expectRevert(bytes(KSTAKINGVAULT_IS_PAUSED));
+        vault.claimUnstakedAssets(requestId);
+
+        // Unpause globally, claim should succeed
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(false);
+
+        vm.prank(users.alice);
+        vault.claimUnstakedAssets(requestId);
+    }
+
     /* //////////////////////////////////////////////////////////////
                         INTEGRATION TESTS
     //////////////////////////////////////////////////////////////*/
@@ -482,7 +547,6 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
         _setupUserWithStkTokens(users.alice, 1000 * _1_USDC);
 
         uint256 sharePrice = vault.sharePrice();
-        uint256 netSharePrice = vault.netSharePrice();
 
         uint256 stkBalance = vault.balanceOf(users.alice);
         assertEq(stkBalance, 1000 * _1_USDC);
@@ -495,7 +559,6 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
 
         // Share prices should stay the same
         assertEq(vault.sharePrice(), sharePrice);
-        assertEq(vault.netSharePrice(), netSharePrice);
 
         // Verify stkTokens were transferred to vault
         assertEq(vault.balanceOf(users.alice), 0);
@@ -511,7 +574,6 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
 
         // Share prices should stay the same
         assertEq(vault.sharePrice(), sharePrice);
-        assertEq(vault.netSharePrice(), netSharePrice);
 
         // 4. Claim unstaked assets
         uint256 kTokenBalanceBefore = kUSD.balanceOf(users.alice);
@@ -521,7 +583,6 @@ contract kStakingVaultClaimsTest is BaseVaultTest {
 
         // Share prices should stay the same
         assertEq(vault.sharePrice(), sharePrice);
-        assertEq(vault.netSharePrice(), netSharePrice);
 
         // Verify user received kTokens back
         uint256 kTokenBalanceAfter = kUSD.balanceOf(users.alice);

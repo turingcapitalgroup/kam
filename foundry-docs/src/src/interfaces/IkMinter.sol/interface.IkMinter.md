@@ -1,8 +1,8 @@
 # IkMinter
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/interfaces/IkMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IkMinter.sol)
 
 **Inherits:**
-[IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Interface for institutional minting and redemption operations in the KAM protocol
 
@@ -43,13 +43,11 @@ withdrawal
 
 This function implements the first phase of the redemption process for qualified institutions. The workflow
 consists of: (1) transferring kTokens from the caller to this contract for escrow (not burned yet), (2)
-generating
-a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4) registering the
-request with kAssetRouter for batch processing. The kTokens remain in escrow until the batch is settled and the
-user calls burn() to complete the process. This two-phase approach is necessary because redemptions are
-processed
-in batches through the DN vault system, which requires waiting for batch settlement to ensure proper asset
-availability and yield distribution. The request can be cancelled before batch closure/settlement.
+generating a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4)
+registering the request with kAssetRouter for batch processing. The kTokens remain in escrow until the
+batch is settled (when they are burned in bulk by settleBatch()) and the user calls burn() to claim assets.
+This two-phase approach is necessary because redemptions are processed in batches through the DN vault system,
+which requires waiting for batch settlement to ensure proper asset availability and yield distribution.
 
 
 ```solidity
@@ -72,20 +70,13 @@ function requestBurn(address asset, address to, uint256 amount) external payable
 
 ### burn
 
-Completes the second phase of institutional redemption by executing a settled batch request
+Completes the second phase of institutional redemption by claiming assets from a settled batch
 
 This function finalizes the redemption process initiated by requestBurn(). It can only be called after
-the batch containing this request has been settled through the kAssetRouter settlement process. The execution
-involves: (1) validating the request exists and is in PENDING status, (2) updating the request status to
-REDEEMED,
-(3) removing the request from tracking, (4) burning the escrowed kTokens permanently, (5) instructing the
-kBatchReceiver contract to transfer the underlying assets to the recipient. The kBatchReceiver is a minimal
-proxy
-deployed per batch that holds the settled assets and ensures isolated distribution. This function will revert if
-the batch is not yet settled, ensuring assets are only distributed when available. The separation between
-request
-and redemption phases allows for efficient batch processing of multiple redemptions while maintaining asset
-safety.
+the batch containing this request has been settled through the kAssetRouter settlement process. The kTokens
+have already been burned during settleBatch(). The execution involves: (1) validating the request exists and
+is in PENDING status, (2) updating the request status to REDEEMED, (3) removing the request from tracking,
+(4) instructing the kBatchReceiver contract to transfer the underlying assets to the recipient.
 
 
 ```solidity
@@ -137,7 +128,9 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 ### settleBatch
 
-Marks a batch as settled after processing
+Marks a batch as settled after processing and burns all escrowed kTokens for the batch
+
+Burns all `requestedSharesInBatch` kTokens at once and decrements `totalLockedAssets`
 
 
 ```solidity
@@ -456,7 +449,7 @@ Emitted when a new redemption request is created and enters the batch queue
 
 ```solidity
 event BurnRequestCreated(
-    bytes32 indexed requestId, address indexed user, address indexed kToken, uint256 amount, bytes32 batchId
+    bytes32 indexed requestId, address indexed recipient, address indexed kToken, uint256 amount, bytes32 batchId
 );
 ```
 
@@ -465,7 +458,7 @@ event BurnRequestCreated(
 |Name|Type|Description|
 |----|----|-----------|
 |`requestId`|`bytes32`|The unique identifier assigned to this redemption request|
-|`user`|`address`|The address that initiated the redemption request|
+|`recipient`|`address`|The address that will receive the underlying assets at settlement (passed as `_to` in `requestBurn`, not necessarily the caller)|
 |`kToken`|`address`|The kToken contract address being burned|
 |`amount`|`uint256`|The amount of kTokens being burned|
 |`batchId`|`bytes32`|The batch identifier this request is associated with|
@@ -562,7 +555,7 @@ struct BurnRequest {
     address asset;
     /// @dev Timestamp when the request was created, used for tracking and auditing
     uint64 requestTimestamp;
-    /// @dev Current status in the redemption lifecycle (PENDING, REDEEMED, or CANCELLED)
+    /// @dev Current status in the redemption lifecycle (PENDING or REDEEMED)
     RequestStatus status;
     /// @dev The batch identifier this request belongs to for settlement processing
     bytes32 batchId;
@@ -598,11 +591,16 @@ struct BatchInfo {
 ### RequestStatus
 Represents the lifecycle status of a redemption request
 
-Used to track the progression of redemption requests through the batch system
+Used to track the progression of redemption requests through the batch system.
+`UNDEFINED = 0` is the zero-initialized sentinel — a fresh storage slot reads as
+`UNDEFINED`, not as a valid `PENDING` request, so callers can distinguish
+"request does not exist" from "request is in flight".
 
 
 ```solidity
 enum RequestStatus {
+    /// @dev Zero-initialized sentinel — request does not exist
+    UNDEFINED,
     /// @dev Request has been created and tokens are held in escrow, awaiting batch settlement
     PENDING,
     /// @dev Request has been successfully executed and underlying assets have been distributed

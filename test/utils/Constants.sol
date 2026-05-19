@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 // Common token amounts for testing
 uint256 constant _1_USDC = 1e6;

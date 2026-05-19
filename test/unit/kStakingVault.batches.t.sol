@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { BaseVaultTest, DeploymentBaseTest } from "../utils/BaseVaultTest.sol";
 import { _1_USDC } from "../utils/Constants.sol";
@@ -172,16 +172,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
 
         // Settle batch through assetRouter (which calls settleBatch)
         uint256 lastTotalAssets = vault.totalAssets();
-
-        vm.prank(users.relayer);
-        bytes32 proposalId = assetRouter.proposeSettleBatch(
-            tokens.usdc, address(vault), batchId, lastTotalAssets + 1000 * _1_USDC, 0, 0
-        );
-
-        // Execute settlement which internally calls settleBatch
-        vm.expectEmit(true, false, false, true);
-        emit IVault.BatchSettled(batchId);
-        assetRouter.executeSettleBatch(proposalId);
+        _executeBatchSettlement(address(vault), batchId, lastTotalAssets);
     }
 
     function test_SettleBatch_RequiresKAssetRouter() public {
@@ -190,15 +181,48 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         // Direct call should fail
         vm.prank(users.alice);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(batchId);
+        vault.settleBatch(batchId, uint64(block.timestamp), 0, 0);
 
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(batchId);
+        vault.settleBatch(batchId, uint64(block.timestamp), 0, 0);
 
         vm.prank(users.admin);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(batchId);
+        vault.settleBatch(batchId, uint64(block.timestamp), 0, 0);
+    }
+
+    function test_SettleBatch_Allows_UnsolicitedKTokenBalance() public {
+        _mintKTokenToUser(users.alice, 1001 * _1_USDC, true);
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), 1000 * _1_USDC);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.alice);
+        bytes32 requestId = vault.requestStake(users.alice, users.alice, 1000 * _1_USDC);
+
+        vm.prank(users.alice);
+        kUSD.transfer(address(vault), 1);
+
+        assertEq(kUSD.balanceOf(address(vault)), vault.expectedKTokenBalance() + 1);
+
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        uint256 totalAssets = vault.totalAssets();
+
+        vm.prank(users.relayer);
+        bytes32 proposalId = assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, totalAssets);
+
+        vm.prank(users.relayer);
+        assetRouter.executeSettleBatch(proposalId);
+
+        assertEq(kUSD.balanceOf(address(vault)), vault.expectedKTokenBalance() + 1);
+
+        vm.prank(users.alice);
+        vault.claimStakedShares(requestId);
     }
 
     function test_SettleBatch_AlreadySettled_Revert() public {
@@ -223,11 +247,11 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         // Try to settle again through assetRouter
         vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_BATCH_ID_PROPOSED));
-        bytes32 proposalId = assetRouter.proposeSettleBatch(
-            tokens.usdc, address(vault), batchId, lastTotalAssets + 1000 * _1_USDC, 0, 0
-        );
+        bytes32 proposalId =
+            assetRouter.proposeSettleBatch(tokens.usdc, address(vault), batchId, lastTotalAssets + 1000 * _1_USDC);
 
         // Should revert with Settled error
+        vm.prank(users.relayer);
         vm.expectRevert(bytes(KASSETROUTER_PROPOSAL_NOT_FOUND));
         assetRouter.executeSettleBatch(proposalId);
     }
@@ -306,7 +330,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
         // Settle batch with zero ID
         vm.prank(users.alice);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(bytes32(0));
+        vault.settleBatch(bytes32(0), uint64(block.timestamp), 0, 0);
     }
 
     function test_BatchOperations_MaxBatchId() public {
@@ -319,7 +343,7 @@ contract kStakingVaultBatchesTest is BaseVaultTest {
 
         vm.prank(users.alice);
         vm.expectRevert(bytes(KSTAKINGVAULT_WRONG_ROLE));
-        vault.settleBatch(maxBatchId);
+        vault.settleBatch(maxBatchId, uint64(block.timestamp), 0, 0);
     }
 
     function test_reach_max_total_assets() public {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { ERC20 } from "solady/tokens/ERC20.sol";
 
@@ -11,7 +11,6 @@ import { OptimizedReentrancyGuardTransient } from "solady/utils/OptimizedReentra
 import { ERC2771Context } from "kam/src/base/ERC2771Context.sol";
 import { K_ASSET_ROUTER, K_MINTER } from "kam/src/constants/Constants.sol";
 import { IkRegistry } from "kam/src/interfaces/IkRegistry.sol";
-import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 import { VaultMathLib } from "kam/src/libraries/VaultMathLib.sol";
 
@@ -47,6 +46,22 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @param paused The new paused state
     event Paused(bool paused);
 
+    /// @notice Emitted when the vault's internal balance is increased
+    /// @param amount The amount the balance was increased by
+    event BalanceIncreased(uint128 amount);
+
+    /// @notice Emitted when the vault's internal balance is decreased
+    /// @param amount The amount the balance was decreased by
+    event BalanceDecreased(uint128 amount);
+
+    /// @notice Emitted when management fees are accrued and shares minted to treasury
+    /// @param managementFeeShares Number of shares minted for management fees
+    event ManagementFeesAccrued(uint256 managementFeeShares);
+
+    /// @notice Emitted when performance fees are charged and shares minted to treasury
+    /// @param performanceFeeShares Number of shares minted for performance fees
+    event PerformanceFeesCharged(uint256 performanceFeeShares);
+
     /* //////////////////////////////////////////////////////////////
                               CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -62,12 +77,8 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     uint256 internal constant INITIALIZED_SHIFT = 40;
     uint256 internal constant PAUSED_MASK = 0x1;
     uint256 internal constant PAUSED_SHIFT = 41;
-    uint256 internal constant IS_HARD_HURDLE_RATE_MASK = 0x1;
-    uint256 internal constant IS_HARD_HURDLE_RATE_SHIFT = 42;
-    uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_MASK = 0xFFFFFFFFFFFFFFFF;
-    uint256 internal constant LAST_FEES_CHARGED_MANAGEMENT_SHIFT = 43;
-    uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_MASK = 0xFFFFFFFFFFFFFFFF;
-    uint256 internal constant LAST_FEES_CHARGED_PERFORMANCE_SHIFT = 107;
+    uint256 internal constant LAST_FEE_TIMESTAMP_MASK = 0xFFFFFFFFFFFFFFFF;
+    uint256 internal constant LAST_FEE_TIMESTAMP_SHIFT = 42;
 
     /* //////////////////////////////////////////////////////////////
                               STORAGE
@@ -76,34 +87,33 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     /// @custom:storage-location erc7201.kam.storage.BaseVault
     struct BaseVaultStorage {
         //1
-        uint256 config; // decimals, performance fee, management fee, initialized, paused,
-        // isHardHurdleRate, lastFeesChargedManagement, lastFeesChargedPerformance
-        //2 - packed together for gas efficiency (both read in _totalAssets)
-        uint128 totalPendingStake;
-        uint128 totalPendingUnstake;
-        //3
-        uint128 sharePriceWatermark;
+        uint256 config; // decimals, performance fee, management fee, initialized, paused, lastFeeTimestamp
+        //2 - asset tracking (both read in _totalAssets hot path)
+        uint128 totalBalance;
         uint128 maxTotalAssets;
-        //4
+        //3
         uint256 currentBatch;
-        //5
+        //4
         uint256 requestCounter;
-        //6
+        //5
         bytes32 currentBatchId;
-        //7
+        //6
         address registry;
-        //8
+        //7
         address underlyingAsset;
-        //9
+        //8
         address kToken;
-        //10
+        //9 - last settlement balance for performance fee calculation
+        uint128 lastSettlementBalance;
+        uint128 totalPendingStake;
+        // Dynamic values
         string name;
-        //11
         string symbol;
         mapping(bytes32 => BaseVaultTypes.BatchInfo) batches;
         mapping(bytes32 => BaseVaultTypes.StakeRequest) stakeRequests;
         mapping(bytes32 => BaseVaultTypes.UnstakeRequest) unstakeRequests;
         mapping(address => OptimizedBytes32EnumerableSetLib.Bytes32Set) userRequests;
+        uint128 totalPendingUnstake;
     }
 
     // keccak256(abi.encode(uint256(keccak256("kam.storage.BaseVault")) - 1)) & ~bytes32(uint256(0xff))
@@ -133,7 +143,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     }
 
     function _getHurdleRate(BaseVaultStorage storage $) internal view returns (uint16) {
-        return _registry().getHurdleRate($.underlyingAsset);
+        return IkRegistry($.registry).getHurdleRate(address(this));
     }
 
     function _getPerformanceFee(BaseVaultStorage storage $) internal view returns (uint16) {
@@ -167,8 +177,9 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
             ($.config & ~(INITIALIZED_MASK << INITIALIZED_SHIFT)) | (uint256(_value ? 1 : 0) << INITIALIZED_SHIFT);
     }
 
+    /// @dev Returns true if the vault is paused either locally (via packed config) or globally (via registry).
     function _getPaused(BaseVaultStorage storage $) internal view returns (bool) {
-        return (($.config >> PAUSED_SHIFT) & PAUSED_MASK) != 0;
+        return (($.config >> PAUSED_SHIFT) & PAUSED_MASK) != 0 || IkRegistry($.registry).isGlobalPaused();
     }
 
     function _setPaused(BaseVaultStorage storage $, bool _value) internal {
@@ -176,34 +187,18 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
     }
 
     function _getIsHardHurdleRate(BaseVaultStorage storage $) internal view returns (bool) {
-        return (($.config >> IS_HARD_HURDLE_RATE_SHIFT) & IS_HARD_HURDLE_RATE_MASK) != 0;
+        return _registry().getIsHardHurdleRate(address(this));
     }
 
-    function _setIsHardHurdleRate(BaseVaultStorage storage $, bool _value) internal {
-        $.config = ($.config & ~(IS_HARD_HURDLE_RATE_MASK << IS_HARD_HURDLE_RATE_SHIFT))
-            | (uint256(_value ? 1 : 0) << IS_HARD_HURDLE_RATE_SHIFT);
-    }
-
-    function _getLastFeesChargedManagement(BaseVaultStorage storage $) internal view returns (uint64) {
-        // casting to 'uint64' is safe because LAST_FEES_CHARGED_MANAGEMENT_MASK ensures value fits in uint64
+    function _getLastFeeTimestamp(BaseVaultStorage storage $) internal view returns (uint64) {
+        // casting to 'uint64' is safe because LAST_FEE_TIMESTAMP_MASK ensures value fits in uint64
         // forge-lint: disable-next-line(unsafe-typecast)
-        return uint64(($.config >> LAST_FEES_CHARGED_MANAGEMENT_SHIFT) & LAST_FEES_CHARGED_MANAGEMENT_MASK);
+        return uint64(($.config >> LAST_FEE_TIMESTAMP_SHIFT) & LAST_FEE_TIMESTAMP_MASK);
     }
 
-    function _setLastFeesChargedManagement(BaseVaultStorage storage $, uint64 _value) internal {
-        $.config = ($.config & ~(LAST_FEES_CHARGED_MANAGEMENT_MASK << LAST_FEES_CHARGED_MANAGEMENT_SHIFT))
-            | (uint256(_value) << LAST_FEES_CHARGED_MANAGEMENT_SHIFT);
-    }
-
-    function _getLastFeesChargedPerformance(BaseVaultStorage storage $) internal view returns (uint64) {
-        // casting to 'uint64' is safe because LAST_FEES_CHARGED_PERFORMANCE_MASK ensures value fits in uint64
-        // forge-lint: disable-next-line(unsafe-typecast)
-        return uint64(($.config >> LAST_FEES_CHARGED_PERFORMANCE_SHIFT) & LAST_FEES_CHARGED_PERFORMANCE_MASK);
-    }
-
-    function _setLastFeesChargedPerformance(BaseVaultStorage storage $, uint64 _value) internal {
-        $.config = ($.config & ~(LAST_FEES_CHARGED_PERFORMANCE_MASK << LAST_FEES_CHARGED_PERFORMANCE_SHIFT))
-            | (uint256(_value) << LAST_FEES_CHARGED_PERFORMANCE_SHIFT);
+    function _setLastFeeTimestamp(BaseVaultStorage storage $, uint64 _value) internal {
+        $.config = ($.config & ~(LAST_FEE_TIMESTAMP_MASK << LAST_FEE_TIMESTAMP_SHIFT))
+            | (uint256(_value) << LAST_FEE_TIMESTAMP_SHIFT);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -229,8 +224,7 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         $.registry = _registryAddress;
         _setPaused($, _paused);
         _setInitialized($, true);
-        _setLastFeesChargedManagement($, uint64(block.timestamp));
-        _setLastFeesChargedPerformance($, uint64(block.timestamp));
+        _setLastFeeTimestamp($, uint64(block.timestamp));
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -288,13 +282,15 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Updates the vault's operational pause state for emergency risk management
+    /// @notice Updates the vault's local operational pause state for emergency risk management
     /// @dev This internal function enables vault implementations to halt operations during emergencies or maintenance.
     /// The pause mechanism: (1) Validates vault initialization to prevent invalid state changes, (2) Updates the
     /// packed config storage with new pause state, (3) Emits event for monitoring and user notification. When paused,
     /// state-changing operations should be blocked while view functions remain accessible for monitoring. The pause
     /// state is stored in packed config for gas efficiency. This function provides the foundation for emergency
     /// controls while maintaining transparency through event emission.
+    /// Note: Even if the vault is locally unpaused, it will still be considered paused if the registry's global
+    /// pause is active (see `_getPaused`).
     /// @param _paused The desired pause state (true = halt operations, false = resume normal operation)
     function _setPaused(bool _paused) internal {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
@@ -353,70 +349,56 @@ abstract contract BaseVault is ERC20, OptimizedReentrancyGuardTransient, ERC2771
         return VaultMathLib.convertToShares(_assets, _totalAssetsValue, _totalSupply);
     }
 
-    /// @notice Calculates net share price per stkToken after deducting accumulated fees
-    /// @dev This function provides the user-facing share price that reflects actual value after management and
-    /// performance fee deductions. The calculation: (1) Uses vault decimals for proper scaling to match token
-    /// precision, (2) Calls _convertToAssets with unit share amount to determine per-token value, (3) Reflects
-    /// total net assets which exclude accrued but unpaid fees. This net pricing ensures users see accurate
-    /// value after all fee obligations, providing transparent visibility into their true vault position value.
-    /// Used primarily for user-facing calculations and accurate balance reporting.
-    /// @return Net price per stkToken in underlying asset terms (scaled to vault decimals)
-    function _netSharePrice() internal view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalNetAssets(), totalSupply());
-    }
-
-    /// @notice Calculates gross share price per stkToken including accumulated fees
-    /// @dev This function provides the total vault performance-based share price before fee deductions. The
-    /// calculation:
-    /// (1) Handles zero total supply edge case with 1:1 initial pricing, (2) Uses total gross assets including accrued
-    /// fees for complete performance measurement, (3) Applies precise fixed-point mathematics for accurate pricing.
-    /// This gross pricing is used for settlement calculations, performance fee assessments, and watermark tracking.
-    /// The inclusion of fees provides complete vault performance measurement for fee calculations and settlement
-    /// coordination.
+    /// @notice Calculates share price per stkToken
+    /// @dev Converts a one-share unit (10^decimals) to asset terms using current `_totalAssets()` and
+    /// `totalSupply()`. Handles zero total supply edge case with 1:1 initial pricing via the underlying
+    /// `convertToAssets` math.
     /// @return Gross price per stkToken in underlying asset terms (scaled to vault decimals)
     function _sharePrice() internal view returns (uint256) {
         BaseVaultStorage storage $ = _getBaseVaultStorage();
         return _convertToAssetsWithTotals(10 ** _getDecimals($), _totalAssets(), totalSupply());
     }
 
-    /// @notice Calculates total assets under management including pending stakes and accrued yields
-    /// @dev This function determines the complete asset base managed by the vault for share price calculations.
-    /// The calculation: (1) Starts with total kToken balance held by the vault contract, (2) Subtracts pending
-    /// stakes that haven't yet been converted to stkTokens to avoid double-counting during settlement periods,
-    /// (3) Includes all accrued yields and performance gains. The pending stake adjustment is crucial for accurate
-    /// share pricing during batch processing periods when assets are deposited but shares haven't been issued.
-    /// This total forms the basis for both gross and net share price calculations.
-    /// @return Total asset value managed by the vault including yields but excluding pending operations
+    /// @notice Returns total assets under management
+    /// @return Total asset value
     function _totalAssets() internal view returns (uint256) {
-        BaseVaultStorage storage $ = _getBaseVaultStorage();
-        return $.kToken.balanceOf(address(this)) - $.totalPendingStake - $.totalPendingUnstake;
+        return _getBaseVaultStorage().totalBalance;
     }
 
-    /// @notice Calculates net assets available to users after deducting accumulated fees
-    /// @dev This function provides the user-facing asset value by removing management and performance fee obligations.
-    /// The calculation: (1) Takes total gross assets as the starting point, (2) Subtracts accumulated fees calculated
-    /// by the fee computation module, (3) Results in the net value attributable to stkToken holders. This net asset
-    /// calculation is critical for fair share pricing, ensuring new entrants pay appropriate prices and existing
-    /// holders receive accurate valuations. The fee deduction prevents users from claiming value that belongs to
-    /// vault operators through fee mechanisms.
-    /// @return Net asset value available to users after all fee deductions
-    function _totalNetAssets() internal view returns (uint256) {
-        return _totalAssets() - _accumulatedFees();
+    /// @notice Returns the raw totalBalance
+    /// @return Raw balance
+    function _totalBalance() internal view returns (uint256) {
+        return _getBaseVaultStorage().totalBalance;
     }
 
-    /// @notice Delegates fee calculation to the vault reader module for comprehensive fee computation
-    /// @dev This function serves as a gateway to the modular fee calculation system implemented in the vault reader.
-    /// The delegation pattern: (1) Calls the reader module which implements detailed fee calculation logic including
-    /// management fee accrual and performance fee assessment, (2) Returns total accumulated fees for asset
-    /// calculations,
-    /// (3) Maintains separation of concerns by isolating complex fee logic in dedicated modules. The reader module
-    /// handles time-based management fees, watermark-based performance fees, and hurdle rate calculations.
-    /// This modular approach enables upgradeable fee calculation logic while maintaining consistent interfaces.
-    /// @return Total accumulated fees (management + performance) in underlying asset terms
-    function _accumulatedFees() internal view returns (uint256) {
-        (,, uint256 totalFees) = IVaultReader(address(this)).computeLastBatchFees();
-        return totalFees;
+    /* //////////////////////////////////////////////////////////////
+                        BALANCE MODIFICATION
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Increases the vault's internal balance
+    /// @dev Used for yield distribution. Authorization must be handled by the calling contract.
+    /// @param _amount The amount to increase the balance by
+    function _increaseBalance(uint128 _amount) internal {
+        _getBaseVaultStorage().totalBalance += _amount;
+        emit BalanceIncreased(_amount);
+    }
+
+    /// @notice Decreases the vault's internal balance
+    /// @dev Used for yield distribution. Authorization must be handled by the calling contract.
+    /// @param _amount The amount to decrease the balance by
+    function _decreaseBalance(uint128 _amount) internal {
+        _getBaseVaultStorage().totalBalance -= _amount;
+        emit BalanceDecreased(_amount);
+    }
+
+    /// @notice Returns the last settlement balance for interest calculation
+    function _getLastSettlementBalance() internal view returns (uint256) {
+        return _getBaseVaultStorage().lastSettlementBalance;
+    }
+
+    /// @notice Sets the last settlement balance snapshot
+    function _setLastSettlementBalance(uint128 _balance) internal {
+        _getBaseVaultStorage().lastSettlementBalance = _balance;
     }
 
     /* //////////////////////////////////////////////////////////////

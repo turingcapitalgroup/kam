@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
 
 import { VaultAdapter } from "kam/src/adapters/VaultAdapter.sol";
-import { VAULTADAPTER_WRONG_ROLE, VAULTADAPTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
+import { VAULTADAPTER_IS_PAUSED, VAULTADAPTER_WRONG_ROLE, VAULTADAPTER_ZERO_ADDRESS } from "kam/src/errors/Errors.sol";
 import { IVaultAdapter } from "kam/src/interfaces/IVaultAdapter.sol";
+import { Execution } from "minimal-smart-account/interfaces/IMinimalSmartAccount.sol";
+import { ExecutionLib } from "minimal-smart-account/libraries/ExecutionLib.sol";
+import { ModeLib } from "minimal-smart-account/libraries/ModeLib.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
 
 contract VaultAdapterTest is DeploymentBaseTest {
@@ -131,6 +134,102 @@ contract VaultAdapterTest is DeploymentBaseTest {
         vm.prank(users.admin);
         vm.expectRevert(bytes(VAULTADAPTER_WRONG_ROLE));
         adapter.pull(USDC, _amount);
+    }
+
+    function test_Pull_RevertsWhenPaused() public {
+        uint256 _amount = 100 * _1_USDC;
+        mockUSDC.mint(address(adapter), _amount);
+
+        vm.prank(users.emergencyAdmin);
+        adapter.setPaused(true);
+
+        // Even the router cannot pull while paused.
+        vm.prank(address(assetRouter));
+        vm.expectRevert(bytes(VAULTADAPTER_IS_PAUSED));
+        adapter.pull(USDC, _amount);
+
+        // Funds remain on the adapter.
+        assertEq(mockUSDC.balanceOf(address(adapter)), _amount);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                            PAUSE COVERAGE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Local adapter pause must halt asset operations.
+    function test_Pull_LocalPaused_Reverts() public {
+        uint256 _amount = 100 * _1_USDC;
+        mockUSDC.mint(address(adapter), _amount);
+
+        vm.prank(users.emergencyAdmin);
+        adapter.setPaused(true);
+
+        vm.prank(address(assetRouter));
+        vm.expectRevert(bytes(VAULTADAPTER_IS_PAUSED));
+        adapter.pull(USDC, _amount);
+    }
+
+    /// @notice Registry-wide global pause must halt adapter operations even when
+    /// the local adapter pause flag is unset. Without this, a global pause does
+    /// not stop strategy execution / asset egress through the adapter.
+    function test_Pull_GlobalPaused_Reverts() public {
+        uint256 _amount = 100 * _1_USDC;
+        mockUSDC.mint(address(adapter), _amount);
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        vm.prank(address(assetRouter));
+        vm.expectRevert(bytes(VAULTADAPTER_IS_PAUSED));
+        adapter.pull(USDC, _amount);
+    }
+
+    /// @notice With neither pause active, the asset operation proceeds.
+    function test_Pull_BothUnpaused_Succeeds() public {
+        uint256 _amount = 100 * _1_USDC;
+        mockUSDC.mint(address(adapter), _amount);
+
+        assertFalse(registry.isGlobalPaused());
+
+        uint256 _balanceBefore = mockUSDC.balanceOf(address(assetRouter));
+
+        vm.prank(address(assetRouter));
+        adapter.pull(USDC, _amount);
+
+        assertEq(mockUSDC.balanceOf(address(assetRouter)), _balanceBefore + _amount);
+    }
+
+    /// @notice Local adapter pause must halt strategy execution.
+    /// @dev Mirrors `test_Pull_LocalPaused_Reverts` at the `execute()` entry point
+    /// — the audit-doc-named coverage of `_authorizeExecute`'s pause check.
+    function test_Execute_LocalPaused_Reverts() public {
+        Execution[] memory _executions = new Execution[](1);
+        _executions[0] = Execution({ target: USDC, value: 0, callData: "" });
+        bytes memory _executionCalldata = ExecutionLib.encodeBatch(_executions);
+
+        vm.prank(users.emergencyAdmin);
+        adapter.setPaused(true);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(VAULTADAPTER_IS_PAUSED));
+        adapter.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
+    }
+
+    /// @notice Registry-wide global pause must halt strategy execution. This is the
+    /// regression test for the audit finding: prior to Phase 8, `_authorizeExecute`
+    /// only checked the local pause flag, so a global pause did not stop adapter
+    /// strategy execution.
+    function test_Execute_GlobalPaused_Reverts() public {
+        Execution[] memory _executions = new Execution[](1);
+        _executions[0] = Execution({ target: USDC, value: 0, callData: "" });
+        bytes memory _executionCalldata = ExecutionLib.encodeBatch(_executions);
+
+        vm.prank(users.emergencyAdmin);
+        registry.setGlobalPause(true);
+
+        vm.prank(users.relayer);
+        vm.expectRevert(bytes(VAULTADAPTER_IS_PAUSED));
+        adapter.execute(ModeLib.encodeSimpleBatch(), _executionCalldata);
     }
 
     /* //////////////////////////////////////////////////////////////

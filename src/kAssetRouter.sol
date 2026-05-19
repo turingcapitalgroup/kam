@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { Ownable } from "solady/auth/Ownable.sol";
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
@@ -14,6 +14,8 @@ import {
     KASSETROUTER_ASSET_MISMATCH,
     KASSETROUTER_BATCH_ID_PROPOSED,
     KASSETROUTER_COOLDOWN_IS_UP,
+    KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD,
+    KASSETROUTER_INSUFFICIENT_ACTIVE_ASSETS,
     KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE,
     KASSETROUTER_INVALID_COOLDOWN,
     KASSETROUTER_IS_PAUSED,
@@ -28,6 +30,7 @@ import {
     KASSETROUTER_PROPOSAL_EXISTS,
     KASSETROUTER_PROPOSAL_NOT_ACCEPTED,
     KASSETROUTER_PROPOSAL_NOT_FOUND,
+    KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE,
     KASSETROUTER_WRONG_ROLE,
     KASSETROUTER_ZERO_ADDRESS,
     KASSETROUTER_ZERO_AMOUNT
@@ -49,12 +52,12 @@ import { MAX_BPS } from "kam/src/constants/Constants.sol";
 /// distribution
 /// @dev This contract serves as the heart of the KAM protocol's financial infrastructure, coordinating complex
 /// interactions between institutional flows (kMinter), retail flows (kStakingVaults), and yield generation (DN vaults).
-/// Key responsibilities include: (1) Managing asset pushes from kMinter institutional deposits to DN vaults for yield
-/// generation, (2) Coordinating virtual asset transfers between kStakingVaults for optimal capital allocation,
+/// Key responsibilities include: (1) Managing asset pushes from kMinter institutional deposits to kMinter adapters,
+/// (2) Coordinating virtual asset transfers between kStakingVaults for optimal capital allocation,
 /// (3) Processing batch settlements with yield distribution through precise kToken minting/burning operations,
 /// (4) Maintaining virtual balance tracking across all vaults for accurate accounting, (5) Implementing security
-/// cooldown periods for settlement proposals, (6) Executing peg protection mechanisms during market stress.
-/// The contract ensures protocol integrity by maintaining the 1:1 backing guarantee through carefully orchestrated
+/// cooldown periods for settlement proposals, (6) Requiring guardian approval for high-delta settlements.
+/// The contract supports protocol integrity through carefully orchestrated
 /// money flows while enabling efficient capital utilization across the entire vault network.
 contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, Ownable {
     using OptimizedFixedPointMathLib for uint256;
@@ -78,10 +81,16 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// Prevents excessive delays that could harm user experience while maintaining security standards
     uint256 private constant MAX_VAULT_SETTLEMENT_COOLDOWN = 1 days;
 
-    /// @notice Default yield tolerance for settlement proposals (10%)
-    /// @dev Provides initial yield deviation threshold to prevent settlements with excessive yield changes
-    /// that could indicate errors in yield calculation or potential manipulation attempts
-    uint256 private constant DEFAULT_MAX_DELTA = 1000; // 10% in basis points
+    struct SettlementProposalParams {
+        address asset;
+        address vault;
+        bytes32 batchId;
+        uint256 totalAssets;
+        int256 netted;
+        uint256 managementFees;
+        uint256 performanceFees;
+        uint64 proposedAt;
+    }
 
     /* //////////////////////////////////////////////////////////////
                             STORAGE LAYOUT
@@ -96,7 +105,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         uint256 proposalCounter;
         /// @dev Current cooldown period in seconds before settlement proposals can be executed
         uint256 vaultSettlementCooldown;
-        /// @dev Maximum allowed yield deviation in basis points per vault before settlement proposal is rejected
+        /// @dev Maximum allowed yield deviation in basis points per vault before guardian approval is required
         mapping(address vault => uint256) maxAllowedDelta;
         /// @dev Set of proposal IDs that have been executed to prevent double-execution
         OptimizedBytes32EnumerableSetLib.Bytes32Set executedProposalIds;
@@ -142,18 +151,18 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     /// @dev Sets up the contract with protocol registry connection and default settlement cooldown.
     /// Must be called immediately after proxy deployment to establish connection with the protocol
     /// registry and initialize the money flow coordination system.
-    /// @param _registry Address of the kRegistry contract that manages protocol configuration
+    /// @param _registryAddr Address of the kRegistry contract that manages protocol configuration
     /// @param _owner Initial owner of the contract
-    function initialize(address _registry, address _owner) external initializer {
+    function initialize(address _registryAddr, address _owner) external initializer {
         _checkAddressNotZero(_owner);
-        __kBase_init(_registry);
+        __kBase_init(_registryAddr);
         _initializeOwner(_owner);
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
         $.vaultSettlementCooldown = DEFAULT_VAULT_SETTLEMENT_COOLDOWN;
         // maxAllowedDelta is now per-vault, set via setMaxAllowedDelta(vault, delta)
 
-        emit ContractInitialized(_registry);
+        emit ContractInitialized(_registryAddr);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -172,7 +181,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         IVaultAdapter _adapter = IVaultAdapter(_registry().getAdapter(_kMinter, _asset));
         _asset.safeTransfer(address(_adapter), _amount);
 
-        emit AssetsPushed(_kMinter, _amount);
+        emit AssetsPushed(_kMinter, _batchId, _amount);
 
         _unlockReentrant();
     }
@@ -185,11 +194,12 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _kMinter = msg.sender;
         _checkKMinter(_kMinter);
 
-        // Validate cumulative total doesn't exceed virtual balance
-        uint256 _totalRequested = IkMinter(_kMinter).getBatchInfo(_batchId).requestedSharesInBatch;
-        _checkSufficientVirtualBalance(_kMinter, _asset, _totalRequested);
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+        // Accumulate global pending requests to cap cross-batch burn capacity
+        uint256 _totalGlobalPending = $.globalPendingRequests[_kMinter][_asset] += _amount;
+        _checkSufficientVirtualBalance(_kMinter, _asset, _totalGlobalPending);
 
-        emit AssetsRequestPulled(_kMinter, _asset, _amount);
+        emit AssetsRequestPulled(_kMinter, _asset, _batchId, _amount);
         _unlockReentrant();
     }
 
@@ -221,18 +231,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // Check against GLOBAL pending, not just this request amount
         _checkSufficientVirtualBalance(_sourceVault, _asset, _totalGlobalPending);
 
-        emit AssetsTransferred(_sourceVault, _targetVault, _asset, _amount);
-        _unlockReentrant();
-    }
-
-    /// @inheritdoc IkAssetRouter
-    function kSharesRequestPush(address _sourceVault, uint256 _amount, bytes32 _batchId) external payable {
-        _lockReentrant();
-        _checkPaused();
-        _checkAmountNotZero(_amount);
-        _checkVault(msg.sender);
-
-        emit SharesRequestedPushed(_sourceVault, _batchId, _amount);
+        emit AssetsTransferred(_sourceVault, _targetVault, _asset, _batchId, _amount);
         _unlockReentrant();
     }
 
@@ -245,9 +244,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         address _asset,
         address _vault,
         bytes32 _batchId,
-        uint256 _totalAssets,
-        uint64 _lastFeesChargedManagement,
-        uint64 _lastFeesChargedPerformance
+        uint256 _totalAssets
     )
         external
         payable
@@ -263,110 +260,233 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         require($.batchIds.add(_batchId), KASSETROUTER_BATCH_ID_PROPOSED);
         require(IkMinter(_vault).isClosed(_batchId), KASSETROUTER_NOT_BATCH_CLOSED);
 
-        // Increase the counter to generate unique proposal id
+        SettlementProposalParams memory _params;
+        _params.asset = _asset;
+        _params.vault = _vault;
+        _params.batchId = _batchId;
+        _params.totalAssets = _totalAssets;
+        _params.proposedAt = block.timestamp.toUint64();
+
+        bool _isMinter = _isKMinter(_params.vault);
+
+        _proposalId = _generateProposalId($, _params.vault, _params.asset, _params.batchId);
+        _checkNoPendingProposalForAsset($, _params.vault, _params.asset, _isMinter);
+        require(!$.executedProposalIds.contains(_proposalId), KASSETROUTER_PROPOSAL_EXECUTED);
+
+        uint256 _requestedInBatch;
+        (_requestedInBatch, _params.netted, _params.managementFees, _params.performanceFees) = _computeNetting(
+            _params.vault, _params.batchId, _params.asset, _params.totalAssets, _isMinter, _params.proposedAt
+        );
+
+        // Validate global pending coverage for kMinter BEFORE adding proposal to the set,
+        // so _effectiveVirtualBalanceInt doesn't iterate this uninitialized proposal slot.
+        if (_isMinter) {
+            _validateAndDecrementGlobalPending($, _params.vault, _params.asset, _requestedInBatch, _params.netted);
+        }
+
+        _createProposal($, _proposalId, _params);
+
+        _unlockReentrant();
+    }
+
+    /// @notice Creates and stores the settlement proposal after all validations pass
+    /// @dev Computes yield, checks tolerance, caches adapter, and emits events.
+    function _createProposal(
+        kAssetRouterStorage storage $,
+        bytes32 _proposalId,
+        SettlementProposalParams memory _params
+    )
+        private
+    {
+        uint256 _lastTotalAssets = _virtualBalance(_params.vault, _params.asset);
+
+        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int256 _yield = int256(_params.totalAssets) - int256(_lastTotalAssets);
+
+        // To calculate the strategy yield we need to include the deposits and requests into the new total
+        // assets to match last total assets.
+        // casting to 'uint256' is safe because we're converting back from int256 arithmetic
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 _totalAssetsAdjusted = uint256(int256(_params.totalAssets) + _params.netted);
+
+        bool _requiresApproval =
+            _checkYieldTolerance($, _params.vault, _params.asset, _params.batchId, _lastTotalAssets, _yield);
+
+        address _adapter = _registry().getAdapter(_params.vault, _params.asset);
+        _checkAddressNotZero(_adapter);
+
+        uint256 _executeAfter;
+        unchecked {
+            _executeAfter = block.timestamp + $.vaultSettlementCooldown;
+        }
+
+        require($.vaultPendingProposalIds[_params.vault].add(_proposalId), KASSETROUTER_PROPOSAL_EXISTS);
+
+        $.settlementProposals[_proposalId] = VaultSettlementProposal({
+            asset: _params.asset,
+            vault: _params.vault,
+            adapter: _adapter,
+            batchId: _params.batchId,
+            totalAssets: _totalAssetsAdjusted,
+            netted: _params.netted,
+            yield: _yield,
+            managementFees: _params.managementFees,
+            performanceFees: _params.performanceFees,
+            proposedAt: _params.proposedAt,
+            executeAfter: _executeAfter.toUint64(),
+            requiresApproval: _requiresApproval
+        });
+
+        emit SettlementProposed(
+            _proposalId, _params.vault, _params.batchId, _params.totalAssets, _params.netted, _yield, _executeAfter
+        );
+    }
+
+    /// @notice Generates a unique proposal ID using vault, asset, batch, timestamp and counter
+    /// @param $ Storage reference
+    /// @param _vault Vault address
+    /// @param _asset Asset address
+    /// @param _batchId Batch identifier
+    /// @return _proposalId The generated unique proposal ID
+    function _generateProposalId(
+        kAssetRouterStorage storage $,
+        address _vault,
+        address _asset,
+        bytes32 _batchId
+    )
+        private
+        returns (bytes32 _proposalId)
+    {
         unchecked {
             $.proposalCounter++;
         }
-
         _proposalId = OptimizedEfficientHashLib.hash(
             uint256(uint160(_vault)), uint256(uint160(_asset)), uint256(_batchId), block.timestamp, $.proposalCounter
         );
+    }
 
-        // At the moment we only allow one proposal per vault to make sure nothing breaks
-        require($.vaultPendingProposalIds[_vault].length() == 0, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME);
+    /// @notice Ensures no pending proposal exists for the same asset on the given vault
+    /// @dev kMinter allows multiple pending proposals per vault but only one per asset;
+    /// kStakingVaults allow only one pending proposal at a time.
+    function _checkNoPendingProposalForAsset(
+        kAssetRouterStorage storage $,
+        address _vault,
+        address _asset,
+        bool _isMinter
+    )
+        private
+        view
+    {
+        uint256 _pendingCount = $.vaultPendingProposalIds[_vault].length();
+        if (_pendingCount == 0) return;
 
-        // Check if proposal already exists
-        require(!$.executedProposalIds.contains(_proposalId), KASSETROUTER_PROPOSAL_EXECUTED);
-        require($.vaultPendingProposalIds[_vault].add(_proposalId), KASSETROUTER_PROPOSAL_EXISTS);
+        // kStakingVaults only allow a single pending proposal
+        require(_isMinter, KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME);
 
-        int256 _netted;
-        int256 _yield;
-        uint256 _lastTotalAssets = _virtualBalance(_vault, _asset);
+        // kMinter allows multiple pending proposals but only one per asset.
+        for (uint256 i; i < _pendingCount;) {
+            require(
+                $.settlementProposals[$.vaultPendingProposalIds[_vault].at(i)].asset != _asset,
+                KASSETROUTER_ONLY_ONE_PROPOSAL_AT_THE_TIME
+            );
+            unchecked {
+                ++i;
+            }
+        }
+    }
 
-        if (_isKMinter(_vault)) {
+    /// @notice Computes the netting (deposits minus requested assets) for a batch
+    /// @dev Uses different logic for kMinter (direct share amounts) vs kStakingVault (convertToAssetsWithTotals)
+    /// @return _requestedInBatch The number of shares/assets requested for withdrawal in this batch
+    /// @return _netted The net deposit/withdrawal amount (positive = net deposit, negative = net withdrawal)
+    function _computeNetting(
+        address _vault,
+        bytes32 _batchId,
+        address _asset,
+        uint256 _totalAssets,
+        bool _isMinter,
+        uint64 _proposedAt
+    )
+        private
+        view
+        returns (uint256 _requestedInBatch, int256 _netted, uint256 _managementFees, uint256 _performanceFees)
+    {
+        if (_isMinter) {
             IkMinter.BatchInfo memory _batchInfo = IkMinter(_vault).getBatchInfo(_batchId);
             require(_asset == _batchInfo.asset, KASSETROUTER_ASSET_MISMATCH);
+            _requestedInBatch = _batchInfo.requestedSharesInBatch;
             _netted = int256(uint256(_batchInfo.depositedInBatch)) - int256(uint256(_batchInfo.requestedSharesInBatch));
         } else {
             require(_asset == IkStakingVault(_vault).underlyingAsset(), KASSETROUTER_ASSET_MISMATCH);
-            (,,,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
+            (,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
-            uint256 _totalSupply = IkStakingVault(_vault).totalSupply();
-            // When _totalSupply == 0, use 1:1 ratio; otherwise math handles _totalAssets == 0 naturally (returns 0)
-            uint256 _requestedAssets = _totalSupply == 0
-                ? _requestedSharesInBatch
-                : _requestedSharesInBatch.fullMulDiv(_totalAssets, _totalSupply);
+            _requestedInBatch = _requestedSharesInBatch;
+            (uint256 _requestedAssets, uint256 _managementFees_, uint256 _performanceFees_) =
+                IkStakingVault(_vault).quoteBatchSettlement(_batchId, _totalAssets, _proposedAt);
+            _managementFees = _managementFees_;
+            _performanceFees = _performanceFees_;
             // casting to 'int256' is safe because we're doing arithmetic on uint256 values
             // forge-lint: disable-next-line(unsafe-typecast)
             _netted = int256(_depositedInBatch) - int256(_requestedAssets);
         }
+    }
 
-        // casting to 'int256' is safe because we're doing arithmetic on uint256 values
-        // forge-lint: disable-next-line(unsafe-typecast)
-        _yield = int256(_totalAssets) - int256(_lastTotalAssets);
-
-        // To calculate the strategy yield we need to include the deposits and requests into the new total assets
-        // First to match last total assets
-        // casting to 'uint256' is safe because we're converting back from int256 arithmetic
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint256 _totalAssetsAdjusted = uint256(int256(_totalAssets) + _netted);
-
-        // Check if yield exceeds tolerance threshold to prevent excessive yield deviations
-        // If exceeded, require guardian approval before execution
-        bool _requiresApproval = false;
+    /// @notice Checks if yield exceeds the tolerance threshold for the vault
+    /// @dev Emits a warning event if yield exceeds tolerance and returns true to flag for guardian approval
+    /// @return _requiresApproval Whether the proposal requires guardian approval before execution
+    function _checkYieldTolerance(
+        kAssetRouterStorage storage $,
+        address _vault,
+        address _asset,
+        bytes32 _batchId,
+        uint256 _lastTotalAssets,
+        int256 _yield
+    )
+        private
+        returns (bool _requiresApproval)
+    {
         if (_lastTotalAssets > 0) {
             uint256 _maxAllowedYield = _lastTotalAssets * $.maxAllowedDelta[_vault] / MAX_BPS;
             if (_yield.abs() > _maxAllowedYield) {
                 _requiresApproval = true;
                 emit YieldExceedsMaxDeltaWarning(_vault, _asset, _batchId, _yield, _maxAllowedYield);
             }
+        } else {
+            require(_yield == 0, KASSETROUTER_FIRST_SETTLEMENT_NON_ZERO_YIELD);
         }
+    }
 
-        // Cache the adapter address at proposal creation time to prevent registry modification
-        // from breaking execution. This ensures settlement can proceed even if vault/adapter
-        // mappings are modified after proposal creation.
-        address _adapter = _registry().getAdapter(_vault, _asset);
-        _checkAddressNotZero(_adapter);
-
-        // Compute execution time in the future
-        uint256 _executeAfter;
-        unchecked {
-            _executeAfter = block.timestamp + $.vaultSettlementCooldown;
-        }
-
-        // Store the proposal
-        $.settlementProposals[_proposalId] = VaultSettlementProposal({
-            asset: _asset,
-            vault: _vault,
-            adapter: _adapter,
-            batchId: _batchId,
-            totalAssets: _totalAssetsAdjusted,
-            netted: _netted,
-            yield: _yield,
-            executeAfter: _executeAfter.toUint64(),
-            lastFeesChargedManagement: _lastFeesChargedManagement,
-            lastFeesChargedPerformance: _lastFeesChargedPerformance,
-            requiresApproval: _requiresApproval
-        });
-
-        emit SettlementProposed(
-            _proposalId,
-            _vault,
-            _batchId,
-            _totalAssets,
-            _netted,
-            _yield,
-            _executeAfter,
-            _lastFeesChargedManagement,
-            _lastFeesChargedPerformance
+    /// @notice Validates that kMinter has sufficient global pending coverage and decrements it
+    /// @dev Checks virtual balance after applying netting to ensure no overdraft. Must be called
+    /// BEFORE adding the proposal to the pending set to avoid iterating an uninitialized proposal slot.
+    function _validateAndDecrementGlobalPending(
+        kAssetRouterStorage storage $,
+        address _vault,
+        address _asset,
+        uint256 _requestedInBatch,
+        int256 _netted
+    )
+        private
+    {
+        uint256 _globalPendingBefore = $.globalPendingRequests[_vault][_asset];
+        require(_globalPendingBefore >= _requestedInBatch, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
+        uint256 _globalPendingAfterProposal = _globalPendingBefore - _requestedInBatch;
+        int256 _effectiveVirtualBalanceAfterProposal = _effectiveVirtualBalanceInt(_vault, _asset) + _netted;
+        require(_effectiveVirtualBalanceAfterProposal >= 0, KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE);
+        require(
+            uint256(_effectiveVirtualBalanceAfterProposal) >= _globalPendingAfterProposal,
+            KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE
         );
-        _unlockReentrant();
+        $.globalPendingRequests[_vault][_asset] = _globalPendingAfterProposal;
     }
 
     /// @inheritdoc IkAssetRouter
     function executeSettleBatch(bytes32 _proposalId) external payable {
         _lockReentrant();
         _checkPaused();
+
+        require(_isRelayer(msg.sender), KASSETROUTER_WRONG_ROLE);
 
         kAssetRouterStorage storage $ = _getkAssetRouterStorage();
 
@@ -410,6 +530,13 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
         // Remove proposal from vault queue
         require($.vaultPendingProposalIds[_vault].remove(_proposalId), KASSETROUTER_PROPOSAL_NOT_FOUND);
 
+        // Restore globalPendingRequests that were decremented at propose time.
+        // The batch is closed so requestedSharesInBatch is immutable.
+        if (_isKMinter(_vault)) {
+            uint256 _requestedInBatch = IkMinter(_vault).getBatchInfo(_proposal.batchId).requestedSharesInBatch;
+            $.globalPendingRequests[_vault][_proposal.asset] += _requestedInBatch;
+        }
+
         $.batchIds.remove(_proposal.batchId);
 
         emit SettlementCancelled(_proposalId, _vault, _proposal.batchId);
@@ -440,106 +567,117 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     }
 
     /// @notice Internal function to execute the core settlement logic with yield distribution
-    /// @dev This function performs the critical yield distribution process: (1) mints or burns kTokens
-    /// to reflect yield gains/losses, (2) updates vault accounting and batch tracking, (3) coordinates
-    /// the 1:1 backing maintenance. This is where the protocol's fundamental promise is maintained -
-    /// the kToken supply is adjusted to precisely match underlying asset changes plus distributed yield.
+    /// @dev This function performs the critical settlement process: (1) transfers kMinter redemption assets or
+    /// mints/burns kTokens for staking vault yield/losses, (2) updates adapter accounting and batch tracking,
+    /// (3) coordinates protocol accounting across the kMinter and staking vault adapters.
     /// @param _proposal The settlement proposal storage reference containing all settlement parameters
     function _executeSettlement(VaultSettlementProposal storage _proposal) private {
-        // Cache some values
+        address _vault = _proposal.vault;
+        address _kMinter = _getKMinter();
+
+        if (_vault == _kMinter) {
+            _executeMinterSettlement(_proposal);
+        } else {
+            _executeVaultSettlement(_proposal, _kMinter);
+        }
+
+        emit BatchSettled(_vault, _proposal.batchId, _proposal.totalAssets);
+    }
+
+    /// @notice Executes settlement for kMinter batches
+    /// @dev Handles pull of requested assets, batch settlement, and kMinter adapter total asset update
+    function _executeMinterSettlement(VaultSettlementProposal storage _proposal) private {
+        address _asset = _proposal.asset;
+        address _vault = _proposal.vault;
+        bytes32 _batchId = _proposal.batchId;
+        int256 _netted = _proposal.netted;
+
+        IVaultAdapter _adapter = IVaultAdapter(_proposal.adapter);
+        _checkAddressNotZero(address(_adapter));
+
+        uint256 _requested = IkMinter(_vault).getBatchInfo(_batchId).requestedSharesInBatch;
+        if (_requested > 0) {
+            address _receiver = IkMinter(_vault).getBatchReceiver(_batchId);
+            _checkAddressNotZero(_receiver);
+            _adapter.pull(_asset, _requested);
+            _asset.safeTransfer(_receiver, _requested);
+        }
+
+        if (_netted > 0) {
+            // casting to 'uint256' is safe because _netted is positive in this branch
+            // forge-lint: disable-next-line(unsafe-typecast)
+            emit Deposited(_vault, _asset, uint256(_netted));
+        } else if (_netted < 0) {
+            // casting to 'uint256' is safe because -_netted is positive in this branch
+            // forge-lint: disable-next-line(unsafe-typecast)
+            emit Withdrawn(_vault, _asset, uint256(-_netted));
+        }
+
+        ISettleBatch(_vault).settleBatch(_batchId, _proposal.proposedAt, 0, 0);
+
+        // Use DELTA instead of SET to avoid race condition with kStakingVault settlements
+        // Both operations modifying kMinter adapter are now commutative (order-independent)
+        int256 _kMinterNewTotalAssets = int256(_adapter.totalAssets()) + _netted;
+        require(_kMinterNewTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
+        // casting to 'uint256' is safe because _kMinterNewTotalAssets is >= 0 due to require check
+        // forge-lint: disable-next-line(unsafe-typecast)
+        _adapter.setTotalAssets(uint256(_kMinterNewTotalAssets));
+        emit TotalAssetsSet(address(_adapter), uint256(_kMinterNewTotalAssets));
+    }
+
+    /// @notice Executes settlement for kStakingVault batches
+    /// @dev Handles yield distribution (mint/burn kTokens), kMinter adapter update, vault settlement,
+    /// and global pending request cleanup.
+    function _executeVaultSettlement(VaultSettlementProposal storage _proposal, address _kMinter) private {
         address _asset = _proposal.asset;
         address _vault = _proposal.vault;
         bytes32 _batchId = _proposal.batchId;
         uint256 _totalAssets = _proposal.totalAssets;
         int256 _netted = _proposal.netted;
         int256 _yield = _proposal.yield;
-        bool _profit = _yield > 0;
-        address _kMinter = _getKMinter();
-        address _kToken = _getKTokenForAsset(_asset);
-        IRegistry _registry = _registry();
 
-        // Use cached adapter from proposal creation time - this prevents registry modification
-        // from breaking settlement execution
         IVaultAdapter _adapter = IVaultAdapter(_proposal.adapter);
         _checkAddressNotZero(address(_adapter));
 
-        // kMinter settlement
-        if (_vault == _kMinter) {
-            uint256 _requested = IkMinter(_vault).getBatchInfo(_batchId).requestedSharesInBatch;
-            if (_requested > 0) {
-                // Transfer assets to batch receiver for redemptions
-                address _receiver = IkMinter(_vault).getBatchReceiver(_batchId);
-                _checkAddressNotZero(_receiver);
-                _adapter.pull(_asset, _requested);
-                _asset.safeTransfer(_receiver, _requested);
-            }
-
-            // If netted assets are positive(it means more deposits than withdrawals)
-            if (_netted > 0) {
-                // casting to 'uint256' is safe because _netted is positive in this branch
+        // Distribute yield via kToken mint/burn
+        if (_yield != 0) {
+            address _kToken = _getKTokenForAsset(_asset);
+            if (_yield > 0) {
+                // casting to 'uint256' is safe because _yield is positive in this branch
                 // forge-lint: disable-next-line(unsafe-typecast)
-                emit Deposited(_vault, _asset, uint256(_netted));
-            } else if (_netted < 0) {
-                // casting to 'uint256' is safe because -_netted is positive in this branch
-                // forge-lint: disable-next-line(unsafe-typecast)
-                emit Withdrawn(_vault, _asset, uint256(-_netted));
+                uint256 _absYield = uint256(_yield);
+                IkToken(_kToken).mint(_vault, _absYield);
+                IkStakingVault(_vault).increaseBalance(_absYield.toUint128());
+            } else {
+                uint256 _absYield = _yield.abs();
+                require(_absYield <= IkStakingVault(_vault).totalAssets(), KASSETROUTER_INSUFFICIENT_ACTIVE_ASSETS);
+                IkToken(_kToken).burn(_vault, _absYield);
+                IkStakingVault(_vault).decreaseBalance(_absYield.toUint128());
             }
-
-            // Mark batch as settled in the vault
-            ISettleBatch(_vault).settleBatch(_batchId);
-
-            // Use DELTA instead of SET to avoid race condition with kStakingVault settlements
-            // Both operations modifying kMinter adapter are now commutative (order-independent)
-            int256 _kMinterNewTotalAssets = int256(_adapter.totalAssets()) + _netted;
-            require(_kMinterNewTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
-            // casting to 'uint256' is safe because _kMinterNewTotalAssets is >= 0 due to require check
-            // forge-lint: disable-next-line(unsafe-typecast)
-            _adapter.setTotalAssets(uint256(_kMinterNewTotalAssets));
-            emit TotalAssetsSet(address(_adapter), uint256(_kMinterNewTotalAssets));
-        } else {
-            // kMinter yield is sent to insuranceFund, cannot be minted.
-            if (_yield != 0) {
-                if (_profit) {
-                    // casting to 'uint256' is safe because _yield is positive in this branch
-                    // forge-lint: disable-next-line(unsafe-typecast)
-                    IkToken(_kToken).mint(_vault, uint256(_yield));
-                } else {
-                    IkToken(_kToken).burn(_vault, _yield.abs());
-                }
-                emit YieldDistributed(_vault, _yield);
-            }
-
-            // Update kMinter adapter total assets (must happen regardless of yield)
-            IVaultAdapter _kMinterAdapter = IVaultAdapter(_registry.getAdapter(_kMinter, _asset));
-            _checkAddressNotZero(address(_kMinterAdapter));
-            int256 _kMinterTotalAssets = int256(_kMinterAdapter.totalAssets()) - _netted;
-            require(_kMinterTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
-            // casting to 'uint256' is safe because _kMinterTotalAssets is >= 0 due to require check
-            // forge-lint: disable-next-line(unsafe-typecast)
-            _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
-            emit TotalAssetsSet(address(_kMinterAdapter), uint256(_kMinterTotalAssets));
-
-            // If new fees were scharged discount from current share price
-            if (_proposal.lastFeesChargedManagement != 0) {
-                IkStakingVault(_vault).notifyManagementFeesCharged(_proposal.lastFeesChargedManagement);
-            }
-            if (_proposal.lastFeesChargedPerformance != 0) {
-                IkStakingVault(_vault).notifyPerformanceFeesCharged(_proposal.lastFeesChargedPerformance);
-            }
-
-            // Mark batch as settled in the vault (also burns unstake shares and tracks claimable kTokens)
-            ISettleBatch(_vault).settleBatch(_batchId);
-            _adapter.setTotalAssets(_totalAssets);
-            emit TotalAssetsSet(address(_adapter), _totalAssets);
-
-            // After successful settlement, reduce global pending requests for kMinter
-            // depositedInBatch represents the stake requests that called kAssetTransfer
-            (,,,,,,,, uint256 _depositedInBatch,) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
-            kAssetRouterStorage storage $ = _getkAssetRouterStorage();
-            $.globalPendingRequests[_kMinter][_asset] -= _depositedInBatch;
+            emit YieldDistributed(_vault, _yield);
         }
 
-        emit BatchSettled(_vault, _batchId, _totalAssets);
+        // Update kMinter adapter total assets (must happen regardless of yield)
+        IVaultAdapter _kMinterAdapter = IVaultAdapter(_registry().getAdapter(_kMinter, _asset));
+        _checkAddressNotZero(address(_kMinterAdapter));
+        int256 _kMinterTotalAssets = int256(_kMinterAdapter.totalAssets()) - _netted;
+        require(_kMinterTotalAssets >= 0, KASSETROUTER_ZERO_AMOUNT);
+        // casting to 'uint256' is safe because _kMinterTotalAssets is >= 0 due to require check
+        // forge-lint: disable-next-line(unsafe-typecast)
+        _kMinterAdapter.setTotalAssets(uint256(_kMinterTotalAssets));
+        emit TotalAssetsSet(address(_kMinterAdapter), uint256(_kMinterTotalAssets));
+
+        // Mark batch as settled in the vault (accrues fees, mints/burns shares, snapshots prices)
+        ISettleBatch(_vault)
+            .settleBatch(_batchId, _proposal.proposedAt, _proposal.managementFees, _proposal.performanceFees);
+        _adapter.setTotalAssets(_totalAssets);
+        emit TotalAssetsSet(address(_adapter), _totalAssets);
+
+        // After successful settlement, reduce global pending requests for kMinter
+        // depositedInBatch represents the stake requests that called kAssetTransfer
+        (,,,,,, uint256 _depositedInBatch,) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+        $.globalPendingRequests[_kMinter][_asset] -= _depositedInBatch;
     }
 
     /* ////////////////////////////////////////////////////////////
@@ -560,10 +698,8 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
     /// @notice Updates the yield tolerance threshold for settlement proposals
     /// @dev This function allows protocol governance to adjust the maximum acceptable yield deviation before
-    /// settlement proposals are rejected. The yield tolerance acts as a safety mechanism to prevent settlement
-    /// proposals with extremely high or low yield values that could indicate calculation errors, data corruption,
-    /// or potential manipulation attempts. Setting an appropriate tolerance balances protocol safety with
-    /// operational flexibility, allowing normal yield fluctuations while blocking suspicious proposals.
+    /// settlement proposals require guardian approval. Proposals beyond the tolerance are flagged for explicit
+    /// guardian acceptance instead of being rejected outright.
     /// @param _maxDelta The new yield tolerance in basis points (e.g., 1000 = 10%)
     function setMaxAllowedDelta(address _vault, uint256 _maxDelta) external {
         _checkAdmin(msg.sender);
@@ -697,10 +833,42 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     }
 
     /// @notice Check if virtual balance is sufficient
+    /// @dev Checks if the virtual balance is sufficient to cover the required amount,
+    /// taking into account any pending proposals
     /// @param _vault Vault address
     /// @param _requiredAmount Required amount
     function _checkSufficientVirtualBalance(address _vault, address _asset, uint256 _requiredAmount) private view {
-        require(_virtualBalance(_vault, _asset) >= _requiredAmount, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
+        int256 _effectiveVirtualBalanceSigned = _effectiveVirtualBalanceInt(_vault, _asset);
+        require(_effectiveVirtualBalanceSigned >= 0, KASSETROUTER_VIRTUAL_BALANCE_NEGATIVE);
+        uint256 _effectiveVirtualBalance = uint256(_effectiveVirtualBalanceSigned);
+        require(_effectiveVirtualBalance >= _requiredAmount, KASSETROUTER_INSUFFICIENT_VIRTUAL_BALANCE);
+    }
+
+    /// @notice Computes effective virtual balance including all pending proposal netting for an asset
+    /// @param _vault Vault address
+    /// @param _asset Asset address
+    /// @return _effectiveVirtualBalanceSigned Effective virtual balance as signed integer
+    function _effectiveVirtualBalanceInt(
+        address _vault,
+        address _asset
+    )
+        private
+        view
+        returns (int256 _effectiveVirtualBalanceSigned)
+    {
+        kAssetRouterStorage storage $ = _getkAssetRouterStorage();
+        _effectiveVirtualBalanceSigned = int256(_virtualBalance(_vault, _asset));
+        uint256 _length = $.vaultPendingProposalIds[_vault].length();
+
+        if (_length == 0) return _effectiveVirtualBalanceSigned;
+
+        bytes32[] memory _pendingProposalIds = $.vaultPendingProposalIds[_vault].values();
+        for (uint256 i = 0; i < _length; i++) {
+            VaultSettlementProposal memory _openProposal = $.settlementProposals[_pendingProposalIds[i]];
+            if (_openProposal.asset == _asset) {
+                _effectiveVirtualBalanceSigned += _openProposal.netted;
+            }
+        }
     }
 
     /// @notice Check if caller is an admin
@@ -738,7 +906,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
             IkMinter.BatchInfo memory _batchInfo = IkMinter(_vault).getBatchInfo(_batchId);
             return (_batchInfo.depositedInBatch, _batchInfo.requestedSharesInBatch);
         } else {
-            (,,,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
+            (,,,,,, uint256 _depositedInBatch, uint256 _requestedSharesInBatch) =
                 IkStakingVault(_vault).getBatchIdInfo(_batchId);
             return (_depositedInBatch, _requestedSharesInBatch);
         }
@@ -746,7 +914,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
 
     /// @inheritdoc IkAssetRouter
     function getRequestedShares(address _vault, bytes32 _batchId) external view returns (uint256) {
-        (,,,,,,,,, uint256 _requestedSharesInBatch) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
+        (,,,,,,, uint256 _requestedSharesInBatch) = IkStakingVault(_vault).getBatchIdInfo(_batchId);
         return _requestedSharesInBatch;
     }
 
@@ -790,7 +958,7 @@ contract kAssetRouter is IkAssetRouter, Initializable, UUPSUpgradeable, kBase, O
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Receive ETH ()
-    receive() external payable { } // TODO: validate with auditors best approach
+    receive() external payable { }
 
     /* //////////////////////////////////////////////////////////////
                         CONTRACT INFO

@@ -1,5 +1,5 @@
 # SmartAdapterAccount
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/adapters/SmartAdapterAccount.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/adapters/SmartAdapterAccount.sol)
 
 **Inherits:**
 MinimalSmartAccount
@@ -17,7 +17,7 @@ Supports receiving Ether, ERC721, and ERC1155 tokens.
 
 Internal authorization check for UUPS upgrades
 
-Overrides parent to use registry.isAdmin instead of owner check
+Only callable by contract owner
 
 
 ```solidity

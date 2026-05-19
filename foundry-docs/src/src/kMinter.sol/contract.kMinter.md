@@ -1,8 +1,8 @@
 # kMinter
-[Git Source](https://github.com/turingcapitalgroup/kam/blob/12a061730ce998f48d7bc71a1e84927b172d8090/src/kMinter.sol)
+[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kMinter.sol)
 
 **Inherits:**
-[IkMinter](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
+[IkMinter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkMinter.sol/interface.IkMinter.md), [ISettleBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.ISettleBatch.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [kBase](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBase.sol/contract.kBase.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
 
 Institutional gateway for kToken minting and redemption with batch settlement processing
 
@@ -10,11 +10,10 @@ This contract serves as the primary interface for qualified institutions to inte
 enabling them to mint kTokens by depositing underlying assets and burn them through a sophisticated batch
 settlement system. Key features include: (1) Immediate 1:1 kToken minting upon asset deposit, bypassing the
 share-based accounting used for retail users, (2) Two-phase redemption process that handles requests through
-batch settlements to optimize gas costs and maintain protocol efficiency, (3) Integration with kStakingVault
-for yield generation on deposited assets, (4) Request tracking and management system with unique IDs for each
-redemption, (5) Cancellation mechanism for pending requests before batch closure. The contract enforces strict
-access control, ensuring only verified institutions can access these privileged operations while maintaining
-the security and integrity of the protocol's asset backing.
+batch settlements to optimize gas costs and maintain protocol efficiency, (3) Request tracking and management
+system with unique IDs for each redemption. The contract enforces strict access control, ensuring only
+verified institutions can access these privileged operations while maintaining the security and integrity of
+the protocol's asset backing.
 
 
 ## State Variables
@@ -61,14 +60,14 @@ Initializes the kMinter contract
 
 
 ```solidity
-function initialize(address _registry, address _owner) external initializer;
+function initialize(address _registryAddr, address _owner) external initializer;
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_registry`|`address`|Address of the registry contract|
-|`_owner`|`address`|Initial owner fo the contract|
+|`_registryAddr`|`address`|Address of the registry contract|
+|`_owner`|`address`|Initial owner of the contract|
 
 
 ### mint
@@ -102,13 +101,11 @@ withdrawal
 
 This function implements the first phase of the redemption process for qualified institutions. The workflow
 consists of: (1) transferring kTokens from the caller to this contract for escrow (not burned yet), (2)
-generating
-a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4) registering the
-request with kAssetRouter for batch processing. The kTokens remain in escrow until the batch is settled and the
-user calls burn() to complete the process. This two-phase approach is necessary because redemptions are
-processed
-in batches through the DN vault system, which requires waiting for batch settlement to ensure proper asset
-availability and yield distribution. The request can be cancelled before batch closure/settlement.
+generating a unique request ID for tracking, (3) creating a BurnRequest struct with PENDING status, (4)
+registering the request with kAssetRouter for batch processing. The kTokens remain in escrow until the
+batch is settled (when they are burned in bulk by settleBatch()) and the user calls burn() to claim assets.
+This two-phase approach is necessary because redemptions are processed in batches through the DN vault system,
+which requires waiting for batch settlement to ensure proper asset availability and yield distribution.
 
 
 ```solidity
@@ -131,20 +128,13 @@ function requestBurn(address _asset, address _to, uint256 _amount) external paya
 
 ### burn
 
-Completes the second phase of institutional redemption by executing a settled batch request
+Completes the second phase of institutional redemption by claiming assets from a settled batch
 
 This function finalizes the redemption process initiated by requestBurn(). It can only be called after
-the batch containing this request has been settled through the kAssetRouter settlement process. The execution
-involves: (1) validating the request exists and is in PENDING status, (2) updating the request status to
-REDEEMED,
-(3) removing the request from tracking, (4) burning the escrowed kTokens permanently, (5) instructing the
-kBatchReceiver contract to transfer the underlying assets to the recipient. The kBatchReceiver is a minimal
-proxy
-deployed per batch that holds the settled assets and ensures isolated distribution. This function will revert if
-the batch is not yet settled, ensuring assets are only distributed when available. The separation between
-request
-and redemption phases allows for efficient batch processing of multiple redemptions while maintaining asset
-safety.
+the batch containing this request has been settled through the kAssetRouter settlement process. The kTokens
+have already been burned during settleBatch(). The execution involves: (1) validating the request exists and
+is in PENDING status, (2) updating the request status to REDEEMED, (3) removing the request from tracking,
+(4) instructing the kBatchReceiver contract to transfer the underlying assets to the recipient.
 
 
 ```solidity
@@ -196,11 +186,13 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 ### settleBatch
 
-Marks a batch as settled after processing
+Marks a batch as settled after processing and burns all escrowed kTokens for the batch
+
+Burns all `requestedSharesInBatch` kTokens at once and decrements `totalLockedAssets`
 
 
 ```solidity
-function settleBatch(bytes32 _batchId) external;
+function settleBatch(bytes32 _batchId) external override(IkMinter, ISettleBatch);
 ```
 **Parameters**
 
@@ -648,18 +640,13 @@ function getTotalLockedAssets(address _asset) external view returns (uint256);
 
 Authorizes contract upgrades
 
-Only callable by ADMIN_ROLE
+Only callable by contract owner. Solady's UUPSUpgradeable already rejects a zero
+implementation via the `proxiableUUID` staticcall in `upgradeToAndCall`.
 
 
 ```solidity
-function _authorizeUpgrade(address _newImplementation) internal view override;
+function _authorizeUpgrade(address) internal view override;
 ```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_newImplementation`|`address`|New implementation address|
-
 
 ### contractName
 

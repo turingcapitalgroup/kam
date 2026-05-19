@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.34;
 
 import { _1_USDC } from "../utils/Constants.sol";
 import { DeploymentBaseTest } from "../utils/DeploymentBaseTest.sol";
@@ -185,6 +185,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         validator.setAllowedReceiver(testToken, testReceiver, true);
 
         bytes memory _params = abi.encode(testReceiver, _amount);
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params);
     }
 
@@ -197,6 +198,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params);
     }
 
@@ -209,6 +211,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_RECEIVER_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params);
     }
 
@@ -228,6 +231,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         validator.setAllowedSource(testToken, testSource, true);
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _params);
     }
 
@@ -240,6 +244,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _params);
     }
 
@@ -252,6 +257,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_RECEIVER_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _params);
     }
 
@@ -266,6 +272,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSource, testReceiver, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_SOURCE_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _params);
     }
 
@@ -280,6 +287,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         validator.setAllowedSpender(testToken, testSpender, true);
 
         bytes memory _params = abi.encode(testSpender, _amount);
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.approve.selector, _params);
     }
 
@@ -288,6 +296,7 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
 
         bytes memory _params = abi.encode(testSpender, _amount);
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_SPENDER_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, ERC20.approve.selector, _params);
     }
 
@@ -300,7 +309,80 @@ contract ERC20ExecutionValidatorTest is DeploymentBaseTest {
         bytes memory _params = "";
 
         vm.expectRevert(bytes(EXECUTIONVALIDATOR_SELECTOR_NOT_ALLOWED));
+        vm.prank(address(registry));
         validator.authorizeCall(testExecutor, testToken, _invalidSelector, _params);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                AUTHORIZECALL - CUMULATIVE PER-BLOCK TRACKING
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Transfers in the same block accumulate against maxSingleTransfer.
+    /// First transfer succeeds (60 <= 100). Second succeeds (60+30=90 <= 100). Third
+    /// reverts (90+30=120 > 100), proving the counter is cumulative and not per-call.
+    function test_AuthorizeCall_Transfer_CumulativePerBlock_RevertsOverMax() public {
+        uint256 _maxAmount = 100 * _1_USDC;
+
+        vm.prank(users.admin);
+        validator.setMaxSingleTransfer(testToken, _maxAmount);
+        vm.prank(users.admin);
+        validator.setAllowedReceiver(testToken, testReceiver, true);
+
+        bytes memory _params60 = abi.encode(testReceiver, 60 * _1_USDC);
+        bytes memory _params30 = abi.encode(testReceiver, 30 * _1_USDC);
+
+        vm.prank(address(registry));
+        validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params60); // 60
+        vm.prank(address(registry));
+        validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params30); // 90
+
+        vm.prank(address(registry));
+        vm.expectRevert(bytes(EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
+        validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params30); // 120 > 100
+    }
+
+    /// @notice Per-block counter is keyed on block.number — moving to a new block
+    /// resets the available headroom.
+    function test_AuthorizeCall_Transfer_CumulativePerBlock_ResetsNextBlock() public {
+        uint256 _maxAmount = 100 * _1_USDC;
+
+        vm.prank(users.admin);
+        validator.setMaxSingleTransfer(testToken, _maxAmount);
+        vm.prank(users.admin);
+        validator.setAllowedReceiver(testToken, testReceiver, true);
+
+        bytes memory _params90 = abi.encode(testReceiver, 90 * _1_USDC);
+
+        // Block 1: use 90
+        vm.prank(address(registry));
+        validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params90);
+
+        // Block 2: should regain full 100 of headroom
+        vm.roll(block.number + 1);
+        vm.prank(address(registry));
+        validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _params90);
+    }
+
+    /// @notice transferFrom shares the same per-block counter as transfer; mixing
+    /// the two in one block accumulates against the same limit.
+    function test_AuthorizeCall_TransferAndTransferFrom_ShareCumulativeBudget() public {
+        uint256 _maxAmount = 100 * _1_USDC;
+
+        vm.startPrank(users.admin);
+        validator.setMaxSingleTransfer(testToken, _maxAmount);
+        validator.setAllowedReceiver(testToken, testReceiver, true);
+        validator.setAllowedSource(testToken, testSource, true);
+        vm.stopPrank();
+
+        bytes memory _transfer = abi.encode(testReceiver, 60 * _1_USDC);
+        bytes memory _transferFrom = abi.encode(testSource, testReceiver, 50 * _1_USDC);
+
+        vm.prank(address(registry));
+        validator.authorizeCall(testExecutor, testToken, ERC20.transfer.selector, _transfer); // 60
+        // 60 + 50 = 110 > 100, must revert.
+        vm.prank(address(registry));
+        vm.expectRevert(bytes(EXECUTIONVALIDATOR_AMOUNT_EXCEEDS_MAX_SINGLE_TRANSFER));
+        validator.authorizeCall(testExecutor, testToken, ERC20.transferFrom.selector, _transferFrom);
     }
 
     /* //////////////////////////////////////////////////////////////
