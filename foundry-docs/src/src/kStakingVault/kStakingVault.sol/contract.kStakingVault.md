@@ -493,7 +493,6 @@ unstake requests. This sum is the invariant baseline the vault must maintain at 
 ```solidity
 function _expectedKTokenBalance(BaseVaultStorage storage $) private view returns (uint256);
 ```
-**Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
@@ -525,6 +524,10 @@ function _auditKTokenBalance(BaseVaultStorage storage $) private view;
 |----|----|-----------|
 |`$`|`BaseVaultStorage`|Direct storage pointer for gas-efficient state access|
 
+
+```solidity
+function _auditKTokenBalance(BaseVaultStorage storage $) private view;
+```
 
 ### _createStakeRequestId
 

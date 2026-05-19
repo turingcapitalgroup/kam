@@ -201,7 +201,7 @@ function allowance(address owner, address spender) public view virtual returns (
 ### approve
 
 Sets `amount` as the allowance of `spender` over the caller's tokens.
-Emits a [Approval](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#approval) event.
+Emits a [Approval](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#approval) event.
 
 
 ```solidity
@@ -213,7 +213,7 @@ function approve(address spender, uint256 amount) public virtual returns (bool);
 Transfer `amount` tokens from the caller to `to`.
 Requirements:
 - `from` must at least have `amount`.
-Emits a [Transfer](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#transfer) event.
+Emits a [Transfer](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#transfer) event.
 
 
 ```solidity
@@ -227,7 +227,7 @@ Note: Does not update the allowance if it is the maximum uint256 value.
 Requirements:
 - `from` must at least have `amount`.
 - The caller must have at least `amount` of allowance to transfer the tokens of `from`.
-Emits a [Transfer](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#transfer) event.
+Emits a [Transfer](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#transfer) event.
 
 
 ```solidity
@@ -276,7 +276,7 @@ function nonces(address owner) public view virtual returns (uint256 result);
 
 Sets `value` as the allowance of `spender` over the tokens of `owner`,
 authorized by a signed approval by `owner`.
-Emits a [Approval](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#approval) event.
+Emits a [Approval](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#approval) event.
 
 
 ```solidity
@@ -305,7 +305,7 @@ function DOMAIN_SEPARATOR() public view virtual returns (bytes32 result);
 ### _mint
 
 Mints `amount` tokens to `to`, increasing the total supply.
-Emits a [Transfer](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#transfer) event.
+Emits a [Transfer](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#transfer) event.
 
 
 ```solidity
@@ -315,7 +315,7 @@ function _mint(address to, uint256 amount) internal virtual;
 ### _burn
 
 Burns `amount` tokens from `from`, reducing the total supply.
-Emits a [Transfer](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#transfer) event.
+Emits a [Transfer](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#transfer) event.
 
 
 ```solidity
@@ -343,7 +343,7 @@ function _spendAllowance(address owner, address spender, uint256 amount) interna
 ### _approve
 
 Sets `amount` as the allowance of `spender` over the tokens of `owner`.
-Emits a [Approval](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#approval) event.
+Emits a [Approval](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#approval) event.
 
 
 ```solidity
@@ -374,7 +374,7 @@ function _afterTokenTransfer(address from, address to, uint256 amount) internal 
 
 Returns whether to fix the Permit2 contract's allowance at infinity.
 This value should be kept constant after contract initialization,
-or else the actual allowance values may not match with the [Approval](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#approval) events.
+or else the actual allowance values may not match with the [Approval](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/tokens/ERC20.sol/abstract.ERC20.md#approval) events.
 For best performance, return a compile-time constant for zero-cost abstraction.
 
 

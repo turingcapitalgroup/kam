@@ -2,7 +2,7 @@
 [Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kRegistry/kRegistry.sol)
 
 **Inherits:**
-[IRegistry](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
+[IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
 
 Central configuration hub and contract registry for the KAM protocol ecosystem
 

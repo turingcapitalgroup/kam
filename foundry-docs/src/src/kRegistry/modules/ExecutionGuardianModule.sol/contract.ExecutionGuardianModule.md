@@ -2,7 +2,7 @@
 [Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kRegistry/modules/ExecutionGuardianModule.sol)
 
 **Inherits:**
-[IExecutionGuardian](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md), [IModule](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
+[IExecutionGuardian](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IExecutionGuardian.sol/interface.IExecutionGuardian.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md)
 
 Module for managing executor permissions and parameter checking in kRegistry
 

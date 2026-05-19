@@ -2,7 +2,7 @@
 [Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/adapters/VaultAdapter.sol)
 
 **Inherits:**
-[SmartAdapterAccount](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/adapters/SmartAdapterAccount.sol/contract.SmartAdapterAccount.md), [IVaultAdapter](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md)
+[SmartAdapterAccount](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/adapters/SmartAdapterAccount.sol/contract.SmartAdapterAccount.md), [IVaultAdapter](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultAdapter.sol/interface.IVaultAdapter.md)
 
 Protocol adapter enabling secure interaction with external DeFi protocols for yield generation.
 

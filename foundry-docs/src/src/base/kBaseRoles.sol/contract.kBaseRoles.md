@@ -2,7 +2,7 @@
 [Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/base/kBaseRoles.sol)
 
 **Inherits:**
-[OptimizedOwnableRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md)
+[OptimizedOwnableRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/OptimizedOwnableRoles.sol/abstract.OptimizedOwnableRoles.md)
 
 Foundation contract providing role-based access control for the KAM protocol.
 

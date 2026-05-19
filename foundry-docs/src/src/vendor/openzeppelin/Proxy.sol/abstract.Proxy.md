@@ -3,9 +3,9 @@
 
 This abstract contract provides a fallback function that delegates all calls to another contract using the EVM
 instruction `delegatecall`. We refer to the second contract as the _implementation_ behind the proxy, and it has to
-be specified by overriding the virtual [_implementation](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md#_implementation) function.
-Additionally, delegation to the implementation can be triggered manually through the [_fallback](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md#_fallback) function, or to a
-different contract through the [_delegate](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md#_delegate) function.
+be specified by overriding the virtual [_implementation](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md#_implementation) function.
+Additionally, delegation to the implementation can be triggered manually through the [_fallback](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md#_fallback) function, or to a
+different contract through the [_delegate](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md#_delegate) function.
 The success and return data of the delegated call will be returned back to the caller of the proxy.
 
 
@@ -23,7 +23,7 @@ function _delegate(address implementation) internal virtual;
 ### _implementation
 
 This is a virtual function that should be overridden so it returns the address to which the fallback
-function and [_fallback](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md#_fallback) should delegate.
+function and [_fallback](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/Proxy.sol/abstract.Proxy.md#_fallback) should delegate.
 
 
 ```solidity

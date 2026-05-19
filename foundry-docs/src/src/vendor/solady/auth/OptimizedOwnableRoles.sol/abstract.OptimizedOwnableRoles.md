@@ -2,7 +2,7 @@
 [Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/vendor/solady/auth/OptimizedOwnableRoles.sol)
 
 **Inherits:**
-[Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
+[Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md)
 
 **Author:**
 Originally by Solady (https://github.com/vectorized/solady/blob/main/src/auth/OwnableRoles.sol)

@@ -264,7 +264,6 @@ Returns the current active batch ID
 ```solidity
 function getBatchId() external view returns (bytes32);
 ```
-**Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
@@ -279,12 +278,42 @@ Returns current batch ID with safety validation
 ```solidity
 function getSafeBatchId() external view returns (bytes32);
 ```
-**Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`bytes32`|The current batch identifier if open and unsettled|
 
+Converts shares to assets with specified totals, rounding down
+
+
+```solidity
+function convertToAssetsWithTotals(
+    uint256 shares,
+    uint256 totalAssets_,
+    uint256 totalSupply_
+)
+    external
+    pure
+    returns (uint256);
+```
+
+### getBatchId
+
+Returns the current active batch ID
+
+
+```solidity
+function getBatchId() external view returns (bytes32);
+```
+
+### getSafeBatchId
+
+Returns current batch ID with safety validation
+
+
+```solidity
+function getSafeBatchId() external view returns (bytes32);
+```
 
 ### isClosed
 
@@ -294,7 +323,6 @@ Returns the close state of a given batch
 ```solidity
 function isClosed(bytes32 batchId_) external view returns (bool isClosed_);
 ```
-**Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
@@ -315,7 +343,6 @@ Returns whether the current batch is closed
 ```solidity
 function isBatchClosed() external view returns (bool);
 ```
-**Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
@@ -431,4 +458,43 @@ function quoteBatchSettlement(
 |`managementFees`|`uint256`|Management fee assets that would be charged at settlement|
 |`performanceFees`|`uint256`|Performance fee assets that would be charged at settlement|
 
+
+```solidity
+function isBatchSettled() external view returns (bool);
+```
+
+### getCurrentBatchInfo
+
+Returns core state for the current batch
+
+
+```solidity
+function getCurrentBatchInfo()
+    external
+    view
+    returns (bytes32 batchId, address batchReceiver, bool isClosed_, bool isSettled);
+```
+
+### getBatchIdInfo
+
+Returns accounting and lifecycle data for a specific batch
+
+
+```solidity
+function getBatchIdInfo(bytes32 batchId)
+    external
+    view
+    returns (
+        address batchReceiver,
+        bool isClosed_,
+        bool isSettled,
+        uint256 sharePrice_,
+        uint256 netSharePrice_,
+        uint256 totalAssets_,
+        uint256 totalNetAssets_,
+        uint256 totalSupply_,
+        uint256 depositedInBatch,
+        uint256 requestedSharesInBatch
+    );
+```
 
