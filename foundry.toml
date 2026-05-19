@@ -73,7 +73,7 @@ ignore = [
 [dependencies]
 forge-std = "1.9.7"
 minimal-smart-account = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-smart-account.git", rev = "0fd060740a7d929b56cff6f73350a19179612ac4" }
-kToken0 = { version = "1.0", git = "https://github.com/turingcapitalgroup/kToken0.git" }
+kToken0 = { version = "1.0", git = "https://github.com/turingcapitalgroup/kToken0.git", rev = "0fd060740a7d929b56cff6f73350a19179612ac4" }
 minimal-uups-factory = { version = "1.0", git = "https://github.com/turingcapitalgroup/minimal-uups-factory", rev = "568d85a0921f5b0bc7c410d99363cebdd0cd2ee5" }
 
 [soldeer]
