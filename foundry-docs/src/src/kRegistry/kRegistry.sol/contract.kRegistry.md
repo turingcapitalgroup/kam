@@ -1,8 +1,8 @@
 # kRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kRegistry/kRegistry.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kRegistry/kRegistry.sol)
 
 **Inherits:**
-[IRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
+[IRegistry](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IRegistry.sol/interface.IRegistry.md), [kBaseRoles](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/kBaseRoles.sol/contract.kBaseRoles.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [MultiFacetProxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
 
 Central configuration hub and contract registry for the KAM protocol ecosystem
 
@@ -12,8 +12,8 @@ kMinter, kAssetRouter, and kTokenFactory ensuring single source of truth, (2) As
 whitelisting, kToken deployment through kTokenFactory, and maintains bidirectional mappings between underlying assets and their
 corresponding kTokens, (3) Vault registry - manages vault registration, classification (DN, ALPHA, BETA, etc.),
 and routing logic to direct assets to appropriate vaults based on type and strategy, (4) Role-based access
-control - implements a hierarchical permission system with ADMIN, EMERGENCY_ADMIN, GUARDIAN, RELAYER, INSTITUTION,
-and VENDOR roles to enforce protocol security, (5) Adapter management - registers and tracks external protocol
+control - implements a hierarchical permission system with ADMIN, EMERGENCY_ADMIN, GUARDIAN, RELAYER, MANAGER,
+INSTITUTION, and VENDOR roles to enforce protocol security, (5) Adapter management - registers and tracks external protocol
 adapters per vault enabling yield strategy integrations. The registry uses upgradeable architecture with UUPS
 pattern and ERC-7201 namespaced storage to ensure future extensibility while maintaining state consistency.
 
@@ -141,7 +141,7 @@ function grantVendorRole(address _vendor) external payable;
 
 Grants relayer role for external vault operations
 
-Only callable by ADMIN_ROLE. Relayers manage external vaults and set hurdle rates.
+Only callable by ADMIN_ROLE. Relayers manage external vault operations.
 
 
 ```solidity
@@ -348,7 +348,7 @@ function revokeInstitutionRole(address _institution) external payable;
 
 Sets the treasury address
 
-Treasury receives protocol fees and serves as emergency fund holder. Only callable by ADMIN_ROLE.
+Stores the protocol treasury address. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -365,7 +365,7 @@ function setTreasury(address _treasury) external payable;
 
 Sets the insurance address
 
-Insurance receives protocol insurance fees. Only callable by ADMIN_ROLE.
+Stores the protocol insurance address. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -382,7 +382,7 @@ function setInsurance(address _insurance) external payable;
 
 Sets the treasury fee in basis points
 
-Treasury fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+Stores treasury fee configuration. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -399,7 +399,7 @@ function setTreasuryBps(uint16 _treasuryBps) external payable;
 
 Sets the insurance fee in basis points
 
-Insurance fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+Stores insurance fee configuration. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -449,9 +449,8 @@ function isGlobalPaused() external view returns (bool);
 Sets the hurdle rate for a specific vault
 
 Only admin can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
-Vault must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
-A hurdle rate of 0 is valid and means performance fees will be charged on all positive yield with no minimum
-threshold.
+Vault must be registered before setting hurdle rate. A hurdle rate of 0 means vault performance fee logic
+has no minimum hurdle threshold.
 
 
 ```solidity
@@ -828,7 +827,7 @@ function getAllVaults() external view returns (address[] memory);
 
 Gets the protocol treasury address
 
-Treasury receives protocol fees and serves as emergency fund holder.
+Returns the stored protocol treasury address.
 
 
 ```solidity
@@ -845,7 +844,7 @@ function getTreasury() external view returns (address);
 
 Gets the insurance address
 
-Insurance receives protocol insurance fees.
+Returns the stored protocol insurance address.
 
 
 ```solidity
@@ -1400,6 +1399,41 @@ function _checkString(string memory _str) private pure;
 |`_str`|`string`|The string to validate|
 
 
+### _deployKToken
+
+Deploys a new kToken for an asset via the kTokenFactory
+
+Extracts decimals, resolves factory and minter addresses, then deploys.
+Reverts if the asset doesn't support the decimals() interface.
+
+
+```solidity
+function _deployKToken(
+    address _asset,
+    address _emergencyAdmin,
+    string memory _name,
+    string memory _symbol
+)
+    private
+    returns (address _kToken, uint8 _decimals);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_asset`|`address`|The underlying asset address|
+|`_emergencyAdmin`|`address`|Emergency admin for the new kToken|
+|`_name`|`string`|Token name|
+|`_symbol`|`string`|Token symbol|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_kToken`|`address`|The deployed kToken address|
+|`_decimals`|`uint8`|The decimals of the underlying asset|
+
+
 ### _tryGetAssetDecimals
 
 Helper function to get the decimals of the underlying asset.
@@ -1515,14 +1549,11 @@ storage-location: erc7201:kam.storage.kRegistry
 
 ```solidity
 struct kRegistryStorage {
-    /// @dev Protocol insurance address for insurance fee collection
-    /// Receives protocol insurance fees for coverage reserves
+    /// @dev Protocol insurance address exposed to settlement integrations
     address insurance;
-    /// @dev Treasury fee in basis points (100 = 1%, max 10000 = 100%)
-    /// Portion of protocol profits allocated to treasury
+    /// @dev Treasury fee configuration in basis points (100 = 1%, max 10000 = 100%)
     uint16 treasuryBps;
-    /// @dev Insurance fee in basis points (100 = 1%, max 10000 = 100%)
-    /// Portion of protocol profits allocated to insurance
+    /// @dev Insurance fee configuration in basis points (100 = 1%, max 10000 = 100%)
     uint16 insuranceBps;
     /// @dev Global pause flag for protocol-wide emergency stop
     /// When true, all kBase-inheriting contracts are paused
@@ -1533,8 +1564,7 @@ struct kRegistryStorage {
     /// @dev Set of all registered vault contracts across all types
     /// Enables iteration and validation of vault registrations
     OptimizedAddressEnumerableSetLib.AddressSet allVaults;
-    /// @dev Protocol treasury address for fee collection and reserves
-    /// Receives protocol fees and serves as emergency fund holder
+    /// @dev Protocol treasury address exposed to fee and settlement integrations
     address treasury;
     /// @dev Maps assets to their maximum mint amount per batch
     mapping(address => uint256) maxMintPerBatch;

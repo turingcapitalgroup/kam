@@ -1,8 +1,8 @@
 # IVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IVault.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/interfaces/IVault.sol)
 
 **Inherits:**
-[IERC2771](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md), [IVaultBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
+[IERC2771](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md), [IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md), [IVaultBatch](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultBatch.sol/interface.IVaultBatch.md), [IVaultClaim](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultClaim.sol/interface.IVaultClaim.md), [IVaultFees](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVaultFees.sol/interface.IVaultFees.md)
 
 Core interface for retail staking operations enabling kToken holders to earn yield through vault strategies
 
@@ -61,11 +61,11 @@ coordination,
 (3) Transferring stkTokens from user to vault contract to maintain stable share price during settlement period,
 (4) Notifying kAssetRouter of share redemption request for proper accounting across vault network. The stkTokens
 remain locked in the vault until settlement when they are burned and equivalent kTokens (including yield) are
-made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens from
-the batch receiver contract. This two-phase design ensures accurate yield calculations and prevents share
+made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens directly
+from the vault. This two-phase design ensures accurate yield calculations and prevents share
 price manipulation during the settlement process.
-NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in stkToken (share) units, not kToken
-(asset) units. This makes the limit immune to price fluctuations between request time and settlement time.
+NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in kToken (asset) units: requested
+shares are converted to assets at current prices before comparing to the configured limit.
 
 
 ```solidity
@@ -196,17 +196,6 @@ Returns gross share price based on active accounted vault assets
 
 ```solidity
 function sharePrice() external view returns (uint256);
-```
-
-### netSharePrice
-
-Returns net share price after fee accounting
-
-Currently equals sharePrice because pending fee effects are reflected through settlement/accrual paths.
-
-
-```solidity
-function netSharePrice() external view returns (uint256);
 ```
 
 ### convertToShares

@@ -1,5 +1,5 @@
 # BaseVaultTypes
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kStakingVault/types/BaseVaultTypes.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kStakingVault/types/BaseVaultTypes.sol)
 
 Library containing all data structures used in the ModuleBase
 
@@ -55,7 +55,7 @@ Batch information structure
 
 ```solidity
 struct BatchInfo {
-    /// @notice Batch receiver address
+    /// @notice Batch receiver field, currently unused by kStakingVault and set to address(0)
     address batchReceiver;
     /// @notice Whether the batch is closed
     bool isClosed;
@@ -67,10 +67,8 @@ struct BatchInfo {
     uint128 depositedInBatch;
     /// @notice Amount of shares requested for unstaking in a batch
     uint128 requestedSharesInBatch;
-    /// @notice Total assets at settlement time (gross, including fees)
+    /// @notice Total assets at settlement time
     uint256 totalAssets;
-    /// @notice Total net assets at settlement time (after fees)
-    uint256 totalNetAssets;
     /// @notice Total supply of stkTokens at settlement time
     uint256 totalSupply;
 }

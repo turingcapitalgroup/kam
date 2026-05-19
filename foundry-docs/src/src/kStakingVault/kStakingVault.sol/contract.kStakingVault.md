@@ -1,8 +1,8 @@
 # kStakingVault
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kStakingVault/kStakingVault.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kStakingVault/kStakingVault.sol)
 
 **Inherits:**
-[IVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [ISettleBatch](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.ISettleBatch.md), [BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
+[IVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVault.sol/interface.IVault.md), [ISettleBatch](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkAssetRouter.sol/interface.ISettleBatch.md), [BaseVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md), [Ownable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/auth/Ownable.sol/abstract.Ownable.md), [MultiFacetProxy](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/MultiFacetProxy.sol/abstract.MultiFacetProxy.md)
 
 Retail staking vault enabling kToken holders to earn yield through batch-processed share tokens
 
@@ -13,9 +13,9 @@ combines several architectural patterns: (1) Dual-token system where kTokens con
 coordination with kAssetRouter for cross-vault yield optimization, (4) Two-phase operations (request → claim)
 ensuring accurate settlement and preventing MEV attacks, (5) Fee management system supporting both management
 and performance fees with hurdle rate mechanisms. The vault integrates with the broader protocol through
-kAssetRouter for asset flow coordination and yield distribution. Gas optimizations include packed storage,
-minimal proxy deployment for batch receivers, and efficient batch settlement processing. The modular architecture
-enables upgrades while maintaining state integrity through UUPS pattern and ERC-7201 storage.
+kAssetRouter for asset flow coordination and yield distribution. Gas optimizations include packed storage
+and efficient batch settlement processing. The modular architecture enables upgrades while maintaining state
+integrity through UUPS pattern and ERC-7201 storage.
 
 
 ## Functions
@@ -36,8 +36,7 @@ This function establishes the vault's integration with the KAM protocol ecosyste
 process: (1) Validates asset address to prevent deployment with invalid configuration, (2) Initializes
 BaseVault foundation with registry and operational state, (3) Sets up ownership and access control through
 Ownable pattern, (4) Configures share token metadata and decimals for ERC20 functionality, (5) Establishes
-kToken integration through registry lookup for asset-to-token mapping, (6) Sets initial share price watermark
-for performance fee calculations, (7) Deploys BatchReceiver implementation for settlement asset distribution.
+kToken integration through registry lookup for asset-to-token mapping, (6) Creates the initial open batch.
 The initialization creates a complete retail staking solution integrated with the protocol's institutional
 flows.
 
@@ -114,11 +113,11 @@ coordination,
 (3) Transferring stkTokens from user to vault contract to maintain stable share price during settlement period,
 (4) Notifying kAssetRouter of share redemption request for proper accounting across vault network. The stkTokens
 remain locked in the vault until settlement when they are burned and equivalent kTokens (including yield) are
-made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens from
-the batch receiver contract. This two-phase design ensures accurate yield calculations and prevents share
+made available. Users must later call claimUnstakedAssets() after settlement to receive their kTokens directly
+from the vault. This two-phase design ensures accurate yield calculations and prevents share
 price manipulation during the settlement process.
-NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in stkToken (share) units, not kToken
-(asset) units. This makes the limit immune to price fluctuations between request time and settlement time.
+NOTE: The batch limit (`maxBurnPerBatch`) for kStakingVaults is enforced in kToken (asset) units: requested
+shares are converted to assets at current prices before comparing to the configured limit.
 
 
 ```solidity
@@ -153,10 +152,10 @@ Claims stkTokens from a settled staking batch at the finalized share price
 This function completes the staking process by distributing stkTokens to users after batch settlement.
 Process: (1) Validates batch has been settled and share prices are finalized to ensure accurate distribution,
 (2) Verifies request ownership and pending status to prevent unauthorized or duplicate claims, (3) Calculates
-stkToken amount based on original kToken deposit and settled net share price (after fees), (4) Transfers
+stkToken amount based on original kToken deposit and settled share price, (4) Transfers
 pre-minted stkTokens from vault to recipient (shares were minted to vault during settlement), (5) Marks
-request as claimed to prevent future reprocessing. The net share price accounts for management and performance
-fees, ensuring users receive their accurate yield-adjusted position. stkTokens are ERC20-compatible shares that
+request as claimed to prevent future reprocessing. Settlement-time fee shares are already included in the
+recorded share price, ensuring users receive their accurate yield-adjusted position. stkTokens are ERC20-compatible shares that
 continue accruing yield through share price appreciation until unstaking.
 
 
@@ -242,40 +241,41 @@ function closeBatch(bytes32 _batchId, bool _create) external;
 
 ### settleBatch
 
-Marks a batch as settled after yield distribution, accrues fees, mints shares for pending stakers, and enables claiming
+Marks a batch as settled after yield distribution, mints proposed fees, mints shares for pending stakers, and enables claiming
 
-CALL CONTRACT — DO NOT REORDER. Each step depends on state mutated by the previous
-step; reordering produces silent fee-math errors (double-charging of management fees
-as yield, stale settlement baselines) or hard reverts (zero-duration settlements).
-1. Capture `_settlementElapsed` BEFORE `_accrueFees()` advances `_lastFeeTimestamp`.
-If this capture happens after the accrual, elapsed = 0 and `computePerformanceFee`
-reverts with `VAULTMATHLIB_ZERO_ELAPSED` (the library guard added to prevent the
-hurdle filter from being silently bypassed).
-2. `_accrueFees()` computes the management fee on pre-yield total assets and advances
-`_lastFeeTimestamp`. Returns the management-fee amount in asset terms.
-3. Compute net interest as
-`_currentBalance - _previousBalance - _mgmtFeeAssets`
-so the management fee is removed from the perf-fee base. Without this subtraction
-the management-fee charge appears as "yield" and is performance-fee'd a second time.
-4. Mint management-fee shares (`_mintManagementFees`).
-5. Compute performance fee using the captured elapsed and the net interest, against
-`_previousBalance` as the hurdle baseline.
-6. Mint performance-fee shares.
-7. Process pending stake/unstake at `_totalAssets()` / `totalSupply()`. These values
-include the just-minted fee shares — that is intentional: stakers join at the
-post-fee rate.
-8. Snapshot `_lastSettlementBalance = _totalBalance()` LAST so the next settlement's
-interest baseline is correct.
+This function finalizes batch settlement by minting the fee amounts snapshotted in the router proposal, recording final asset values, minting shares, and enabling claims.
+Process: (1) Validates batch is closed and not already settled to prevent duplicate processing, (2) Uses
+the fee amounts computed at proposal time — both fee types are minted as shares directly to the
+treasury inside this function (no separate notify step), (3) Updates
+`lastSettlementBalance` to snapshot current vault balance as the baseline for the next batch's interest
+calculation, (4) Snapshots total assets and total supply at settlement time from which share price is
+derived for stake and unstake calculations, (5) Mints stkTokens for all pending stakers in this batch
+to the vault itself at the settlement share price, (6) Burns all requested unstake stkTokens and
+calculates claimable kTokens at the settled price, decreasing internal balance accordingly, (7) Marks batch as
+settled enabling users to claim their staked shares or unstaked assets. Only kAssetRouter can settle batches
+as it coordinates yield calculations across DN vaults and manages cross-vault asset flows. The pre-minting
+approach ensures share prices are locked at settlement and users receive shares via transfer (not mint) when
+they claim.
 
 
 ```solidity
-function settleBatch(bytes32 _batchId) external override(IVaultBatch, ISettleBatch);
+function settleBatch(
+    bytes32 _batchId,
+    uint64 _proposedAt,
+    uint256 _managementFees,
+    uint256 _performanceFees
+)
+    external
+    override(IVaultBatch, ISettleBatch);
 ```
 **Parameters**
 
 |Name|Type|Description|
 |----|----|-----------|
 |`_batchId`|`bytes32`|The batch identifier to mark as settled (must be closed, not previously settled)|
+|`_proposedAt`|`uint64`|The exact block.timestamp when the proposal was submitted, used to freeze fee math|
+|`_managementFees`|`uint256`|Management fee assets computed when the settlement was proposed|
+|`_performanceFees`|`uint256`|Performance fee assets computed when the settlement was proposed|
 
 
 ### _createNewBatch
@@ -421,9 +421,6 @@ function _checkAdmin(address _admin) private view;
 
 Sets the annual management fee rate charged on assets under management
 
-Accrues pending fees before changing the rate. Management fees are calculated based on
-time elapsed since last accrual and total assets under management.
-
 
 ```solidity
 function setManagementFee(uint16 _managementFee) external;
@@ -438,8 +435,6 @@ function setManagementFee(uint16 _managementFee) external;
 ### setPerformanceFee
 
 Sets the performance fee rate charged on vault returns above hurdle rates
-
-Accrues pending fees before changing the rate.
 
 
 ```solidity
@@ -488,21 +483,52 @@ function decreaseBalance(uint128 _amount) external;
 
 ### _expectedKTokenBalance
 
+Computes the expected kToken balance held by the vault as a sum of active assets and pending reserves
+
+The expected balance reconciles three categories: (1) active assets earning yield in strategies,
+(2) kTokens deposited for pending stake requests not yet settled, (3) kTokens reserved for settled-but-unclaimed
+unstake requests. This sum is the invariant baseline the vault must maintain at all times.
+
 
 ```solidity
 function _expectedKTokenBalance(BaseVaultStorage storage $) private view returns (uint256);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`$`|`BaseVaultStorage`|Direct storage pointer for gas-efficient state access|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`uint256`|The total kToken balance the vault should hold according to protocol state|
+
 
 ### _auditKTokenBalance
+
+Audits the vault's kToken balance against the expected invariant, reverting on mismatch
+
+Called at the end of `settleBatch` to catch any kToken leakage caused by rounding, fee errors,
+or balance manipulation. Reverts with KSTAKINGVAULT_BALANCE_AUDIT_FAILED if the vault holds fewer
+kTokens than the sum of active assets and pending reserves. This is a safety check — the vault may
+hold more kTokens than expected (e.g. from rounding in claim transfers) but never less.
 
 
 ```solidity
 function _auditKTokenBalance(BaseVaultStorage storage $) private view;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`$`|`BaseVaultStorage`|Direct storage pointer for gas-efficient state access|
+
 
 ### _createStakeRequestId
 
-Creates a unique request ID for a staking request
+Creates a unique request ID for a staking or unstaking request
 
 
 ```solidity
@@ -513,7 +539,7 @@ function _createStakeRequestId(address _user, uint256 _amount, uint256 _timestam
 |Name|Type|Description|
 |----|----|-----------|
 |`_user`|`address`|User address|
-|`_amount`|`uint256`|Amount of underlying assets|
+|`_amount`|`uint256`|Amount (kTokens for stakes, stkTokens for unstakes)|
 |`_timestamp`|`uint256`|Timestamp|
 
 **Returns**
@@ -689,23 +715,6 @@ function sharePrice() external view returns (uint256);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`uint256`|The amount of active assets represented by one whole share unit|
-
-
-### netSharePrice
-
-Returns the current net share price after fee accounting
-
-Currently equals sharePrice because pending fee effects are reflected through settlement/accrual paths.
-
-
-```solidity
-function netSharePrice() external view returns (uint256);
-```
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`uint256`|The net amount of active assets represented by one whole share unit|
 
 
 ### convertToShares

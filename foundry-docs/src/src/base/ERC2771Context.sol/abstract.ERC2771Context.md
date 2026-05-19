@@ -1,8 +1,8 @@
 # ERC2771Context
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/base/ERC2771Context.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/base/ERC2771Context.sol)
 
 **Inherits:**
-[IERC2771](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md)
+[IERC2771](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IERC2771.sol/interface.IERC2771.md)
 
 Context variant with ERC-2771 support for meta-transactions.
 
@@ -13,7 +13,7 @@ specification adding the address size in bytes (20) to the calldata size. An exa
 behavior could be an unintended fallback (or another function) invocation while trying to invoke the `receive`
 function only accessible if `msg.data.length == 0`.
 WARNING: The usage of `delegatecall` in this contract is dangerous and may result in context corruption.
-Any forwarded request to this contract triggering a `delegatecall` to itself will result in an invalid [_msgSender](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md#_msgsender)
+Any forwarded request to this contract triggering a `delegatecall` to itself will result in an invalid [_msgSender](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md#_msgsender)
 recovery
 
 
@@ -38,7 +38,7 @@ function _getERC2771ContextStorage() private pure returns (ERC2771ContextStorage
 
 Initializes the contract with a trusted forwarder, which will be able to
 invoke functions on this contract on behalf of other accounts.
-NOTE: The trusted forwarder can be replaced by overriding [trustedForwarder](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md#trustedforwarder).
+NOTE: The trusted forwarder can be replaced by overriding [trustedForwarder](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/base/ERC2771Context.sol/abstract.ERC2771Context.md#trustedforwarder).
 
 
 ```solidity
@@ -62,7 +62,7 @@ function _setTrustedForwarder(address trustedForwarder_) internal virtual;
 
 ### trustedForwarder
 
-Returns the address of the trusted forwarder.
+Returns the address of the trusted forwarder for meta-transactions
 
 
 ```solidity
@@ -72,12 +72,12 @@ function trustedForwarder() public view virtual returns (address forwarder);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`forwarder`|`address`|the special address for metatransactions|
+|`forwarder`|`address`|The trusted forwarder address (address(0) if disabled)|
 
 
 ### isTrustedForwarder
 
-Indicates whether any particular address is the trusted forwarder.
+Indicates whether any particular address is the trusted forwarder
 
 
 ```solidity
@@ -87,13 +87,13 @@ function isTrustedForwarder(address forwarder) public view virtual returns (bool
 
 |Name|Type|Description|
 |----|----|-----------|
-|`forwarder`|`address`|wallet address|
+|`forwarder`|`address`|The address to check|
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`bool`|isTrusted whether is a trusted forwarder or not.|
+|`<none>`|`bool`|True if the address is the trusted forwarder|
 
 
 ### _msgSender

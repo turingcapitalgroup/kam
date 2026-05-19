@@ -1,8 +1,8 @@
 # IRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/interfaces/IRegistry.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/interfaces/IRegistry.sol)
 
 **Inherits:**
-[IVersioned](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
+[IVersioned](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IVersioned.sol/interface.IVersioned.md)
 
 Core protocol registry interface for managing assets, vaults, adapters, and access control.
 
@@ -218,7 +218,7 @@ function grantVendorRole(address vendor_) external payable;
 
 Grants relayer role for external vault operations
 
-Only callable by ADMIN_ROLE. Relayers manage external vaults and set hurdle rates.
+Only callable by ADMIN_ROLE. Relayers manage external vault operations.
 
 
 ```solidity
@@ -896,7 +896,7 @@ function getAllVaults() external view returns (address[] memory);
 
 Gets the protocol treasury address
 
-Treasury receives protocol fees and serves as emergency fund holder.
+Returns the stored protocol treasury address.
 
 
 ```solidity
@@ -914,9 +914,8 @@ function getTreasury() external view returns (address);
 Sets the hurdle rate for a specific vault
 
 Only admin can set hurdle rates (performance thresholds). Ensures hurdle rate doesn't exceed 100%.
-Vault must be registered before setting hurdle rate. Sets minimum performance threshold for yield distribution.
-A hurdle rate of 0 is valid and means performance fees will be charged on all positive yield with no minimum
-threshold.
+Vault must be registered before setting hurdle rate. A hurdle rate of 0 means vault performance fee logic
+has no minimum hurdle threshold.
 
 
 ```solidity
@@ -1021,7 +1020,7 @@ function removeVault(address vault) external payable;
 
 Sets the treasury address
 
-Treasury receives protocol fees and serves as emergency fund holder. Only callable by ADMIN_ROLE.
+Stores the protocol treasury address. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -1038,7 +1037,7 @@ function setTreasury(address treasury_) external payable;
 
 Sets the insurance address
 
-Insurance receives protocol insurance fees. Only callable by ADMIN_ROLE.
+Stores the protocol insurance address. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -1055,7 +1054,7 @@ function setInsurance(address insurance_) external payable;
 
 Sets the treasury fee in basis points
 
-Treasury fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+Stores treasury fee configuration. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -1072,7 +1071,7 @@ function setTreasuryBps(uint16 treasuryBps_) external payable;
 
 Sets the insurance fee in basis points
 
-Insurance fee is taken from protocol profits. Only callable by ADMIN_ROLE.
+Stores insurance fee configuration. Only callable by ADMIN_ROLE.
 
 
 ```solidity
@@ -1089,7 +1088,7 @@ function setInsuranceBps(uint16 insuranceBps_) external payable;
 
 Gets the insurance address
 
-Insurance receives protocol insurance fees.
+Returns the stored protocol insurance address.
 
 
 ```solidity

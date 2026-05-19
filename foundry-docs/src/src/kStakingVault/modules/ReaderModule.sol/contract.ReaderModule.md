@@ -1,13 +1,13 @@
 # ReaderModule
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kStakingVault/modules/ReaderModule.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kStakingVault/modules/ReaderModule.sol)
 
 **Inherits:**
-[BaseVault](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Extsload](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [IModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [IVaultReader](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/modules/IVaultReader.sol/interface.IVaultReader.md)
+[BaseVault](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/kStakingVault/base/BaseVault.sol/abstract.BaseVault.md), [Extsload](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/uniswap/Extsload.sol/abstract.Extsload.md), [IModule](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IModule.sol/interface.IModule.md), [IVaultReader](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/modules/IVaultReader.sol/interface.IVaultReader.md)
 
 Contains fee, request, batch, and auxiliary getters for the Staking Vault
 
 Essential vault getters (totalAssets, sharePrice, conversions, etc.) live directly on kStakingVault.
-This module holds the remaining specialized readers including batch info, fee config, and request queries.
+This module holds the remaining specialized readers including batch metadata, fee config, and request queries.
 
 
 ## Functions
@@ -88,7 +88,9 @@ function managementFee() external view returns (uint16);
 
 ### getBatchReceiver
 
-Returns the batch receiver address for a specific batch ID
+Returns the batch receiver field for a specific batch ID
+
+kStakingVault does not custody settlement assets in batch receivers; this field is currently address(0).
 
 
 ```solidity
@@ -98,18 +100,20 @@ function getBatchReceiver(bytes32 _batchId) external view returns (address);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_batchId`|`bytes32`|The batch identifier to query|
+|`_batchId`|`bytes32`||
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`address`|Address of the batch receiver|
+|`<none>`|`address`|Address stored in the batch receiver field|
 
 
 ### getSafeBatchReceiver
 
-Returns batch receiver address with validation
+Returns the batch receiver field with unsettled-batch validation
+
+kStakingVault does not custody settlement assets in batch receivers; this field is currently address(0).
 
 
 ```solidity
@@ -119,13 +123,13 @@ function getSafeBatchReceiver(bytes32 _batchId) external view returns (address);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_batchId`|`bytes32`|The batch identifier to query|
+|`_batchId`|`bytes32`||
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`address`|Address of the batch receiver|
+|`<none>`|`address`|Address stored in the batch receiver field|
 
 
 ### getUserRequests
@@ -140,7 +144,7 @@ function getUserRequests(address _user) external view returns (bytes32[] memory 
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_user`|`address`|The address to query requests for|
+|`_user`|`address`||
 
 **Returns**
 
@@ -164,7 +168,7 @@ function getStakeRequest(bytes32 _requestId)
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_requestId`|`bytes32`|The unique identifier of the stake request|
+|`_requestId`|`bytes32`||
 
 **Returns**
 
@@ -188,7 +192,7 @@ function getUnstakeRequest(bytes32 _requestId)
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_requestId`|`bytes32`|The unique identifier of the unstake request|
+|`_requestId`|`bytes32`||
 
 **Returns**
 
@@ -197,26 +201,9 @@ function getUnstakeRequest(bytes32 _requestId)
 |`unstakeRequest`|`BaseVaultTypes.UnstakeRequest`|The unstake request struct|
 
 
-### totalNetAssets
-
-Returns net active accounted vault assets after fee accounting
-
-Currently equals totalAssets because fees are accrued and minted through the canonical fee path.
-
-
-```solidity
-function totalNetAssets() external view returns (uint256);
-```
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`uint256`|The net active asset base|
-
-
 ### convertToSharesWithTotals
 
-Converts an asset amount to shares using caller-provided totals
+Converts assets to shares with specified totals, rounding down
 
 Pure helper for integrations that need deterministic conversions against historical or simulated totals.
 Rounds down in favor of the vault.
@@ -236,9 +223,9 @@ function convertToSharesWithTotals(
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_assets`|`uint256`|The active asset amount to convert|
-|`_totalAssetsVal`|`uint256`|The total active assets to use for the conversion|
-|`_totalSupplyVal`|`uint256`|The total share supply to use for the conversion|
+|`_assets`|`uint256`||
+|`_totalAssetsVal`|`uint256`||
+|`_totalSupplyVal`|`uint256`||
 
 **Returns**
 
@@ -249,7 +236,7 @@ function convertToSharesWithTotals(
 
 ### convertToAssetsWithTotals
 
-Converts a share amount to assets using caller-provided totals
+Converts shares to assets with specified totals, rounding down
 
 Pure helper for integrations that need deterministic conversions against historical or simulated totals.
 Rounds down in favor of the vault.
@@ -269,15 +256,15 @@ function convertToAssetsWithTotals(
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_shares`|`uint256`|The share amount to convert|
-|`_totalAssetsVal`|`uint256`|The total active assets to use for the conversion|
-|`_totalSupplyVal`|`uint256`|The total share supply to use for the conversion|
+|`_shares`|`uint256`||
+|`_totalAssetsVal`|`uint256`||
+|`_totalSupplyVal`|`uint256`||
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`uint256`|The active asset amount for the provided shares and totals|
+|`<none>`|`uint256`|The asset amount for the provided shares and totals|
 
 
 ### getBatchId
@@ -297,7 +284,7 @@ function getBatchId() public view returns (bytes32);
 
 ### getSafeBatchId
 
-Returns the current active batch ID if it is open and unsettled
+Returns current batch ID with safety validation
 
 Reverts when the current batch is closed or already settled.
 
@@ -309,12 +296,12 @@ function getSafeBatchId() external view returns (bytes32);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`<none>`|`bytes32`|The current batch identifier|
+|`<none>`|`bytes32`|The current batch identifier if open and unsettled|
 
 
 ### isClosed
 
-Returns whether a specific batch is closed
+Returns the close state of a given batch
 
 
 ```solidity
@@ -324,7 +311,7 @@ function isClosed(bytes32 _batchId) external view returns (bool isClosed_);
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_batchId`|`bytes32`|The batch identifier to inspect|
+|`_batchId`|`bytes32`||
 
 **Returns**
 
@@ -379,7 +366,7 @@ function getCurrentBatchInfo()
 |Name|Type|Description|
 |----|----|-----------|
 |`batchId`|`bytes32`|The current batch identifier|
-|`batchReceiver`|`address`|The receiver holding settlement assets for the batch|
+|`batchReceiver`|`address`|The stored batch receiver field, currently address(0) for kStakingVault batches|
 |`isClosed_`|`bool`|True if the current batch is closed|
 |`isSettled`|`bool`|True if the current batch is settled|
 
@@ -398,9 +385,7 @@ function getBatchIdInfo(bytes32 _batchId)
         bool isClosed_,
         bool isSettled,
         uint256 sharePrice_,
-        uint256 netSharePrice_,
         uint256 totalAssets_,
-        uint256 totalNetAssets_,
         uint256 totalSupply_,
         uint256 depositedInBatch,
         uint256 requestedSharesInBatch
@@ -410,22 +395,54 @@ function getBatchIdInfo(bytes32 _batchId)
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_batchId`|`bytes32`|The batch identifier to inspect|
+|`_batchId`|`bytes32`||
 
 **Returns**
 
 |Name|Type|Description|
 |----|----|-----------|
-|`batchReceiver`|`address`|The receiver holding settlement assets for the batch|
+|`batchReceiver`|`address`|The stored batch receiver field, currently address(0) for kStakingVault batches|
 |`isClosed_`|`bool`|True if the batch is closed|
 |`isSettled`|`bool`|True if the batch is settled|
-|`sharePrice_`|`uint256`|The settled or stored gross share price for the batch|
-|`netSharePrice_`|`uint256`|The settled or stored net share price for the batch|
+|`sharePrice_`|`uint256`|The settled share price for the batch|
 |`totalAssets_`|`uint256`|The active assets recorded for the batch|
-|`totalNetAssets_`|`uint256`|The net active assets recorded for the batch|
 |`totalSupply_`|`uint256`|The share supply recorded for the batch|
 |`depositedInBatch`|`uint256`|The kToken amount pending stake in the batch|
 |`requestedSharesInBatch`|`uint256`|The share amount pending unstake in the batch|
+
+
+### quoteBatchSettlement
+
+Calculates the exact underlying assets that will be claimed by unstakers in a batch, simulating settlement fees
+
+Used by kAssetRouter and kSettler to determine exact netting amounts post-fee dilution
+
+
+```solidity
+function quoteBatchSettlement(
+    bytes32 _batchId,
+    uint256 _newTotalAssets,
+    uint64 _endOfPeriod
+)
+    external
+    view
+    returns (uint256 _requestedAssets, uint256 _managementFees, uint256 _performanceFees);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_batchId`|`bytes32`||
+|`_newTotalAssets`|`uint256`||
+|`_endOfPeriod`|`uint64`||
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_requestedAssets`|`uint256`|requestedAssets The exact amount of underlying assets claimable by unstakers|
+|`_managementFees`|`uint256`|managementFees Management fee assets that would be charged at settlement|
+|`_performanceFees`|`uint256`|performanceFees Performance fee assets that would be charged at settlement|
 
 
 ### selectors

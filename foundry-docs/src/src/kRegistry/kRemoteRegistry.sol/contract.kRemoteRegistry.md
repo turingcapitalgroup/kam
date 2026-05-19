@@ -1,8 +1,8 @@
 # kRemoteRegistry
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/kRegistry/kRemoteRegistry.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/kRegistry/kRemoteRegistry.sol)
 
 **Inherits:**
-[IkRemoteRegistry](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/interfaces/IkRemoteRegistry.sol/interface.IkRemoteRegistry.md), [ExecutionGuardianModule](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/kRegistry/modules/ExecutionGuardianModule.sol/contract.ExecutionGuardianModule.md), [Initializable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md)
+[IkRemoteRegistry](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/interfaces/IkRemoteRegistry.sol/interface.IkRemoteRegistry.md), [ExecutionGuardianModule](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/kRegistry/modules/ExecutionGuardianModule.sol/contract.ExecutionGuardianModule.md), [Initializable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/Initializable.sol/abstract.Initializable.md), [UUPSUpgradeable](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/solady/utils/UUPSUpgradeable.sol/abstract.UUPSUpgradeable.md)
 
 Lightweight registry for cross-chain metaWallet adapter validation
 

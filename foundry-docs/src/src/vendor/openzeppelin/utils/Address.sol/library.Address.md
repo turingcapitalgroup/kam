@@ -1,5 +1,5 @@
 # Address
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/vendor/openzeppelin/utils/Address.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/vendor/openzeppelin/utils/Address.sol)
 
 Collection of functions related to the address type
 
@@ -12,7 +12,7 @@ Replacement for Solidity's `transfer`: sends `amount` wei to
 https://eips.ethereum.org/EIPS/eip-1884[EIP1884] increases the gas cost
 of certain opcodes, possibly making contracts go over the 2300 gas limit
 imposed by `transfer`, making them unable to receive funds via
-`transfer`. [sendValue](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/utils/Address.sol/library.Address.md#sendvalue) removes this limitation.
+`transfer`. [sendValue](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/utils/Address.sol/library.Address.md#sendvalue) removes this limitation.
 https://consensys.net/diligence/blog/2019/09/stop-using-soliditys-transfer-now/[Learn more].
 IMPORTANT: because control is transferred to `recipient`, care must be
 taken to not create reentrancy vulnerabilities. Consider using

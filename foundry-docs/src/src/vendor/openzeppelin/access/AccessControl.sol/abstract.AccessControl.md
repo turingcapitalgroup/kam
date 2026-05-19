@@ -1,8 +1,8 @@
 # AccessControl
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/vendor/openzeppelin/access/AccessControl.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/vendor/openzeppelin/access/AccessControl.sol)
 
 **Inherits:**
-[Context](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/utils/Context.sol/abstract.Context.md), [IAccessControl](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/IAccessControl.sol/interface.IAccessControl.md), [ERC165](/Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/utils/introspection/ERC165.sol/abstract.ERC165.md)
+[Context](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/utils/Context.sol/abstract.Context.md), [IAccessControl](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/IAccessControl.sol/interface.IAccessControl.md), [ERC165](/home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/utils/introspection/ERC165.sol/abstract.ERC165.md)
 
 Contract module that allows children to implement role-based access
 control mechanisms. This is a lightweight version that doesn't allow enumerating role
@@ -16,20 +16,20 @@ using `public constant` hash digests:
 bytes32 public constant MY_ROLE = keccak256("MY_ROLE");
 ```
 Roles can be used to represent a set of permissions. To restrict access to a
-function call, use [hasRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#hasrole):
+function call, use [hasRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#hasrole):
 ```solidity
 function foo() public {
 require(hasRole(MY_ROLE, msg.sender));
 ...
 }
 ```
-Roles can be granted and revoked dynamically via the [grantRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#grantrole) and
-[revokeRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#revokerole) functions. Each role has an associated admin role, and only
-accounts that have a role's admin role can call [grantRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#grantrole) and [revokeRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#revokerole).
+Roles can be granted and revoked dynamically via the [grantRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#grantrole) and
+[revokeRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#revokerole) functions. Each role has an associated admin role, and only
+accounts that have a role's admin role can call [grantRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#grantrole) and [revokeRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#revokerole).
 By default, the admin role for all roles is `DEFAULT_ADMIN_ROLE`, which means
 that only accounts with this role will be able to grant or revoke other
 roles. More complex role relationships can be created by using
-[_setRoleAdmin](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#_setroleadmin).
+[_setRoleAdmin](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#_setroleadmin).
 WARNING: The `DEFAULT_ADMIN_ROLE` is also its own admin: it has permission to
 grant and revoke this role. Extra precautions should be taken to secure
 accounts that have been granted it. We recommend using {AccessControlDefaultAdminRules}
@@ -81,7 +81,7 @@ function hasRole(bytes32 role, address account) public view virtual returns (boo
 ### _checkRole
 
 Reverts with an {AccessControlUnauthorizedAccount} error if `_msgSender()`
-is missing `role`. Overriding this function changes the behavior of the [onlyRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#onlyrole) modifier.
+is missing `role`. Overriding this function changes the behavior of the [onlyRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#onlyrole) modifier.
 
 
 ```solidity
@@ -100,9 +100,9 @@ function _checkRole(bytes32 role, address account) internal view virtual;
 
 ### getRoleAdmin
 
-Returns the admin role that controls `role`. See [grantRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#grantrole) and
-[revokeRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#revokerole).
-To change a role's admin, use [_setRoleAdmin](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#_setroleadmin).
+Returns the admin role that controls `role`. See [grantRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#grantrole) and
+[revokeRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#revokerole).
+To change a role's admin, use [_setRoleAdmin](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#_setroleadmin).
 
 
 ```solidity
@@ -139,7 +139,7 @@ function revokeRole(bytes32 role, address account) public virtual onlyRole(getRo
 ### renounceRole
 
 Revokes `role` from the calling account.
-Roles are often managed via [grantRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#grantrole) and [revokeRole](//Users/filipe.venancio/Documents/GitHub/KAM/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#revokerole): this function's
+Roles are often managed via [grantRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#grantrole) and [revokeRole](//home/solthodox/Documentos/keyrock/kam/foundry-docs/src/src/vendor/openzeppelin/access/AccessControl.sol/abstract.AccessControl.md#revokerole): this function's
 purpose is to provide a mechanism for accounts to lose their privileges
 if they are compromised (such as when a trusted device is misplaced).
 If the calling account had been revoked `role`, emits a {RoleRevoked}

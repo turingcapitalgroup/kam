@@ -1,5 +1,5 @@
 # Constants
-[Git Source](https://github.com/VerisLabs/KAM/blob/447168c958315cdee5506bbde566ae1376e64d18/src/errors/Errors.sol)
+[Git Source](https://github.com/turingcapitalgroup/kam/blob/ff596cc04152c6a76cd4f835891a09e2edadf4e9/src/errors/Errors.sol)
 
 ### KASSETROUTER_ALREADY_REGISTERED
 KAM Protocol Error Codes - Centralized error code constants for the KAM protocol.
@@ -1041,5 +1041,11 @@ string constant MULTIFACETPROXY_SELECTOR_ALREADY_SET = "MFP4"
 
 ```solidity
 string constant VAULTMATHLIB_ZERO_ELAPSED = "VML1"
+```
+
+### VAULTMATHLIB_FEES_EXCEED_ASSETS
+
+```solidity
+string constant VAULTMATHLIB_FEES_EXCEED_ASSETS = "VML2"
 ```
 
