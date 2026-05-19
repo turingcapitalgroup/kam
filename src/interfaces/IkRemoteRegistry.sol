@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.34;
+<<<<<<< HEAD
+pragma solidity ^0.8.4;
 
 import { IVersioned } from "kam/src/interfaces/IVersioned.sol";
 import { IExecutionGuardian } from "kam/src/interfaces/modules/IExecutionGuardian.sol";
