@@ -221,6 +221,7 @@ abstract contract DeploymentManager is Script {
         address erc4626ExecutionValidator;
         address minimalSmartAccountImpl;
         address insuranceSmartAccount;
+        address adminTimelock;
     }
 
     /// @notice Pending contract address write for batch operations
@@ -287,6 +288,7 @@ abstract contract DeploymentManager is Script {
     bytes32 internal constant JK_ERC4626_EXECUTION_VALIDATOR = keccak256("erc4626ExecutionValidator");
     bytes32 internal constant JK_MINIMAL_SMART_ACCOUNT_IMPL = keccak256("minimalSmartAccountImpl");
     bytes32 internal constant JK_INSURANCE_SMART_ACCOUNT = keccak256("insuranceSmartAccount");
+    bytes32 internal constant JK_ADMIN_TIMELOCK = keccak256("adminTimelock");
 
     // Config role keys (for resolveAddress)
     bytes32 internal constant JK_TREASURY = keccak256("treasury");
@@ -661,6 +663,9 @@ abstract contract DeploymentManager is Script {
         }
         output.contracts.minimalSmartAccountImpl = json.readAddress(".contracts.minimalSmartAccountImpl");
         output.contracts.insuranceSmartAccount = json.readAddress(".contracts.insuranceSmartAccount");
+        if (json.keyExists(".contracts.adminTimelock")) {
+            output.contracts.adminTimelock = json.readAddress(".contracts.adminTimelock");
+        }
 
         return output;
     }
@@ -763,6 +768,7 @@ abstract contract DeploymentManager is Script {
         else if (h == JK_INSURANCE_SMART_ACCOUNT) output.contracts.insuranceSmartAccount = contractAddress;
         // Support ExecutionGuardianModule key as alias for adapterGuardianModule
         else if (h == JK_EXECUTION_GUARDIAN_MODULE) output.contracts.adapterGuardianModule = contractAddress;
+        else if (h == JK_ADMIN_TIMELOCK) output.contracts.adminTimelock = contractAddress;
     }
 
     /// @notice Serialize output using vm.serialize* pattern for efficient JSON building
@@ -800,8 +806,8 @@ abstract contract DeploymentManager is Script {
         vm.serializeAddress(c, "erc20ExecutionValidator", output.contracts.erc20ExecutionValidator);
         vm.serializeAddress(c, "erc4626ExecutionValidator", output.contracts.erc4626ExecutionValidator);
         vm.serializeAddress(c, "minimalSmartAccountImpl", output.contracts.minimalSmartAccountImpl);
-        string memory contractsJson =
-            vm.serializeAddress(c, "insuranceSmartAccount", output.contracts.insuranceSmartAccount);
+        vm.serializeAddress(c, "insuranceSmartAccount", output.contracts.insuranceSmartAccount);
+        string memory contractsJson = vm.serializeAddress(c, "adminTimelock", output.contracts.adminTimelock);
 
         // Serialize root object
         string memory root = "root";
