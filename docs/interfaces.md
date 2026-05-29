@@ -26,7 +26,7 @@ The institutional gateway for minting and burning kTokens. Implements a push-pul
 
 - `createNewBatch(address asset_)` - Creates new batch for asset and returns batch ID (RELAYER_ROLE or registry)
 - `closeBatch(bytes32 _batchId, bool _create)` - Closes batch to prevent new requests, optionally creates new batch (RELAYER_ROLE required)
-- `settleBatch(bytes32 _batchId)` - Marks batch as settled after processing (kAssetRouter only)
+- `settleBatch(bytes32 _batchId, uint64 _proposedAt, uint256 _managementFees, uint256 _performanceFees)` - Marks batch as settled after processing (kAssetRouter only)
 - `getBatchId(address asset_)` - Returns current active batch ID for an asset
 - `getCurrentBatchNumber(address asset_)` - Returns current batch number counter for an asset
 - `hasActiveBatch(address asset_)` - Checks if asset has an active batch
@@ -47,20 +47,20 @@ Central coordinator for all asset movements and settlements in the KAM protocol.
 
 **Virtual Balance System**
 
-- `kAssetPush(address asset, uint256 amount, bytes32 batchId)` - Transfers incoming assets from kMinter to the adapter (batchId is reserved for future use)
-- `kAssetRequestPull(address asset, uint256 amount, bytes32 batchId)` - Stages outgoing asset requests from caller's virtual balance
+- `kAssetPush(address _asset, uint256 amount, bytes32 batchId)` - Transfers incoming assets from kMinter to the adapter (batchId used for event tracking)
+- `kAssetRequestPull(address _asset, uint256 amount, bytes32 batchId)` - Stages outgoing asset requests from caller's virtual balance
 - Retail unstake share requests are tracked in `kStakingVault` batch state and emitted through `UnstakeRequestCreated`
 
 **Settlement Operations**
 
 - `proposeSettleBatch(address asset, address vault, bytes32 batchId, uint256 totalAssets)` - Creates timelock settlement proposal with automatic yield calculations (RELAYER_ROLE required)
 - `executeSettleBatch(bytes32 proposalId)` - Executes approved settlement after cooldown using proposal ID (RELAYER_ROLE required)
-- `cancelProposal(bytes32 proposalId)` - Cancels settlement proposals during cooldown period (GUARDIAN_ROLE required)
+- `cancelProposal(bytes32 proposalId)` - Cancels settlement proposals during cooldown period (GUARDIAN_ROLE **or EMERGENCY_ADMIN_ROLE** required)
 - `acceptProposal(bytes32 proposalId)` - Approves high-yield-delta proposals that exceed the yield tolerance threshold (GUARDIAN_ROLE required)
 
 **Asset Transfer**
 
-- `kAssetTransfer(address sourceVault, address targetVault, address asset, uint256 amount, bytes32 batchId)` - Direct asset transfers between entities with virtual balance updates
+- `kAssetTransfer(address sourceVault, address targetVault, address _asset, uint256 amount, bytes32 batchId)` - Direct asset transfers between entities with virtual balance updates
 - Implements explicit approval pattern for secure adapter interactions
 - Coordinates with batch receivers for redemption distribution
 
@@ -118,7 +118,7 @@ Central registry managing protocol contracts, supported assets, vault registrati
 
 **Vault Registry**
 
-- `registerVault(address vault, VaultType type_, address asset)` - Registers new vault with type classification for single asset
+- `registerVault(address vault, uint8 type_, address asset)` - Registers new vault with type classification (uint8) for single asset
 - `getVaultsByAsset(address asset)` - Returns all vaults managing a specific asset
 - `getVaultByAssetAndType(address asset, uint8 vaultType)` - Retrieves vault by asset and type combination
 - `getVaultType(address vault)` - Returns the VaultType classification (uint8) of a vault
@@ -209,7 +209,7 @@ Comprehensive interface combining retail staking operations with ERC20 share tok
 **Meta-Transaction Support (ERC2771)**
 
 - `trustedForwarder()` - Returns the current trusted forwarder address for meta-transactions
-- `setTrustedForwarder(address trustedForwarder_)` - Sets the trusted forwarder address (ADMIN_ROLE required, address(0) to disable)
+- `setTrustedForwarder(address trustedForwarder_)` - Sets the trusted forwarder address (**OWNER** required, address(0) to disable)
 - `isTrustedForwarder(address forwarder)` - Checks if an address is the trusted forwarder
 
 ### IVault
@@ -231,7 +231,7 @@ Interface for batch lifecycle management enabling gas-efficient settlement of mu
 
 - `createNewBatch()` - Creates new batch for processing requests (RELAYER_ROLE required)
 - `closeBatch(bytes32 batchId, bool create)` - Closes batch to prevent new requests (RELAYER_ROLE required)
-- `settleBatch(bytes32 batchId)` - Marks batch as settled after yield distribution (kAssetRouter only)
+- `settleBatch(bytes32 _batchId, uint64 _proposedAt, uint256 _managementFees, uint256 _performanceFees)` - Marks batch as settled after yield distribution (kAssetRouter only)
 
 ### IVaultClaim
 
@@ -248,8 +248,8 @@ Interface for vault fee management including performance and management fees.
 
 **Fee Management**
 
-- `setManagementFee(uint16 fee)` - Sets management fee in basis points (ADMIN_ROLE required, max 10000 bp). The new rate applies to the entire elapsed period at the next `settleBatch()` — fee setters do not accrue eagerly.
-- `setPerformanceFee(uint16 fee)` - Sets performance fee in basis points (ADMIN_ROLE required, max 10000 bp). The new rate applies to the entire elapsed period at the next `settleBatch()` — fee setters do not accrue eagerly.
+- `setManagementFee(uint16 _managementFee)` - Sets management fee in basis points (ADMIN_ROLE required, max 10000 bp). The new rate applies to the entire elapsed period at the next `settleBatch()` — fee setters do not accrue eagerly.
+- `setPerformanceFee(uint16 _performanceFee)` - Sets performance fee in basis points (ADMIN_ROLE required, max 10000 bp). The new rate applies to the entire elapsed period at the next `settleBatch()` — fee setters do not accrue eagerly.
 
 **Internal Fee Accrual**
 

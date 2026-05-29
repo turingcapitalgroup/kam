@@ -67,15 +67,15 @@ A guardian or emergency admin may also call `cancelProposal(proposalId)` at any 
 **Rule:** Admins can change fee rates at any time. The new rate will apply starting from the next settlement batch.
 
 ### 5.2 Mid-period fee-rate changes bias the next batch's perf fee
-Fee-rate changes do not update `lastSettlementBalance`. The next batch's settlement math therefore mixes two periods:
+Fee-rate changes do not update `lastSettlementBalance` or `lastFeeTimestamp`. The next batch's settlement math therefore applies the **new** rate to the **full** period since the last settlement:
 
 - **Interest** spans `[lastSettlement, proposedAt]` — the full period since the previous settlement.
-- **Hurdle and management-fee elapsed window** span `[lastFeeTimestamp, proposedAt]` — shorter, because `lastFeeTimestamp` was advanced by the rate change.
+- **Hurdle and management-fee elapsed window** also span `[lastFeeTimestamp, proposedAt]` — the same full period, because fee-rate setters do not advance `lastFeeTimestamp` (it is only advanced inside `settleBatch`).
 
 Consequences:
 
 - All yield earned since the previous settlement is taxed at the **new** performance-fee rate, not the rate that was active when the yield accrued.
-- The hurdle return, annualized over the shorter elapsed window, is smaller than the hurdle that would apply over the true interest window. With a hard hurdle this materially under-filters the fee.
+- The hurdle return is annualized over the full elapsed window, so the hurdle filter is not distorted by the rate change. However, the new rate applies retroactively to the entire period's yield.
 
 **Rule:** Treat mid-batch fee changes as a deliberate accounting boundary. Where possible, settle the open batch first, then change the rate so the new rate applies cleanly to the next batch's yield only.
 

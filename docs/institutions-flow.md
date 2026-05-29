@@ -213,15 +213,20 @@
 Request Status Flow:
 
 ┌─────────────┐
-│PENDING      │ ── Initial state when requestBurn() is called
+│UNDEFINED    │ ── Default state for uninitialized storage slots
 └──────┬──────┘
-       │  (batch must be settled before burn() can be called)
+       │  requestBurn()
+       ▼
+┌─────────────┐
+│PENDING      │ ── Initial active state when requestBurn() is called
+└──────┬──────┘
+       │  burn() (after batch is settled)
        ▼
 ┌─────────────┐
 │REDEEMED     │ ── After burn() successfully pulls assets
 └─────────────┘
 
-Note: The request itself has only two states (PENDING, REDEEMED).
+Note: The request has three states: UNDEFINED (default/uninitialized), PENDING (active in-flight), and REDEEMED (finalized/claimed).
 The batch settlement is tracked separately via batches[batchId].isSettled.
 ```
 

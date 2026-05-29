@@ -10,7 +10,7 @@
 | kMinter | UUPS | Multisig | `_authorizeUpgrade` → `onlyOwner` (Solady) | ERC-7201 `"kam.storage.kMinter"` + `"kam.storage.kBase"` |
 | kAssetRouter | UUPS | Multisig | `_authorizeUpgrade` → `onlyOwner` (Solady) | ERC-7201 `"kam.storage.kAssetRouter"` + `"kam.storage.kBase"` |
 | kStakingVault | UUPS + MultiFacetProxy | Multisig | `_authorizeUpgrade` → `onlyOwner` (Solady) | ERC-7201 `"kam.storage.BaseVault"` |
-| VaultAdapter | Minimal proxy (non-upgradeable) | n/a | n/a | ERC-7201 `"kam.storage.VaultAdapter"` + `SmartAdapterAccount` |
+| VaultAdapter | UUPS | Multisig | `_authorizeUpgrade` → `onlyOwner` (Solady) | ERC-7201 `"kam.storage.VaultAdapter"` + `SmartAdapterAccount` |
 | kBatchReceiver | Minimal proxy clone | n/a | n/a | Immutable after `initialize` |
 | kToken | Separate repo (kToken0) | Multisig | Separate upgrade path | Separate storage |
 | ExecutionGuardianModule | Module on kRegistry | n/a | Lives in kRegistry storage | ERC-7201 `"kam.storage.ExecutionGuardianModule"` |
@@ -65,7 +65,7 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 | Global pause | `kRegistry.kRegistryStorage.globalPaused` | `EMERGENCY_ADMIN` via `kRegistry.setGlobalPause(true)` | Every contract via `_registry().isGlobalPaused()` |
 | kBase local pause | `kBase.kBaseStorage.paused` | `EMERGENCY_ADMIN` via `kBase.setPaused(true)` on each contract | `kBase._isPaused()` returns `$.paused \|\| _registry().isGlobalPaused()` |
 | BaseVault packed pause | Bit 1 of `BaseVaultStorage.config` | `EMERGENCY_ADMIN` via BaseVault | `BaseVault._getPaused($)` returns `(config >> PAUSED_SHIFT & PAUSED_MASK) != 0 \|\| registry.isGlobalPaused()` |
-| VaultAdapter pause | `VaultAdapterStorage.paused` | `EMERGENCY_ADMIN` via `VaultAdapter.setPaused(true)` | `VaultAdapter._checkPaused($)` — local only, does NOT check global |
+| VaultAdapter pause | `VaultAdapterStorage.paused` | `EMERGENCY_ADMIN` via `VaultAdapter.setPaused(true)` | `VaultAdapter._checkPaused($)` — checks **both** local `$.paused` and `registry.isGlobalPaused()` |
 
 ### Pause matrix — which operations are blocked
 
@@ -76,17 +76,17 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 | kMinter | `createNewBatch` | None | — | Relayer-only, no pause gate |
 | kMinter | `closeBatch` | None | — | Relayer-only, no pause gate |
 | kMinter | `settleBatch` | None | — | Router-only, no pause gate (deliberate: allows draining pending batches) |
-| kMinter | `isPaused()` (view) | **INCONSISTENCY**: returns `_getBaseStorage().paused` only | **No** | Does not reflect global pause. Fix: change to `return _isPaused();` (improvement plan Phase 4 item 9) |
+| kMinter | `isPaused()` (view) | `_isPaused()` | Yes | Returns combined local + global pause state |
 | kAssetRouter | `proposeSettleBatch` | `_checkPaused()` → `_isPaused()` | Yes | Blocks new proposals |
 | kAssetRouter | `executeSettleBatch` | `_checkPaused()` → `_isPaused()` | Yes | Blocks execution |
 | kAssetRouter | `cancelProposal` | `_checkPaused()` → `_isPaused()` | Yes | Blocks cancellation during pause — intentional or not? Consider allowing guardian to cancel even during pause |
-| kStakingVault | `stake` | `_checkNotPaused()` | Yes (via BaseVault) | Blocks retail deposits |
-| kStakingVault | `unstake` | `_checkNotPaused()` | Yes (via BaseVault) | Blocks retail withdrawal requests |
+| kStakingVault | `requestStake` | `_checkNotPaused()` | Yes (via BaseVault) | Blocks retail deposits |
+| kStakingVault | `requestUnstake` | `_checkNotPaused()` | Yes (via BaseVault) | Blocks retail withdrawal requests |
 | kStakingVault | `claimStakedShares` | `_checkNotPaused()` | Yes (via BaseVault) | Blocks claim. Consider: should settled claims be claimable even while paused? |
 | kStakingVault | `claimUnstakedAssets` | `_checkNotPaused()` | Yes (via BaseVault) | Same consideration as above |
 | kStakingVault | `settleBatch` | None | — | Router-only, no pause gate |
-| VaultAdapter | `execute` | `_checkPaused($)` — local only | **No** | Does not check global pause. Fix: add `require(!IkRegistry(registry).isGlobalPaused())` |
-| VaultAdapter | `pull` | Router-only, no pause check | — | |
+| VaultAdapter | `execute` | `_checkPaused($)` — local + global | Yes | `_checkPaused` checks both `$.paused` and `registry.isGlobalPaused()` |
+| VaultAdapter | `pull` | `_checkPaused($)` — local + global | Yes | Pause check added; router-only access control also enforced |
 | VaultAdapter | `setTotalAssets` | Router-only, no pause check | — | |
 
 ### Pause invariants
@@ -94,8 +94,8 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 1. **Global pause halts all user-facing state changes** except `rescueAssets` and `rescueETH` (admin-only recovery).
 2. **Local pause is additive**: contract X can be paused while the rest of the protocol runs.
 3. **Settlement completion is not paused**: `settleBatch` on kMinter and kStakingVault has no pause check, which is intentional — pending settlements must complete to avoid stuck funds.
-4. **VaultAdapter.execute must also respect global pause** — currently it does not. (Fix required — improvement plan Phase 8)
-5. **`isPaused()` view functions must match enforcement**: kMinter's `isPaused()` must return `_isPaused()`, not just `$.paused`. (Fix required — improvement plan Phase 4 item 9)
+4. **VaultAdapter.execute respects global pause**: `_checkPaused($)` checks both `VaultAdapterStorage.paused` and `registry.isGlobalPaused()`.
+5. **`isPaused()` view functions match enforcement**: kMinter's `isPaused()` calls `_isPaused()`, which returns the combined local + global pause state.
 
 ---
 
@@ -120,7 +120,7 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
                                   │                           │
                                   │                           │ Users: claimStakedShares
                                   │                           │        claimUnstakedAssets
-                                  │                           │        claimBurnedAssets
+                                  │                           │        burn
 ```
 
 ### Invariants for batch lifecycle
@@ -146,7 +146,7 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 | `isClosed` | `bool` | `closeBatch` |
 | `isSettled` | `bool` | `settleBatch` |
 | `depositedInBatch` | `uint128` | Incremented by `mint` |
-| `requestedSharesInBatch` | `uint128` | Incremented by `burn` |
+| `requestedSharesInBatch` | `uint128` | Incremented by `requestBurn` |
 
 ### kStakingVault batch fields (`BaseVaultTypes.BatchInfo`)
 
@@ -184,22 +184,22 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 ### Settlement flow
 
 1. **Propose** (`proposeSettleBatch`): Relayer submits `(asset, vault, batchId, totalAssets)`. Router computes `netted`, `yield`, checks tolerance, caches adapter, sets cooldown. Gas: ~120k.
-2. **Cooldown**: `executeAfter` must pass. During this window, guardian can `approveProposal` or `cancelProposal`.
-3. **Approve** (optional): If `requiresApproval`, guardian must call `approveProposal(_proposalId)` before execution.
+2. **Cooldown**: `executeAfter` must pass. During this window, guardian can `acceptProposal` or `cancelProposal`.
+3. **Accept** (optional): If `requiresApproval`, guardian must call `acceptProposal(_proposalId)` before execution.
 4. **Execute** (`executeSettleBatch`): Relayer calls after cooldown. Router:
    - Calls `vault.settleBatch(_batchId)` which handles fee accrual, share minting/burning, and balance snapshots.
    - Handles physical asset movement: if `netted > 0` (net inflow), transfers assets from vault to adapter. If `netted < 0` (net outflow), pulls from adapter.
-   - Distributes yield to treasury and insurance per `treasuryBps` and `insuranceBps`.
-   - Updates virtual balance: `$.virtualBalances[_vault][_asset] = proposal.totalAssets`.
+   - For kMinter settlements with positive yield: mints kTokens directly to the vault. No router-level treasury/insurance split occurs here — vault-level fees are handled inside `kStakingVault.settleBatch()` via `VaultMathLib`.
+   - Updates the vault's virtual balance by calling `adapter.setTotalAssets(proposal.totalAssets)`, making the adapter the authoritative source of the vault's balance.
    - Moves proposal to `executedProposalIds` set.
 
 ### Settlement invariants
 
-1. **Virtual balance matches adapter value** (approximately): `virtualBalances[vault][asset] ≈ adapter.lastTotalAssets`. Discrepancy is bounded by `maxAllowedDelta`.
+1. **Virtual balance IS the adapter's last recorded total** (approximately): `adapter.totalAssets() ≈ last settled value`. Discrepancy between settlements is bounded by `maxAllowedDelta`. There is no separate `virtualBalances` mapping — the adapter is the authoritative store.
 2. **Proposal executed exactly once**: `executedProposalIds` is an enumerable set, `proposalId` is checked against it before execution.
 3. **Adapter address frozen at proposal time**: `proposal.adapter` is cached at creation. Even if the admin changes the adapter mapping in kRegistry during cooldown, execution uses the cached address.
 4. **Fee parameters should ideally be frozen at proposal time** — consider snapshotting fee config in the `VaultSettlementProposal` struct at proposal creation so that admin changes during the cooldown window cannot affect the in-flight settlement.
-5. **Net yield never exceeds actual adapter returns**: `_yield = _totalAssets - _lastTotalAssets` where `_lastTotalAssets = virtualBalances[vault][asset]` (the previous settlement's total).
+5. **Net yield never exceeds actual adapter returns**: `_yield = _totalAssets - _lastTotalAssets` where `_lastTotalAssets = adapter.totalAssets()` (the value set at the previous settlement).
 
 ---
 
@@ -212,8 +212,7 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 | Management fee | `VaultMathLib.computeManagementFee` → called from `kStakingVault.settleBatch` | `totalAssets * elapsed * managementFee / (SECS_PER_YEAR * MAX_BPS)` | Treasury (minted as stkToken shares) |
 | Performance fee (hard hurdle) | `VaultMathLib.computePerformanceFee` → called from `kStakingVault.settleBatch` | `excessAboveHurdle * performanceFee / MAX_BPS` | Treasury (minted as stkToken shares) |
 | Performance fee (soft hurdle) | Same path | `totalInterest * performanceFee / MAX_BPS` (if return > hurdle) | Treasury (minted as stkToken shares) |
-| Yield split — treasury | `kAssetRouter._executeSettlement` | `yieldForTreasury = yield * treasuryBps / MAX_BPS` | Treasury address from registry |
-| Yield split — insurance | `kAssetRouter._executeSettlement` | `yieldForInsurance = yield * insuranceBps / MAX_BPS` | Insurance address from registry |
+| kMinter yield distribution | `kAssetRouter._executeMinterSettlement` | Positive yield → `IkToken.mint(vault, absYield)`; negative yield → `IkToken.burn(vault, absLoss)` | kMinter contract (adjusts kToken supply 1:1 with asset backing) |
 
 ### Fee invariants
 
@@ -231,8 +230,8 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 - **Performance fee**: packed into `BaseVaultStorage.config` (bits at `PERFORMANCE_FEE_SHIFT`), per-vault.
 - **Hurdle rate**: stored in kRegistry via `setHurdleRate(vault, rate)`, read by vault at settlement.
 - **Hard/soft hurdle flag**: stored in kRegistry via `setIsHardHurdleRate(vault, bool)`.
-- **Treasury/insurance BPS**: stored in kRegistry (`treasuryBps`, `insuranceBps`), applied in kAssetRouter.
-- **Treasury/insurance addresses**: stored in kRegistry (`treasury`, `insurance`).
+- **Treasury/insurance BPS**: stored in kRegistry (`treasuryBps`, `insuranceBps`). These are used by the vault-level fee model (stkToken share minting), not directly in the router settlement path.
+- **Treasury/insurance addresses**: stored in kRegistry (`treasury`, `insurance`). Treasury receives minted fee shares from `kStakingVault.settleBatch()`.
 
 ---
 
@@ -249,7 +248,7 @@ VaultAdapter (proxy)
     │ inherits SmartAdapterAccount
     │ _authorizeExecute → registry.isManager(msg.sender)
     │
-    ├──► _checkPaused (local only — TODO: add global check)
+    ├──► _checkPaused (local + global pause check)
     │
     └──► MinimalSmartAccount._execute(target, value, data)
               │
@@ -288,17 +287,9 @@ Validates ERC20 `transfer`, `transferFrom`, and `approve` calls:
 4. **Adapter state is managed only by kAssetRouter**: `setTotalAssets` and `pull` both verify `msg.sender == K_ASSET_ROUTER` via `_checkRouter`.
 5. **Adapter pause is EMERGENCY_ADMIN-only**: `VaultAdapter.setPaused` checks `registry.isEmergencyAdmin(msg.sender)`.
 
-### Missing: Global pause on adapter execution
+### Global pause on adapter execution
 
-`VaultAdapter._authorizeExecute` calls `_checkPaused($)` which only checks `VaultAdapterStorage.paused`. It does NOT check `registry.isGlobalPaused()`. Fix:
-
-```solidity
-function _authorizeExecute(address user) internal override {
-    VaultAdapterStorage storage $ = _getVaultAdapterStorage();
-    require(!$.paused && !IkRegistry(address(_getMinimalAccountStorage().registry)).isGlobalPaused(), VAULTADAPTER_IS_PAUSED);
-    super._authorizeExecute(user);
-}
-```
+`VaultAdapter._checkPaused($)` checks **both** `VaultAdapterStorage.paused` (local) and `registry.isGlobalPaused()` (global). Both `execute` and `pull` are gated by this check, ensuring a global pause fully halts adapter activity.
 
 ---
 
@@ -306,30 +297,30 @@ function _authorizeExecute(address user) internal override {
 
 ### How it works
 
-Each vault-asset pair has a `virtualBalance` stored in `kAssetRouter.kAssetRouterStorage.virtualBalances[vault][asset]`. This tracks how many assets are logically assigned to a vault, without requiring physical token movement until settlement.
+The "virtual balance" for a vault-asset pair is the value stored in `VaultAdapter.lastTotalAssets` — the adapter is the authoritative store. There is **no** separate `virtualBalances` mapping in `kAssetRouterStorage`. The router reads and writes this value by calling `adapter.totalAssets()` (read) and `adapter.setTotalAssets(newValue)` (write).
 
 ### Update points
 
 | Event | Virtual balance change |
 |-------|----------------------|
-| First vault registration | Set to 0 |
-| `executeSettleBatch` completes | Set to `proposal.totalAssets` (the adjusted new total) |
-| `cancelProposal` | No change (proposal never executed) |
+| First vault registration | `adapter.totalAssets()` initializes to 0 |
+| `executeSettleBatch` completes | `adapter.setTotalAssets(proposal.totalAssets)` sets the new total |
+| `cancelProposal` | No change (proposal never executed, adapter unchanged) |
 
 ### Virtual balance invariant
 
 ```
-virtualBalances[vault][asset] == adapter.lastTotalAssets
+adapter.totalAssets() == last settled value for (vault, asset)
 ```
 
-This should hold after every successful settlement. Between settlements, the adapter's actual strategy value may diverge (due to DeFi yields/losses), but the virtual balance is only updated at settlement.
+This holds immediately after every successful settlement. Between settlements, the adapter's actual strategy value may diverge (due to DeFi yields/losses), but `adapter.lastTotalAssets` only changes when the router calls `setTotalAssets`.
 
 ### Effective virtual balance during pending proposals
 
 For kMinter vaults with multiple assets, there can be one pending proposal per asset simultaneously. The `_effectiveVirtualBalanceInt` function iterates all pending proposals for a vault to compute the "what-if" balance assuming all pending proposals execute:
 
 ```
-effectiveVB = virtualBalance + sum(proposal.netted for each pending proposal)
+effectiveVB = adapter.totalAssets() + sum(proposal.netted for each pending proposal)
 ```
 
 The global pending requests (`globalPendingRequests[vault][asset]`) track burn requests that have been filed but not yet proposed. At proposal time:
@@ -349,9 +340,9 @@ This ensures the protocol never promises more redemptions than it can cover.
 
 **Mint flow**: `institution → mint(asset, amount, recipient)` → immediately mints kTokens 1:1 and records deposit in current batch.
 
-**Burn flow**: `institution → burn(asset, amount, recipient)` → locks kTokens, creates `BurnRequest` with status `PENDING`, records in current batch.
+**Burn flow**: `institution → requestBurn(asset, recipient, amount)` → locks kTokens, creates `BurnRequest` with status `PENDING`, records in current batch.
 
-**Claim flow**: After batch is settled and kAssetRouter executes settlement, the `batchReceiver` contract holds the underlying assets. Institution calls `kMinter.claimBurnedAssets(requestId)` which:
+**Claim flow**: After batch is settled and kAssetRouter executes settlement, the `batchReceiver` contract holds the underlying assets. Institution calls `kMinter.burn(requestId)` which:
 1. Verifies batch is settled
 2. Verifies request status is PENDING
 3. Transfers underlying from batchReceiver to recipient
@@ -373,7 +364,7 @@ This ensures the protocol never promises more redemptions than it can cover.
 2. **Each request belongs to exactly one batch**: `request.batchId` is set at creation and never changes.
 3. **Claims can only happen after settlement**: `require(batch.isSettled)`.
 4. **Claims are idempotent**: `require(request.status == PENDING)` and status is set to CLAIMED atomically.
-5. **Zero-initialized requests must be distinguishable from valid PENDING requests**: Currently `RequestStatus.PENDING == 0`, which means zero-init looks valid. Fix: add `UNDEFINED = 0` variant (improvement plan Phase 4, items 4-5).
+5. **Zero-initialized requests are distinguishable from valid PENDING requests**: Enforced by `RequestStatus.UNDEFINED = 0` as the zero-initialized sentinel. A fresh storage slot reads as `UNDEFINED`, not as a valid `PENDING` request, so callers can correctly distinguish 'request does not exist' from 'request is in flight'.
 
 ---
 
@@ -402,7 +393,7 @@ All upgradeable contracts use Solady's `UUPSUpgradeable` with `_authorizeUpgrade
 
 ### Adding a new asset
 
-1. Admin calls `kRegistry.addAsset(assetName, assetAddress, kTokenAddress)`.
+1. Admin calls `kRegistry.registerAsset(name, symbol, assetAddress, maxMintPerBatch, maxBurnPerBatch, emergencyAdmin)`. This deploys the kToken automatically — do NOT pass a pre-existing kToken address.
 2. Admin calls `kRegistry.registerVault(vault, asset, type, ...)` to associate a vault with the asset.
 3. Admin calls `kRegistry.registerAdapter(vault, asset, adapter)` to set the adapter.
 4. Admin calls `kAssetRouter.setMaxAllowedDelta(vault, bps)` to set the yield tolerance.

@@ -229,6 +229,7 @@ struct BatchInfo {
 }
 
 enum RequestStatus {
+    UNDEFINED,
     PENDING,
     REDEEMED
 }
@@ -242,6 +243,7 @@ enum RequestStatus {
 interface IkMinter {
     /// @notice Represents the status of a burn request
     enum RequestStatus {
+        UNDEFINED,
         PENDING,
         REDEEMED
     }
