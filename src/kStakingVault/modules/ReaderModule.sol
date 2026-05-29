@@ -4,7 +4,11 @@ pragma solidity 0.8.34;
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { Extsload } from "uniswap/Extsload.sol";
 
-import { KSTAKINGVAULT_VAULT_CLOSED, KSTAKINGVAULT_VAULT_SETTLED } from "kam/src/errors/Errors.sol";
+import {
+    KSTAKINGVAULT_VAULT_CLOSED,
+    KSTAKINGVAULT_VAULT_SETTLED,
+    VAULTCLAIMS_BATCH_NOT_SETTLED
+} from "kam/src/errors/Errors.sol";
 import { IModule } from "kam/src/interfaces/modules/IModule.sol";
 import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
@@ -130,6 +134,43 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         returns (uint256)
     {
         return _convertToAssetsWithTotals(_shares, _totalAssetsVal, _totalSupplyVal);
+    }
+
+    /// @inheritdoc IVaultReader
+    /// @dev Uses the stored settlement snapshot for the batch. Rounds down in favor of the vault.
+    function getBatchSharePrice(bytes32 _batchId) external view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        BaseVaultTypes.BatchInfo storage batch = _getSettledBatch($, _batchId);
+
+        return _convertToAssetsWithTotals(10 ** _getDecimals($), batch.totalAssets, batch.totalSupply);
+    }
+
+    /// @inheritdoc IVaultReader
+    /// @dev Uses the stored settlement snapshot for the batch. Rounds down in favor of the vault.
+    function convertToSharesInBatch(bytes32 _batchId, uint256 _assets) external view returns (uint256) {
+        BaseVaultTypes.BatchInfo storage batch = _getSettledBatch(_getBaseVaultStorage(), _batchId);
+
+        return _convertToSharesWithTotals(_assets, batch.totalAssets, batch.totalSupply);
+    }
+
+    /// @inheritdoc IVaultReader
+    /// @dev Uses the stored settlement snapshot for the batch. Rounds down in favor of the vault.
+    function convertToAssetsInBatch(bytes32 _batchId, uint256 _shares) external view returns (uint256) {
+        BaseVaultTypes.BatchInfo storage batch = _getSettledBatch(_getBaseVaultStorage(), _batchId);
+
+        return _convertToAssetsWithTotals(_shares, batch.totalAssets, batch.totalSupply);
+    }
+
+    function _getSettledBatch(
+        BaseVaultStorage storage $,
+        bytes32 _batchId
+    )
+        internal
+        view
+        returns (BaseVaultTypes.BatchInfo storage batch)
+    {
+        batch = $.batches[_batchId];
+        require(batch.isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -269,7 +310,7 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](20);
+        bytes4[] memory moduleSelectors = new bytes4[](23);
         moduleSelectors[0] = this.lastFeeTimestamp.selector;
         moduleSelectors[1] = this.hurdleRate.selector;
         moduleSelectors[2] = this.isHardHurdleRate.selector;
@@ -290,6 +331,9 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         moduleSelectors[17] = this.getCurrentBatchInfo.selector;
         moduleSelectors[18] = this.getBatchIdInfo.selector;
         moduleSelectors[19] = this.quoteBatchSettlement.selector;
+        moduleSelectors[20] = this.getBatchSharePrice.selector;
+        moduleSelectors[21] = this.convertToSharesInBatch.selector;
+        moduleSelectors[22] = this.convertToAssetsInBatch.selector;
         return moduleSelectors;
     }
 }

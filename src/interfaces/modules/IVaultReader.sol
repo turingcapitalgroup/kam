@@ -91,6 +91,26 @@ interface IVaultReader {
         pure
         returns (uint256);
 
+    /// @notice Returns the settled share price for a batch, rounding down
+    /// @dev Reverts unless the batch is settled. Uses the batch's settlement snapshot totals.
+    /// @param batchId The settled batch identifier to query
+    /// @return The settled batch share price in vault share decimals
+    function getBatchSharePrice(bytes32 batchId) external view returns (uint256);
+
+    /// @notice Converts assets to shares using a settled batch's snapshot totals, rounding down
+    /// @dev Reverts unless the batch is settled.
+    /// @param batchId The settled batch identifier whose snapshot totals are used
+    /// @param assets The asset amount to convert
+    /// @return The share amount for the provided assets in the settled batch
+    function convertToSharesInBatch(bytes32 batchId, uint256 assets) external view returns (uint256);
+
+    /// @notice Converts shares to assets using a settled batch's snapshot totals, rounding down
+    /// @dev Reverts unless the batch is settled.
+    /// @param batchId The settled batch identifier whose snapshot totals are used
+    /// @param shares The share amount to convert
+    /// @return The asset amount for the provided shares in the settled batch
+    function convertToAssetsInBatch(bytes32 batchId, uint256 shares) external view returns (uint256);
+
     /* //////////////////////////////////////////////////////////////
                         BATCH GETTERS
     //////////////////////////////////////////////////////////////*/
