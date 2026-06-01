@@ -7,7 +7,7 @@ Think of KAM like a bank connecting two groups:
 - **Institutions** (banks, hedge funds) deposit USDC or Bitcoin → Get kTokens instantly
 - **Regular users** (you and me) stake kTokens → Earn yield from strategies
 
-**The Key Insight**: kMinter and DN Vaults share the SAME external strategy per asset. That's why they transfer shares, not actual USDC/WBTC. Alpha and Beta use DIFFERENT strategies (CEFFU custody), so physical assets move from the shared strategy via kMinter Adapter to CEFFU. The kMinter Adapter is the central hub for all physical asset movements.
+**The Key Insight**: kMinter and DN Vaults share the SAME external strategy per asset. They transfer shares, not actual USDC/WBTC. Alpha and Beta use DIFFERENT strategies (CEFFU custody), so physical assets move from the shared strategy via kMinter Adapter to CEFFU. The kMinter Adapter is the central hub for all physical asset movements.
 
 ---
 
@@ -60,7 +60,8 @@ Think of KAM like a bank connecting two groups:
 
 ### 4. **Adapters** - The Smart Wallets
 
-- Each vault-asset pair has its own adapter for tracking and permissions
+Each vault-asset pair has its own adapter for tracking and permissions.
+
 - **kMinter Adapter** (THE central hub - only one physically holding/moving assets):
   - Physically holds USDC/WBTC temporarily
   - Deploys to shared DN strategy (per asset)
@@ -70,11 +71,9 @@ Think of KAM like a bank connecting two groups:
   - Track virtual balances only (shares in shared strategy)
   - Don't physically hold USDC/WBTC
   - Share same external strategy as kMinter (per asset)
-  - Used for accounting and share tracking
 - **Alpha/Beta Adapters**:
   - Track virtual balances only (no physical assets)
   - Assets physically at CEFFU (moved via kMinter Adapter)
-  - Used for accounting and permissions only
 
 ### 5. **Relayers and Managers** - The Operators
 
@@ -243,7 +242,6 @@ Result:
 - Alpha/Beta use ASSET accounting (track USDC amounts)
 - Alpha/Beta adapters are VIRTUAL ONLY (never hold USDC)
 - ALL physical USDC flows through kMinter Adapter
-- Minimizes transactions and centralizes control at one point
 
 ---
 
@@ -251,7 +249,7 @@ Result:
 
 **What Settlement Actually Does:**
 
-Settlement, updates virtual balances and distributes yield via token minting/burning.
+Settlement updates virtual balances and distributes yield via token minting/burning.
 
 ```
 Example Settlement for Delta Neutral Vault:
@@ -473,8 +471,7 @@ Note: kMinter settlement DOES physically move assets — `adapter.pull()` + `saf
 
 ### 2. Physical Transfers via Adapter.execute()
 
-Adapters inherit from `MinimalSmartAccount` which has an `execute()` function.
-Managers (MANAGER_ROLE) call this to:
+Adapters inherit from `MinimalSmartAccount` which has an `execute()` function. Managers (MANAGER_ROLE) call this to:
 
 - Deploy to strategies
 - Transfer between adapters
@@ -498,57 +495,51 @@ Managers (MANAGER_ROLE) call this to:
 
 ### 4. kAssetRouter Briefly Holds USDC During Mint
 
-During institutional minting, the router temporarily receives USDC from kMinter via `safeTransferFrom`, then immediately forwards it to the kMinter adapter via `kAssetPush()`. Outside of this brief transit, the router does not hold assets. It:
+During institutional minting, the router temporarily receives USDC from kMinter via `safeTransferFrom`, then immediately forwards it to the kMinter adapter via `kAssetPush()`. Outside of this brief transit, the router holds no assets.
+
+It:
 
 - Tracks virtual balances
 - Calculates yield
 - Tells adapters to update their totalAssets
 - Forwards assets from kMinter to adapters during mint
 
-Physical USDC/WBTC is always in:
+Physical USDC/WBTC always lives in one of these places:
 
-- kMinter Adapter (central hub - temporarily holds before deployment)
+- kMinter Adapter (temporarily, before deployment)
 - Shared DN strategies (per asset - USDC and WBTC separate)
 - CEFFU custody (Alpha/Beta strategies)
-- BatchReceivers (temporarily for withdrawals)
+- BatchReceivers (temporarily, for withdrawals)
 
-Note: DN/Alpha/Beta adapters DON'T physically hold assets - only virtual tracking!
-Only kMinter Adapter physically holds and moves assets!
+DN/Alpha/Beta adapters never physically hold assets. Only kMinter Adapter does.
 
 ---
 
-## FAQ - Common Questions
+## FAQ
 
-**Q: So settlement doesn't move money?**  
-A: For kStakingVault settlements, yes — only virtual balances are updated. kMinter settlements also move physical assets to BatchReceiver for redemptions. Physical deployment to strategies happens separately when managers (MANAGER_ROLE) call adapter.execute().
+**Q: Does settlement move money?**  
+A: kStakingVault settlements only update virtual balances. kMinter settlements also move physical assets to BatchReceiver for redemptions. Physical deployment to strategies is a separate manager action via adapter.execute().
 
 **Q: Why have virtual balances at all?**  
-A: Efficiency! Users can stake/unstake instantly. Physical deployment happens in batches to save gas and keep money earning yield continuously.
+A: Users can stake/unstake instantly. Physical deployment happens in batches to save gas and keep money earning yield continuously.
 
 **Q: When does USDC/WBTC actually move?**  
-A: When managers (MANAGER_ROLE) call kMinterAdapter.execute() to:
+A: When managers call kMinterAdapter.execute() to deploy to DN strategies, withdraw from them, or send/receive from CEFFU. All physical flows go through kMinter Adapter.
 
-- Deploy to shared DN strategies (per asset)
-- Withdraw from shared DN strategies
-- Send to CEFFU (for Alpha/Beta)
-- Receive from CEFFU (for Alpha/Beta withdrawals)
+**Q: Why do kMinter and DN use shares instead of assets?**  
+A: They invest in the SAME strategy per asset, so they can split ownership via shares instead of moving USDC/WBTC back and forth.
 
-All physical USDC/WBTC flows through kMinter Adapter - it's the central hub!
+**Q: Why do Alpha/Beta use asset accounting?**  
+A: They use a DIFFERENT strategy (CEFFU custody). Physical USDC must move: Shared DN strategy → kMinter Adapter → CEFFU.
 
-**Q: Why do kMinter and DN (same asset) use shares?**  
-A: They invest in the SAME strategy (per asset), so they can just split ownership (shares) instead of moving USDC/WBTC back and forth. Much more efficient!
+**Q: What if kMinter adapter doesn't have enough USDC?**  
+A: Manager first withdraws from the shared DN strategy into kMinter adapter, then sends to CEFFU or BatchReceiver.
 
-**Q: Why do Alpha/Beta use assets?**  
-A: They use a DIFFERENT strategy (CEFFU custody). Physical USDC must move: Shared DN strategy → kMinter adapter → CEFFU. Their adapters only track virtual balances.
-
-**Q: What if there's not enough USDC in kMinter adapter?**  
-A: Manager first withdraws from shared DN strategy into kMinter adapter, then can send to CEFFU or institutional withdrawals.
-
-**Q: Do DN/Alpha/Beta adapters ever physically hold USDC?**  
-A: NO! They only track virtual balances. All physical USDC stays in kMinter adapter (temporarily) or deployed locations (shared DN strategies, CEFFU). This minimizes transactions and centralizes control.
+**Q: Do DN/Alpha/Beta adapters ever hold USDC?**  
+A: No. They only track virtual balances. Physical USDC stays in kMinter adapter (temporarily) or deployed locations (DN strategies, CEFFU).
 
 **Q: Is my money safe during all this?**  
-A: Yes! Multiple protections:
+A: Yes. Multiple protections:
 
 - 1 hour settlement cooldown (guardians can cancel)
 - Yield tolerance checks (configurable per vault via `setMaxAllowedDelta`, defaults to 0 until set)
@@ -598,13 +589,11 @@ USER FLOW - ALPHA/BETA (assets):
 
 ---
 
-**Remember**: 
+**Remember**:
 
-1. kMinter + DN (same asset) = SAME strategy = Share accounting
-2. Alpha/Beta = DIFFERENT strategies = Asset accounting
-3. **kMinter Adapter = Central hub** - ALL physical USDC/WBTC flows through it
-4. DN/Alpha/Beta adapters = Virtual tracking only (never physically hold assets)
-5. Settlement = Virtual bookkeeping ONLY
-6. Managers = Physical money movers via kMinterAdapter.execute() (MANAGER_ROLE)
-7. Relayers = Propose settlements (RELAYER_ROLE)
-8. Always 1:1 backing maintained!
+1. kMinter + DN (same asset) = Same strategy, share accounting
+2. Alpha/Beta = Different strategies, asset accounting
+3. **kMinter Adapter = Central hub** for all physical USDC/WBTC flows
+4. DN/Alpha/Beta adapters = Virtual tracking only
+5. Settlement = Virtual bookkeeping; managers handle physical moves
+6. 1:1 backing always maintained

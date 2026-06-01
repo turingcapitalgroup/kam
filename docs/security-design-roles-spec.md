@@ -52,7 +52,7 @@ _grantRoles(_relayer, RELAYER_ROLE)
 _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 ```
 
-**Design note**: The dual-role grants (`admin+vendor`, `relayer+manager`) are convenience defaults for initial deployment. In production, these should be separated to distinct addresses for proper separation of duties.
+**Design note**: The dual-role grants (`admin+vendor`, `relayer+manager`) are convenience defaults for initial deployment. In production, separate these to distinct addresses for proper separation of duties.
 
 ---
 
@@ -93,9 +93,9 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 
 1. **Global pause halts all user-facing state changes** except `rescueAssets` and `rescueETH` (admin-only recovery).
 2. **Local pause is additive**: contract X can be paused while the rest of the protocol runs.
-3. **Settlement completion is not paused**: `settleBatch` on kMinter and kStakingVault has no pause check, which is intentional — pending settlements must complete to avoid stuck funds.
+3. **Settlement completion is not paused**: `settleBatch` on kMinter and kStakingVault has no pause check — intentional to avoid stuck funds in pending settlements.
 4. **VaultAdapter.execute respects global pause**: `_checkPaused($)` checks both `VaultAdapterStorage.paused` and `registry.isGlobalPaused()`.
-5. **`isPaused()` view functions match enforcement**: kMinter's `isPaused()` calls `_isPaused()`, which returns the combined local + global pause state.
+5. **`isPaused()` view functions match enforcement**: kMinter's `isPaused()` calls `_isPaused()`, returning the combined local + global pause state.
 
 ---
 
@@ -161,7 +161,7 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 | `totalAssets` | `uint256` | Snapshot at settlement after fee-share minting |
 | `totalSupply` | `uint256` | Snapshot at settlement |
 
-**Design note**: `totalAssets` and `totalSupply` snapshots are critical for claim conversion. `claimStakedShares` and `claimUnstakedAssets` use these snapshots (not live values) to compute the exact amount each user receives, ensuring `sum(individual claims) <= total reserved amount`.
+**Design note**: The `totalAssets` and `totalSupply` snapshots are critical for claim conversion. `claimStakedShares` and `claimUnstakedAssets` use these snapshots (not live values) to compute each user's exact payout, guaranteeing `sum(individual claims) <= total reserved amount`.
 
 ---
 
@@ -183,10 +183,10 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 
 ### Settlement flow
 
-1. **Propose** (`proposeSettleBatch`): Relayer submits `(asset, vault, batchId, totalAssets)`. Router computes `netted`, `yield`, checks tolerance, caches adapter, sets cooldown. Gas: ~120k.
-2. **Cooldown**: `executeAfter` must pass. During this window, guardian can `acceptProposal` or `cancelProposal`.
-3. **Accept** (optional): If `requiresApproval`, guardian must call `acceptProposal(_proposalId)` before execution.
-4. **Execute** (`executeSettleBatch`): Relayer calls after cooldown. Router:
+1. **Propose** (`proposeSettleBatch`): Relayer submits `(asset, vault, batchId, totalAssets)`. The router computes `netted`, `yield`, checks tolerance, caches the adapter, and sets the cooldown.
+2. **Cooldown**: `executeAfter` must pass. During this window, the guardian can call `acceptProposal` or `cancelProposal`.
+3. **Accept** (optional): If `requiresApproval`, the guardian must call `acceptProposal(_proposalId)` before execution.
+4. **Execute** (`executeSettleBatch`): Relayer calls after cooldown. The router:
    - Calls `vault.settleBatch(_batchId)` which handles fee accrual, share minting/burning, and balance snapshots.
    - Handles physical asset movement: if `netted > 0` (net inflow), transfers assets from vault to adapter. If `netted < 0` (net outflow), pulls from adapter.
    - For kMinter settlements with positive yield: mints kTokens directly to the vault. No router-level treasury/insurance split occurs here — vault-level fees are handled inside `kStakingVault.settleBatch()` via `VaultMathLib`.
@@ -196,9 +196,9 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 ### Settlement invariants
 
 1. **Virtual balance IS the adapter's last recorded total** (approximately): `adapter.totalAssets() ≈ last settled value`. Discrepancy between settlements is bounded by `maxAllowedDelta`. There is no separate `virtualBalances` mapping — the adapter is the authoritative store.
-2. **Proposal executed exactly once**: `executedProposalIds` is an enumerable set, `proposalId` is checked against it before execution.
+2. **Proposal executed exactly once**: `executedProposalIds` is an enumerable set; `proposalId` is checked against it before execution.
 3. **Adapter address frozen at proposal time**: `proposal.adapter` is cached at creation. Even if the admin changes the adapter mapping in kRegistry during cooldown, execution uses the cached address.
-4. **Fee parameters should ideally be frozen at proposal time** — consider snapshotting fee config in the `VaultSettlementProposal` struct at proposal creation so that admin changes during the cooldown window cannot affect the in-flight settlement.
+4. **Fee parameters should ideally be frozen at proposal time** — consider snapshotting fee config in `VaultSettlementProposal` at proposal creation so admin changes during cooldown cannot affect in-flight settlement.
 5. **Net yield never exceeds actual adapter returns**: `_yield = _totalAssets - _lastTotalAssets` where `_lastTotalAssets = adapter.totalAssets()` (the value set at the previous settlement).
 
 ---
@@ -230,7 +230,7 @@ _grantRoles(_relayer, MANAGER_ROLE)      // relayer starts as manager too
 - **Performance fee**: packed into `BaseVaultStorage.config` (bits at `PERFORMANCE_FEE_SHIFT`), per-vault.
 - **Hurdle rate**: stored in kRegistry via `setHurdleRate(vault, rate)`, read by vault at settlement.
 - **Hard/soft hurdle flag**: stored in kRegistry via `setIsHardHurdleRate(vault, bool)`.
-- **Treasury/insurance BPS**: stored in kRegistry (`treasuryBps`, `insuranceBps`). These are used by the vault-level fee model (stkToken share minting), not directly in the router settlement path.
+- **Treasury/insurance BPS**: stored in kRegistry (`treasuryBps`, `insuranceBps`). Used by the vault-level fee model (stkToken share minting), not directly in the router settlement path.
 - **Treasury/insurance addresses**: stored in kRegistry (`treasury`, `insurance`). Treasury receives minted fee shares from `kStakingVault.settleBatch()`.
 
 ---
@@ -266,7 +266,7 @@ VaultAdapter (proxy)
 
 1. **Executor-target-selector allowlist**: `ExecutionGuardianModule.allowedSelectors[executor][target][selector]` — must be `true`.
 2. **Target-type-selector allowlist**: `ExecutionGuardianModule.targetTypeSelectors[targetType][selector]` — alternative path.
-3. **Parameter validator** (optional): If `executionValidators[target]` is set, the validator's `authorizeCall` is invoked for deeper parameter checking.
+3. **Parameter validator** (optional): If `executionValidators[target]` is set, the validator's `authorizeCall` runs for deeper parameter checking.
 
 ### `ERC20ExecutionValidator` (`src/adapters/parameters/ERC20ExecutionValidator.sol`)
 
@@ -289,7 +289,7 @@ Validates ERC20 `transfer`, `transferFrom`, and `approve` calls:
 
 ### Global pause on adapter execution
 
-`VaultAdapter._checkPaused($)` checks **both** `VaultAdapterStorage.paused` (local) and `registry.isGlobalPaused()` (global). Both `execute` and `pull` are gated by this check, ensuring a global pause fully halts adapter activity.
+`VaultAdapter._checkPaused($)` checks **both** `VaultAdapterStorage.paused` (local) and `registry.isGlobalPaused()` (global). Both `execute` and `pull` are gated by this check, so a global pause fully halts adapter activity.
 
 ---
 
@@ -297,7 +297,7 @@ Validates ERC20 `transfer`, `transferFrom`, and `approve` calls:
 
 ### How it works
 
-The "virtual balance" for a vault-asset pair is the value stored in `VaultAdapter.lastTotalAssets` — the adapter is the authoritative store. There is **no** separate `virtualBalances` mapping in `kAssetRouterStorage`. The router reads and writes this value by calling `adapter.totalAssets()` (read) and `adapter.setTotalAssets(newValue)` (write).
+The "virtual balance" for a vault-asset pair is `VaultAdapter.lastTotalAssets` — the adapter is the authoritative store. There is **no** separate `virtualBalances` mapping in `kAssetRouterStorage`. The router reads via `adapter.totalAssets()` and writes via `adapter.setTotalAssets(newValue)`.
 
 ### Update points
 
@@ -317,20 +317,20 @@ This holds immediately after every successful settlement. Between settlements, t
 
 ### Effective virtual balance during pending proposals
 
-For kMinter vaults with multiple assets, there can be one pending proposal per asset simultaneously. The `_effectiveVirtualBalanceInt` function iterates all pending proposals for a vault to compute the "what-if" balance assuming all pending proposals execute:
+For kMinter vaults with multiple assets, one pending proposal per asset can exist simultaneously. `_effectiveVirtualBalanceInt` iterates all pending proposals for a vault to compute a "what-if" balance assuming all pending proposals execute:
 
 ```
 effectiveVB = adapter.totalAssets() + sum(proposal.netted for each pending proposal)
 ```
 
-The global pending requests (`globalPendingRequests[vault][asset]`) track burn requests that have been filed but not yet proposed. At proposal time:
+`globalPendingRequests[vault][asset]` tracks burn requests filed but not yet proposed. At proposal time:
 
 ```
 globalPendingAfterProposal = globalPendingBefore - requestedInBatch
 effectiveVirtualBalanceAfterProposal >= globalPendingAfterProposal
 ```
 
-This ensures the protocol never promises more redemptions than it can cover.
+This prevents the protocol from promising more redemptions than it can cover.
 
 ---
 
@@ -338,11 +338,11 @@ This ensures the protocol never promises more redemptions than it can cover.
 
 ### kMinter (institutional)
 
-**Mint flow**: `institution → mint(asset, amount, recipient)` → immediately mints kTokens 1:1 and records deposit in current batch.
+**Mint flow**: `institution → mint(asset, amount, recipient)` → immediately mints kTokens 1:1 and records the deposit in the current batch.
 
-**Burn flow**: `institution → requestBurn(asset, recipient, amount)` → locks kTokens, creates `BurnRequest` with status `PENDING`, records in current batch.
+**Burn flow**: `institution → requestBurn(asset, recipient, amount)` → locks kTokens, creates `BurnRequest` with status `PENDING`, records in the current batch.
 
-**Claim flow**: After batch is settled and kAssetRouter executes settlement, the `batchReceiver` contract holds the underlying assets. Institution calls `kMinter.burn(requestId)` which:
+**Claim flow**: After the batch is settled and kAssetRouter executes settlement, the `batchReceiver` contract holds the underlying assets. The institution calls `kMinter.burn(requestId)` which:
 1. Verifies batch is settled
 2. Verifies request status is PENDING
 3. Transfers underlying from batchReceiver to recipient
@@ -364,7 +364,7 @@ This ensures the protocol never promises more redemptions than it can cover.
 2. **Each request belongs to exactly one batch**: `request.batchId` is set at creation and never changes.
 3. **Claims can only happen after settlement**: `require(batch.isSettled)`.
 4. **Claims are idempotent**: `require(request.status == PENDING)` and status is set to CLAIMED atomically.
-5. **Zero-initialized requests are distinguishable from valid PENDING requests**: Enforced by `RequestStatus.UNDEFINED = 0` as the zero-initialized sentinel. A fresh storage slot reads as `UNDEFINED`, not as a valid `PENDING` request, so callers can correctly distinguish 'request does not exist' from 'request is in flight'.
+5. **Zero-initialized requests are distinguishable from valid PENDING requests**: `RequestStatus.UNDEFINED = 0` acts as the zero-initialized sentinel. A fresh storage slot reads as `UNDEFINED`, not `PENDING`, so callers can distinguish "request does not exist" from "request is in flight."
 
 ---
 
@@ -384,7 +384,7 @@ All upgradeable contracts use Solady's `UUPSUpgradeable` with `_authorizeUpgrade
 ### MultiFacetProxy safety
 
 - `addFunction(selector, impl, forceOverride)` must validate `impl` is a non-zero contract address (not `address(this)`, and has `code.length > 0`).
-- `removeFunction` silently succeeds if the selector was never registered — this is safe but should emit an event for monitoring.
+- `removeFunction` silently succeeds if the selector was never registered — safe but should emit an event for monitoring.
 - `getImplementation(selector)` should exist as a view function for debugging and monitoring.
 
 ---
@@ -404,7 +404,7 @@ All upgradeable contracts use Solady's `UUPSUpgradeable` with `_authorizeUpgrade
 1. **Asset address must be non-zero and must be an ERC20**: No on-chain code-length check currently exists. Consider adding `require(asset.code.length > 0)`.
 2. **kToken must match the asset**: `kRegistry.getKTokenForAsset(asset)` must return the correct kToken. Misconfiguration here would allow minting the wrong kToken for an asset.
 3. **Adapter must be initialized with the correct registry**: `VaultAdapter.initialize(registry, ...)`. A mismatched registry means role checks fail.
-4. **maxAllowedDelta must be set before first settlement**: Otherwise defaults to 0, which means any non-zero yield requires guardian approval. Consider bounding to `[10, 5000]` BPS to prevent accidental misconfiguration.
+4. **maxAllowedDelta must be set before first settlement**: Otherwise defaults to 0, meaning any non-zero yield requires guardian approval. Consider bounding to `[10, 5000]` BPS to prevent accidental misconfiguration.
 
 ---
 
@@ -425,7 +425,7 @@ All upgradeable contracts use Solady's `UUPSUpgradeable` with `_authorizeUpgrade
 1. ADMIN calls `kRegistry.revokeRelayerRole(compromisedAddress)`.
 2. ADMIN calls `kRegistry.grantRelayerRole(newAddress)`.
 3. Any proposals created by the compromised relayer during the window are reviewed by GUARDIAN before approval.
-4. No retroactive damage: relayer cannot steal funds (only create batches and propose settlements, both of which require cooldown + guardian approval for large amounts).
+4. No retroactive damage: the relayer cannot steal funds (only create batches and propose settlements, both of which require cooldown + guardian approval for large amounts).
 
 ### Scenario: Compromised admin key
 
@@ -438,7 +438,7 @@ All upgradeable contracts use Solady's `UUPSUpgradeable` with `_authorizeUpgrade
 
 1. ADMIN calls `kBase.rescueAssets(asset, to, amount)` — only works for non-protocol assets (reverts if `asset` is a registered protocol asset).
 2. ADMIN calls `kBase.rescueETH(to, amount)` — for stuck ETH.
-3. On VaultAdapter: `rescueAssets(asset, to, amount)` restricted to ADMIN, but CAN rescue any asset (including strategy assets) — this is intentional for emergency recovery.
+3. On VaultAdapter: `rescueAssets(asset, to, amount)` restricted to ADMIN, but CAN rescue any asset (including strategy assets) — intentional for emergency recovery.
 
 ---
 
@@ -459,7 +459,7 @@ All upgradeable contracts use Solady's `UUPSUpgradeable` with `_authorizeUpgrade
 
 ## 14. Specification Workflow for Future Changes
 
-When proposing a protocol change, follow this sequence:
+When proposing a protocol change:
 
 1. **Spec update**: Add a section to this document describing the new invariant, role change, or state transition.
 2. **Test first**: Write a failing test that asserts the new behavior.

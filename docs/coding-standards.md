@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the coding standards and conventions used throughout the KAM protocol codebase. These standards ensure consistency, readability, and maintainability across all contracts.
+Every Solidity file in the KAM protocol follows these conventions for consistency and readability.
 
 ---
 
@@ -20,7 +20,7 @@ This document outlines the coding standards and conventions used throughout the 
 
 ## Import Order
 
-All Solidity files follow a strict import order for consistency and readability:
+All Solidity files follow a strict import order.
 
 ### 1. External Libraries
 External dependencies from Solady, OpenZeppelin, or other third-party libraries.
@@ -99,7 +99,7 @@ function calculateFees() internal view returns (uint256) {
 
 #### Function Arguments and Return Values
 
-Function arguments and return value names should use `_camelCase` and **always start with an underscore**.
+Arguments and return value names use `_camelCase` and **always start with an underscore**.
 
 ```solidity
 function mint(address _to, uint256 _amount) external returns (uint256 _shares) {
@@ -121,7 +121,7 @@ interface IkToken {
 
 ### Contract Naming
 
-**Exception**: Contracts starting with "k" (like `kToken`, `kMinter`, `kRegistry`) are acceptable and part of the protocol's naming convention.
+Contracts starting with "k" (like `kToken`, `kMinter`, `kRegistry`) follow the protocol's naming convention.
 
 ```solidity
 contract kToken is IkToken, ERC20 {
@@ -135,7 +135,7 @@ contract kToken is IkToken, ERC20 {
 
 ### Event Naming
 
-Events should **always be named in the past tense** to indicate that something has happened.
+Name events in the **past tense** to indicate something has happened.
 
 ```solidity
 event TokensMinted(address indexed to, uint256 amount);
@@ -146,7 +146,7 @@ event SharePriceWatermarkUpdated(uint256 newWatermark);
 
 ### Event Definition
 
-**Always define events in the contract interface** to maintain a clear separation between interface and implementation.
+Define events in the contract interface to keep a clear separation between interface and implementation.
 
 ```solidity
 interface IkStakingVault {
@@ -159,7 +159,7 @@ interface IkStakingVault {
 
 ### Event Emission Standard
 
-**Always emit events when storage or state is changed.** This ensures transparency and enables off-chain tracking.
+Emit an event whenever storage or state changes. This allows off-chain tracking.
 
 ```solidity
 function setManagementFee(uint16 _managementFee) external onlyRole(ADMIN_ROLE) {
@@ -179,7 +179,7 @@ function setManagementFee(uint16 _managementFee) external onlyRole(ADMIN_ROLE) {
 
 ### Error Definition
 
-Errors are defined as **string constants** in a centralized `Errors.sol` file for consistency and gas efficiency.
+Errors are **string constants** in a centralized `Errors.sol` file for consistency and gas efficiency.
 
 ```solidity
 // src/errors/Errors.sol
@@ -190,7 +190,7 @@ string constant KTOKEN_ZERO_ADDRESS = "T3";
 
 ### Error Naming
 
-Errors should be prefixed with the contract name and use `UPPERCASE_SNAKE_CASE`.
+Prefix errors with the contract name and use `UPPERCASE_SNAKE_CASE`.
 
 ```solidity
 string constant KMINTER_BATCH_NOT_SET = "M1";
@@ -217,7 +217,7 @@ function mint(address _to, uint256 _amount) external onlyRole(MINTER_ROLE) {
 
 ### Naming Convention
 
-Structs and Enums should be named using the **CapWords style** (PascalCase).
+Structs and Enums use **PascalCase**.
 
 ```solidity
 struct BatchInfo {
@@ -237,7 +237,7 @@ enum RequestStatus {
 
 ### Definition Location
 
-**Always define Structs and Enums in the interface** to maintain clear separation of concerns.
+Define Structs and Enums in the interface to keep a clear separation of concerns.
 
 ```solidity
 interface IkMinter {
@@ -258,7 +258,7 @@ interface IkMinter {
 }
 ```
 
-**Exception**: Storage structs used for ERC-7201 namespaced storage are defined in the contract implementation.
+**Exception**: Storage structs for ERC-7201 namespaced storage go in the contract implementation.
 
 ```solidity
 contract kMinter {
@@ -296,7 +296,7 @@ function _getkMinterStorage() private pure returns (kMinterStorage storage $) {
 
 ### Storage Variable Naming
 
-Storage struct instances should use the `$` symbol for clarity.
+Storage struct instances use the `$` symbol for clarity.
 
 ```solidity
 function closeBatch(address _asset) external onlyRole(RELAYER_ROLE) {
@@ -315,7 +315,7 @@ function closeBatch(address _asset) external onlyRole(RELAYER_ROLE) {
 
 ### NatSpec Comments
 
-All public and external functions should have comprehensive NatSpec documentation.
+All public and external functions need full NatSpec documentation.
 
 ```solidity
 /// @notice Mints kTokens to a recipient
@@ -350,7 +350,7 @@ if (_yield > 0 && _yield > _hurdleReturn) {
 
 ## Linting Configuration
 
-The project uses Foundry's built-in linter with the following configuration in `foundry.toml`:
+The project uses Foundry's built-in linter with the following `foundry.toml` config:
 
 ```toml
 [lint]
@@ -374,18 +374,3 @@ When typecasts are necessary, add inline suppression comments with explanations:
 // forge-lint: disable-next-line(unsafe-typecast)
 int256 _yield = int256(_totalAssets) - int256(_lastTotalAssets);
 ```
-
----
-
-## Summary
-
-Following these coding standards ensures:
-
-- **Consistency**: Uniform code style across the entire codebase
-- **Readability**: Clear and understandable code structure
-- **Maintainability**: Easy to modify and extend
-- **Safety**: Clear separation of concerns and proper state management
-- **Transparency**: Comprehensive event emission for off-chain tracking
-
-All contributors should adhere to these standards when developing new features or modifying existing code.
-

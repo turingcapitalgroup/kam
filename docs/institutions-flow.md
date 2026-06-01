@@ -1,6 +1,6 @@
-# KAM Protocol - Institutions Flow Diagram
+# Institutions Flow
 
-## Overview: Institution Journey
+## High-Level Journey
 
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
@@ -14,7 +14,9 @@
 └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-## Detailed Flow: Minting kTokens
+## Minting kTokens
+
+Callers must hold `INSTITUTION_ROLE` and target an active batch. Assets transfer to the router, which tracks them via virtual balance before minting kTokens 1:1.
 
 ```
 ┌─────────────────┐
@@ -59,7 +61,9 @@
 └─────────────────┘
 ```
 
-## Detailed Flow: Redemption Request
+## Redemption Request
+
+kTokens are escrowed (not burned) in `kMinter`. The request ID is a hash of `(contract, user, amount, timestamp, counter)`. A `BatchReceiver` is created on the first redemption request for a given batch if one doesn't exist yet.
 
 ```
 ┌─────────────────┐
@@ -110,7 +114,9 @@
 └─────────────────┘
 ```
 
-## Batch Settlement Process
+## Batch Settlement
+
+The relayer closes the batch, then proposes settlement with a `totalAssets` snapshot. The router nets deposits against redemption requests and computes yield. After a 1-hour cooldown (cancellable by guards), the relayer executes settlement and assets flow to the `BatchReceiver`.
 
 ```
 ┌─────────────────┐
@@ -168,6 +174,8 @@
 
 ## Redemption Execution
 
+Once the batch is settled, the institution calls `burn()`. The kTokens were already burned in bulk during `settleBatch()`, so `burn()` just marks the request as `REDEEMED` and pulls assets from the `BatchReceiver`.
+
 ```
 ┌─────────────────┐
 │Request Pending  │
@@ -207,7 +215,9 @@
 └─────────────────┘
 ```
 
-## State Machine: Request Lifecycle
+## Request Lifecycle
+
+Three states: `UNDEFINED` (uninitialized), `PENDING` (active), `REDEEMED` (finalized). Batch settlement is tracked separately via `batches[batchId].isSettled`.
 
 ```
 Request Status Flow:
@@ -225,12 +235,9 @@ Request Status Flow:
 ┌─────────────┐
 │REDEEMED     │ ── After burn() successfully pulls assets
 └─────────────┘
-
-Note: The request has three states: UNDEFINED (default/uninitialized), PENDING (active in-flight), and REDEEMED (finalized/claimed).
-The batch settlement is tracked separately via batches[batchId].isSettled.
 ```
 
-## Key Functions by Contract
+## Contract Functions
 
 ```
 ┌─────────────────────────────────────────────────────────────────-┐
@@ -261,7 +268,7 @@ The batch settlement is tracked separately via batches[batchId].isSettled.
 └────────────────────────────────────────────────────────────────-─┘
 ```
 
-## Timeline: Happy Path
+## Happy Path Timeline
 
 ```
 Institutional Redemption Timeline:
@@ -337,6 +344,8 @@ Day N+3:                                 Day N+3:                   │
 ```
 
 ## Virtual Balance Tracking
+
+Two tracking layers live in `kAssetRouter`. Per-batch balances track deposits and redemption requests. The adapter's `totalAssets` gets updated during settlement with `totalAssetsAdjusted = totalAssets + netted`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐

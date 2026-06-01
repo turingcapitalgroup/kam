@@ -1,9 +1,9 @@
 # Relayer Operations & Settlement Specification
 
 ## 1. Overview
-This specification defines the operational rules for Relayers, Custodians, Guardians, and Off-chain Managers during the batch settlement process. The KAM protocol uses a **Proposal Snapshot (T_propose)** model. Fees, yield, and netting are exactly calculated up to the moment the batch settlement is proposed, locking the mathematical state so that Custodians can prepare penny-perfect physical wires during the settlement cooldown.
+KAM uses a **Proposal Snapshot (T_propose)** model. Fees, yield, and netting are calculated exactly up to the moment the relayer proposes a batch settlement. This locks the mathematical state so Custodians can prepare penny-perfect physical wires during the settlement cooldown.
 
-The labels used throughout this document refer to logical points in the batch lifecycle, not to a fixed wall-clock offset:
+The labels below refer to logical points in the batch lifecycle, not fixed wall-clock offsets:
 
 - `T_close` — the relayer calls `closeBatch` and stops accepting new requests for that batch.
 - `T_propose` — the relayer calls `proposeSettleBatch` with the live TVL snapshot. **All settlement math is frozen at this point.** For DN vaults via the external `kam-settler` contract, `T_close` and `T_propose` happen atomically in a single transaction.
@@ -20,8 +20,8 @@ At `T_propose` the router stores, for each settlement proposal:
 
 During the subsequent cooldown (`T_propose -> T_execute`), no settlement-relevant math runs on-chain for this batch:
 
-- Fee shares are not yet minted.
-- `lastFeeTimestamp` is not advanced until `settleBatch` runs.
+- The protocol has not yet minted fee shares.
+- `lastFeeTimestamp` does not advance until `settleBatch` runs.
 - The cooldown window therefore generates **no fees for this batch**; the elapsed time rolls into the next batch's fee-accrual window (deferred, not lost).
 
 `executeSettleBatch` reads the snapshotted values from the proposal struct and forwards them directly to `settleBatch`. It does not recompute fees or yield.
@@ -29,9 +29,9 @@ During the subsequent cooldown (`T_propose -> T_execute`), no settlement-relevan
 ## 3. Vault-Specific Operational Rules
 
 ### 3.1 Delta-Neutral (DN) Vaults
-- **Flow:** Settlement math is fully on-chain *given a trusted TVL input*. The TVL itself still originates from the off-chain custodian managing the underlying metawallet — the relayer is only responsible for relaying it on-chain.
+- **Flow:** Settlement math is fully on-chain *given a trusted TVL input*. The TVL itself originates from the off-chain custodian managing the underlying metawallet — the relayer only relays it on-chain.
 - **Rule:** Relayers should use the external `kam-settler` (separate repository) `closeAndProposeDNVaultBatch` entrypoint.
-- **Mechanism:** `closeAndProposeDNVaultBatch` performs `closeBatch` and `proposeSettleBatch` synchronously, so `T_close == T_propose` for DN vaults. The fee math is frozen at that moment.
+- **Mechanism:** `closeAndProposeDNVaultBatch` performs `closeBatch` and `proposeSettleBatch` synchronously, so `T_close == T_propose` for DN vaults. Fee math is frozen at that moment.
 
 ### 3.2 Alpha & Beta (Custodial) Vaults
 - **Flow:** Off-chain strategy execution with decoupled `closeBatch` and `proposeSettleBatch` phases.
@@ -40,21 +40,21 @@ During the subsequent cooldown (`T_propose -> T_execute`), no settlement-relevan
 
 ### 3.3 kMinter (Institutional) Batches
 - **Flow:** Institutional mints/redemptions through `kMinter` are batched and settled by `kAssetRouter` on a separate path from staking-vault batches.
-- **Net Transfer Amount is frozen at `T_close`, not `T_propose`:** `requestedSharesInBatch` (the institutional redemption quantity) is fixed when `kMinter.closeBatch` is called. Subsequent calls to `proposeSettleBatch` and `executeSettleBatch` do not change it.
+- **Net Transfer Amount freezes at `T_close`, not `T_propose`:** `requestedSharesInBatch` (the institutional redemption quantity) is fixed when `kMinter.closeBatch` is called. Subsequent calls to `proposeSettleBatch` and `executeSettleBatch` do not change it.
 - **No fee math runs:** `kMinter.settleBatch` accepts the new `(_proposedAt, _managementFees, _performanceFees)` parameters for interface compatibility with `ISettleBatch` but ignores them; kMinter has no management or performance fees of its own. The router always passes `(proposedAt, 0, 0)` on the kMinter path.
 - **Physical wires:** On execution, `_executeMinterSettlement` pulls `requestedSharesInBatch` from the kMinter adapter and transfers the underlying directly to the batch's `kBatchReceiver`. Institutional users then claim from the receiver.
 
 ## 4. Approval Path for High-Delta Proposals
-A proposal is flagged with `requiresApproval = true` when the absolute yield exceeds the per-vault threshold:
+The router flags a proposal with `requiresApproval = true` when the absolute yield exceeds the per-vault threshold:
 
 `|yield| > lastAdapterTotalAssets * maxAllowedDelta[vault] / 10_000`
 
 When that flag is set:
 
 1. The router emits a `YieldExceedsMaxDeltaWarning` event in addition to `SettlementProposed`.
-2. `executeSettleBatch` will revert with `KASSETROUTER_PROPOSAL_NOT_ACCEPTED` until a guardian calls `acceptProposal(proposalId)`.
+2. `executeSettleBatch` reverts with `KASSETROUTER_PROPOSAL_NOT_ACCEPTED` until a guardian calls `acceptProposal(proposalId)`.
 3. The cooldown still applies on top of the acceptance: `T_execute >= proposedAt + vaultSettlementCooldown`.
-4. The settlement is always actually executed by the **relayer**, not by the guardian. The guardian only authorizes; the relayer triggers.
+4. The **relayer** always executes the settlement, not the guardian. The guardian only authorizes; the relayer triggers.
 
 A guardian or emergency admin may also call `cancelProposal(proposalId)` at any time before execution. Cancellation removes the proposal, restores `globalPendingRequests` for kMinter batches, and frees the batch ID for re-proposal.
 
@@ -62,9 +62,9 @@ A guardian or emergency admin may also call `cancelProposal(proposalId)` at any 
 
 ### 5.1 Fee-rate changes
 
-`setManagementFee` and `setPerformanceFee` update the fee rate directly without accruing pending fees. Fees are only accrued and minted at settlement time (`settleBatch`). Fee-rate changes take effect at the next settlement.
+`setManagementFee` and `setPerformanceFee` update the fee rate directly without accruing pending fees. The protocol only accrues and mints fees at settlement time (`settleBatch`). Fee-rate changes take effect at the next settlement.
 
-**Rule:** Admins can change fee rates at any time. The new rate will apply starting from the next settlement batch.
+**Rule:** Admins can change fee rates at any time. The new rate applies starting from the next settlement batch.
 
 ### 5.2 Mid-period fee-rate changes bias the next batch's perf fee
 Fee-rate changes do not update `lastSettlementBalance` or `lastFeeTimestamp`. The next batch's settlement math therefore applies the **new** rate to the **full** period since the last settlement:

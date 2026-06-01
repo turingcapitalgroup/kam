@@ -2,13 +2,13 @@
 
 Companion: [`security-design-roles-spec.md`](security-design-roles-spec.md).
 
-This document specifies how privileged operations on the KAM protocol are gated by a single on-chain timelock, how the role architecture interacts with that timelock, and how operators interact with it day-to-day.
+This document specifies how a single on-chain timelock gates privileged operations on KAM, how the role architecture interacts with it, and how operators use it day-to-day.
 
 ---
 
 ## Note on sources
 
-This document derives its patterns and code from **OpenZeppelin Contracts v5.6.1 (MIT-licensed)**, vendored under `src/vendor/openzeppelin/`. The MIT license permits use, modification, and redistribution provided the original copyright notice is preserved (which we do — vendored files retain their original SPDX and OZ headers).
+Patterns and code derive from **OpenZeppelin Contracts v5.6.1 (MIT-licensed)**, vendored under `src/vendor/openzeppelin/`. The MIT license permits use, modification, and redistribution as long as the original copyright notice is preserved — vendored files retain their original SPDX and OZ headers.
 
 KAM is proprietary code (`SPDX-License-Identifier: UNLICENSED`). We do not derive patterns, code, or architectural details from any licensed protocol other than OpenZeppelin. Industry comparisons cite public documentation only.
 
@@ -23,7 +23,7 @@ Every protocol role is a Fordefi MPC wallet. Fordefi provides:
 - Per-call policy enforcement at signature time
 - Server share inside AWS Nitro Secure Enclave
 
-Role separation is enforced at the contract level (Solady `OwnableRoles` for KAM contracts; OZ `AccessControl` inside the vendored `TimelockController`); Fordefi enforces signature requirements within each wallet.
+Contracts enforce role separation (Solady `OwnableRoles` for KAM contracts; OZ `AccessControl` inside the vendored `TimelockController`). Fordefi enforces signature requirements within each wallet.
 
 ### 1.2 Roles and signature requirements
 
@@ -38,9 +38,9 @@ Role separation is enforced at the contract level (Solady `OwnableRoles` for KAM
 
 ### 1.3 Why this split
 
-KAM's role taxonomy already separates incident-response (`EMERGENCY_ADMIN`, `GUARDIAN`), operational (`MANAGER`, `RELAYER`), and governance (`ADMIN`) concerns. The timelock layer applies **only to ADMIN's `_checkOwner()`-gated calls**; operational and emergency roles are unaffected because they use role-based checks (`_checkManager`, `_checkEmergencyAdmin`, etc.), not ownership checks.
+KAM's role taxonomy already separates incident-response (`EMERGENCY_ADMIN`, `GUARDIAN`), operational (`MANAGER`, `RELAYER`), and governance (`ADMIN`) concerns. The timelock layer applies **only to ADMIN's `_checkOwner()`-gated calls**. Operational and emergency roles are unaffected because they use role-based checks (`_checkManager`, `_checkEmergencyAdmin`, etc.), not ownership checks.
 
-Fast roles must remain instant because they exist for time-critical events (incident response, settlement throughput). Wrapping them in a timelock would defeat their purpose.
+Fast roles must stay instant — they exist for time-critical events (incident response, settlement throughput). A timelock would defeat their purpose.
 
 ---
 
@@ -63,20 +63,20 @@ A **single** `TimelockController` instance (OpenZeppelin v5.6.1, vendored — se
 
 ### 2.2 Why a single tier (not two)
 
-The single-tier choice is grounded in observation of public protocol documentation:
+The single-tier choice reflects observed public protocol documentation:
 
 - **Compound**: single tier, 2 days ([docs.compound.finance](https://docs.compound.finance/v2/governance/))
 - **MakerDAO / Sky**: single tier, 48 hours via GSM Pause ([developers.sky.money](https://developers.sky.money/protocol/governance/pause/))
 - **Frax**: single tier, 2 days via veFXS-controlled timelock ([docs.frax.finance](https://docs.frax.finance/governance/advanced-concepts))
 - **Aave V3**: dual tier (1d / 7d) — but the 7d tier is reserved for governance-of-governance (voting rules, executor configuration), not routine fees; Aave executes dozens of parameter votes per month so the fast tier pays back its complexity
 
-KAM's setter cardinality is small and changes are rare (treasury rotation, fee changes — months between events). A 24h "fast tier" wouldn't pay back its complexity cost. KAM's profile aligns with Compound/Maker/Frax (single tier), with a slightly more conservative delay (3d vs 2d).
+KAM has a small setter count and rare changes (treasury rotation, fee changes — months between events). A 24h "fast tier" wouldn't pay back its complexity cost. KAM's profile aligns with Compound/Maker/Frax (single tier), with a slightly more conservative delay (3d vs 2d).
 
 If a future setter requires sub-3d delay, adding a separate `OPS_TIMELOCK_ROLE` (granted to a new shorter-delay timelock) is a pure additive change — non-breaking and incremental.
 
 ### 2.3 Why `TimelockController` directly (no Governor wrapper)
 
-OZ provides `TimelockController` as a standalone contract. It can also be wrapped in a `Governor` for token-vote-driven proposals or in a custom selector-level access-control layer. KAM's gated functions are a small fixed set — UUPS `_authorizeUpgrade` overrides plus a handful of role-grant and config setters. Wrapping the timelock in a more granular governance layer adds complexity (more contracts, more state, harder to reason about) for no benefit at this scale.
+OZ ships `TimelockController` as a standalone contract. It can also be wrapped in a `Governor` for token-vote-driven proposals or in a custom selector-level access-control layer. KAM's gated functions are a small fixed set — UUPS `_authorizeUpgrade` overrides plus a handful of role-grant and config setters. A more granular governance layer adds complexity (more contracts, more state, harder to reason about) for no benefit at this scale.
 
 We use `TimelockController` directly as the owner of UUPS contracts via the existing Solady `Ownable` pattern. This is the canonical OZ usage: the [OpenZeppelin governance README](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/governance/README.adoc) explicitly states *"In a governance system, the {TimelockController} contract is in charge of introducing a delay between a proposal and its execution. It can be used with or without a {Governor}."*
 
@@ -86,7 +86,7 @@ We use `TimelockController` directly as the owner of UUPS contracts via the exis
 
 ### 3.1 Timelocked (3 day delay) — gated by the existing `_checkOwner()` call
 
-The Admin Timelock owns every UUPS contract. Every `_checkOwner()` call site is therefore 3d-gated automatically — no contract code is modified to integrate the timelock.
+The Admin Timelock owns every UUPS contract. Every `_checkOwner()` call site is therefore 3d-gated automatically — no contract code changes needed to integrate the timelock.
 
 | Contract | Function | Reason |
 |----------|----------|--------|
@@ -100,11 +100,11 @@ The Admin Timelock owns every UUPS contract. Every `_checkOwner()` call site is 
 | `VaultAdapter` | `_authorizeUpgrade` | UUPS upgrade |
 | `kToken` | `_authorizeUpgrade`, `grantAdminRole`, `revokeAdminRole` | UUPS upgrade + role grants |
 
-**Contract types vs. proxy instances**: the table lists contract *types*. Each type is deployed as one or more proxies (e.g. `kStakingVault` has `dnVaultUSDC`, `dnVaultWBTC`, `alphaVault`, `betaVault`; `VaultAdapter` has one per (vault × asset) combination). Each proxy instance has its own ownership transferred at deployment time.
+**Contract types vs. proxy instances**: the table lists contract *types*. Each type deploys as one or more proxies (e.g. `kStakingVault` has `dnVaultUSDC`, `dnVaultWBTC`, `alphaVault`, `betaVault`; `VaultAdapter` has one per (vault × asset) combination). Each proxy instance has its own ownership transferred at deployment time.
 
 **Special cases**:
-- `SmartAdapterAccount` is the parent class of `VaultAdapter`. It is not deployed as a standalone proxy in the protocol; transferring ownership of each `VaultAdapter` proxy is sufficient.
-- `kRemoteRegistry` is deployed via the multichain pipeline; its ownership transfer is performed in the multichain repository at deployment time on each remote chain.
+- `SmartAdapterAccount` is the parent class of `VaultAdapter`. It is not deployed as a standalone proxy — transferring ownership of each `VaultAdapter` proxy is sufficient.
+- `kRemoteRegistry` deploys via the multichain pipeline; its ownership transfer happens in the multichain repository at deployment time on each remote chain.
 - `kTokenFactory` is a stateless deploy helper (not Ownable / not UUPS); it has no ownership to transfer. Upgrade authority lives on each deployed `kToken` proxy.
 
 ### 3.2 Instant (no timelock — role-gated only)
@@ -120,13 +120,13 @@ The Admin Timelock owns every UUPS contract. Every `_checkOwner()` call site is 
 | `setManagementFee`, `setPerformanceFee` | `_checkAdmin` (kStakingVault) | Vault fee rates — ADMIN-gated, not owner-gated, so not timelocked |
 | All settlement / batch / mint / burn / claim ops | `_checkManager`, `_checkRelayer`, `_checkInstitution` | Operational throughput |
 
-These functions use role-based checks rather than ownership checks, so they are unaffected by the ownership transfer to the timelock.
+These functions use role-based checks, not ownership checks, so the ownership transfer to the timelock does not affect them.
 
 ---
 
 ## 4. Deployment
 
-The Admin Timelock is deployed by [`script/deployment/13_DeployTimelock.s.sol`](../script/deployment/13_DeployTimelock.s.sol) — the final step in the deployment sequence (`make deploy-timelock`, deliberately not part of `deploy-all`).
+The Admin Timelock deploys via [`script/deployment/13_DeployTimelock.s.sol`](../script/deployment/13_DeployTimelock.s.sol) — the final step in the deployment sequence (`make deploy-timelock`, deliberately not part of `deploy-all`).
 
 ### 4.1 `TimelockController` constructor
 
@@ -143,9 +143,9 @@ constructor(
 
 Constructor side effects:
 - `DEFAULT_ADMIN_ROLE` is granted to **both** `address(this)` (always) and the `admin` parameter.
-- Each address in `proposers` is granted `PROPOSER_ROLE` **and** `CANCELLER_ROLE` (auto-grant).
-- Each address in `executors` is granted `EXECUTOR_ROLE`. Passing `address(0)` here opens the role to anyone.
-- The constructor does **not** validate that `proposers.length > 0`. Deploying with an empty `proposers` array creates a permanently-locked timelock. The deployment script must assert non-empty.
+- Each address in `proposers` gets `PROPOSER_ROLE` **and** `CANCELLER_ROLE` (auto-grant).
+- Each address in `executors` gets `EXECUTOR_ROLE`. Passing `address(0)` opens the role to anyone.
+- The constructor does **not** validate that `proposers.length > 0`. An empty `proposers` array creates a permanently-locked timelock. The deployment script must assert non-empty.
 
 ### 4.2 Deploy → Configure → Transfer sequence
 
@@ -203,13 +203,13 @@ If any assertion fails, the script reverts and the deployment must be redone.
 
 Two repos hold UUPS contracts:
 - **kam** — deploys core contracts (kRegistry, kMinter, kAssetRouter, kStakingVault instances, VaultAdapter instances) and the `kToken` proxy instances (kUSD, kBTC) via the kam deployment pipeline.
-- **kToken0** — provides the `kToken` and `kTokenFactory` source. The `kToken` proxy instances are deployed by the kam pipeline; their ownership is transferred from `13_DeployTimelock.s.sol` on the kam side.
+- **kToken0** — provides the `kToken` and `kTokenFactory` source. The `kToken` proxies deploy through the kam pipeline; `13_DeployTimelock.s.sol` transfers their ownership on the kam side.
 
-`kRemoteRegistry` is deployed via `script/multichain/DeployRemoteRegistry.s.sol` and its ownership transfer happens at deployment time on each remote chain, not from `13_DeployTimelock.s.sol`.
+`kRemoteRegistry` deploys via `script/multichain/DeployRemoteRegistry.s.sol` and its ownership transfers at deployment time on each remote chain, not from `13_DeployTimelock.s.sol`.
 
 ### 4.5 No rollback
 
-Once `transferOwnership(timelock)` is executed, the deployer EOA loses all authority. Only the timelock can undo it — via a timelock-gated proposal that itself takes 3 days.
+Once `transferOwnership(timelock)` executes, the deployer EOA loses all authority. Only the timelock can undo it — via a timelock-gated proposal that itself takes 3 days.
 
 Mitigation:
 1. **Testnet rehearsal**: full deploy → grant → renounce → upgrade cycle on Sepolia (or local fork) before mainnet.
@@ -220,7 +220,7 @@ Mitigation:
 
 ## 5. Vendored contract
 
-OpenZeppelin Contracts **v5.6.1** is vendored under `src/vendor/openzeppelin/`. Same convention as the existing `src/vendor/openzeppelin/Proxy.sol`. **No modifications** to OZ source — files are copied verbatim with original SPDX (`MIT`), version pragma, and OZ header comments preserved.
+OpenZeppelin Contracts **v5.6.1** vendored under `src/vendor/openzeppelin/`. Same convention as the existing `src/vendor/openzeppelin/Proxy.sol`. **No modifications** to OZ source — files are copied verbatim with original SPDX (`MIT`), version pragma, and OZ header comments preserved.
 
 13 files vendored:
 
@@ -248,20 +248,20 @@ src/vendor/openzeppelin/
         └── IERC165.sol
 ```
 
-`TimelockController` inherits `ERC721Holder` and `ERC1155Holder` — these add no functionality the protocol uses (the timelock is not expected to receive NFTs) but keeping the vendor copy unmodified avoids future divergence cost when bumping OZ versions.
+`TimelockController` inherits `ERC721Holder` and `ERC1155Holder` — these add no functionality the protocol uses (the timelock won't receive NFTs), but keeping the vendor copy unmodified avoids future divergence cost when bumping OZ versions.
 
 ### 5.1 Accidental ETH/NFT recovery
 
-If ETH or NFTs land at the timelock by accident, recovery is via a **self-scheduled transfer**:
+If ETH or NFTs land at the timelock by accident, recover them via a **self-scheduled transfer**:
 1. Schedule an op where `target = address(token)` and `data = abi.encodeCall(token.transfer, (recipient, amount))`, or `target = recipient` with `value = ethAmount` for raw ETH.
 2. Wait through the 3-day delay.
 3. Anyone executes.
 
-Because the timelock holds funds via its own contract address, only the timelock can move them — same as any other recovery action.
+The timelock holds funds at its own contract address, so only the timelock can move them — same as any other recovery action.
 
 ### 5.2 Licensing note
 
-OZ Contracts is MIT — permissive, compatible with proprietary use. The MIT license requires preservation of the copyright notice (which we do via the unchanged headers). KAM's own code remains `UNLICENSED` and is unaffected by the vendored MIT files.
+OZ Contracts is MIT — permissive, compatible with proprietary use. The MIT license requires preserving the copyright notice (done via the unchanged headers). KAM's own code remains `UNLICENSED` and is unaffected by the vendored MIT files.
 
 ### 5.3 Maintenance
 
@@ -313,7 +313,7 @@ adminTimelock.execute({
 
 The same `data` as scheduled. Mismatch → revert. Op state becomes `Done`.
 
-For batch execution, the `executeBatch(targets, values, datas, predecessor, salt)` variant accepts arrays. The original schedule params can be reconstructed from the on-chain `CallScheduled` event log (event signature: `CallScheduled(bytes32 indexed id, uint256 indexed index, address target, uint256 value, bytes data, bytes32 predecessor, uint256 delay)`).
+For batch execution, `executeBatch(targets, values, datas, predecessor, salt)` accepts arrays. The original schedule params can be reconstructed from the on-chain `CallScheduled` event log (event signature: `CallScheduled(bytes32 indexed id, uint256 indexed index, address target, uint256 value, bytes data, bytes32 predecessor, uint256 delay)`).
 
 ### 6.3 Cancel a queued op
 
@@ -331,11 +331,11 @@ Op state goes back to `Unset`. The proposer must re-schedule from scratch (with 
 
 `scheduleBatch` / `executeBatch` accept arrays. Useful for atomically rotating treasury + insurance + bps in one delay window.
 
-`predecessor` (the fourth `schedule` parameter) lets you require a prior op to be `Done` before the new op becomes executable. Use this to enforce ordering of dependent ops (e.g. *upgrade implementation* must complete before *call new initialize function*) without having to wait two consecutive delay windows.
+`predecessor` (the fourth `schedule` parameter) requires a prior op to be `Done` before the new op becomes executable. Use this to enforce ordering of dependent ops (e.g. *upgrade implementation* must complete before *call new initialize function*) without waiting two consecutive delay windows.
 
 ### 6.5 Salt rotation policy
 
-Each operation is identified by `id = hashOperation(target, value, data, predecessor, salt)`. After execution, an op enters `Done` and **the same id can never be scheduled again** (OZ enforces this). To re-do the same logical action, you must use a different salt.
+Each operation is identified by `id = hashOperation(target, value, data, predecessor, salt)`. After execution, an op enters `Done` and **the same id can never be scheduled again** (OZ enforces this). To repeat the same logical action, use a different salt.
 
 **Policy**: every salt must encode either an ISO date (`YYYY-MM-DD`) or a monotonically increasing counter as part of its preimage. Examples:
 
@@ -344,13 +344,13 @@ keccak256("set-treasury-2026-05-15")        // dated
 keccak256(abi.encode("set-treasury", 1))    // counter
 ```
 
-Reusing salts across different intents is forbidden. The salt convention is part of operational hygiene; it is not enforced on-chain.
+Reusing salts across different intents is forbidden. The salt convention is operational hygiene; it is not enforced on-chain.
 
 ---
 
 ## 7. How to update the delay (post-deployment)
 
-The timelock has a single `minDelay`. Changing it is itself a timelock-gated operation through the same timelock — `updateDelay` is restricted to `address(this)`.
+The timelock has a single `minDelay`. Changing it is itself a timelock-gated operation — `updateDelay` is restricted to `address(this)`.
 
 ### 7.1 The procedure
 

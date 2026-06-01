@@ -1,8 +1,8 @@
 # KAM Protocol - Roles and Permissions Flow
 
-## Overview: Role-Based Access Control
+## Role-Based Access Control
 
-The KAM Protocol implements a comprehensive role-based access control system using Solady's OptimizedOwnableRoles. Each role has specific permissions and responsibilities within the protocol, enabling secure and efficient operations while maintaining proper access controls.
+KAM uses Solady's OptimizedOwnableRoles for access control. Each role maps to a specific set of protocol operations.
 
 ## Role Hierarchy
 
@@ -26,35 +26,21 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 
 ## Role Definitions and Permissions
 
-**Note**: Not all access control in the protocol is role-based. Some functions use contract-based access control (e.g., only kAssetRouter can call certain VaultAdapter functions).
+**Note**: Not all access control is role-based. Some functions use contract-based access control (e.g., only kAssetRouter can call certain VaultAdapter functions).
 
 ### OWNER
 
-**Ultimate Protocol Control**
+Full protocol control across all contracts. Manages upgrades and grants/revokes ADMIN, EMERGENCY_ADMIN, and GUARDIAN roles.
 
-- **Scope**: All contracts
-- **Key Permissions**:
-  - Contract upgrades and critical changes
-  - Role management for ADMIN_ROLE, EMERGENCY_ADMIN_ROLE, and GUARDIAN_ROLE (symmetric grant/revoke)
-  - Emergency protocol interventions
 - **Key Functions**:
   - `kRegistry.grantAdminRole()` / `revokeAdminRole()`
   - `kRegistry.grantEmergencyAdminRole()` / `revokeEmergencyAdminRole()`
   - `kRegistry.grantGuardianRole()` / `revokeGuardianRole()`
-- **Usage**: Protocol governance and critical decisions
 
 ### ADMIN_ROLE
 
-**Operational Management**
+Handles configuration, registry updates, vault/adapter registration, treasury management, and role management for VENDOR, RELAYER, and MANAGER. Can also revoke INSTITUTION_ROLE as a backstop (documented exception to strict grant/revoke symmetry).
 
-- **Scope**: All contracts
-- **Key Permissions**:
-  - Configuration management
-  - Registry updates
-  - Vault and adapter registration
-  - Treasury management
-  - Role management for VENDOR, RELAYER, MANAGER (symmetric grant/revoke)
-  - Backstop revoker for INSTITUTION_ROLE (documented exception to strict symmetry)
 - **Key Functions**:
   - `kRegistry.setSingletonContract()` - Register core contracts
   - `kRegistry.registerVault()` - Register new vaults
@@ -63,17 +49,12 @@ The KAM Protocol implements a comprehensive role-based access control system usi
   - `kRegistry.grantVendorRole()` / `revokeVendorRole()`
   - `kRegistry.grantRelayerRole()` / `revokeRelayerRole()`
   - `kRegistry.grantManagerRole()` / `revokeManagerRole()`
-  - `kRegistry.revokeInstitutionRole()` - Operational backstop only (VENDOR is the primary revoker)
+  - `kRegistry.revokeInstitutionRole()` - Backstop only (VENDOR is the primary revoker)
 
 ### EMERGENCY_ADMIN_ROLE
 
-**Emergency Response**
+Pauses and unpauses any contract in the protocol. Handles emergency asset recovery.
 
-- **Scope**: All contracts
-- **Key Permissions**:
-  - Protocol-wide pause/unpause
-  - Emergency asset recovery
-  - Crisis response operations
 - **Key Functions**:
   - `kStakingVault.setPaused()` - Pause staking vault
   - `kToken.setPaused()` - Pause token operations
@@ -82,27 +63,16 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 
 ### GUARDIAN_ROLE
 
-**Settlement Oversight**
+Oversees settlement accuracy on kAssetRouter. Can cancel proposals during cooldown and must approve high-yield-delta proposals that exceed tolerance.
 
-- **Scope**: kAssetRouter
-- **Key Permissions**:
-  - Cancel settlement proposals during cooldown (also available to EMERGENCY_ADMIN_ROLE)
-  - Approve high-yield-delta proposals that exceed tolerance
-  - Monitor settlement accuracy
-  - Circuit breaker for incorrect settlements
 - **Key Functions**:
   - `kAssetRouter.cancelProposal()` - Cancel settlement proposals during cooldown (GUARDIAN_ROLE or EMERGENCY_ADMIN_ROLE)
-  - `kAssetRouter.acceptProposal()` - Approve high-yield-delta proposals that require guardian approval (GUARDIAN_ROLE only)
+  - `kAssetRouter.acceptProposal()` - Approve high-yield-delta proposals (GUARDIAN_ROLE only)
 
 ### RELAYER_ROLE
 
-**Settlement Operations**
+Runs batch lifecycle and settlement operations across kAssetRouter, kMinter, and kStakingVault.
 
-- **Scope**: kAssetRouter, kMinter, kStakingVault
-- **Key Permissions**:
-  - Batch lifecycle management
-  - Settlement proposal and execution
-  - Automated protocol operations
 - **Key Functions**:
   - `kAssetRouter.proposeSettleBatch()` - Propose batch settlements
   - `kMinter.closeBatch()` - Close minting batches
@@ -113,13 +83,8 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 
 ### INSTITUTION_ROLE
 
-**Institutional Access**
+Grants access to mint kTokens 1:1 with underlying assets, request redemptions, and execute redemptions after settlement. Scoped to kMinter.
 
-- **Scope**: kMinter
-- **Key Permissions**:
-  - Mint kTokens 1:1 with underlying assets
-  - Request redemptions
-  - Execute redemptions after settlement
 - **Key Functions**:
   - `kMinter.mint()` - Mint kTokens
   - `kMinter.requestBurn()` - Request redemption
@@ -127,39 +92,23 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 
 ### VENDOR_ROLE
 
-**Vendor Management**
+Primary KYC/KYB lifecycle owner. Grants and revokes INSTITUTION_ROLE on kRegistry.
 
-- **Scope**: kRegistry
-- **Key Permissions**:
-  - Grant and revoke institution roles (primary KYC/KYB lifecycle owner)
-  - KYC/KYB Controller
-  - Manage vendor-specific operations
 - **Key Functions**:
   - `kRegistry.grantInstitutionRole()` - Grant institutional access
   - `kRegistry.revokeInstitutionRole()` - Revoke institutional access (primary revoker)
 
 ### MANAGER_ROLE
 
-**Adapter Management**
+Executes permissioned calls to external protocols through VaultAdapter. Calls are restricted by `authorizeCall()` checks from the registry's ExecutionGuardianModule.
 
-- **Scope**: VaultAdapter (via SmartAdapterAccount)
-- **Key Permissions**:
-  - Execute permissioned calls to external protocols via adapters
-  - Manage adapter operations within allowed selectors
-  - Coordinate with external protocols following permission model
 - **Key Functions**:
   - `VaultAdapter.execute()` - Execute calls to whitelisted targets/selectors (only function using MANAGER_ROLE)
-- **Note**: Execution is restricted by `authorizeCall()` checks enforced by registry's ExecutionGuardianModule
 
 ### BLACKLIST_ADMIN_ROLE
 
-**Account Freeze/Blacklist Management (kToken)**
+Freezes and unfreezes accounts on kToken (USDC-style compliance). Frozen accounts cannot send, receive, mint, or burn tokens — funds stay locked until unfrozen.
 
-- **Scope**: kToken
-- **Key Permissions**:
-  - Freeze accounts to block all token transfers (USDC-style compliance)
-  - Unfreeze accounts to restore transfer capability
-  - Compliance and security incident response
 - **Key Functions**:
   - `kToken.freeze()` - Freeze an account
   - `kToken.unfreeze()` - Unfreeze an account
@@ -167,7 +116,6 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 - **Restrictions**:
   - Cannot freeze the owner address
   - Cannot freeze `address(0)` (mint/burn sentinel)
-- **Note**: Frozen accounts cannot send, receive, mint, or burn tokens. Funds remain locked until unfrozen.
 
 ## Role Usage Flow Diagrams
 
@@ -422,19 +370,15 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 │  │• grantRelayerRole() / revokeRelayerRole()                   │ │
 │  │• grantManagerRole() / revokeManagerRole()                   │ │
 │  │• revokeInstitutionRole() - Backstop only                    │ │
+│  │• setHurdleRate() - Set performance thresholds per vault      │ │
+│  │• setBatchLimits() - Set max mint/redeem per batch           │ │
+│  │• rescueAssets() - Emergency asset recovery (ADMIN_ROLE)     │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                  │
 │  VENDOR_ROLE Functions:                                          │
 │  ┌─────────────────────────────────────────────────────────────┐ │
 │  │• grantInstitutionRole() - Grant institutional access        │ │
 │  │• revokeInstitutionRole() - Revoke (primary revoker)         │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  ADMIN_ROLE Functions (continued):                               │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │• setHurdleRate() - Set performance thresholds per vault      │ │
-│  │• setBatchLimits() - Set max mint/redeem per batch           │ │
-│  │• rescueAssets() - Emergency asset recovery (ADMIN_ROLE)     │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                  │
 └────────────────────────────────────────────────────────────────-─┘
@@ -571,23 +515,11 @@ The KAM Protocol implements a comprehensive role-based access control system usi
 
 ## Security Considerations
 
-### Role Isolation
-
-- Each role has minimal required permissions
-- No single role has complete protocol control
-- Emergency controls are separate from operational roles
-
-### Multi-Signature Requirements
-
-- Critical operations may require multiple role confirmations
-- Settlement proposals have cooldown periods for review
-- Guardian role provides circuit breaker functionality
-
-### Emergency Response
-
-- EMERGENCY_ADMIN_ROLE can pause entire protocol
-- Asset recovery mechanisms for crisis situations
-- Role revocation capabilities for compromised accounts
+- Each role holds minimal permissions. No single role has full protocol control.
+- Emergency controls are isolated from operational roles.
+- Settlement proposals go through a cooldown period. The guardian acts as a circuit breaker.
+- EMERGENCY_ADMIN_ROLE can pause the entire protocol and trigger asset recovery.
+- Compromised accounts can have their roles revoked by the appropriate authority.
 
 ## Role Validation Patterns
 

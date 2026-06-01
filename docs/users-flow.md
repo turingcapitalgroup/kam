@@ -17,6 +17,8 @@
 
 ## Detailed Flow: Staking kTokens
 
+Users deposit kTokens into the vault. The vault transfers them in, creates a request struct, and notifies the router via `kAssetTransfer()`. The request then waits for batch settlement.
+
 ```
 ┌─────────────────┐
 │User has kTokens │
@@ -74,6 +76,8 @@
 
 ## Detailed Flow: Unstaking Process
 
+The user's stkTokens are held by the vault. An unstake request is created and virtual balances are updated. The request waits for the next batch settlement.
+
 ```
 ┌─────────────────┐
 │User has         │
@@ -117,6 +121,8 @@
 ```
 
 ## Batch Processing
+
+The relayer closes the active batch, proposes settlement with yield data, and waits through a 1-hour cooldown. Guardians can cancel during the cooldown. After it expires, the relayer calls `executeSettleBatch()`, which mints/burns kTokens for yield, snapshots share prices, and pre-mints stkTokens for all pending stakers.
 
 ```
 ┌─────────────────┐
@@ -185,6 +191,8 @@
 
 ## Claiming Staked Shares
 
+After batch settlement, the vault calculates stkTokens owed using the ERC4626 formula with the batch snapshot values, transfers the pre-minted shares to the user, and marks the request as `CLAIMED`.
+
 ```
 ┌─────────────────┐
 │Stake Request    │
@@ -228,6 +236,8 @@
 ```
 
 ## Claiming Unstaked Assets
+
+After batch settlement, the vault converts stkTokens back to kTokens using the inverse ERC4626 formula. The stkTokens were already burned during `settleBatch()`. The net kTokens (principal + yield, fees already collected via dilution) are transferred to the user.
 
 ```
 ┌─────────────────┐
@@ -318,6 +328,8 @@
 
 ## Share Price Calculation
 
+`totalAssets` equals `totalBalance`, which tracks the vault's active kToken capital. Fees are collected via share dilution at settlement time (treasury shares minted via `VaultMathLib.computeFeeShares()`), so no fee deduction appears in the share price formula itself.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        Share Price Calculation                      │
@@ -356,7 +368,12 @@
 
 ## Fee Distribution
 
-Fees are collected via share dilution at settlement time only. During `settleBatch()`, the management fee for the elapsed period is computed via `VaultMathLib.computeManagementFee` and `lastFeeTimestamp` is updated. Performance fees are computed on net interest (`currentBalance − lastSettlementBalance − managementFeeAssets`) above the time-weighted hurdle threshold. Both fee asset amounts are then converted to treasury shares in a single `VaultMathLib.computeFeeShares` call using a dilution-adjusted denominator (`totalAssets − totalFeeAssets`), so the treasury's post-mint share value equals the asset quote regardless of the size of the mint. Per-fee event amounts (`ManagementFeesAccrued`, `PerformanceFeesCharged`) are emitted as proportional splits of the single mint.
+Both fee types are collected via share dilution during `settleBatch()` only:
+
+- **Management fee** — time-based, computed via `VaultMathLib.computeManagementFee` over the elapsed period since `lastFeeTimestamp`.
+- **Performance fee** — charged on net interest (`currentBalance − lastSettlementBalance − managementFeeAssets`) above the time-weighted hurdle threshold.
+
+Both fee asset amounts are converted to treasury shares in a single `VaultMathLib.computeFeeShares` call. The denominator is dilution-adjusted (`totalAssets − totalFeeAssets`), so the treasury's post-mint share value matches the asset quote regardless of mint size. Per-fee event amounts (`ManagementFeesAccrued`, `PerformanceFeesCharged`) are emitted as proportional splits of that single mint.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -404,6 +421,8 @@ Fees are collected via share dilution at settlement time only. During `settleBat
 ```
 
 ## Request States
+
+Three states: `UNDEFINED` (default/uninitialized), `PENDING` (active in-flight), and `CLAIMED` (finalized).
 
 ```
 Request Status Flow:
@@ -465,8 +484,7 @@ Request Status Flow:
 │  │  (called at settlement    │      │• setPerformanceFee()      │   │
 │  │   only; perf fee also     │      │  (accrue fees first, then │   │
 │  │   minted in settleBatch)  │      │   update rate; hurdle     │   │
-│  └───────────────────────────┘      │   update rate; hurdle     │   │
-│                                     │   rates in registry)      │   │
+│  └───────────────────────────┘      │   rates in registry)      │   │
 │                                     └───────────────────────────┘   │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -562,6 +580,8 @@ Day 0:              Day 1:              Day 2:              Day 2:
 ```
 
 ## Yield Accumulation
+
+Yield from adapters (MetaWallet, CEFFU) flows into the yield pool, increasing `totalAssets`. This raises the share price. All stkToken holders earn proportional yield automatically.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
