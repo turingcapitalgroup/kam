@@ -186,4 +186,34 @@ interface IVaultReader {
         external
         view
         returns (uint256 requestedAssets, uint256 managementFees, uint256 performanceFees);
+
+    /* //////////////////////////////////////////////////////////////
+                        REQUEST LIMIT GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the remaining stake capacity in the current batch
+    /// @return Remaining kToken amount before the current batch stake limit is reached
+    function remainingStakeBatchLimit() external view returns (uint256);
+
+    /// @notice Returns the remaining stake capacity before the vault total assets cap is reached
+    /// @return Remaining kToken amount before active assets plus pending stake reaches maxTotalAssets
+    function remainingStakeTotalAssetsLimit() external view returns (uint256);
+
+    /// @notice Returns whether a stake request amount fits the current batch and total assets limits
+    /// @param amount The kToken amount to check
+    /// @return True if the amount fits both stake limit checks
+    function canRequestStake(uint256 amount) external view returns (bool);
+
+    /// @notice Returns current batch unstake requests converted to assets with current totals
+    /// @return Asset-denominated unstake amount currently requested in the active batch
+    function requestedUnstakeAssetsInCurrentBatch() external view returns (uint256);
+
+    /// @notice Returns the remaining unstake capacity in the current batch
+    /// @return Remaining asset-denominated amount before the current batch unstake limit is reached
+    function remainingUnstakeBatchLimit() external view returns (uint256);
+
+    /// @notice Returns whether an unstake request amount fits the current batch burn limit
+    /// @param stkTokenAmount The stkToken share amount to check
+    /// @return True if adding the shares keeps asset-denominated requests within the burn limit
+    function canRequestUnstake(uint256 stkTokenAmount) external view returns (bool);
 }

@@ -305,12 +305,77 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
     }
 
     /* //////////////////////////////////////////////////////////////
+                        REQUEST LIMIT GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IVaultReader
+    function remainingStakeBatchLimit() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = $.currentBatchId;
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) return 0;
+
+        uint256 _limit = _registry().getMaxMintPerBatch(address(this));
+        uint256 _depositedInBatch = $.batches[_batchId].depositedInBatch;
+        if (_depositedInBatch >= _limit) return 0;
+
+        return _limit - _depositedInBatch;
+    }
+
+    /// @inheritdoc IVaultReader
+    function remainingStakeTotalAssetsLimit() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        uint256 _usedCapacity = $.totalBalance + $.totalPendingStake;
+        if (_usedCapacity >= $.maxTotalAssets) return 0;
+
+        return $.maxTotalAssets - _usedCapacity;
+    }
+
+    /// @inheritdoc IVaultReader
+    function canRequestStake(uint256 _amount) external view returns (bool) {
+        return _amount <= remainingStakeBatchLimit() && _amount <= remainingStakeTotalAssetsLimit();
+    }
+
+    /// @inheritdoc IVaultReader
+    function requestedUnstakeAssetsInCurrentBatch() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = $.currentBatchId;
+        if (_batchId == bytes32(0)) return 0;
+
+        return _convertToAssetsWithTotals($.batches[_batchId].requestedSharesInBatch, _totalAssets(), totalSupply());
+    }
+
+    /// @inheritdoc IVaultReader
+    function remainingUnstakeBatchLimit() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = $.currentBatchId;
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) return 0;
+
+        uint256 _limit = _registry().getMaxBurnPerBatch(address(this));
+        uint256 _requestedAssets = requestedUnstakeAssetsInCurrentBatch();
+        if (_requestedAssets >= _limit) return 0;
+
+        return _limit - _requestedAssets;
+    }
+
+    /// @inheritdoc IVaultReader
+    function canRequestUnstake(uint256 _stkTokenAmount) external view returns (bool) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = $.currentBatchId;
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) return false;
+
+        uint256 _requestedAssets = _convertToAssetsWithTotals(
+            $.batches[_batchId].requestedSharesInBatch + _stkTokenAmount, _totalAssets(), totalSupply()
+        );
+        return _requestedAssets <= _registry().getMaxBurnPerBatch(address(this));
+    }
+
+    /* //////////////////////////////////////////////////////////////
                         MODULE INFO
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](23);
+        bytes4[] memory moduleSelectors = new bytes4[](29);
         moduleSelectors[0] = this.lastFeeTimestamp.selector;
         moduleSelectors[1] = this.hurdleRate.selector;
         moduleSelectors[2] = this.isHardHurdleRate.selector;
@@ -334,6 +399,12 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         moduleSelectors[20] = this.getBatchSharePrice.selector;
         moduleSelectors[21] = this.convertToSharesInBatch.selector;
         moduleSelectors[22] = this.convertToAssetsInBatch.selector;
+        moduleSelectors[23] = this.remainingStakeBatchLimit.selector;
+        moduleSelectors[24] = this.remainingStakeTotalAssetsLimit.selector;
+        moduleSelectors[25] = this.canRequestStake.selector;
+        moduleSelectors[26] = this.requestedUnstakeAssetsInCurrentBatch.selector;
+        moduleSelectors[27] = this.remainingUnstakeBatchLimit.selector;
+        moduleSelectors[28] = this.canRequestUnstake.selector;
         return moduleSelectors;
     }
 }

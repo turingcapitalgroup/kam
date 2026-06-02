@@ -209,6 +209,28 @@ interface IkMinter is IVersioned {
     /// @return The batch information
     function getBatchInfo(bytes32 batchId_) external view returns (IkMinter.BatchInfo memory);
 
+    /// @notice Returns the remaining mint capacity for an asset's current batch
+    /// @param asset The asset to query
+    /// @return Remaining amount before the current batch mint limit is reached
+    function remainingMintBatchLimit(address asset) external view returns (uint256);
+
+    /// @notice Returns whether a mint amount fits the asset's current batch mint limit
+    /// @param asset The asset to query
+    /// @param amount The mint amount to check
+    /// @return True if the amount fits the current mint batch limit
+    function canMint(address asset, uint256 amount) external view returns (bool);
+
+    /// @notice Returns the remaining burn request capacity for an asset's current batch
+    /// @param asset The asset to query
+    /// @return Remaining amount before the current batch burn limit is reached
+    function remainingBurnBatchLimit(address asset) external view returns (uint256);
+
+    /// @notice Returns whether a burn request amount fits the asset's current batch burn limit
+    /// @param asset The asset to query
+    /// @param amount The burn request amount to check
+    /// @return True if the amount fits the current burn batch limit
+    function canRequestBurn(address asset, uint256 amount) external view returns (bool);
+
     /// @notice Gets the batch receiver address for a specific batch
     /// @param batchId_ The batch ID to query
     /// @return The address of the batch receiver
