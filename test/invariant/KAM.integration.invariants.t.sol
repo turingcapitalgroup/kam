@@ -72,4 +72,16 @@ contract IntegrationInvariants is SetUp {
         vaultHandlerAlpha.INVARIANT_G_SHARE_PRICE_DELTA();
         vaultHandlerBeta.INVARIANT_G_SHARE_PRICE_DELTA();
     }
+
+    function invariant_INTEGRATION_kStakingVaultUserRequestSet() public view {
+        vaultHandlerDeltaNeutral.INVARIANT_E_USER_REQUEST_SET();
+        vaultHandlerAlpha.INVARIANT_E_USER_REQUEST_SET();
+        vaultHandlerBeta.INVARIANT_E_USER_REQUEST_SET();
+    }
+
+    function invariant_INTEGRATION_kStakingVaultSolvencyFloor() public view {
+        vaultHandlerDeltaNeutral.INVARIANT_K_SOLVENCY_FLOOR();
+        vaultHandlerAlpha.INVARIANT_K_SOLVENCY_FLOOR();
+        vaultHandlerBeta.INVARIANT_K_SOLVENCY_FLOOR();
+    }
 }

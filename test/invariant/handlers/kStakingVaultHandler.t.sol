@@ -743,4 +743,35 @@ contract kStakingVaultHandler is BaseHandler {
             "KSTAKING_VAULT: INVARIANT_L - Vault self-balance doesn't match expected"
         );
     }
+
+    /// @notice Invariant: Staking vault user request count matches actual pending requests
+    /// @dev Ensures EnumerableSet stays in sync with actual state
+    function INVARIANT_E_USER_REQUEST_SET() public view {
+        address[] memory actorList = actors();
+        for (uint256 i = 0; i < actorList.length; i++) {
+            address actor = actorList[i];
+            uint256 actualCount = kStakingVault_vault.getUserRequests(actor).length;
+            uint256 expectedCount = kStakingVault_actorStakeRequests[actor].count()
+                + kStakingVault_actorUnstakeRequests[actor].count();
+            assertEq(
+                actualCount,
+                expectedCount,
+                "KSTAKING_VAULT: INVARIANT_E - User request set out of sync"
+            );
+        }
+    }
+
+    /// @notice Invariant: The vault's physical kToken balance must be greater than or equal to expected baseline
+    /// @dev baseline = vault.totalAssets() + vault.totalPendingStake() + vault.totalPendingUnstake()
+    function INVARIANT_K_SOLVENCY_FLOOR() public view {
+        uint256 physicalBalance = kStakingVault_kToken.balanceOf(address(kStakingVault_vault));
+        uint256 expectedBaseline = kStakingVault_vault.totalAssets()
+            + kStakingVault_vault.totalPendingStake()
+            + kStakingVault_vault.totalPendingUnstake();
+        assertGe(
+            physicalBalance,
+            expectedBaseline,
+            "KSTAKING_VAULT: INVARIANT_K - Solvency floor violated: physical balance less than expected baseline"
+        );
+    }
 }

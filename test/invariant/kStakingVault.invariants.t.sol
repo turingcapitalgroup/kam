@@ -48,4 +48,12 @@ contract kStakingVaultInvariants is SetUp {
     function invariant_kStakingVaultSelfBalance() public view {
         vaultHandlerAlpha.INVARIANT_L_VAULT_SELF_BALANCE();
     }
+
+    function invariant_kStakingVaultUserRequestSet() public view {
+        vaultHandlerAlpha.INVARIANT_E_USER_REQUEST_SET();
+    }
+
+    function invariant_kStakingVaultSolvencyFloor() public view {
+        vaultHandlerAlpha.INVARIANT_K_SOLVENCY_FLOOR();
+    }
 }
