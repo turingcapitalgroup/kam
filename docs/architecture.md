@@ -66,7 +66,7 @@ Each kToken instance maintains strict peg enforcement through a sophisticated vi
 **Virtual Balance Implementation**: The virtual accounting system works as follows:
 
 - Each vault has a VaultAdapter that maintains `totalAssets()` representing virtual balance
-- kAssetRouter tracks pending deposits/withdrawals per vault per batch via `getBatchIdBalances(vault, batchId)`
+- kAssetRouter exposes `getBatchIdBalances(vault, batchId)` which delegates to the vault's own batch state (kMinter's `getBatchInfo` or kStakingVault's `getBatchIdInfo`)
 - Virtual balance = `adapter.totalAssets()` which is updated during settlement via `adapter.setTotalAssets()`
 - Settlement reconciles virtual balances with actual asset movements from external strategies
 
@@ -257,7 +257,7 @@ The kAssetRouter serves as the central coordinator for all asset movements withi
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Institutional Operations (kMinter):                        │
-│  • kAssetPush() - Track deposits from kMinter               │
+│  • kAssetPush() - Transfer deposits from kMinter to adapter  │
 │  • kAssetRequestPull() - Track withdrawal requests          │
 │                                                             │
 │  Retail Operations (kStakingVault):                         │
@@ -318,7 +318,7 @@ Settlement uses a proposal-commit pattern that provides security through time de
 
 The router handles four distinct types of asset movements: kMinter push operations when institutions mint tokens, kMinter pull requests when institutions request redemptions, vault transfers when retail users stake/unstake, and share management for complex multi-vault operations.
 
-During settlement execution, the system handles kMinter versus regular vault settlement differently. For kMinter settlements, assets are transferred to batch receivers for institutional redemptions, with the vault variable being reassigned to the corresponding DN vault. For regular vault settlements, yield is minted or burned based on profit/loss calculations. Netted assets are then deployed to external strategies via adapters using explicit approval patterns for security.
+During settlement execution, the system handles kMinter versus regular vault settlement differently. For kMinter settlements, assets are transferred to batch receivers for institutional redemptions; the kMinter adapter's `totalAssets` is updated to reflect the new balance after the redemption. For regular vault settlements, yield is minted or burned based on profit/loss calculations. Netted assets are then deployed to external strategies via adapters using explicit approval patterns for security.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
@@ -464,7 +464,7 @@ Institution                kMinter              kAssetRouter            kToken
 
 ### Institutional Redemption Flow
 
-The burn process implements a secure request-queue system that protects both the protocol and institutions. The process begins with request creation where institutions call requestBurn() with their kToken amount. A unique ID is created from the recipient address, amount, timestamp, and an incrementing counter, and kTokens are transferred to kMinter for escrow (not burned immediately). Virtual balances are updated in kAssetRouter to mark assets as requested for withdrawal.
+The burn process implements a secure request-queue system that protects both the protocol and institutions. The process begins with request creation where institutions call requestBurn() with their kToken amount. A unique ID is created from the contract address, recipient address, amount, timestamp, and an incrementing counter, and kTokens are transferred to kMinter for escrow (not burned immediately). Virtual balances are updated in kAssetRouter to mark assets as requested for withdrawal.
 
 During batch settlement, escrowed kTokens are burned in bulk by `settleBatch()` and assets are retrieved from strategies and transferred to kBatchReceiver for distribution. Institutions then call `burn()` to mark their request as REDEEMED and claim underlying assets from the batch receiver.
 

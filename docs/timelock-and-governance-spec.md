@@ -92,13 +92,11 @@ The Admin Timelock owns every UUPS contract. Every `_checkOwner()` call site is 
 |----------|----------|--------|
 | `kRegistry` | `_authorizeUpgrade` | UUPS upgrade |
 | `kRegistry` | `grantAdminRole`, `grantEmergencyAdminRole`, `grantGuardianRole`, `revokeAdminRole`, `revokeEmergencyAdminRole`, `revokeGuardianRole` | Role escalation / de-escalation |
-| `kRegistry` | `setTreasury`, `setInsurance`, `setTreasuryBps`, `setInsuranceBps` | Fee config |
 | `kRegistry` | `setSingletonContract`, other `_checkOwner()` admin sites | Misc admin |
 | `kRemoteRegistry` | `_authorizeUpgrade`, `setAllowedSelector`, `setExecutionValidator` | Cross-chain executor config |
 | `kMinter` | `_authorizeUpgrade` | UUPS upgrade |
 | `kAssetRouter` | `_authorizeUpgrade` | UUPS upgrade |
 | `kStakingVault` | `_authorizeUpgrade`, `setTrustedForwarder`, `_authorizeModifyFunctions` (MultiFacetProxy add/remove) | UUPS upgrade + admin config + facet management |
-| `kStakingVault` | `setManagementFee`, `setPerformanceFee` | Vault fees |
 | `VaultAdapter` | `_authorizeUpgrade` | UUPS upgrade |
 | `kToken` | `_authorizeUpgrade`, `grantAdminRole`, `revokeAdminRole` | UUPS upgrade + role grants |
 
@@ -115,9 +113,11 @@ The Admin Timelock owns every UUPS contract. Every `_checkOwner()` call site is 
 |----------|------------|-------------|
 | `setGlobalPause` | `_checkEmergencyAdmin` (kRegistry) | Incident response speed |
 | `setPaused` (per-contract, e.g. VaultAdapter) | `_checkEmergencyAdmin` | Incident response speed |
-| `cancelProposal` (settlement, high-yield path) | `_checkGuardian` | Kill switch on bad yield proposal |
+| `cancelProposal` (settlement, high-yield path) | `_checkGuardian` **or** `_checkEmergencyAdmin` | Kill switch on bad yield proposal. Note: blocked during global pause (`_checkPaused()` runs first) |
 | `cancel` on the Timelock | OZ `CANCELLER_ROLE` (held by GUARDIAN + ADMIN) | Cancel a bad queued op before it executes |
 | `rescueAssets`, `rescueETH` | `_checkAdmin` (kBase + kRegistry) | Time-critical asset recovery |
+| `setTreasury`, `setInsurance`, `setTreasuryBps`, `setInsuranceBps` | `_checkAdmin` (kRegistry) | Fee/treasury config — ADMIN-gated, not owner-gated, so not timelocked |
+| `setManagementFee`, `setPerformanceFee` | `_checkAdmin` (kStakingVault) | Vault fee rates — ADMIN-gated, not owner-gated, so not timelocked |
 | All settlement / batch / mint / burn / claim ops | `_checkManager`, `_checkRelayer`, `_checkInstitution` | Operational throughput |
 
 These functions use role-based checks rather than ownership checks, so they are unaffected by the ownership transfer to the timelock.

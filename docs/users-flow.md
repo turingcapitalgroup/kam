@@ -409,9 +409,14 @@ Fees are collected via share dilution at settlement time only. During `settleBat
 Request Status Flow:
 
 ┌─────────────┐
-│PENDING      │ ── Initial state when requestStake() or requestUnstake() is called
+│UNDEFINED    │ ── Default state for uninitialized storage slots
 └──────┬──────┘
-       │
+       │  requestStake() or requestUnstake()
+       ▼
+┌─────────────┐
+│PENDING      │ ── Initial active state when requestStake() or requestUnstake() is called
+└──────┬──────┘
+       │  claimStakedShares() or claimUnstakedAssets() (after batch settlement)
        ▼
 ┌─────────────┐
 │CLAIMED      │ ── After successful claim operation
