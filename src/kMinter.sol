@@ -411,6 +411,42 @@ contract kMinter is IkMinter, ISettleBatch, Initializable, UUPSUpgradeable, kBas
     }
 
     /// @inheritdoc IkMinter
+    function remainingMintBatchLimit(address _asset) public view returns (uint256) {
+        kMinterStorage storage $ = _getkMinterStorage();
+        bytes32 _batchId = $.currentBatchIds[_asset];
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) return 0;
+
+        uint256 _limit = _registry().getMaxMintPerBatch(_asset);
+        uint256 _depositedInBatch = $.batches[_batchId].depositedInBatch;
+        if (_depositedInBatch >= _limit) return 0;
+
+        return _limit - _depositedInBatch;
+    }
+
+    /// @inheritdoc IkMinter
+    function canMint(address _asset, uint256 _amount) external view returns (bool) {
+        return _amount <= remainingMintBatchLimit(_asset);
+    }
+
+    /// @inheritdoc IkMinter
+    function remainingBurnBatchLimit(address _asset) public view returns (uint256) {
+        kMinterStorage storage $ = _getkMinterStorage();
+        bytes32 _batchId = $.currentBatchIds[_asset];
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) return 0;
+
+        uint256 _limit = _registry().getMaxBurnPerBatch(_asset);
+        uint256 _requestedSharesInBatch = $.batches[_batchId].requestedSharesInBatch;
+        if (_requestedSharesInBatch >= _limit) return 0;
+
+        return _limit - _requestedSharesInBatch;
+    }
+
+    /// @inheritdoc IkMinter
+    function canRequestBurn(address _asset, uint256 _amount) external view returns (bool) {
+        return _amount <= remainingBurnBatchLimit(_asset);
+    }
+
+    /// @inheritdoc IkMinter
     function getBatchReceiver(bytes32 _batchId) external view returns (address) {
         kMinterStorage storage $ = _getkMinterStorage();
         address _receiver = $.batches[_batchId].batchReceiver;

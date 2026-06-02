@@ -187,6 +187,26 @@ contract kMinterTest is DeploymentBaseTest {
         minter.mint(USDC, users.alice, MINT_AMOUNT);
     }
 
+    function test_MintLimitGetters_TrackBatchHeadroom() public {
+        uint256 mintLimit = MINT_AMOUNT;
+
+        vm.prank(users.admin);
+        registry.setBatchLimits(USDC, mintLimit, type(uint128).max);
+
+        assertEq(minter.remainingMintBatchLimit(USDC), mintLimit);
+        assertTrue(minter.canMint(USDC, mintLimit));
+        assertFalse(minter.canMint(USDC, mintLimit + 1));
+
+        mockUSDC.mint(users.institution, mintLimit);
+        vm.prank(users.institution);
+        mockUSDC.approve(_minter, mintLimit);
+        vm.prank(users.institution);
+        minter.mint(USDC, users.institution, mintLimit);
+
+        assertEq(minter.remainingMintBatchLimit(USDC), 0);
+        assertFalse(minter.canMint(USDC, 1));
+    }
+
     /* //////////////////////////////////////////////////////////////
                             REQUEST BURN
     //////////////////////////////////////////////////////////////*/
@@ -283,6 +303,25 @@ contract kMinterTest is DeploymentBaseTest {
         vm.prank(users.institution);
         vm.expectRevert(bytes(KMINTER_BATCH_REDEEM_REACHED));
         minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+    }
+
+    function test_RequestBurnLimitGetters_TrackBatchHeadroom() public {
+        _mint(USDC, users.institution, MINT_AMOUNT);
+
+        vm.prank(users.admin);
+        registry.setBatchLimits(USDC, type(uint128).max, REQUEST_AMOUNT);
+
+        assertEq(minter.remainingBurnBatchLimit(USDC), REQUEST_AMOUNT);
+        assertTrue(minter.canRequestBurn(USDC, REQUEST_AMOUNT));
+        assertFalse(minter.canRequestBurn(USDC, REQUEST_AMOUNT + 1));
+
+        vm.prank(users.institution);
+        kUSD.approve(_minter, REQUEST_AMOUNT);
+        vm.prank(users.institution);
+        minter.requestBurn(USDC, users.institution, REQUEST_AMOUNT);
+
+        assertEq(minter.remainingBurnBatchLimit(USDC), 0);
+        assertFalse(minter.canRequestBurn(USDC, 1));
     }
 
     /* //////////////////////////////////////////////////////////////

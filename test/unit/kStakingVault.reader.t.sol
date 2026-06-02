@@ -10,7 +10,11 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IkStakingVault } from "kam/src/interfaces/IkStakingVault.sol";
 import { BaseVaultTypes } from "kam/src/kStakingVault/types/BaseVaultTypes.sol";
 
-import { KSTAKINGVAULT_VAULT_CLOSED, KSTAKINGVAULT_VAULT_SETTLED } from "kam/src/errors/Errors.sol";
+import {
+    KSTAKINGVAULT_VAULT_CLOSED,
+    KSTAKINGVAULT_VAULT_SETTLED,
+    VAULTCLAIMS_BATCH_NOT_SETTLED
+} from "kam/src/errors/Errors.sol";
 
 /// @title kStakingVaultReaderTest
 /// @notice Unit tests for all VaultReader (ReaderModule) functions
@@ -335,6 +339,90 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         assertEq(shares, assets);
     }
 
+    function test_batchSharePrice_EqualsBatchInfoSharePrice_WhenSettled() public {
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.bob);
+        kUSD.approve(address(vault), SMALL_DEPOSIT);
+        vm.prank(users.bob);
+        vault.requestStake(users.bob, users.bob, SMALL_DEPOSIT);
+
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        uint256 totalAssetsVal = vault.totalAssets();
+        _executeBatchSettlement(address(vault), batchId, totalAssetsVal);
+
+        (,,, uint256 batchInfoSharePrice,,,,) = vault.getBatchIdInfo(batchId);
+
+        assertEq(vault.getBatchSharePrice(batchId), batchInfoSharePrice);
+    }
+
+    function test_convertToSharesInBatch_UsesSettledBatchTotals() public {
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.bob);
+        kUSD.approve(address(vault), SMALL_DEPOSIT);
+        vm.prank(users.bob);
+        vault.requestStake(users.bob, users.bob, SMALL_DEPOSIT);
+
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        uint256 totalAssetsVal = vault.totalAssets();
+        _executeBatchSettlement(address(vault), batchId, totalAssetsVal);
+
+        (,,,, uint256 batchTotalAssets, uint256 batchTotalSupply,,) = vault.getBatchIdInfo(batchId);
+
+        uint256 assets = 1234 * _1_USDC;
+        assertEq(
+            vault.convertToSharesInBatch(batchId, assets),
+            vault.convertToSharesWithTotals(assets, batchTotalAssets, batchTotalSupply)
+        );
+    }
+
+    function test_convertToAssetsInBatch_UsesSettledBatchTotals() public {
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        bytes32 batchId = vault.getBatchId();
+
+        vm.prank(users.bob);
+        kUSD.approve(address(vault), SMALL_DEPOSIT);
+        vm.prank(users.bob);
+        vault.requestStake(users.bob, users.bob, SMALL_DEPOSIT);
+
+        vm.prank(users.relayer);
+        vault.closeBatch(batchId, true);
+
+        uint256 totalAssetsVal = vault.totalAssets();
+        _executeBatchSettlement(address(vault), batchId, totalAssetsVal);
+
+        (,,,, uint256 batchTotalAssets, uint256 batchTotalSupply,,) = vault.getBatchIdInfo(batchId);
+
+        uint256 shares = 1234 * 1e6;
+        assertEq(
+            vault.convertToAssetsInBatch(batchId, shares),
+            vault.convertToAssetsWithTotals(shares, batchTotalAssets, batchTotalSupply)
+        );
+    }
+
+    function test_batchConversionReaders_Revert_WhenBatchNotSettled() public {
+        bytes32 batchId = vault.getBatchId();
+
+        vm.expectRevert(bytes(VAULTCLAIMS_BATCH_NOT_SETTLED));
+        vault.getBatchSharePrice(batchId);
+
+        vm.expectRevert(bytes(VAULTCLAIMS_BATCH_NOT_SETTLED));
+        vault.convertToSharesInBatch(batchId, SMALL_DEPOSIT);
+
+        vm.expectRevert(bytes(VAULTCLAIMS_BATCH_NOT_SETTLED));
+        vault.convertToAssetsInBatch(batchId, SMALL_DEPOSIT);
+    }
+
     /* //////////////////////////////////////////////////////////////
                         REQUEST GETTER TESTS
     //////////////////////////////////////////////////////////////*/
@@ -416,6 +504,69 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         assertEq(maxAssets, newMax);
     }
 
+    function test_requestStakeLimitGetters_TrackBatchHeadroom() public {
+        uint256 stakeLimit = SMALL_DEPOSIT * 2;
+
+        vm.prank(users.admin);
+        registry.setBatchLimits(address(vault), stakeLimit, type(uint128).max);
+
+        assertEq(vault.remainingStakeBatchLimit(), stakeLimit);
+        assertTrue(vault.canRequestStake(SMALL_DEPOSIT));
+        assertFalse(vault.canRequestStake(stakeLimit + 1));
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), SMALL_DEPOSIT);
+        vm.prank(users.alice);
+        vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
+
+        assertEq(vault.remainingStakeBatchLimit(), SMALL_DEPOSIT);
+        assertTrue(vault.canRequestStake(SMALL_DEPOSIT));
+        assertFalse(vault.canRequestStake(SMALL_DEPOSIT + 1));
+    }
+
+    function test_requestStakeLimitGetters_TrackTotalAssetsHeadroom() public {
+        uint256 totalAssetsLimit = SMALL_DEPOSIT;
+
+        vm.startPrank(users.admin);
+        registry.setBatchLimits(address(vault), type(uint128).max, type(uint128).max);
+        vault.setMaxTotalAssets(uint128(totalAssetsLimit));
+        vm.stopPrank();
+
+        assertEq(vault.remainingStakeTotalAssetsLimit(), totalAssetsLimit);
+        assertTrue(vault.canRequestStake(SMALL_DEPOSIT));
+        assertFalse(vault.canRequestStake(SMALL_DEPOSIT + 1));
+
+        vm.prank(users.alice);
+        kUSD.approve(address(vault), SMALL_DEPOSIT);
+        vm.prank(users.alice);
+        vault.requestStake(users.alice, users.alice, SMALL_DEPOSIT);
+
+        assertEq(vault.remainingStakeTotalAssetsLimit(), 0);
+        assertFalse(vault.canRequestStake(1));
+    }
+
+    function test_requestUnstakeLimitGetters_TrackAssetDenominatedHeadroom() public {
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
+
+        uint256 sharesToUnstake = vault.balanceOf(users.alice) / 2;
+        uint256 requestedAssets = vault.convertToAssets(sharesToUnstake);
+
+        vm.prank(users.admin);
+        registry.setBatchLimits(address(vault), type(uint128).max, requestedAssets);
+
+        assertEq(vault.requestedUnstakeAssetsInCurrentBatch(), 0);
+        assertEq(vault.remainingUnstakeBatchLimit(), requestedAssets);
+        assertTrue(vault.canRequestUnstake(sharesToUnstake));
+        assertFalse(vault.canRequestUnstake(sharesToUnstake + 1));
+
+        vm.prank(users.alice);
+        vault.requestUnstake(users.alice, users.alice, sharesToUnstake);
+
+        assertEq(vault.requestedUnstakeAssetsInCurrentBatch(), requestedAssets);
+        assertEq(vault.remainingUnstakeBatchLimit(), 0);
+        assertFalse(vault.canRequestUnstake(1));
+    }
+
     /* //////////////////////////////////////////////////////////////
                         CONTRACT METADATA TESTS
     //////////////////////////////////////////////////////////////*/
@@ -434,9 +585,12 @@ contract kStakingVaultReaderTest is BaseVaultTest {
                         INTEGRATION TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_allReaderFunctions_WorkThroughVaultProxy() public view {
+    function test_allReaderFunctions_WorkThroughVaultProxy() public {
         // This test verifies that all reader functions work when called through the vault
-        // (i.e., the module is properly registered)
+        // (i.e., the module is properly registered), including settled-batch readers.
+
+        bytes32 settledBatchId = vault.getBatchId();
+        _performStakeAndSettle(users.alice, INITIAL_DEPOSIT, 0);
 
         // General info
         vault.registry();
@@ -465,12 +619,21 @@ contract kStakingVaultReaderTest is BaseVaultTest {
         vault.convertToAssets(1000);
         vault.convertToSharesWithTotals(1000, 10_000, 10_000);
         vault.convertToAssetsWithTotals(1000, 10_000, 10_000);
+        vault.getBatchSharePrice(settledBatchId);
+        vault.convertToSharesInBatch(settledBatchId, 1000);
+        vault.convertToAssetsInBatch(settledBatchId, 1000);
 
         // Request getters
         vault.getUserRequests(users.alice);
 
         // Config
         vault.maxTotalAssets();
+        vault.remainingStakeBatchLimit();
+        vault.remainingStakeTotalAssetsLimit();
+        vault.canRequestStake(1000);
+        vault.requestedUnstakeAssetsInCurrentBatch();
+        vault.remainingUnstakeBatchLimit();
+        vault.canRequestUnstake(1000);
 
         // Metadata
         vault.contractName();
@@ -494,6 +657,12 @@ contract kStakingVaultReaderTest is BaseVaultTest {
             v.getBatchId();
             v.sharePrice();
             v.totalAssets();
+            v.remainingStakeBatchLimit();
+            v.remainingStakeTotalAssetsLimit();
+            v.canRequestStake(1000);
+            v.requestedUnstakeAssetsInCurrentBatch();
+            v.remainingUnstakeBatchLimit();
+            v.canRequestUnstake(1000);
             v.contractName();
             v.contractVersion();
         }

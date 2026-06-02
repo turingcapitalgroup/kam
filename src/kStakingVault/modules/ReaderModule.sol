@@ -4,7 +4,11 @@ pragma solidity 0.8.34;
 import { OptimizedBytes32EnumerableSetLib } from "solady/utils/EnumerableSetLib/OptimizedBytes32EnumerableSetLib.sol";
 import { Extsload } from "uniswap/Extsload.sol";
 
-import { KSTAKINGVAULT_VAULT_CLOSED, KSTAKINGVAULT_VAULT_SETTLED } from "kam/src/errors/Errors.sol";
+import {
+    KSTAKINGVAULT_VAULT_CLOSED,
+    KSTAKINGVAULT_VAULT_SETTLED,
+    VAULTCLAIMS_BATCH_NOT_SETTLED
+} from "kam/src/errors/Errors.sol";
 import { IModule } from "kam/src/interfaces/modules/IModule.sol";
 import { IVaultReader } from "kam/src/interfaces/modules/IVaultReader.sol";
 import { BaseVault } from "kam/src/kStakingVault/base/BaseVault.sol";
@@ -130,6 +134,43 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         returns (uint256)
     {
         return _convertToAssetsWithTotals(_shares, _totalAssetsVal, _totalSupplyVal);
+    }
+
+    /// @inheritdoc IVaultReader
+    /// @dev Uses the stored settlement snapshot for the batch. Rounds down in favor of the vault.
+    function getBatchSharePrice(bytes32 _batchId) external view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        BaseVaultTypes.BatchInfo storage batch = _getSettledBatch($, _batchId);
+
+        return _convertToAssetsWithTotals(10 ** _getDecimals($), batch.totalAssets, batch.totalSupply);
+    }
+
+    /// @inheritdoc IVaultReader
+    /// @dev Uses the stored settlement snapshot for the batch. Rounds down in favor of the vault.
+    function convertToSharesInBatch(bytes32 _batchId, uint256 _assets) external view returns (uint256) {
+        BaseVaultTypes.BatchInfo storage batch = _getSettledBatch(_getBaseVaultStorage(), _batchId);
+
+        return _convertToSharesWithTotals(_assets, batch.totalAssets, batch.totalSupply);
+    }
+
+    /// @inheritdoc IVaultReader
+    /// @dev Uses the stored settlement snapshot for the batch. Rounds down in favor of the vault.
+    function convertToAssetsInBatch(bytes32 _batchId, uint256 _shares) external view returns (uint256) {
+        BaseVaultTypes.BatchInfo storage batch = _getSettledBatch(_getBaseVaultStorage(), _batchId);
+
+        return _convertToAssetsWithTotals(_shares, batch.totalAssets, batch.totalSupply);
+    }
+
+    function _getSettledBatch(
+        BaseVaultStorage storage $,
+        bytes32 _batchId
+    )
+        internal
+        view
+        returns (BaseVaultTypes.BatchInfo storage batch)
+    {
+        batch = $.batches[_batchId];
+        require(batch.isSettled, VAULTCLAIMS_BATCH_NOT_SETTLED);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -264,12 +305,77 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
     }
 
     /* //////////////////////////////////////////////////////////////
+                        REQUEST LIMIT GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IVaultReader
+    function remainingStakeBatchLimit() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = $.currentBatchId;
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) return 0;
+
+        uint256 _limit = _registry().getMaxMintPerBatch(address(this));
+        uint256 _depositedInBatch = $.batches[_batchId].depositedInBatch;
+        if (_depositedInBatch >= _limit) return 0;
+
+        return _limit - _depositedInBatch;
+    }
+
+    /// @inheritdoc IVaultReader
+    function remainingStakeTotalAssetsLimit() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        uint256 _usedCapacity = $.totalBalance + $.totalPendingStake;
+        if (_usedCapacity >= $.maxTotalAssets) return 0;
+
+        return $.maxTotalAssets - _usedCapacity;
+    }
+
+    /// @inheritdoc IVaultReader
+    function canRequestStake(uint256 _amount) external view returns (bool) {
+        return _amount <= remainingStakeBatchLimit() && _amount <= remainingStakeTotalAssetsLimit();
+    }
+
+    /// @inheritdoc IVaultReader
+    function requestedUnstakeAssetsInCurrentBatch() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = $.currentBatchId;
+        if (_batchId == bytes32(0)) return 0;
+
+        return _convertToAssetsWithTotals($.batches[_batchId].requestedSharesInBatch, _totalAssets(), totalSupply());
+    }
+
+    /// @inheritdoc IVaultReader
+    function remainingUnstakeBatchLimit() public view returns (uint256) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = $.currentBatchId;
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) return 0;
+
+        uint256 _limit = _registry().getMaxBurnPerBatch(address(this));
+        uint256 _requestedAssets = requestedUnstakeAssetsInCurrentBatch();
+        if (_requestedAssets >= _limit) return 0;
+
+        return _limit - _requestedAssets;
+    }
+
+    /// @inheritdoc IVaultReader
+    function canRequestUnstake(uint256 _stkTokenAmount) external view returns (bool) {
+        BaseVaultStorage storage $ = _getBaseVaultStorage();
+        bytes32 _batchId = $.currentBatchId;
+        if (_batchId == bytes32(0) || $.batches[_batchId].isClosed) return false;
+
+        uint256 _requestedAssets = _convertToAssetsWithTotals(
+            $.batches[_batchId].requestedSharesInBatch + _stkTokenAmount, _totalAssets(), totalSupply()
+        );
+        return _requestedAssets <= _registry().getMaxBurnPerBatch(address(this));
+    }
+
+    /* //////////////////////////////////////////////////////////////
                         MODULE INFO
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IModule
     function selectors() external pure returns (bytes4[] memory) {
-        bytes4[] memory moduleSelectors = new bytes4[](20);
+        bytes4[] memory moduleSelectors = new bytes4[](29);
         moduleSelectors[0] = this.lastFeeTimestamp.selector;
         moduleSelectors[1] = this.hurdleRate.selector;
         moduleSelectors[2] = this.isHardHurdleRate.selector;
@@ -290,6 +396,15 @@ contract ReaderModule is BaseVault, Extsload, IModule, IVaultReader {
         moduleSelectors[17] = this.getCurrentBatchInfo.selector;
         moduleSelectors[18] = this.getBatchIdInfo.selector;
         moduleSelectors[19] = this.quoteBatchSettlement.selector;
+        moduleSelectors[20] = this.getBatchSharePrice.selector;
+        moduleSelectors[21] = this.convertToSharesInBatch.selector;
+        moduleSelectors[22] = this.convertToAssetsInBatch.selector;
+        moduleSelectors[23] = this.remainingStakeBatchLimit.selector;
+        moduleSelectors[24] = this.remainingStakeTotalAssetsLimit.selector;
+        moduleSelectors[25] = this.canRequestStake.selector;
+        moduleSelectors[26] = this.requestedUnstakeAssetsInCurrentBatch.selector;
+        moduleSelectors[27] = this.remainingUnstakeBatchLimit.selector;
+        moduleSelectors[28] = this.canRequestUnstake.selector;
         return moduleSelectors;
     }
 }
