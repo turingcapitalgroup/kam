@@ -6,7 +6,14 @@ import { Script, console } from "forge-std/Script.sol";
 import { TimelockController } from "kam/src/vendor/openzeppelin/governance/TimelockController.sol";
 import { Ownable } from "solady/auth/Ownable.sol";
 
+import { IRegistry } from "kam/src/interfaces/IRegistry.sol";
+
 import { DeploymentManager } from "../utils/DeploymentManager.sol";
+
+interface IOwnableRoles {
+    function grantRoles(address user, uint256 roles) external payable;
+    function revokeRoles(address user, uint256 roles) external payable;
+}
 
 /// @title 13_DeployTimelock
 /// @notice Phase 6 final deployment step: deploy the Admin Timelock with a 3-day delay,
@@ -35,6 +42,7 @@ import { DeploymentManager } from "../utils/DeploymentManager.sol";
 contract DeployTimelockScript is Script, DeploymentManager {
     /// @notice Minimum delay enforced by the Admin Timelock for every queued operation.
     uint256 internal constant ADMIN_TIMELOCK_DELAY = 3 days;
+    uint256 internal constant ADMIN_AND_VENDOR_ROLES = (1 << 0) | (1 << 5);
 
     struct TimelockTargets {
         address registry;
@@ -96,14 +104,21 @@ contract DeployTimelockScript is Script, DeploymentManager {
         NetworkConfig memory config = readNetworkConfig();
         validateConfig(config);
 
+        // Final governance roles for the timelock handover. These are decoupled from the
+        // deploy-time signer (config.roles.*): the deployer EOA broadcasts and bootstraps the
+        // timelock, but PROPOSER/CANCELLER are the production governance addresses.
+        FinalRoles memory finalRoles = readFinalRoles(config);
+
         logScriptHeader("13_DeployTimelock");
         logRoles(config);
         logBroadcaster(config.roles.owner);
+        console.log("Final admin (proposer/canceller):", finalRoles.admin);
+        console.log("Final guardian (canceller):", finalRoles.guardian);
         logExecutionStart();
 
-        // PROPOSER = ADMIN (Fordefi x-of-y); CANCELLER auto-granted to PROPOSER by the OZ constructor.
+        // PROPOSER = final ADMIN (Fordefi x-of-y); CANCELLER auto-granted to PROPOSER by the OZ constructor.
         address[] memory proposers = new address[](1);
-        proposers[0] = config.roles.admin;
+        proposers[0] = finalRoles.admin;
         require(proposers[0] != address(0), "13_DeployTimelock: admin not configured");
         require(proposers.length > 0, "13_DeployTimelock: must have at least one proposer");
 
@@ -111,7 +126,7 @@ contract DeployTimelockScript is Script, DeploymentManager {
         address[] memory openExecutors = new address[](1);
         openExecutors[0] = address(0);
 
-        require(config.roles.guardian != address(0), "13_DeployTimelock: guardian not configured");
+        require(finalRoles.guardian != address(0), "13_DeployTimelock: guardian not configured");
 
         vm.startBroadcast(config.roles.owner);
 
@@ -127,14 +142,35 @@ contract DeployTimelockScript is Script, DeploymentManager {
         // to every PROPOSER (TimelockController.sol lines 126-127 of v5.6.1). We do not
         // re-grant to ADMIN; the call below is the only explicit canceller grant required.
         bytes32 cancellerRole = timelock.CANCELLER_ROLE();
-        timelock.grantRole(cancellerRole, config.roles.guardian);
-        console.log("Granted CANCELLER_ROLE to guardian:", config.roles.guardian);
+        timelock.grantRole(cancellerRole, finalRoles.guardian);
+        console.log("Granted CANCELLER_ROLE to guardian:", finalRoles.guardian);
 
         // Step 3: deployer renounces DEFAULT_ADMIN_ROLE so the timelock is self-administered.
         // After this point, only the timelock itself can change its own roles, via a 3-day proposal.
         bytes32 defaultAdminRole = timelock.DEFAULT_ADMIN_ROLE();
         timelock.renounceRole(defaultAdminRole, config.roles.owner);
         console.log("Deployer renounced DEFAULT_ADMIN_ROLE on the timelock");
+
+        // Step 3b: when `.finalRoles` is configured, migrate the kRegistry operational roles
+        // (ADMIN_ROLE + VENDOR_ROLE) from the deploy-time signer to the final admin. This MUST
+        // happen while the deployer is still the registry owner; ownership is transferred to the
+        // timelock below. The raw Solady role bitmask uses ROLE_0 = ADMIN and ROLE_5 = VENDOR.
+        if (finalRoles.configured && output.contracts.kRegistry != address(0) && finalRoles.admin != config.roles.owner)
+        {
+            IRegistry registry = IRegistry(output.contracts.kRegistry);
+            IOwnableRoles roleManager = IOwnableRoles(output.contracts.kRegistry);
+
+            roleManager.grantRoles(finalRoles.admin, ADMIN_AND_VENDOR_ROLES);
+            console.log("Granted ADMIN_ROLE + VENDOR_ROLE to final admin:", finalRoles.admin);
+
+            roleManager.revokeRoles(config.roles.owner, ADMIN_AND_VENDOR_ROLES);
+            console.log("Revoked ADMIN_ROLE + VENDOR_ROLE from deployer:", config.roles.owner);
+
+            require(registry.isAdmin(finalRoles.admin), "13_DeployTimelock: final admin missing ADMIN_ROLE");
+            require(registry.isVendor(finalRoles.admin), "13_DeployTimelock: final admin missing VENDOR_ROLE");
+            require(!registry.isAdmin(config.roles.owner), "13_DeployTimelock: deployer ADMIN_ROLE not revoked");
+            require(!registry.isVendor(config.roles.owner), "13_DeployTimelock: deployer VENDOR_ROLE not revoked");
+        }
 
         // Step 4: transfer ownership of every UUPS contract to the timelock.
         // Order is most-critical first so the script aborts early if a transfer fails.
@@ -172,9 +208,9 @@ contract DeployTimelockScript is Script, DeploymentManager {
             !timelock.hasRole(defaultAdminRole, config.roles.owner),
             "13_DeployTimelock: deployer DEFAULT_ADMIN_ROLE not renounced"
         );
-        require(timelock.hasRole(timelock.PROPOSER_ROLE(), config.roles.admin), "13_DeployTimelock: admin not proposer");
-        require(timelock.hasRole(cancellerRole, config.roles.admin), "13_DeployTimelock: admin canceller missing");
-        require(timelock.hasRole(cancellerRole, config.roles.guardian), "13_DeployTimelock: guardian canceller missing");
+        require(timelock.hasRole(timelock.PROPOSER_ROLE(), finalRoles.admin), "13_DeployTimelock: admin not proposer");
+        require(timelock.hasRole(cancellerRole, finalRoles.admin), "13_DeployTimelock: admin canceller missing");
+        require(timelock.hasRole(cancellerRole, finalRoles.guardian), "13_DeployTimelock: guardian canceller missing");
         require(timelock.hasRole(timelock.EXECUTOR_ROLE(), address(0)), "13_DeployTimelock: executor not open");
         require(timelock.getMinDelay() == ADMIN_TIMELOCK_DELAY, "13_DeployTimelock: delay not set");
 
@@ -186,8 +222,8 @@ contract DeployTimelockScript is Script, DeploymentManager {
         console.log("=== TIMELOCK DEPLOYMENT COMPLETE ===");
         console.log("AdminTimelock:", adminTimelock);
         console.log("Delay (seconds):", ADMIN_TIMELOCK_DELAY);
-        console.log("Proposer (admin):", config.roles.admin);
-        console.log("Canceller (guardian, additional):", config.roles.guardian);
+        console.log("Proposer (admin):", finalRoles.admin);
+        console.log("Canceller (guardian, additional):", finalRoles.guardian);
     }
 
     /// @dev Transfer ownership of a UUPS contract to the new owner with verification.

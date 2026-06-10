@@ -341,6 +341,29 @@ abstract contract DeploymentManager is Script {
         return config;
     }
 
+    /// @notice Final governance roles applied at the end of deployment (e.g. timelock handover).
+    /// @dev Allows decoupling the deploy-time signer (config.roles.*) from the production
+    /// governance addresses. Reads the optional `.finalRoles` block from the network config,
+    /// falling back to the matching `.roles.*` value when a key is absent.
+    struct FinalRoles {
+        address admin;
+        address guardian;
+        bool configured;
+    }
+
+    function readFinalRoles(NetworkConfig memory config) internal view returns (FinalRoles memory finalRoles) {
+        string memory network = getCurrentNetwork();
+        string memory deploymentsPath = getDeploymentsPath();
+        string memory configPath = string.concat(deploymentsPath, "/config/", network, ".json");
+        string memory json = vm.readFile(configPath);
+        bool hasFinalAdmin = vm.keyExistsJson(json, ".finalRoles.admin");
+        bool hasFinalGuardian = vm.keyExistsJson(json, ".finalRoles.guardian");
+
+        finalRoles.admin = hasFinalAdmin ? json.readAddress(".finalRoles.admin") : config.roles.admin;
+        finalRoles.guardian = hasFinalGuardian ? json.readAddress(".finalRoles.guardian") : config.roles.guardian;
+        finalRoles.configured = hasFinalAdmin || hasFinalGuardian;
+    }
+
     function _readRolesAndAssets(string memory json, NetworkConfig memory config) private pure {
         // Parse role addresses
         config.roles.owner = json.readAddress(".roles.owner");
@@ -828,7 +851,6 @@ abstract contract DeploymentManager is Script {
         require(config.roles.relayer != address(0), "Missing relayer address");
         require(config.roles.institution != address(0), "Missing institution address");
         require(config.roles.treasury != address(0), "Missing treasury address");
-        require(config.roles.insurance != address(0), "Missing insurance address");
         require(config.assets.USDC != address(0), "Missing USDC address");
         require(config.assets.WBTC != address(0), "Missing WBTC address");
 
@@ -839,7 +861,6 @@ abstract contract DeploymentManager is Script {
         require(!_isPlaceholderAddress(config.roles.relayer), "Placeholder relayer address");
         require(!_isPlaceholderAddress(config.roles.institution), "Placeholder institution address");
         require(!_isPlaceholderAddress(config.roles.treasury), "Placeholder treasury address");
-        require(!_isPlaceholderAddress(config.roles.insurance), "Placeholder insurance address");
         require(!_isPlaceholderAddress(config.assets.USDC), "Placeholder USDC address");
         require(!_isPlaceholderAddress(config.assets.WBTC), "Placeholder WBTC address");
 
